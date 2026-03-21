@@ -1,0 +1,87 @@
+using System.Text;
+using Claudio.Api.Auth;
+using Claudio.Api.Configuration;
+using Claudio.Api.Data;
+using Claudio.Api.Endpoints;
+using Claudio.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+
+var configPath = Environment.GetEnvironmentVariable("CLAUDIO_CONFIG_PATH")
+    ?? "/config/config.toml";
+
+var config = ConfigLoader.Load(configPath);
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Database
+if (config.Database.Provider == "postgres" && config.Database.PostgresConnection is not null)
+{
+    builder.Services.AddDbContext<AppDbContext>(opt =>
+        opt.UseNpgsql(config.Database.PostgresConnection));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(opt =>
+        opt.UseSqlite($"Data Source={config.Database.SqlitePath}"));
+}
+
+// Auth
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opt =>
+    {
+        opt.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(config.Auth.JwtSecret))
+        };
+    });
+builder.Services.AddAuthorization();
+
+// JSON serialization
+builder.Services.ConfigureHttpJsonOptions(opt =>
+{
+    opt.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase));
+});
+
+// Services
+builder.Services.AddSingleton(config);
+builder.Services.AddSingleton<TokenService>();
+builder.Services.AddTransient<DownloadService>();
+builder.Services.AddSingleton<DownloadTicketService>();
+builder.Services.AddSingleton<LibraryScanService>();
+builder.Services.AddHostedService<LibraryScanBackgroundService>();
+builder.Services.AddSingleton<IgdbService>();
+builder.Services.AddHttpClient();
+
+var app = builder.Build();
+
+// Auto-migrate database
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
+// Scan library on startup
+var scanService = app.Services.GetRequiredService<LibraryScanService>();
+await scanService.ScanAsync();
+
+app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Minimal API endpoints
+app.MapAuthEndpoints();
+app.MapGameEndpoints();
+app.MapAdminEndpoints();
+
+// SPA fallback — serve index.html for non-API, non-file routes
+app.MapFallbackToFile("index.html");
+
+app.Run();

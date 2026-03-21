@@ -1,0 +1,38 @@
+const platformNames: Record<string, string> = {
+  pc: 'PC',
+  mac: 'Mac',
+  linux: 'Linux',
+  switch2: 'Switch 2',
+  switch: 'Switch',
+  '3ds': '3DS',
+  wiiu: 'Wii U',
+  wii: 'Wii',
+  gamecube: 'GameCube',
+  gba: 'GBA',
+  gbc: 'GBC',
+  gb: 'GB',
+  n64: 'N64',
+  snes: 'SNES',
+  nes: 'NES',
+  ds: 'DS',
+  ps5: 'PS5',
+  ps4: 'PS4',
+  ps3: 'PS3',
+  ps2: 'PS2',
+  ps1: 'PS1',
+  psp: 'PSP',
+  vita: 'Vita',
+  xboxseries: 'Xbox Series X|S',
+  xboxone: 'Xbox One',
+  xbox360: 'Xbox 360',
+  xbox: 'Xbox',
+  android: 'Android',
+  ios: 'iOS',
+  genesis: 'Genesis',
+  saturn: 'Saturn',
+  dreamcast: 'Dreamcast',
+}
+
+export function formatPlatform(platform: string): string {
+  return platformNames[platform.toLowerCase()] ?? platform
+}

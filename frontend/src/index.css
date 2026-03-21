@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #00d9b8;
+  --color-accent-hover: #00c4a6;
+  --color-accent-dim: oklch(from #00d9b8 l c h / 0.15);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-border: var(--border-color);
+  --color-border-subtle: var(--border-subtle);
+  --color-bg: var(--bg);
+  --color-bg-blur: var(--bg-blur);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted-color);
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Barlow Condensed", system-ui, sans-serif;
+}
+
+/* Dark theme tokens (default) */
+:root {
+  --bg: #0a0a0f;
+  --bg-blur: rgba(10, 10, 15, 0.8);
+  --surface: #111118;
+  --surface-raised: #1a1a24;
+  --surface-overlay: #22222e;
+  --border-color: #2a2a36;
+  --border-subtle: #1e1e28;
+  --text-primary: #e5e5e5;
+  --text-secondary: #a0a0b0;
+  --text-muted-color: #6b6b7b;
+}
+
+/* Light theme tokens */
+.light {
+  --bg: #f8f8fa;
+  --bg-blur: rgba(248, 248, 250, 0.85);
+  --surface: #ffffff;
+  --surface-raised: #f0f0f3;
+  --surface-overlay: #e8e8ec;
+  --border-color: #d8d8df;
+  --border-subtle: #e8e8ec;
+  --text-primary: #1a1a2e;
+  --text-secondary: #555566;
+  --text-muted-color: #888899;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  button {
+    cursor: pointer;
+  }
+}
+
+/* Grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}

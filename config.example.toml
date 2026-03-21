@@ -1,0 +1,18 @@
+[server]
+port = 8080
+
+[database]
+provider = "sqlite"             # "sqlite" or "postgres"
+sqlite_path = "/config/claudio.db"
+# postgres_connection = "Host=localhost;Database=claudio;Username=claudio;Password=secret"
+
+[auth]
+jwt_secret = "CHANGE-ME-TO-A-RANDOM-SECRET"
+token_expiry_hours = 168        # 7 days
+
+[igdb]
+client_id = ""
+client_secret = ""
+
+[library]
+library_paths = ["/games"]
