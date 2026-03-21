@@ -1,16 +1,16 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: '../src/Claudio.Api/wwwroot',
+    outDir: "../src/Claudio.Api/wwwroot",
     emptyOutDir: true,
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:5118',
+      "/api": "http://localhost:8080",
     },
   },
-})
+});

@@ -6,6 +6,7 @@ public class ClaudioConfig
     public DatabaseConfig Database { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
     public IgdbConfig Igdb { get; set; } = new();
+    public SteamGridDbConfig Steamgriddb { get; set; } = new();
     public LibraryConfig Library { get; set; } = new();
 }
 
@@ -31,6 +32,11 @@ public class IgdbConfig
 {
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecret { get; set; } = string.Empty;
+}
+
+public class SteamGridDbConfig
+{
+    public string ApiKey { get; set; } = string.Empty;
 }
 
 public class LibraryConfig

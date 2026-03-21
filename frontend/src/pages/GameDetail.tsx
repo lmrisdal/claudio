@@ -1,4 +1,7 @@
 import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
   Listbox,
   ListboxButton,
   ListboxOption,
@@ -12,23 +15,19 @@ import { useAuth } from "../hooks/useAuth";
 import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 
-function DownloadButton({
-  gameId,
-  size,
-}: {
-  gameId: number;
-  size: number;
-}) {
+function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   const [preparing, setPreparing] = useState(false);
 
   async function handleDownload() {
     setPreparing(true);
     try {
-      const { ticket } = await api.post<{ ticket: string }>(`/games/${gameId}/download-ticket`);
+      const { ticket } = await api.post<{ ticket: string }>(
+        `/games/${gameId}/download-ticket`,
+      );
       const url = `/api/games/${gameId}/download?ticket=${encodeURIComponent(ticket)}`;
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = '';
+      a.download = "";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -47,8 +46,19 @@ function DownloadButton({
       {preparing ? (
         <>
           <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
           Preparing...
         </>
@@ -120,7 +130,10 @@ function ExeListbox({
               />
             </svg>
           </ListboxButton>
-          <ListboxOptions anchor="bottom start" className="z-20 w-[var(--button-width)] max-h-48 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm focus:outline-none">
+          <ListboxOptions
+            anchor="bottom start"
+            className="z-20 w-[var(--button-width)] max-h-48 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm focus:outline-none"
+          >
             <ListboxOption
               value=""
               className="px-3 py-2 cursor-pointer data-[focus]:bg-surface-raised data-[selected]:text-accent transition-colors"
@@ -190,6 +203,10 @@ export default function GameDetail() {
   }, [browsePath]);
 
   const [editing, setEditing] = useState(false);
+  const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+  const [coverSearching, setCoverSearching] = useState(false);
+  const [coverResults, setCoverResults] = useState<string[] | null>(null);
+  const [coverQuery, setCoverQuery] = useState("");
   const [editForm, setEditForm] = useState({
     title: "",
     summary: "",
@@ -247,6 +264,25 @@ export default function GameDetail() {
       setSearchError(err instanceof Error ? err.message : "Search failed");
     } finally {
       setSearching(false);
+    }
+  }
+
+  async function openCoverSearch(g: Game) {
+    const q = g.title;
+    setCoverQuery(q);
+    setCoverResults(null);
+    setCoverDialogOpen(true);
+    setCoverSearching(true);
+    try {
+      const qs = q.trim() ? `?query=${encodeURIComponent(q.trim())}` : "";
+      const urls = await api.post<string[]>(
+        `/admin/games/${g.id}/covers/search${qs}`,
+      );
+      setCoverResults(urls);
+    } catch {
+      setCoverResults([]);
+    } finally {
+      setCoverSearching(false);
     }
   }
 
@@ -339,7 +375,7 @@ export default function GameDetail() {
     return (
       <main className="max-w-5xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row gap-10 animate-pulse">
-          <div className="w-72 shrink-0 aspect-[3/4] bg-surface-raised rounded-xl" />
+          <div className="w-72 shrink-0 aspect-[2/3] bg-surface-raised rounded-xl" />
           <div className="flex-1 space-y-4 pt-2">
             <div className="h-8 bg-surface-raised rounded w-2/3" />
             <div className="h-4 bg-surface-raised rounded w-1/3" />
@@ -390,7 +426,12 @@ export default function GameDetail() {
       <div className="flex flex-col md:flex-row gap-10">
         {/* Cover */}
         <div className="w-72 shrink-0">
-          <div className="aspect-[3/4] bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border">
+          <div
+            className={`aspect-[2/3] bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
+            onClick={
+              user?.role === "admin" ? () => openCoverSearch(game) : undefined
+            }
+          >
             {game.coverUrl ? (
               <img
                 src={game.coverUrl}
@@ -565,9 +606,18 @@ export default function GameDetail() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Cover URL
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                    Cover URL
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => openCoverSearch(game)}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    Search SteamGridDB
+                  </button>
+                </div>
                 <input
                   type="url"
                   value={editForm.coverUrl}
@@ -717,14 +767,37 @@ export default function GameDetail() {
                         : "bg-accent-dim ring-accent/20 text-accent"
                     }`}
                   >
-                    {game.installType === "installer" ? "Installer" : "Portable"}
+                    {game.installType === "installer"
+                      ? "Installer"
+                      : "Portable"}
                   </span>
                 )}
               </div>
 
-              <p className="text-xs text-text-muted font-mono mb-8 -mt-4">
-                /{game.platform}/{game.folderName}
-              </p>
+              <div className="mb-8 -mt-4">
+                <p className="text-xs text-text-muted font-mono">
+                  /{game.platform}/{game.folderName}
+                </p>
+                <button
+                  onClick={() => setBrowsePath("")}
+                  className="inline-flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent transition"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                    />
+                  </svg>
+                  Browse files
+                </button>
+              </div>
 
               {/* Summary */}
               {game.summary && (
@@ -861,25 +934,6 @@ export default function GameDetail() {
                     )}
                   </button>
                 )}
-                <button
-                  onClick={() => setBrowsePath("")}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium bg-surface-raised ring-1 ring-border text-text-secondary hover:text-text-primary hover:ring-accent/30 transition"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                    />
-                  </svg>
-                  Browse Files
-                </button>
               </div>
             </>
           )}
@@ -942,7 +996,11 @@ export default function GameDetail() {
                                   key={segPath}
                                   className="flex items-center gap-1"
                                 >
-                                  {i > 0 && <span className="text-text-muted/50">/</span>}
+                                  {i > 0 && (
+                                    <span className="text-text-muted/50">
+                                      /
+                                    </span>
+                                  )}
                                   <button
                                     onClick={() => setBrowsePath(segPath)}
                                     className={`hover:text-text-primary transition ${isLast ? "text-text-primary font-medium" : ""}`}
@@ -1066,6 +1124,126 @@ export default function GameDetail() {
                 </div>
               );
             })()}
+
+          {/* SteamGridDB cover picker */}
+          <Dialog
+            open={coverDialogOpen}
+            onClose={() => setCoverDialogOpen(false)}
+            className="relative z-50"
+          >
+            <DialogBackdrop className="fixed inset-0 bg-black/60" />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <DialogPanel className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-text-primary font-medium">
+                    SteamGridDB Covers
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setCoverDialogOpen(false)}
+                    className="text-text-muted hover:text-text-primary transition p-1"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <form
+                  className="flex gap-2 mb-4"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setCoverResults(null);
+                    setCoverSearching(true);
+                    try {
+                      const q = coverQuery.trim()
+                        ? `?query=${encodeURIComponent(coverQuery.trim())}`
+                        : "";
+                      const urls = await api.post<string[]>(
+                        `/admin/games/${game.id}/covers/search${q}`,
+                      );
+                      setCoverResults(urls);
+                    } catch {
+                      setCoverResults([]);
+                    } finally {
+                      setCoverSearching(false);
+                    }
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={coverQuery}
+                    onChange={(e) => setCoverQuery(e.target.value)}
+                    placeholder="Search query..."
+                    className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 transition"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={coverSearching || !coverQuery.trim()}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
+                  >
+                    {coverSearching ? "Searching..." : "Search"}
+                  </button>
+                </form>
+                {coverResults !== null && coverResults.length === 0 ? (
+                  <p className="text-sm text-text-muted">No covers found.</p>
+                ) : coverResults !== null ? (
+                  <div className="grid grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
+                    {coverResults.map((url) => (
+                      <button
+                        key={url}
+                        type="button"
+                        onClick={() => {
+                          if (editing) {
+                            setEditForm({ ...editForm, coverUrl: url });
+                          } else {
+                            updateMutation.mutate({
+                              title: game.title,
+                              summary: game.summary ?? null,
+                              genre: game.genre ?? null,
+                              releaseYear: game.releaseYear ?? null,
+                              coverUrl: url,
+                              installType: game.installType,
+                              installerExe: game.installerExe ?? null,
+                              gameExe: game.gameExe ?? null,
+                              developer: game.developer ?? null,
+                              publisher: game.publisher ?? null,
+                              gameMode: game.gameMode ?? null,
+                              series: game.series ?? null,
+                              franchise: game.franchise ?? null,
+                              gameEngine: game.gameEngine ?? null,
+                            });
+                          }
+                          setCoverDialogOpen(false);
+                        }}
+                        className={`aspect-[2/3] rounded-lg ring-2 transition hover:ring-accent ${
+                          (editing ? editForm.coverUrl : game.coverUrl) === url
+                            ? "ring-accent"
+                            : "ring-transparent"
+                        }`}
+                      >
+                        <img
+                          src={url}
+                          alt=""
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </DialogPanel>
+            </div>
+          </Dialog>
 
           {/* IGDB candidate picker */}
           {candidates && (

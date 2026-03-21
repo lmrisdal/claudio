@@ -14,5 +14,8 @@ token_expiry_hours = 168        # 7 days
 client_id = ""
 client_secret = ""
 
+[steamgriddb]
+api_key = ""
+
 [library]
 library_paths = ["/games"]

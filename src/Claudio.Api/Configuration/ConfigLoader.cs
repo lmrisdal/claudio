@@ -42,6 +42,9 @@ public static class ConfigLoader
         if (Environment.GetEnvironmentVariable("CLAUDIO_DB_POSTGRES") is { Length: > 0 } pgConn)
             config.Database.PostgresConnection = pgConn;
 
+        if (Environment.GetEnvironmentVariable("CLAUDIO_STEAMGRIDDB_API_KEY") is { Length: > 0 } sgdbKey)
+            config.Steamgriddb.ApiKey = sgdbKey;
+
         // Auto-generate JWT secret if not configured
         if (string.IsNullOrEmpty(config.Auth.JwtSecret))
             config.Auth.JwtSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));

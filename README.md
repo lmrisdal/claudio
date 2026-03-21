@@ -58,6 +58,7 @@ volumes:
 | `CLAUDIO_LIBRARY_PATHS` | Comma-separated game library paths | `/games` |
 | `CLAUDIO_IGDB_CLIENT_ID` | IGDB/Twitch client ID | |
 | `CLAUDIO_IGDB_CLIENT_SECRET` | IGDB/Twitch client secret | |
+| `CLAUDIO_STEAMGRIDDB_API_KEY` | SteamGridDB API key (for cover art search) | |
 | `CLAUDIO_JWT_SECRET` | JWT signing key (auto-generated if unset) | |
 | `CLAUDIO_DB_PROVIDER` | `sqlite` or `postgres` | `sqlite` |
 | `CLAUDIO_DB_SQLITE_PATH` | SQLite database file path | `/config/claudio.db` |

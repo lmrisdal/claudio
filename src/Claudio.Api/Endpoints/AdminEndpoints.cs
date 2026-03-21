@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
 using Claudio.Shared.Enums;
@@ -26,6 +29,7 @@ public static class AdminEndpoints
         group.MapPost("/igdb/search", SearchIgdbFreeText);
         group.MapPost("/games/{id:int}/igdb/apply", ApplyGameIgdb);
         group.MapDelete("/games/{id:int}", DeleteGame);
+        group.MapPost("/games/{id:int}/covers/search", SearchCovers);
 
         return group;
     }
@@ -197,6 +201,65 @@ public static class AdminEndpoints
         db.Games.Remove(game);
         await db.SaveChangesAsync();
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> SearchCovers(
+        int id, [FromQuery] string? query, AppDbContext db, ClaudioConfig config, IHttpClientFactory httpClientFactory)
+    {
+        if (string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
+            return Results.BadRequest("SteamGridDB API key not configured.");
+
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        var searchTerm = string.IsNullOrWhiteSpace(query) ? game.Title : query;
+
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
+
+        // Search for game on SteamGridDB
+        var searchRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(searchTerm)}");
+        if (!searchRes.IsSuccessStatusCode)
+            return Results.Problem("SteamGridDB search failed.", statusCode: 502);
+
+        var searchJson = await searchRes.Content.ReadAsStringAsync();
+        var searchResult = JsonSerializer.Deserialize<SteamGridDbResponse<List<SteamGridDbGame>>>(searchJson);
+        if (searchResult?.Data is not { Count: > 0 })
+            return Results.Ok(Array.Empty<string>());
+
+        var sgdbGameId = searchResult.Data[0].Id;
+
+        // Get 600x900 cover grids
+        var gridsRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/grids/game/{sgdbGameId}?dimensions=600x900");
+        if (!gridsRes.IsSuccessStatusCode)
+            return Results.Ok(Array.Empty<string>());
+
+        var gridsJson = await gridsRes.Content.ReadAsStringAsync();
+        var gridsResult = JsonSerializer.Deserialize<SteamGridDbResponse<List<SteamGridDbGrid>>>(gridsJson);
+
+        var urls = gridsResult?.Data?.Select(g => g.Url).Where(u => u is not null).ToList() ?? [];
+        return Results.Ok(urls);
+    }
+
+    private class SteamGridDbResponse<T>
+    {
+        [JsonPropertyName("data")]
+        public T? Data { get; set; }
+    }
+
+    private class SteamGridDbGame
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+    }
+
+    private class SteamGridDbGrid
+    {
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
     }
 
     public record RoleUpdateRequest(string Role);

@@ -27,7 +27,7 @@
   --surface-raised: #1a1a24;
   --surface-overlay: #22222e;
   --border-color: #2a2a36;
-  --border-subtle: #1e1e28;
+  --border-subtle: rgba(255, 255, 255, 0.018);
   --text-primary: #e5e5e5;
   --text-secondary: #a0a0b0;
   --text-muted-color: #6b6b7b;
@@ -41,7 +41,7 @@
   --surface-raised: #f0f0f3;
   --surface-overlay: #e8e8ec;
   --border-color: #d8d8df;
-  --border-subtle: #e8e8ec;
+  --border-subtle: rgba(0, 0, 0, 0.04);
   --text-primary: #1a1a2e;
   --text-secondary: #555566;
   --text-muted-color: #888899;
@@ -64,7 +64,7 @@ body {
   background-image:
     linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
     linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background-size: 28px 28px;
 }
 
 /* Scrollbar */
