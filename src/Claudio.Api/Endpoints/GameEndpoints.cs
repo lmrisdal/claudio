@@ -134,8 +134,8 @@ public static class GameEndpoints
     public record BrowseEntry(string Name, bool IsDirectory, long? Size);
     public record BrowseResult(string Path, bool InsideArchive, List<BrowseEntry> Entries);
 
-    private static readonly HashSet<string> HiddenNames = new(StringComparer.OrdinalIgnoreCase)
-        { "__MACOSX", ".DS_Store" };
+    internal static readonly HashSet<string> HiddenNames = new(StringComparer.OrdinalIgnoreCase)
+        { "__MACOSX", ".DS_Store", "@eaDir", "#recycle", "Thumbs.db" };
 
     private static readonly string[] ArchiveExtensions = [".zip", ".tar", ".tar.gz", ".tgz"];
 

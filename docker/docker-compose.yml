@@ -1,12 +1,15 @@
 services:
   claudio:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/lmrisdal/claudio:latest
     ports:
       - "8080:8080"
     volumes:
-      - ./config:/config
+      - claudio-data:/config
       - /path/to/games:/games:ro
-    environment:
-      - ASPNETCORE_URLS=http://+:8080
+    # environment:
+    #   - CLAUDIO_IGDB_CLIENT_ID=
+    #   - CLAUDIO_IGDB_CLIENT_SECRET=
+    #   - CLAUDIO_PORT=8080
+
+volumes:
+  claudio-data:

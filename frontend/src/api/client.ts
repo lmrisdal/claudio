@@ -11,9 +11,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
 
   if (res.status === 401) {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
+    const isAuthEndpoint = path.startsWith('/auth/');
+    if (!isAuthEndpoint) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    const body = await res.text();
+    throw new Error(body || 'Unauthorized');
   }
 
   if (!res.ok) {

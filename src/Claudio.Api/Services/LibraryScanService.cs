@@ -28,10 +28,14 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
             foreach (var platformDir in Directory.GetDirectories(scanPath))
             {
                 var platform = Path.GetFileName(platformDir);
+                if (Endpoints.GameEndpoints.HiddenNames.Contains(platform))
+                    continue;
 
                 foreach (var gameDir in Directory.GetDirectories(platformDir))
                 {
                     var folderName = Path.GetFileName(gameDir);
+                    if (Endpoints.GameEndpoints.HiddenNames.Contains(folderName))
+                        continue;
                     foundPaths.Add($"{platform}/{folderName}");
 
                     var existing = await db.Games

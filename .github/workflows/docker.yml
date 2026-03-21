@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths:
+      - "src/**"
+      - "frontend/**"
+      - "docker/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "Claudio.slnx"
 
 env:
   REGISTRY: ghcr.io

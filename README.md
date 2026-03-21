@@ -35,17 +35,16 @@ Open http://localhost:8080 and register your first user (automatically gets admi
 ```yaml
 services:
   claudio:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/lmrisdal/claudio:latest
     ports:
-      - "8080:8080"
+      - "8080:8080"  # host:container
     volumes:
-      - /path/to/games:/games:ro
       - claudio-data:/config
+      - /path/to/games:/games:ro
     environment:
       - CLAUDIO_IGDB_CLIENT_ID=your_client_id
       - CLAUDIO_IGDB_CLIENT_SECRET=your_client_secret
+      # - CLAUDIO_PORT=8080
 
 volumes:
   claudio-data:
@@ -55,6 +54,7 @@ volumes:
 
 | Variable | Description | Default |
 |---|---|---|
+| `CLAUDIO_PORT` | HTTP port | `8080` |
 | `CLAUDIO_LIBRARY_PATHS` | Comma-separated game library paths | `/games` |
 | `CLAUDIO_IGDB_CLIENT_ID` | IGDB/Twitch client ID | |
 | `CLAUDIO_IGDB_CLIENT_SECRET` | IGDB/Twitch client secret | |

@@ -13,7 +13,9 @@ var configPath = Environment.GetEnvironmentVariable("CLAUDIO_CONFIG_PATH")
 
 var config = ConfigLoader.Load(configPath);
 
+var port = Environment.GetEnvironmentVariable("CLAUDIO_PORT") ?? config.Server.Port.ToString();
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls($"http://+:{port}");
 
 // Database
 if (config.Database.Provider == "postgres" && config.Database.PostgresConnection is not null)
@@ -68,9 +70,12 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-// Scan library on startup
-var scanService = app.Services.GetRequiredService<LibraryScanService>();
-await scanService.ScanAsync();
+// Scan library on startup (non-blocking)
+_ = Task.Run(async () =>
+{
+    var scanService = app.Services.GetRequiredService<LibraryScanService>();
+    await scanService.ScanAsync();
+});
 
 app.UseStaticFiles();
 app.UseAuthentication();
