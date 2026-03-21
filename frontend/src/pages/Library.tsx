@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { Game } from '../types/models'
 import GameCard from '../components/GameCard'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatPlatform } from '../utils/platforms'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react'
 
@@ -15,6 +15,94 @@ export default function Library() {
     queryFn: () => api.get<Game[]>('/games'),
   })
 
+  const gridRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const focusAnchorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    focusAnchorRef.current?.focus()
+  }, [])
+
+  const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const grid = gridRef.current
+    if (!grid) return
+    const firstLink = grid.querySelector<HTMLElement>('a')
+    switch (e.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+        e.preventDefault()
+        firstLink?.focus()
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        searchRef.current?.focus()
+        break
+    }
+  }, [])
+
+  const handleToolbarKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown') return
+    const grid = gridRef.current
+    if (!grid) return
+    const firstLink = grid.querySelector<HTMLElement>('a')
+    if (firstLink) {
+      e.preventDefault()
+      firstLink.focus()
+    }
+  }, [])
+
+  const handleGridKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return
+
+    const grid = gridRef.current
+    if (!grid) return
+
+    const links = Array.from(grid.querySelectorAll<HTMLElement>('a'))
+    const currentIndex = links.indexOf(document.activeElement as HTMLElement)
+    if (currentIndex === -1) return
+
+    const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length
+    let nextIndex = -1
+
+    switch (e.key) {
+      case 'ArrowRight':
+        nextIndex = currentIndex + 1
+        break
+      case 'ArrowLeft':
+        nextIndex = currentIndex - 1
+        break
+      case 'ArrowDown':
+        nextIndex = currentIndex + cols
+        break
+      case 'ArrowUp':
+        nextIndex = currentIndex - cols
+        break
+    }
+
+    if (e.key === 'ArrowUp' && nextIndex < 0) {
+      e.preventDefault()
+      focusAnchorRef.current?.focus()
+      return
+    }
+
+    if (nextIndex >= 0 && nextIndex < links.length) {
+      e.preventDefault()
+      links[nextIndex].focus()
+    }
+  }, [])
+
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('a, button, input, [role="listbox"]')) {
+        e.preventDefault()
+        focusAnchorRef.current?.focus()
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [])
+
   const platforms = [...new Set(games.map((g) => g.platform))].sort()
 
   const filtered = games.filter((g) => {
@@ -25,14 +113,17 @@ export default function Library() {
   })
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-8">
+    <main
+      className="max-w-7xl mx-auto px-6 py-8"
+    >
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+      <div className="flex flex-col sm:flex-row gap-3 mb-8" onKeyDown={handleToolbarKeyDown}>
         <div className="relative flex-1">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
+            ref={searchRef}
             type="text"
             placeholder="Search games..."
             value={search}
@@ -78,6 +169,14 @@ export default function Library() {
         </p>
       )}
 
+      {/* Focus anchor for keyboard/gamepad navigation */}
+      <div
+        ref={focusAnchorRef}
+        tabIndex={0}
+        onKeyDown={handleFocusAnchorKeyDown}
+        className="outline-none h-0 overflow-hidden"
+      />
+
       {/* Grid */}
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -98,7 +197,11 @@ export default function Library() {
           <p className="text-xs mt-1">Try adjusting your search or filters</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+        <div
+          ref={gridRef}
+          onKeyDown={handleGridKeyDown}
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
+        >
           {filtered.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}

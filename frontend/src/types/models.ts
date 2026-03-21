@@ -8,6 +8,7 @@ export interface Game {
   genre?: string;
   releaseYear?: number;
   coverUrl?: string;
+  heroUrl?: string;
   igdbId?: number;
   sizeBytes: number;
   isMissing: boolean;

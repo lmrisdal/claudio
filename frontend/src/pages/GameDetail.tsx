@@ -8,8 +8,8 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import type { Game } from "../types/models";
@@ -186,6 +186,7 @@ interface IgdbCandidate {
 export default function GameDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [candidates, setCandidates] = useState<IgdbCandidate[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -193,26 +194,20 @@ export default function GameDetail() {
   const [igdbQuery, setIgdbQuery] = useState("");
   const [browsePath, setBrowsePath] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (browsePath === null) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setBrowsePath(null);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [browsePath]);
-
   const [editing, setEditing] = useState(false);
-  const [coverDialogOpen, setCoverDialogOpen] = useState(false);
-  const [coverSearching, setCoverSearching] = useState(false);
-  const [coverResults, setCoverResults] = useState<string[] | null>(null);
-  const [coverQuery, setCoverQuery] = useState("");
+  const [sgdbDialog, setSgdbDialog] = useState<{ open: boolean; mode: "covers" | "heroes" }>({ open: false, mode: "covers" });
+  const [sgdbQuery, setSgdbQuery] = useState("");
+  const [sgdbSearching, setSgdbSearching] = useState(false);
+  const [sgdbGames, setSgdbGames] = useState<{ id: number; name: string; year?: number }[] | null>(null);
+  const [sgdbImages, setSgdbImages] = useState<string[] | null>(null);
+  const [sgdbLoadingImages, setSgdbLoadingImages] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "",
     summary: "",
     genre: "",
     releaseYear: "",
     coverUrl: "",
+    heroUrl: "",
     installType: "" as "portable" | "installer",
     installerExe: "",
     gameExe: "",
@@ -223,6 +218,19 @@ export default function GameDetail() {
     franchise: "",
     gameEngine: "",
   });
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (browsePath !== null) {
+        setBrowsePath(null);
+      } else if (!editing && !sgdbDialog.open && !candidates) {
+        navigate("/");
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [browsePath, editing, sgdbDialog.open, candidates, navigate]);
 
   const { data: exeList } = useQuery({
     queryKey: ["executables", id],
@@ -267,22 +275,43 @@ export default function GameDetail() {
     }
   }
 
-  async function openCoverSearch(g: Game) {
-    const q = g.title;
-    setCoverQuery(q);
-    setCoverResults(null);
-    setCoverDialogOpen(true);
-    setCoverSearching(true);
+  const sgdbRequestRef = useRef(0);
+
+  async function openSgdbDialog(mode: "covers" | "heroes") {
+    const q = game?.title ?? "";
+    const requestId = ++sgdbRequestRef.current;
+    setSgdbQuery(q);
+    setSgdbGames(null);
+    setSgdbImages(null);
+    setSgdbLoadingImages(false);
+    setSgdbDialog({ open: true, mode });
+    setSgdbSearching(true);
     try {
-      const qs = q.trim() ? `?query=${encodeURIComponent(q.trim())}` : "";
-      const urls = await api.post<string[]>(
-        `/admin/games/${g.id}/covers/search${qs}`,
+      const games = await api.get<{ id: number; name: string; year?: number }[]>(
+        `/admin/steamgriddb/search?query=${encodeURIComponent(q)}`,
       );
-      setCoverResults(urls);
+      if (sgdbRequestRef.current !== requestId) return;
+      setSgdbGames(games);
+      if (games.length === 1) selectSgdbGame(games[0].id, mode);
     } catch {
-      setCoverResults([]);
+      if (sgdbRequestRef.current !== requestId) return;
+      setSgdbGames([]);
     } finally {
-      setCoverSearching(false);
+      if (sgdbRequestRef.current === requestId) setSgdbSearching(false);
+    }
+  }
+
+  async function selectSgdbGame(sgdbGameId: number, mode?: "covers" | "heroes") {
+    setSgdbImages(null);
+    setSgdbLoadingImages(true);
+    const endpoint = mode ?? sgdbDialog.mode;
+    try {
+      const urls = await api.get<string[]>(`/admin/steamgriddb/${sgdbGameId}/${endpoint}`);
+      setSgdbImages(urls);
+    } catch {
+      setSgdbImages([]);
+    } finally {
+      setSgdbLoadingImages(false);
     }
   }
 
@@ -313,6 +342,7 @@ export default function GameDetail() {
       genre: string | null;
       releaseYear: number | null;
       coverUrl: string | null;
+      heroUrl: string | null;
       installType: string;
       installerExe: string | null;
       gameExe: string | null;
@@ -338,6 +368,7 @@ export default function GameDetail() {
       genre: game.genre ?? "",
       releaseYear: game.releaseYear?.toString() ?? "",
       coverUrl: game.coverUrl ?? "",
+      heroUrl: game.heroUrl ?? "",
       installType: game.installType,
       installerExe: game.installerExe ?? "",
       gameExe: game.gameExe ?? "",
@@ -359,6 +390,7 @@ export default function GameDetail() {
       genre: editForm.genre || null,
       releaseYear: editForm.releaseYear ? parseInt(editForm.releaseYear) : null,
       coverUrl: editForm.coverUrl || null,
+      heroUrl: editForm.heroUrl || null,
       installType: editForm.installType,
       installerExe: editForm.installerExe || null,
       gameExe: editForm.gameExe || null,
@@ -401,318 +433,385 @@ export default function GameDetail() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-12">
-      {/* Back link */}
-      <Link
-        to="/"
-        className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition mb-8"
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
+    <>
+      {/* Hero banner */}
+      {game.heroUrl && (
+        <div className="absolute inset-x-0 top-0 h-72 overflow-hidden -z-10">
+          <img
+            src={game.heroUrl}
+            alt=""
+            className="w-full h-full object-cover"
           />
-        </svg>
-        Library
-      </Link>
-
-      <div className="flex flex-col md:flex-row gap-10">
-        {/* Cover */}
-        <div className="w-72 shrink-0">
-          <div
-            className={`aspect-[2/3] bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
-            onClick={
-              user?.role === "admin" ? () => openCoverSearch(game) : undefined
-            }
-          >
-            {game.coverUrl ? (
-              <img
-                src={game.coverUrl}
-                alt={game.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
-                <svg
-                  className="w-12 h-12"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
-                  />
-                </svg>
-                <span className="text-xs">No cover</span>
-              </div>
-            )}
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/60 to-transparent" />
         </div>
+      )}
+      <main className="max-w-5xl mx-auto px-6 py-12 relative">
+        {user?.role === "admin" && (
+          <button
+            onClick={() => openSgdbDialog("heroes")}
+            className={`fixed top-18 right-4 z-10 p-2 rounded-lg transition flex items-center gap-1.5 text-xs ${
+              game.heroUrl
+                ? "bg-black/40 text-white/70 hover:text-white opacity-0 hover:opacity-100"
+                : "text-text-muted hover:text-text-primary bg-surface-raised ring-1 ring-border"
+            }`}
+            title={game.heroUrl ? "Change hero image" : "Add hero image"}
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
+              />
+            </svg>
+            {!game.heroUrl && "Add hero"}
+          </button>
+        )}
+        {/* Back link */}
+        <Link
+          to="/"
+          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 ${
+            game.heroUrl
+              ? "text-text-primary/80 hover:text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+              : "text-text-muted hover:text-text-primary"
+          }`}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
+            />
+          </svg>
+          Library
+        </Link>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          {editing ? (
-            /* Edit form */
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={editForm.title}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, title: e.target.value })
-                  }
-                  required
-                  className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+        <div className="flex flex-col md:flex-row gap-10">
+          {/* Cover */}
+          <div className="w-72 shrink-0">
+            <div
+              className={`aspect-[2/3] bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
+              onClick={
+                user?.role === "admin" ? () => openSgdbDialog("covers") : undefined
+              }
+            >
+              {game.coverUrl ? (
+                <img
+                  src={game.coverUrl}
+                  alt={game.title}
+                  className="w-full h-full object-cover"
                 />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Summary
-                </label>
-                <textarea
-                  value={editForm.summary}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, summary: e.target.value })
-                  }
-                  rows={4}
-                  className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition resize-y"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Genre
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.genre}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, genre: e.target.value })
-                    }
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Release Year
-                  </label>
-                  <input
-                    type="number"
-                    value={editForm.releaseYear}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, releaseYear: e.target.value })
-                    }
-                    placeholder="e.g. 2025"
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Developer
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.developer}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, developer: e.target.value })
-                    }
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Publisher
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.publisher}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, publisher: e.target.value })
-                    }
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Game Mode
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.gameMode}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, gameMode: e.target.value })
-                    }
-                    placeholder="e.g. Single player, Multiplayer"
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Engine
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.gameEngine}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, gameEngine: e.target.value })
-                    }
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Series
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.series}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, series: e.target.value })
-                    }
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Franchise
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.franchise}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, franchise: e.target.value })
-                    }
-                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Cover URL
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => openCoverSearch(game)}
-                    className="text-xs text-accent hover:underline"
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
+                  <svg
+                    className="w-12 h-12"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1}
                   >
-                    Search SteamGridDB
-                  </button>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
+                    />
+                  </svg>
+                  <span className="text-xs">No cover</span>
                 </div>
-                <input
-                  type="url"
-                  value={editForm.coverUrl}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, coverUrl: e.target.value })
-                  }
-                  placeholder="https://..."
-                  className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-                />
-              </div>
-              {/* Install type & executables (PC games) */}
-              {isPcPlatform(game.platform) && (
-                <>
+              )}
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            {editing ? (
+              /* Edit form */
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, title: e.target.value })
+                    }
+                    required
+                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                    Summary
+                  </label>
+                  <textarea
+                    value={editForm.summary}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, summary: e.target.value })
+                    }
+                    rows={4}
+                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition resize-y"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                      Install Type
+                      Genre
                     </label>
-                    <div className="mt-1 flex gap-2">
-                      {(["portable", "installer"] as const).map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() =>
-                            setEditForm({ ...editForm, installType: type })
-                          }
-                          className={`px-4 py-2 rounded-lg text-sm font-medium ring-1 transition ${
-                            editForm.installType === type
-                              ? "bg-accent/15 text-accent ring-accent/30"
-                              : "bg-surface-raised text-text-secondary ring-border hover:ring-accent/30"
-                          }`}
-                        >
-                          {type === "portable" ? "Portable" : "Installer"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {editForm.installType === "installer" && (
-                    <ExeListbox
-                      label="Installer Executable"
-                      value={editForm.installerExe}
-                      onChange={(v) =>
-                        setEditForm({ ...editForm, installerExe: v })
+                    <input
+                      type="text"
+                      value={editForm.genre}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, genre: e.target.value })
                       }
-                      options={exeList ?? []}
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
-                  )}
-                  {editForm.installType === "portable" && (
-                    <ExeListbox
-                      label="Game Executable"
-                      value={editForm.gameExe}
-                      onChange={(v) => setEditForm({ ...editForm, gameExe: v })}
-                      options={exeList ?? []}
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Release Year
+                    </label>
+                    <input
+                      type="number"
+                      value={editForm.releaseYear}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          releaseYear: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. 2025"
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
-                  )}
-                </>
-              )}
-              {updateMutation.isError && (
-                <p className="text-sm text-red-400">
-                  {updateMutation.error instanceof Error
-                    ? updateMutation.error.message
-                    : "Update failed"}
-                </p>
-              )}
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-medium px-5 py-2.5 rounded-lg transition text-sm"
-                >
-                  {updateMutation.isPending ? "Saving..." : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="px-5 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            /* Display view */
-            <>
-              <div className="flex items-start gap-3 mb-3">
-                <h1 className="font-display text-4xl font-bold text-text-primary">
-                  {game.title}
-                </h1>
-                {user?.role === "admin" && (
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Developer
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.developer}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, developer: e.target.value })
+                      }
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Publisher
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.publisher}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, publisher: e.target.value })
+                      }
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Game Mode
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.gameMode}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, gameMode: e.target.value })
+                      }
+                      placeholder="e.g. Single player, Multiplayer"
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Engine
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.gameEngine}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, gameEngine: e.target.value })
+                      }
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Series
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.series}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, series: e.target.value })
+                      }
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Franchise
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.franchise}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, franchise: e.target.value })
+                      }
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Cover URL
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openSgdbDialog("covers")}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      Search SteamGridDB
+                    </button>
+                  </div>
+                  <input
+                    type="url"
+                    value={editForm.coverUrl}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, coverUrl: e.target.value })
+                    }
+                    placeholder="https://..."
+                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                  />
+                </div>
+                {/* Install type & executables (PC games) */}
+                {isPcPlatform(game.platform) && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                        Install Type
+                      </label>
+                      <div className="mt-1 flex gap-2">
+                        {(["portable", "installer"] as const).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() =>
+                              setEditForm({ ...editForm, installType: type })
+                            }
+                            className={`px-4 py-2 rounded-lg text-sm font-medium ring-1 transition ${
+                              editForm.installType === type
+                                ? "bg-accent/15 text-accent ring-accent/30"
+                                : "bg-surface-raised text-text-secondary ring-border hover:ring-accent/30"
+                            }`}
+                          >
+                            {type === "portable" ? "Portable" : "Installer"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {editForm.installType === "installer" && (
+                      <ExeListbox
+                        label="Installer Executable"
+                        value={editForm.installerExe}
+                        onChange={(v) =>
+                          setEditForm({ ...editForm, installerExe: v })
+                        }
+                        options={exeList ?? []}
+                      />
+                    )}
+                    {editForm.installType === "portable" && (
+                      <ExeListbox
+                        label="Game Executable"
+                        value={editForm.gameExe}
+                        onChange={(v) =>
+                          setEditForm({ ...editForm, gameExe: v })
+                        }
+                        options={exeList ?? []}
+                      />
+                    )}
+                  </>
+                )}
+                {updateMutation.isError && (
+                  <p className="text-sm text-red-400">
+                    {updateMutation.error instanceof Error
+                      ? updateMutation.error.message
+                      : "Update failed"}
+                  </p>
+                )}
+                <div className="flex gap-2 pt-2">
                   <button
-                    onClick={startEditing}
-                    className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
-                    title="Edit game"
+                    type="submit"
+                    disabled={updateMutation.isPending}
+                    className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-medium px-5 py-2.5 rounded-lg transition text-sm"
                   >
+                    {updateMutation.isPending ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="px-5 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Display view */
+              <>
+                <div className="flex items-start gap-3 mb-3">
+                  <h1 className="font-display text-4xl font-bold text-text-primary">
+                    {game.title}
+                  </h1>
+                  {user?.role === "admin" && (
+                    <button
+                      onClick={startEditing}
+                      className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
+                      title="Edit game"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Meta tags */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
                     <svg
-                      className="w-4 h-4"
+                      className="w-3 h-3 text-text-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -721,376 +820,306 @@ export default function GameDetail() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                        d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"
                       />
                     </svg>
-                  </button>
-                )}
-              </div>
-
-              {/* Meta tags */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-                  <svg
-                    className="w-3 h-3 text-text-muted"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"
-                    />
-                  </svg>
-                  {formatPlatform(game.platform)}
-                </span>
-                {game.releaseYear && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-                    {game.releaseYear}
+                    {formatPlatform(game.platform)}
                   </span>
-                )}
-                {game.genre && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-                    {game.genre}
+                  {game.releaseYear && (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
+                      {game.releaseYear}
+                    </span>
+                  )}
+                  {game.genre && (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
+                      {game.genre}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-muted">
+                    {formatSize(game.sizeBytes)}
                   </span>
-                )}
-                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-muted">
-                  {formatSize(game.sizeBytes)}
-                </span>
-                {isPcPlatform(game.platform) && (
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ${
-                      game.installType === "installer"
-                        ? "bg-blue-500/10 ring-blue-500/20 text-blue-400"
-                        : "bg-accent-dim ring-accent/20 text-accent"
-                    }`}
-                  >
-                    {game.installType === "installer"
-                      ? "Installer"
-                      : "Portable"}
-                  </span>
-                )}
-              </div>
+                  {isPcPlatform(game.platform) && (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ${
+                        game.installType === "installer"
+                          ? "bg-blue-500/10 ring-blue-500/20 text-blue-400"
+                          : "bg-accent-dim ring-accent/20 text-accent"
+                      }`}
+                    >
+                      {game.installType === "installer"
+                        ? "Installer"
+                        : "Portable"}
+                    </span>
+                  )}
+                </div>
 
-              <div className="mb-8 -mt-4">
-                <p className="text-xs text-text-muted font-mono">
-                  /{game.platform}/{game.folderName}
-                </p>
-                <button
-                  onClick={() => setBrowsePath("")}
-                  className="inline-flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent transition"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                    />
-                  </svg>
-                  Browse files
-                </button>
-              </div>
-
-              {/* Summary */}
-              {game.summary && (
-                <div className="mb-8">
-                  <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
-                    About
-                  </h2>
-                  <p className="text-text-secondary leading-relaxed">
-                    {game.summary}
+                <div className="mb-8 -mt-4">
+                  <p className="text-xs text-text-muted font-mono">
+                    /{game.platform}/{game.folderName}
                   </p>
-                </div>
-              )}
-
-              {/* Details */}
-              {(game.developer ||
-                game.publisher ||
-                game.gameMode ||
-                game.series ||
-                game.franchise ||
-                game.gameEngine) && (
-                <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-8 text-sm">
-                  {game.developer && (
-                    <div>
-                      <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
-                        Developer
-                      </span>
-                      <p className="text-text-secondary mt-0.5">
-                        {game.developer}
-                      </p>
-                    </div>
-                  )}
-                  {game.publisher && (
-                    <div>
-                      <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
-                        Publisher
-                      </span>
-                      <p className="text-text-secondary mt-0.5">
-                        {game.publisher}
-                      </p>
-                    </div>
-                  )}
-                  {game.gameMode && (
-                    <div>
-                      <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
-                        Game Mode
-                      </span>
-                      <p className="text-text-secondary mt-0.5">
-                        {game.gameMode}
-                      </p>
-                    </div>
-                  )}
-                  {game.gameEngine && (
-                    <div>
-                      <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
-                        Engine
-                      </span>
-                      <p className="text-text-secondary mt-0.5">
-                        {game.gameEngine}
-                      </p>
-                    </div>
-                  )}
-                  {game.series && (
-                    <div>
-                      <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
-                        Series
-                      </span>
-                      <p className="text-text-secondary mt-0.5">
-                        {game.series}
-                      </p>
-                    </div>
-                  )}
-                  {game.franchise && (
-                    <div>
-                      <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
-                        Franchise
-                      </span>
-                      <p className="text-text-secondary mt-0.5">
-                        {game.franchise}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-3">
-                <DownloadButton gameId={game.id} size={game.sizeBytes} />
-                {user?.role === "admin" && (
                   <button
-                    onClick={openIgdbSearch}
-                    disabled={searching}
-                    className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
+                    onClick={() => setBrowsePath("")}
+                    className="inline-flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent transition"
                   >
-                    {searching ? (
-                      <>
-                        <svg
-                          className="w-4 h-4 animate-spin"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                          />
-                        </svg>
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                          />
-                        </svg>
-                        {game.igdbId ? "Re-match on IGDB" : "Match on IGDB"}
-                      </>
-                    )}
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                      />
+                    </svg>
+                    Browse files
                   </button>
+                </div>
+
+                {/* Summary */}
+                {game.summary && (
+                  <div className="mb-8">
+                    <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                      About
+                    </h2>
+                    <p className="text-text-secondary leading-relaxed">
+                      {game.summary}
+                    </p>
+                  </div>
                 )}
-              </div>
-            </>
-          )}
 
-          {/* File browser modal */}
-          {browsePath !== null &&
-            (() => {
-              const resolvedPath = browseData?.path ?? browsePath;
-              return (
-                <div
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                  onClick={() => setBrowsePath(null)}
-                >
-                  <div
-                    className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-text-primary font-medium shrink-0">
-                        Browse Files
-                      </h3>
-                      <button
-                        onClick={() => setBrowsePath(null)}
-                        className="text-text-muted hover:text-text-primary transition p-1 shrink-0"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </div>
+                {/* Details */}
+                {(game.developer ||
+                  game.publisher ||
+                  game.gameMode ||
+                  game.series ||
+                  game.franchise ||
+                  game.gameEngine) && (
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-8 text-sm">
+                    {game.developer && (
+                      <div>
+                        <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
+                          Developer
+                        </span>
+                        <p className="text-text-secondary mt-0.5">
+                          {game.developer}
+                        </p>
+                      </div>
+                    )}
+                    {game.publisher && (
+                      <div>
+                        <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
+                          Publisher
+                        </span>
+                        <p className="text-text-secondary mt-0.5">
+                          {game.publisher}
+                        </p>
+                      </div>
+                    )}
+                    {game.gameMode && (
+                      <div>
+                        <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
+                          Game Mode
+                        </span>
+                        <p className="text-text-secondary mt-0.5">
+                          {game.gameMode}
+                        </p>
+                      </div>
+                    )}
+                    {game.gameEngine && (
+                      <div>
+                        <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
+                          Engine
+                        </span>
+                        <p className="text-text-secondary mt-0.5">
+                          {game.gameEngine}
+                        </p>
+                      </div>
+                    )}
+                    {game.series && (
+                      <div>
+                        <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
+                          Series
+                        </span>
+                        <p className="text-text-secondary mt-0.5">
+                          {game.series}
+                        </p>
+                      </div>
+                    )}
+                    {game.franchise && (
+                      <div>
+                        <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
+                          Franchise
+                        </span>
+                        <p className="text-text-secondary mt-0.5">
+                          {game.franchise}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                    {/* Breadcrumb */}
-                    <div className="flex items-center gap-1 text-xs text-text-muted mb-3 flex-wrap">
-                      {resolvedPath ? (
+                {/* Actions */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <DownloadButton gameId={game.id} size={game.sizeBytes} />
+                  {user?.role === "admin" && (
+                    <button
+                      onClick={openIgdbSearch}
+                      disabled={searching}
+                      className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
+                    >
+                      {searching ? (
                         <>
-                          <button
-                            onClick={() => setBrowsePath("")}
-                            className="hover:text-text-primary transition"
+                          <svg
+                            className="w-4 h-4 animate-spin"
+                            viewBox="0 0 24 24"
+                            fill="none"
                           >
-                            /
-                          </button>
-                          {resolvedPath
-                            .split("/")
-                            .filter(Boolean)
-                            .map((segment, i, arr) => {
-                              const segPath = arr.slice(0, i + 1).join("/");
-                              const isLast = i === arr.length - 1;
-                              return (
-                                <span
-                                  key={segPath}
-                                  className="flex items-center gap-1"
-                                >
-                                  {i > 0 && (
-                                    <span className="text-text-muted/50">
-                                      /
-                                    </span>
-                                  )}
-                                  <button
-                                    onClick={() => setBrowsePath(segPath)}
-                                    className={`hover:text-text-primary transition ${isLast ? "text-text-primary font-medium" : ""}`}
-                                  >
-                                    {segment}
-                                  </button>
-                                </span>
-                              );
-                            })}
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
+                          </svg>
+                          Searching...
                         </>
                       ) : (
-                        <span className="text-text-primary font-medium">/</span>
+                        <>
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                            />
+                          </svg>
+                          {game.igdbId ? "Re-match on IGDB" : "Match on IGDB"}
+                        </>
                       )}
-                    </div>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
 
-                    {/* Content */}
-                    <div className="overflow-y-auto flex-1 -mx-2">
-                      {browseLoading ? (
-                        <div className="flex items-center justify-center py-12 text-text-muted text-sm">
-                          Loading...
-                        </div>
-                      ) : !browseData?.entries.length ? (
-                        <div className="flex items-center justify-center py-12 text-text-muted text-sm">
-                          Empty directory
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-border/50">
-                          {resolvedPath && (
+            {/* File browser modal */}
+            {browsePath !== null &&
+              (() => {
+                const resolvedPath = browseData?.path ?? browsePath;
+                return (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={() => setBrowsePath(null)}
+                  >
+                    <div
+                      className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-text-primary font-medium shrink-0">
+                          Browse Files
+                        </h3>
+                        <button
+                          onClick={() => setBrowsePath(null)}
+                          className="text-text-muted hover:text-text-primary transition p-1 shrink-0"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Breadcrumb */}
+                      <div className="flex items-center gap-1 text-xs text-text-muted mb-3 flex-wrap">
+                        {resolvedPath ? (
+                          <>
                             <button
-                              onClick={() => {
-                                const parts = resolvedPath
-                                  .split("/")
-                                  .filter(Boolean);
-                                parts.pop();
-                                setBrowsePath(parts.join("/"));
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-surface-raised/50 transition text-left"
+                              onClick={() => setBrowsePath("")}
+                              className="hover:text-text-primary transition"
                             >
-                              <svg
-                                className="w-4 h-4 text-text-muted shrink-0"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
-                                />
-                              </svg>
-                              <span className="text-text-muted">..</span>
+                              /
                             </button>
-                          )}
-                          {browseData.entries.map((entry) => (
-                            <button
-                              key={entry.name}
-                              onClick={() => {
-                                if (
-                                  entry.isDirectory ||
-                                  entry.name.toLowerCase().endsWith(".zip")
-                                )
-                                  setBrowsePath(
-                                    resolvedPath
-                                      ? `${resolvedPath}/${entry.name}`
-                                      : entry.name,
-                                  );
-                              }}
-                              className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition text-left ${
-                                entry.isDirectory ||
-                                entry.name.toLowerCase().endsWith(".zip")
-                                  ? "hover:bg-surface-raised/50 cursor-pointer"
-                                  : "cursor-default"
-                              }`}
-                            >
-                              {entry.isDirectory ? (
-                                <svg
-                                  className="w-4 h-4 text-accent shrink-0"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                                  />
-                                </svg>
-                              ) : (
+                            {resolvedPath
+                              .split("/")
+                              .filter(Boolean)
+                              .map((segment, i, arr) => {
+                                const segPath = arr.slice(0, i + 1).join("/");
+                                const isLast = i === arr.length - 1;
+                                return (
+                                  <span
+                                    key={segPath}
+                                    className="flex items-center gap-1"
+                                  >
+                                    {i > 0 && (
+                                      <span className="text-text-muted/50">
+                                        /
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => setBrowsePath(segPath)}
+                                      className={`hover:text-text-primary transition ${isLast ? "text-text-primary font-medium" : ""}`}
+                                    >
+                                      {segment}
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                          </>
+                        ) : (
+                          <span className="text-text-primary font-medium">
+                            /
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="overflow-y-auto flex-1 -mx-2">
+                        {browseLoading ? (
+                          <div className="flex items-center justify-center py-12 text-text-muted text-sm">
+                            Loading...
+                          </div>
+                        ) : !browseData?.entries.length ? (
+                          <div className="flex items-center justify-center py-12 text-text-muted text-sm">
+                            Empty directory
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-border/50">
+                            {resolvedPath && (
+                              <button
+                                onClick={() => {
+                                  const parts = resolvedPath
+                                    .split("/")
+                                    .filter(Boolean);
+                                  parts.pop();
+                                  setBrowsePath(parts.join("/"));
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-surface-raised/50 transition text-left"
+                              >
                                 <svg
                                   className="w-4 h-4 text-text-muted shrink-0"
                                   fill="none"
@@ -1101,265 +1130,387 @@ export default function GameDetail() {
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                                    d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
                                   />
                                 </svg>
-                              )}
-                              <span
-                                className={`truncate ${entry.isDirectory ? "text-text-primary" : "text-text-secondary"}`}
+                                <span className="text-text-muted">..</span>
+                              </button>
+                            )}
+                            {browseData.entries.map((entry) => (
+                              <button
+                                key={entry.name}
+                                onClick={() => {
+                                  if (
+                                    entry.isDirectory ||
+                                    entry.name.toLowerCase().endsWith(".zip")
+                                  )
+                                    setBrowsePath(
+                                      resolvedPath
+                                        ? `${resolvedPath}/${entry.name}`
+                                        : entry.name,
+                                    );
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition text-left ${
+                                  entry.isDirectory ||
+                                  entry.name.toLowerCase().endsWith(".zip")
+                                    ? "hover:bg-surface-raised/50 cursor-pointer"
+                                    : "cursor-default"
+                                }`}
                               >
-                                {entry.name}
-                              </span>
-                              {entry.size != null && !entry.isDirectory && (
-                                <span className="ml-auto text-xs text-text-muted font-mono shrink-0">
-                                  {formatSize(entry.size)}
+                                {entry.isDirectory ? (
+                                  <svg
+                                    className="w-4 h-4 text-accent shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-4 h-4 text-text-muted shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                                    />
+                                  </svg>
+                                )}
+                                <span
+                                  className={`truncate ${entry.isDirectory ? "text-text-primary" : "text-text-secondary"}`}
+                                >
+                                  {entry.name}
                                 </span>
-                              )}
+                                {entry.size != null && !entry.isDirectory && (
+                                  <span className="ml-auto text-xs text-text-muted font-mono shrink-0">
+                                    {formatSize(entry.size)}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* SteamGridDB picker (covers & heroes) */}
+            <Dialog
+              open={sgdbDialog.open}
+              onClose={() => setSgdbDialog({ ...sgdbDialog, open: false })}
+              className="relative z-50"
+            >
+              <DialogBackdrop className="fixed inset-0 bg-black/60" />
+              <div className="fixed inset-0 flex items-center justify-center p-4">
+                <DialogPanel className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-text-primary font-medium">
+                      SteamGridDB {sgdbDialog.mode === "covers" ? "Covers" : "Heroes"}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setSgdbDialog({ ...sgdbDialog, open: false })}
+                      className="text-text-muted hover:text-text-primary transition p-1"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <form
+                    className="flex gap-2 mb-4"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const requestId = ++sgdbRequestRef.current;
+                      setSgdbGames(null);
+                      setSgdbImages(null);
+                      setSgdbLoadingImages(false);
+                      setSgdbSearching(true);
+                      try {
+                        const games = await api.get<{ id: number; name: string; year?: number }[]>(
+                          `/admin/steamgriddb/search?query=${encodeURIComponent(sgdbQuery.trim())}`,
+                        );
+                        if (sgdbRequestRef.current !== requestId) return;
+                        setSgdbGames(games);
+                        if (games.length === 1) selectSgdbGame(games[0].id);
+                      } catch {
+                        if (sgdbRequestRef.current !== requestId) return;
+                        setSgdbGames([]);
+                      } finally {
+                        if (sgdbRequestRef.current === requestId) setSgdbSearching(false);
+                      }
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={sgdbQuery}
+                      onChange={(e) => setSgdbQuery(e.target.value)}
+                      placeholder="Search game..."
+                      className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 transition"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      disabled={sgdbSearching || !sgdbQuery.trim()}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
+                    >
+                      {sgdbSearching ? "Searching..." : "Search"}
+                    </button>
+                  </form>
+
+                  {/* Step 1: pick a game */}
+                  {sgdbImages === null && (
+                    <>
+                      {sgdbSearching ? (
+                        <p className="text-sm text-text-muted">Searching...</p>
+                      ) : sgdbGames !== null && sgdbGames.length === 0 ? (
+                        <p className="text-sm text-text-muted">No games found.</p>
+                      ) : sgdbGames !== null ? (
+                        <div className="overflow-y-auto flex-1 min-h-0 space-y-1">
+                          {sgdbGames.map((g) => (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => selectSgdbGame(g.id)}
+                              className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-surface-raised transition text-text-secondary hover:text-text-primary"
+                            >
+                              {g.name}{g.year ? ` (${g.year})` : ""}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* Step 2: pick an image */}
+                  {sgdbImages !== null && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSgdbImages(null)}
+                        className="text-xs text-text-muted hover:text-text-primary transition mb-3 self-start flex items-center gap-1"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        </svg>
+                        Back to results
+                      </button>
+                      {sgdbLoadingImages ? (
+                        <p className="text-sm text-text-muted">Loading images...</p>
+                      ) : sgdbImages.length === 0 ? (
+                        <p className="text-sm text-text-muted">No {sgdbDialog.mode} found.</p>
+                      ) : sgdbDialog.mode === "covers" ? (
+                        <div className="grid grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
+                          {sgdbImages.map((url) => (
+                            <button
+                              key={url}
+                              type="button"
+                              onClick={() => {
+                                if (editing) {
+                                  setEditForm({ ...editForm, coverUrl: url });
+                                } else {
+                                  updateMutation.mutate({
+                                    title: game.title,
+                                    summary: game.summary ?? null,
+                                    genre: game.genre ?? null,
+                                    releaseYear: game.releaseYear ?? null,
+                                    coverUrl: url,
+                                    heroUrl: game.heroUrl ?? null,
+                                    installType: game.installType,
+                                    installerExe: game.installerExe ?? null,
+                                    gameExe: game.gameExe ?? null,
+                                    developer: game.developer ?? null,
+                                    publisher: game.publisher ?? null,
+                                    gameMode: game.gameMode ?? null,
+                                    series: game.series ?? null,
+                                    franchise: game.franchise ?? null,
+                                    gameEngine: game.gameEngine ?? null,
+                                  });
+                                }
+                                setSgdbDialog({ ...sgdbDialog, open: false });
+                              }}
+                              className={`aspect-[2/3] rounded-lg ring-2 transition hover:ring-accent ${
+                                (editing ? editForm.coverUrl : game.coverUrl) === url ? "ring-accent" : "ring-transparent"
+                              }`}
+                            >
+                              <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-3 overflow-y-auto p-1 flex-1 min-h-0">
+                          {sgdbImages.map((url) => (
+                            <button
+                              key={url}
+                              type="button"
+                              onClick={() => {
+                                if (editing) {
+                                  setEditForm({ ...editForm, heroUrl: url });
+                                } else {
+                                  updateMutation.mutate({
+                                    title: game.title,
+                                    summary: game.summary ?? null,
+                                    genre: game.genre ?? null,
+                                    releaseYear: game.releaseYear ?? null,
+                                    coverUrl: game.coverUrl ?? null,
+                                    heroUrl: url,
+                                    installType: game.installType,
+                                    installerExe: game.installerExe ?? null,
+                                    gameExe: game.gameExe ?? null,
+                                    developer: game.developer ?? null,
+                                    publisher: game.publisher ?? null,
+                                    gameMode: game.gameMode ?? null,
+                                    series: game.series ?? null,
+                                    franchise: game.franchise ?? null,
+                                    gameEngine: game.gameEngine ?? null,
+                                  });
+                                }
+                                setSgdbDialog({ ...sgdbDialog, open: false });
+                              }}
+                              className={`rounded-lg ring-2 transition hover:ring-accent ${
+                                (editing ? editForm.heroUrl : game.heroUrl) === url ? "ring-accent" : "ring-transparent"
+                              }`}
+                            >
+                              <img src={url} alt="" className="w-full rounded-lg object-cover" />
                             </button>
                           ))}
                         </div>
                       )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+                    </>
+                  )}
+                </DialogPanel>
+              </div>
+            </Dialog>
 
-          {/* SteamGridDB cover picker */}
-          <Dialog
-            open={coverDialogOpen}
-            onClose={() => setCoverDialogOpen(false)}
-            className="relative z-50"
-          >
-            <DialogBackdrop className="fixed inset-0 bg-black/60" />
-            <div className="fixed inset-0 flex items-center justify-center p-4">
-              <DialogPanel className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-text-primary font-medium">
-                    SteamGridDB Covers
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setCoverDialogOpen(false)}
-                    className="text-text-muted hover:text-text-primary transition p-1"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <form
-                  className="flex gap-2 mb-4"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setCoverResults(null);
-                    setCoverSearching(true);
-                    try {
-                      const q = coverQuery.trim()
-                        ? `?query=${encodeURIComponent(coverQuery.trim())}`
-                        : "";
-                      const urls = await api.post<string[]>(
-                        `/admin/games/${game.id}/covers/search${q}`,
-                      );
-                      setCoverResults(urls);
-                    } catch {
-                      setCoverResults([]);
-                    } finally {
-                      setCoverSearching(false);
-                    }
-                  }}
+            {/* IGDB candidate picker */}
+            {candidates && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                onClick={() => setCandidates(null)}
+              >
+                <div
+                  className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <input
-                    type="text"
-                    value={coverQuery}
-                    onChange={(e) => setCoverQuery(e.target.value)}
-                    placeholder="Search query..."
-                    className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 transition"
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    disabled={coverSearching || !coverQuery.trim()}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
-                  >
-                    {coverSearching ? "Searching..." : "Search"}
-                  </button>
-                </form>
-                {coverResults !== null && coverResults.length === 0 ? (
-                  <p className="text-sm text-text-muted">No covers found.</p>
-                ) : coverResults !== null ? (
-                  <div className="grid grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
-                    {coverResults.map((url) => (
-                      <button
-                        key={url}
-                        type="button"
-                        onClick={() => {
-                          if (editing) {
-                            setEditForm({ ...editForm, coverUrl: url });
-                          } else {
-                            updateMutation.mutate({
-                              title: game.title,
-                              summary: game.summary ?? null,
-                              genre: game.genre ?? null,
-                              releaseYear: game.releaseYear ?? null,
-                              coverUrl: url,
-                              installType: game.installType,
-                              installerExe: game.installerExe ?? null,
-                              gameExe: game.gameExe ?? null,
-                              developer: game.developer ?? null,
-                              publisher: game.publisher ?? null,
-                              gameMode: game.gameMode ?? null,
-                              series: game.series ?? null,
-                              franchise: game.franchise ?? null,
-                              gameEngine: game.gameEngine ?? null,
-                            });
-                          }
-                          setCoverDialogOpen(false);
-                        }}
-                        className={`aspect-[2/3] rounded-lg ring-2 transition hover:ring-accent ${
-                          (editing ? editForm.coverUrl : game.coverUrl) === url
-                            ? "ring-accent"
-                            : "ring-transparent"
-                        }`}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-text-primary font-medium">
+                      Match on IGDB
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setCandidates(null);
+                        setSearchError(null);
+                      }}
+                      className="text-text-muted hover:text-text-primary transition p-1"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
                       >
-                        <img
-                          src={url}
-                          alt=""
-                          className="w-full h-full object-cover rounded-lg"
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
                         />
+                      </svg>
+                    </button>
+                  </div>
+                  <form
+                    onSubmit={handleIgdbCustomSearch}
+                    className="flex gap-2 mb-4"
+                  >
+                    <input
+                      type="text"
+                      value={igdbQuery}
+                      onChange={(e) => setIgdbQuery(e.target.value)}
+                      placeholder="Search IGDB..."
+                      className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 transition"
+                    />
+                    <button
+                      type="submit"
+                      disabled={searching || !igdbQuery.trim()}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
+                    >
+                      {searching ? "Searching..." : "Search"}
+                    </button>
+                  </form>
+                  {searchError && (
+                    <p className="text-sm text-red-400 mb-3">{searchError}</p>
+                  )}
+                  <div className="overflow-y-auto space-y-2 flex-1">
+                    {candidates.map((c) => (
+                      <button
+                        key={c.igdbId}
+                        onClick={() => applyMutation.mutate(c.igdbId)}
+                        disabled={applyMutation.isPending}
+                        className="w-full flex gap-4 p-3 rounded-lg ring-1 ring-border hover:ring-purple-500/50 hover:bg-surface-raised/50 transition text-left disabled:opacity-50"
+                      >
+                        <div className="w-16 h-20 shrink-0 rounded-md overflow-hidden bg-surface-raised">
+                          {c.coverUrl ? (
+                            <img
+                              src={c.coverUrl}
+                              alt={c.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-text-muted">
+                              <svg
+                                className="w-6 h-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-text-primary truncate">
+                            {c.name}
+                          </p>
+                          <div className="flex gap-2 mt-0.5 text-xs text-text-muted">
+                            {c.releaseYear && <span>{c.releaseYear}</span>}
+                            {c.genre && (
+                              <span className="truncate">{c.genre}</span>
+                            )}
+                          </div>
+                          {c.summary && (
+                            <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                              {c.summary}
+                            </p>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
-                ) : null}
-              </DialogPanel>
-            </div>
-          </Dialog>
-
-          {/* IGDB candidate picker */}
-          {candidates && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-              onClick={() => setCandidates(null)}
-            >
-              <div
-                className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-text-primary font-medium">
-                    Match on IGDB
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setCandidates(null);
-                      setSearchError(null);
-                    }}
-                    className="text-text-muted hover:text-text-primary transition p-1"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <form
-                  onSubmit={handleIgdbCustomSearch}
-                  className="flex gap-2 mb-4"
-                >
-                  <input
-                    type="text"
-                    value={igdbQuery}
-                    onChange={(e) => setIgdbQuery(e.target.value)}
-                    placeholder="Search IGDB..."
-                    className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 transition"
-                  />
-                  <button
-                    type="submit"
-                    disabled={searching || !igdbQuery.trim()}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
-                  >
-                    {searching ? "Searching..." : "Search"}
-                  </button>
-                </form>
-                {searchError && (
-                  <p className="text-sm text-red-400 mb-3">{searchError}</p>
-                )}
-                <div className="overflow-y-auto space-y-2 flex-1">
-                  {candidates.map((c) => (
-                    <button
-                      key={c.igdbId}
-                      onClick={() => applyMutation.mutate(c.igdbId)}
-                      disabled={applyMutation.isPending}
-                      className="w-full flex gap-4 p-3 rounded-lg ring-1 ring-border hover:ring-purple-500/50 hover:bg-surface-raised/50 transition text-left disabled:opacity-50"
-                    >
-                      <div className="w-16 h-20 shrink-0 rounded-md overflow-hidden bg-surface-raised">
-                        {c.coverUrl ? (
-                          <img
-                            src={c.coverUrl}
-                            alt={c.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-text-muted">
-                            <svg
-                              className="w-6 h-6"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
-                              />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-text-primary truncate">
-                          {c.name}
-                        </p>
-                        <div className="flex gap-2 mt-0.5 text-xs text-text-muted">
-                          {c.releaseYear && <span>{c.releaseYear}</span>}
-                          {c.genre && (
-                            <span className="truncate">{c.genre}</span>
-                          )}
-                        </div>
-                        {c.summary && (
-                          <p className="text-xs text-text-secondary mt-1 line-clamp-2">
-                            {c.summary}
-                          </p>
-                        )}
-                      </div>
-                    </button>
-                  ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

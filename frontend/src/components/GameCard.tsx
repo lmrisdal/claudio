@@ -4,8 +4,8 @@ import { formatPlatform } from '../utils/platforms'
 
 export default function GameCard({ game }: { game: Game }) {
   return (
-    <Link to={`/games/${game.id}`} className={`group ${game.isMissing ? 'opacity-50' : ''}`}>
-      <div className="aspect-[3/4] bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 transition-all duration-200 relative">
+    <Link to={`/games/${game.id}`} className={`group outline-none ${game.isMissing ? 'opacity-50' : ''}`}>
+      <div className="aspect-[3/4] bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:ring-accent/50 transition-all duration-200 relative">
         {game.isMissing && (
           <div className="absolute top-2 right-2 z-10 bg-red-500/90 text-white text-[10px] font-bold uppercase px-1.5 py-0.5 rounded">
             Missing
@@ -16,7 +16,7 @@ export default function GameCard({ game }: { game: Game }) {
             src={game.coverUrl}
             alt={game.title}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 group-focus-visible:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-text-muted">
@@ -27,7 +27,7 @@ export default function GameCard({ game }: { game: Game }) {
           </div>
         )}
       </div>
-      <h3 className="text-sm font-medium truncate group-hover:text-accent transition-colors">
+      <h3 className="text-sm font-medium truncate group-hover:text-accent group-focus-visible:text-accent transition-colors">
         {game.title}
       </h3>
       <p className="text-xs text-text-muted mt-0.5">{formatPlatform(game.platform)}{game.releaseYear ? ` · ${game.releaseYear}` : ''} · {game.installType === 'installer' ? 'Installer' : 'Portable'}</p>

@@ -29,7 +29,9 @@ public static class AdminEndpoints
         group.MapPost("/igdb/search", SearchIgdbFreeText);
         group.MapPost("/games/{id:int}/igdb/apply", ApplyGameIgdb);
         group.MapDelete("/games/{id:int}", DeleteGame);
-        group.MapPost("/games/{id:int}/covers/search", SearchCovers);
+        group.MapGet("/steamgriddb/search", SearchSteamGridDb);
+        group.MapGet("/steamgriddb/{sgdbGameId:long}/covers", GetSteamGridDbCovers);
+        group.MapGet("/steamgriddb/{sgdbGameId:long}/heroes", GetSteamGridDbHeroes);
 
         return group;
     }
@@ -151,6 +153,7 @@ public static class AdminEndpoints
         game.Genre = request.Genre;
         game.ReleaseYear = request.ReleaseYear;
         game.CoverUrl = request.CoverUrl;
+        game.HeroUrl = request.HeroUrl;
         game.InstallType = request.InstallType;
         game.InstallerExe = request.InstallerExe;
         game.GameExe = request.GameExe;
@@ -171,6 +174,7 @@ public static class AdminEndpoints
         string? Genre,
         int? ReleaseYear,
         string? CoverUrl,
+        string? HeroUrl,
         InstallType InstallType,
         string? InstallerExe,
         string? GameExe,
@@ -203,33 +207,42 @@ public static class AdminEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> SearchCovers(
-        int id, [FromQuery] string? query, AppDbContext db, ClaudioConfig config, IHttpClientFactory httpClientFactory)
+    private static async Task<IResult> SearchSteamGridDb(
+        [FromQuery] string query, ClaudioConfig config, IHttpClientFactory httpClientFactory)
     {
         if (string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
             return Results.BadRequest("SteamGridDB API key not configured.");
 
-        var game = await db.Games.FindAsync(id);
-        if (game is null) return Results.NotFound();
-
-        var searchTerm = string.IsNullOrWhiteSpace(query) ? game.Title : query;
-
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
 
-        // Search for game on SteamGridDB
-        var searchRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(searchTerm)}");
+        var searchRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(query)}");
         if (!searchRes.IsSuccessStatusCode)
             return Results.Problem("SteamGridDB search failed.", statusCode: 502);
 
         var searchJson = await searchRes.Content.ReadAsStringAsync();
         var searchResult = JsonSerializer.Deserialize<SteamGridDbResponse<List<SteamGridDbGame>>>(searchJson);
-        if (searchResult?.Data is not { Count: > 0 })
-            return Results.Ok(Array.Empty<string>());
 
-        var sgdbGameId = searchResult.Data[0].Id;
+        var results = (searchResult?.Data ?? []).Select(g => new
+        {
+            g.Id,
+            g.Name,
+            Year = g.ReleaseDate is > 0
+                ? DateTimeOffset.FromUnixTimeSeconds(g.ReleaseDate.Value).Year
+                : (int?)null,
+        });
+        return Results.Ok(results);
+    }
 
-        // Get 600x900 cover grids
+    private static async Task<IResult> GetSteamGridDbCovers(
+        long sgdbGameId, ClaudioConfig config, IHttpClientFactory httpClientFactory)
+    {
+        if (string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
+            return Results.BadRequest("SteamGridDB API key not configured.");
+
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
+
         var gridsRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/grids/game/{sgdbGameId}?dimensions=600x900");
         if (!gridsRes.IsSuccessStatusCode)
             return Results.Ok(Array.Empty<string>());
@@ -238,6 +251,26 @@ public static class AdminEndpoints
         var gridsResult = JsonSerializer.Deserialize<SteamGridDbResponse<List<SteamGridDbGrid>>>(gridsJson);
 
         var urls = gridsResult?.Data?.Select(g => g.Url).Where(u => u is not null).ToList() ?? [];
+        return Results.Ok(urls);
+    }
+
+    private static async Task<IResult> GetSteamGridDbHeroes(
+        long sgdbGameId, ClaudioConfig config, IHttpClientFactory httpClientFactory)
+    {
+        if (string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
+            return Results.BadRequest("SteamGridDB API key not configured.");
+
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
+
+        var heroesRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGameId}");
+        if (!heroesRes.IsSuccessStatusCode)
+            return Results.Ok(Array.Empty<string>());
+
+        var heroesJson = await heroesRes.Content.ReadAsStringAsync();
+        var heroesResult = JsonSerializer.Deserialize<SteamGridDbResponse<List<SteamGridDbGrid>>>(heroesJson);
+
+        var urls = heroesResult?.Data?.Select(g => g.Url).Where(u => u is not null).ToList() ?? [];
         return Results.Ok(urls);
     }
 
@@ -254,6 +287,9 @@ public static class AdminEndpoints
 
         [JsonPropertyName("name")]
         public string? Name { get; set; }
+
+        [JsonPropertyName("release_date")]
+        public long? ReleaseDate { get; set; }
     }
 
     private class SteamGridDbGrid

@@ -118,6 +118,7 @@ public static class GameEndpoints
         Genre = game.Genre,
         ReleaseYear = game.ReleaseYear,
         CoverUrl = game.CoverUrl,
+        HeroUrl = game.HeroUrl,
         IgdbId = game.IgdbId,
         SizeBytes = game.SizeBytes,
         IsMissing = game.IsMissing,

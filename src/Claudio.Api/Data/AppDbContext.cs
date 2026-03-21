@@ -43,6 +43,7 @@ public class Game
     public string? Genre { get; set; }
     public int? ReleaseYear { get; set; }
     public string? CoverUrl { get; set; }
+    public string? HeroUrl { get; set; }
     public long? IgdbId { get; set; }
     public long SizeBytes { get; set; }
     public bool IsMissing { get; set; }
