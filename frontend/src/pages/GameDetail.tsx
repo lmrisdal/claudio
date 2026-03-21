@@ -8,12 +8,13 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
+import { sounds } from "../utils/sounds";
 
 function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   const [preparing, setPreparing] = useState(false);
@@ -41,7 +42,8 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
     <button
       onClick={handleDownload}
       disabled={preparing}
-      className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-6 py-3 rounded-lg transition text-sm"
+      data-nav
+      className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-6 py-3 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
     >
       {preparing ? (
         <>
@@ -224,13 +226,50 @@ export default function GameDetail() {
       if (e.key !== "Escape") return;
       if (browsePath !== null) {
         setBrowsePath(null);
+        sounds.back();
       } else if (!editing && !sgdbDialog.open && !candidates) {
+        sounds.back();
         navigate("/");
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [browsePath, editing, sgdbDialog.open, candidates, navigate]);
+
+  const mainRef = useRef<HTMLElement>(null)
+  const backLinkRef = useRef<HTMLAnchorElement>(null)
+  const focusAnchorRef = useRef<HTMLDivElement>(null)
+
+  // Arrow key navigation between back link and download button
+  const handleMainKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!['ArrowUp', 'ArrowDown'].includes(e.key)) return
+    if (editing || sgdbDialog.open || candidates || browsePath !== null) return
+
+    const main = mainRef.current
+    if (!main) return
+
+    const focusables = Array.from(
+      main.querySelectorAll<HTMLElement>('a[data-nav], button[data-nav]')
+    )
+    if (focusables.length === 0) return
+
+    const currentIndex = focusables.indexOf(document.activeElement as HTMLElement)
+    let nextIndex: number
+
+    if (currentIndex === -1) {
+      nextIndex = e.key === 'ArrowDown' ? 0 : focusables.length - 1
+    } else if (e.key === 'ArrowDown') {
+      nextIndex = Math.min(currentIndex + 1, focusables.length - 1)
+    } else {
+      nextIndex = Math.max(currentIndex - 1, 0)
+    }
+
+    if (nextIndex !== currentIndex) {
+      e.preventDefault()
+      focusables[nextIndex].focus()
+      sounds.navigate()
+    }
+  }, [editing, sgdbDialog.open, candidates, browsePath])
 
   const { data: exeList } = useQuery({
     queryKey: ["executables", id],
@@ -251,6 +290,12 @@ export default function GameDetail() {
       ),
     enabled: browsePath !== null,
   });
+
+  useEffect(() => {
+    if (!isLoading && game) {
+      requestAnimationFrame(() => focusAnchorRef.current?.focus())
+    }
+  }, [isLoading, game])
 
   async function searchIgdb(customQuery?: string) {
     setSearching(true);
@@ -317,6 +362,7 @@ export default function GameDetail() {
 
   function openIgdbSearch() {
     setIgdbQuery(game?.title ?? "");
+    setCandidates([]);
     searchIgdb();
   }
 
@@ -445,7 +491,7 @@ export default function GameDetail() {
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/60 to-transparent" />
         </div>
       )}
-      <main className="max-w-5xl mx-auto px-6 py-12 relative">
+      <main ref={mainRef} onKeyDown={handleMainKeyDown} className="max-w-5xl mx-auto px-6 py-12 relative">
         {user?.role === "admin" && (
           <button
             onClick={() => openSgdbDialog("heroes")}
@@ -472,10 +518,25 @@ export default function GameDetail() {
             {!game.heroUrl && "Add hero"}
           </button>
         )}
+        {/* Focus anchor for gamepad navigation */}
+        <div
+          ref={focusAnchorRef}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+              e.preventDefault()
+              const first = mainRef.current?.querySelector<HTMLElement>('[data-nav]')
+              if (first) { first.focus(); sounds.navigate() }
+            }
+          }}
+          className="outline-none h-0 overflow-hidden"
+        />
         {/* Back link */}
         <Link
+          ref={backLinkRef}
           to="/"
-          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 ${
+          data-nav
+          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 outline-2 outline-offset-4 outline-transparent focus-visible:outline-accent rounded ${
             game.heroUrl
               ? "text-text-primary/80 hover:text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
               : "text-text-muted hover:text-text-primary"
@@ -784,7 +845,7 @@ export default function GameDetail() {
                   <h1 className="font-display text-4xl font-bold text-text-primary">
                     {game.title}
                   </h1>
-                  {user?.role === "admin" && (
+                  {user?.role === "admin" && (<>
                     <button
                       onClick={startEditing}
                       className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
@@ -804,7 +865,27 @@ export default function GameDetail() {
                         />
                       </svg>
                     </button>
-                  )}
+                    <button
+                      onClick={openIgdbSearch}
+                      disabled={searching}
+                      className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50"
+                      title={game.igdbId ? "Re-match on IGDB" : "Match on IGDB"}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                        />
+                      </svg>
+                    </button>
+                  </>)}
                 </div>
 
                 {/* Meta tags */}
@@ -964,55 +1045,6 @@ export default function GameDetail() {
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3">
                   <DownloadButton gameId={game.id} size={game.sizeBytes} />
-                  {user?.role === "admin" && (
-                    <button
-                      onClick={openIgdbSearch}
-                      disabled={searching}
-                      className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50"
-                    >
-                      {searching ? (
-                        <>
-                          <svg
-                            className="w-4 h-4 animate-spin"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                            />
-                          </svg>
-                          Searching...
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                            />
-                          </svg>
-                          {game.igdbId ? "Re-match on IGDB" : "Match on IGDB"}
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
               </>
             )}
@@ -1454,12 +1486,24 @@ export default function GameDetail() {
                     <p className="text-sm text-red-400 mb-3">{searchError}</p>
                   )}
                   <div className="overflow-y-auto space-y-2 flex-1">
+                    {searching && candidates.length === 0 && (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="flex gap-4 p-3 rounded-lg animate-pulse">
+                          <div className="w-16 h-20 shrink-0 rounded-md bg-surface-raised" />
+                          <div className="flex-1 space-y-2 py-1">
+                            <div className="h-4 bg-surface-raised rounded w-3/4" />
+                            <div className="h-3 bg-surface-raised rounded w-1/3" />
+                            <div className="h-3 bg-surface-raised rounded w-full mt-2" />
+                          </div>
+                        </div>
+                      ))
+                    )}
                     {candidates.map((c) => (
                       <button
                         key={c.igdbId}
                         onClick={() => applyMutation.mutate(c.igdbId)}
                         disabled={applyMutation.isPending}
-                        className="w-full flex gap-4 p-3 rounded-lg ring-1 ring-border hover:ring-purple-500/50 hover:bg-surface-raised/50 transition text-left disabled:opacity-50"
+                        className="w-full flex gap-4 p-3 rounded-lg hover:bg-surface-raised transition text-left disabled:opacity-50"
                       >
                         <div className="w-16 h-20 shrink-0 rounded-md overflow-hidden bg-surface-raised">
                           {c.coverUrl ? (

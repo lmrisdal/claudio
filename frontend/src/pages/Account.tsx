@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../api/client'
 import type { AuthResponse } from '../types/models'
+import { isSoundsEnabled, setSoundsEnabled } from '../utils/sounds'
 
 export default function Account() {
   const { user, setToken, setUser } = useAuth()
@@ -31,6 +32,9 @@ export default function Account() {
         </div>
       </section>
 
+      {/* Preferences */}
+      <PreferencesSection />
+
       {/* Change password */}
       <ChangePasswordForm
         onSuccess={(res) => {
@@ -39,6 +43,34 @@ export default function Account() {
         }}
       />
     </main>
+  )
+}
+
+function PreferencesSection() {
+  const [soundsOn, setSoundsOn] = useState(isSoundsEnabled)
+
+  return (
+    <section className="card bg-surface rounded-xl ring-1 ring-border p-6 mb-6">
+      <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-4">Preferences</h2>
+      <label className="flex items-center justify-between cursor-pointer">
+        <span className="text-sm text-text-primary">Navigation sounds</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={soundsOn}
+          onClick={() => {
+            const next = !soundsOn
+            setSoundsOn(next)
+            setSoundsEnabled(next)
+          }}
+          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${soundsOn ? 'bg-accent' : 'bg-surface-raised ring-1 ring-border'}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${soundsOn ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </label>
+    </section>
   )
 }
 

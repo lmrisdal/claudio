@@ -92,7 +92,7 @@ public static class AdminEndpoints
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
 
-        var candidates = await igdbService.SearchCandidatesAsync(game.Title);
+        var candidates = await igdbService.SearchCandidatesAsync(game.FolderName ?? game.Title);
         return Results.Ok(candidates);
     }
 

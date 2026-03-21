@@ -16,8 +16,9 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
     queryFn: () => api.get<Game[]>('/games'),
   })
 
+  const normalize = (s: string) => s.toLowerCase().replace(/[.\-]/g, '')
   const filtered = query.length > 0
-    ? games.filter((g) => g.title.toLowerCase().includes(query.toLowerCase())).slice(0, 20)
+    ? games.filter((g) => normalize(g.title).includes(normalize(query))).slice(0, 20)
     : []
 
   useEffect(() => {

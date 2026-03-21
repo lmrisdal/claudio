@@ -4,7 +4,11 @@ import type { Game } from '../types/models'
 import GameCard from '../components/GameCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatPlatform } from '../utils/platforms'
+import { sounds } from '../utils/sounds'
+import { isGamepadEvent } from '../hooks/useGamepad'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react'
+
+let lastFocusedGameId: string | null = null
 
 export default function Library() {
   const [search, setSearch] = useState('')
@@ -19,9 +23,6 @@ export default function Library() {
   const searchRef = useRef<HTMLInputElement>(null)
   const focusAnchorRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    focusAnchorRef.current?.focus()
-  }, [])
 
   const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
     const grid = gridRef.current
@@ -31,11 +32,12 @@ export default function Library() {
       case 'ArrowDown':
       case 'ArrowRight':
         e.preventDefault()
-        firstLink?.focus()
+        if (firstLink) { firstLink.focus(); sounds.navigate() }
         break
       case 'ArrowUp':
         e.preventDefault()
         searchRef.current?.focus()
+        sounds.navigate()
         break
     }
   }, [])
@@ -48,11 +50,47 @@ export default function Library() {
     if (firstLink) {
       e.preventDefault()
       firstLink.focus()
+      sounds.navigate()
     }
   }, [])
 
+  const keyRepeatState = useRef<{ key: string; count: number; time: number }>({
+    key: '', count: 0, time: 0,
+  })
+
+  const saveGridFocus = useCallback(() => {
+    const active = document.activeElement as HTMLElement
+    const gameId = active?.closest<HTMLElement>('[data-game-id]')?.dataset.gameId
+    if (gameId) lastFocusedGameId = gameId
+  }, [])
+
   const handleGridKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      saveGridFocus()
+      sounds.select()
+      return
+    }
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return
+
+    // Throttle held keys with acceleration (gamepad handles its own throttle)
+    if (e.repeat && !isGamepadEvent) {
+      const now = performance.now()
+      const rs = keyRepeatState.current
+      if (rs.key !== e.key) {
+        rs.key = e.key
+        rs.count = 0
+        rs.time = now
+      }
+      const interval = Math.max(50, 180 * 0.8 ** rs.count)
+      if (now - rs.time < interval) {
+        e.preventDefault()
+        return
+      }
+      rs.count++
+      rs.time = now
+    } else {
+      keyRepeatState.current = { key: e.key, count: 0, time: performance.now() }
+    }
 
     const grid = gridRef.current
     if (!grid) return
@@ -73,6 +111,8 @@ export default function Library() {
         break
       case 'ArrowDown':
         nextIndex = currentIndex + cols
+        // If beyond last item, go to last item in next row (or last item overall)
+        if (nextIndex >= links.length) nextIndex = links.length - 1
         break
       case 'ArrowUp':
         nextIndex = currentIndex - cols
@@ -82,12 +122,14 @@ export default function Library() {
     if (e.key === 'ArrowUp' && nextIndex < 0) {
       e.preventDefault()
       focusAnchorRef.current?.focus()
+      sounds.navigate()
       return
     }
 
     if (nextIndex >= 0 && nextIndex < links.length) {
       e.preventDefault()
       links[nextIndex].focus()
+      sounds.navigate()
     }
   }, [])
 
@@ -107,10 +149,33 @@ export default function Library() {
 
   const filtered = games.filter((g) => {
     if (platform && g.platform !== platform) return false
-    if (search && !g.title.toLowerCase().includes(search.toLowerCase()))
-      return false
+    if (search) {
+      const normalize = (s: string) => s.toLowerCase().replace(/[.\-]/g, '')
+      if (!normalize(g.title).includes(normalize(search))) return false
+    }
     return true
   })
+
+  // Restore focus to previously selected game, or focus anchor (on mount only)
+  useEffect(() => {
+    if (isLoading) return
+    const gameId = lastFocusedGameId
+    lastFocusedGameId = null
+    if (gameId && filtered.length > 0) {
+      requestAnimationFrame(() => {
+        const link = gridRef.current?.querySelector<HTMLElement>(`[data-game-id="${gameId}"]`)
+        if (link) {
+          link.focus()
+          link.scrollIntoView({ block: 'center' })
+        } else {
+          focusAnchorRef.current?.focus()
+        }
+      })
+      return
+    }
+    focusAnchorRef.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading])
 
   return (
     <main
@@ -182,7 +247,7 @@ export default function Library() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
           {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="animate-pulse">
-              <div className="aspect-[3/4] bg-surface-raised rounded-lg mb-2" />
+              <div className="aspect-[2/3] bg-surface-raised rounded-lg mb-2" />
               <div className="h-3 bg-surface-raised rounded w-3/4 mb-1.5" />
               <div className="h-2.5 bg-surface-raised rounded w-1/2" />
             </div>
@@ -200,6 +265,7 @@ export default function Library() {
         <div
           ref={gridRef}
           onKeyDown={handleGridKeyDown}
+          onClick={saveGridFocus}
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
         >
           {filtered.map((game) => (

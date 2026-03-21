@@ -8,6 +8,7 @@ import Register from './pages/Register'
 import Admin from './pages/Admin'
 import Account from './pages/Account'
 import Header from './components/Header'
+import { useGamepad } from './hooks/useGamepad'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuth()
@@ -29,6 +30,8 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useGamepad()
+
   return (
     <div className="min-h-screen bg-grid">
       <Routes>

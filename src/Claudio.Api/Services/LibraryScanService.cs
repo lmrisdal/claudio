@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Claudio.Api.Data;
 using Claudio.Shared.Enums;
 using Claudio.Shared.Models;
@@ -5,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Claudio.Api.Services;
 
-public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig config, ILogger<LibraryScanService> logger)
+public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig config, IHttpClientFactory httpClientFactory, ILogger<LibraryScanService> logger)
 {
     public async Task<ScanResult> ScanAsync()
     {
@@ -100,6 +103,21 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
             }
         }
 
+        // Auto-fetch hero images from SteamGridDB
+        if (!string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
+        {
+            try
+            {
+                var heroCount = await FetchSteamGridDbHeroesAsync(db);
+                if (heroCount > 0)
+                    logger.LogInformation("SteamGridDB: added hero images for {Count} games", heroCount);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "SteamGridDB hero fetch failed");
+            }
+        }
+
         logger.LogInformation("Scan complete: {Found} found, {Added} added, {Missing} missing",
             gamesFound, gamesAdded, gamesMissing);
 
@@ -142,6 +160,77 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
         return new DirectoryInfo(directory)
             .EnumerateFiles("*", SearchOption.AllDirectories)
             .Sum(f => f.Length);
+    }
+
+    private async Task<int> FetchSteamGridDbHeroesAsync(AppDbContext db)
+    {
+        var games = await db.Games
+            .Where(g => g.HeroUrl == null && !g.IsMissing)
+            .ToListAsync();
+
+        if (games.Count == 0) return 0;
+
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
+
+        var count = 0;
+        foreach (var game in games)
+        {
+            try
+            {
+                // Search for the game on SteamGridDB
+                var searchRes = await client.GetAsync(
+                    $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(game.Title)}");
+                if (!searchRes.IsSuccessStatusCode) continue;
+
+                var searchJson = await searchRes.Content.ReadAsStringAsync();
+                var searchResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbGame>>>(searchJson);
+                var sgdbGame = searchResult?.Data?.FirstOrDefault();
+                if (sgdbGame is null) continue;
+
+                // Fetch heroes for the game
+                var heroesRes = await client.GetAsync(
+                    $"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGame.Id}");
+                if (!heroesRes.IsSuccessStatusCode) continue;
+
+                var heroesJson = await heroesRes.Content.ReadAsStringAsync();
+                var heroesResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbImage>>>(heroesJson);
+                var heroUrl = heroesResult?.Data?.FirstOrDefault()?.Url;
+                if (heroUrl is null) continue;
+
+                game.HeroUrl = heroUrl;
+                count++;
+                logger.LogInformation("SteamGridDB hero: {Title} -> {Url}", game.Title, heroUrl);
+
+                // Rate limit
+                await Task.Delay(250);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "SteamGridDB hero fetch failed for: {Title}", game.Title);
+            }
+        }
+
+        if (count > 0) await db.SaveChangesAsync();
+        return count;
+    }
+
+    private class SgdbResponse<T>
+    {
+        [JsonPropertyName("data")]
+        public T? Data { get; set; }
+    }
+
+    private class SgdbGame
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+    }
+
+    private class SgdbImage
+    {
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
     }
 
     public record ScanResult(int GamesFound, int GamesAdded, int GamesMissing);
