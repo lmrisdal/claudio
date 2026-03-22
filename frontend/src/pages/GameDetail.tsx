@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import type { Game } from "../types/models";
+import type { CompressionStatus, Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 import { sounds } from "../utils/sounds";
 
@@ -22,6 +22,7 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   async function handleDownload() {
     setPreparing(true);
     try {
+      // Ticket creation also pre-builds the tar if needed
       const { ticket } = await api.post<{ ticket: string }>(
         `/games/${gameId}/download-ticket`,
       );
@@ -33,8 +34,7 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
       a.click();
       document.body.removeChild(a);
     } finally {
-      // Keep spinner briefly so user sees feedback before browser download starts
-      setTimeout(() => setPreparing(false), 2000);
+      setTimeout(() => setPreparing(false), 1000);
     }
   }
 
@@ -83,6 +83,62 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
         </>
       )}
     </button>
+  );
+}
+
+function CompressionProgress({ gameId }: { gameId: number }) {
+  const { data: status } = useQuery({
+    queryKey: ["compressionStatus"],
+    queryFn: () => api.get<CompressionStatus>("/admin/compress/status"),
+    refetchInterval: 2000,
+  });
+
+  const job =
+    status?.current?.gameId === gameId
+      ? status.current
+      : status?.queued.find((q) => q.gameId === gameId);
+  const percent = job?.progressPercent ?? 0;
+  const isQueued = status?.queued.some((q) => q.gameId === gameId);
+
+  // SVG circular progress: radius 10, circumference ~62.83
+  const circumference = 2 * Math.PI * 10;
+  const offset = circumference - (percent / 100) * circumference;
+
+  return (
+    <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-amber-400 bg-amber-500/10 ring-1 ring-amber-500/30">
+      {isQueued ? (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+      ) : (
+        <svg className="w-5 h-5 -rotate-90" viewBox="0 0 24 24">
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            className="opacity-20"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-1000"
+          />
+        </svg>
+      )}
+      {isQueued
+        ? `Queued (${job?.format?.toUpperCase() ?? "ZIP"})...`
+        : `Packaging ${job?.format?.toUpperCase() ?? "ZIP"} ${percent}%`}
+    </span>
   );
 }
 
@@ -219,6 +275,8 @@ export default function GameDetail() {
     series: "",
     franchise: "",
     gameEngine: "",
+    igdbId: "",
+    igdbSlug: "",
   });
 
   useEffect(() => {
@@ -280,6 +338,8 @@ export default function GameDetail() {
   const { data: game, isLoading } = useQuery({
     queryKey: ["game", id],
     queryFn: () => api.get<Game>(`/games/${id}`),
+    refetchInterval: (query) =>
+      query.state.data?.isProcessing ? 3000 : false,
   });
 
   const { data: browseData, isLoading: browseLoading } = useQuery({
@@ -398,11 +458,31 @@ export default function GameDetail() {
       series: string | null;
       franchise: string | null;
       gameEngine: string | null;
+      igdbId: number | null;
+      igdbSlug: string | null;
     }) => api.put<Game>(`/admin/games/${id}`, data),
     onSuccess: (data) => {
       queryClient.setQueryData(["game", id], data);
       queryClient.invalidateQueries({ queryKey: ["games"] });
       setEditing(false);
+    },
+  });
+
+  const compressMutation = useMutation({
+    mutationFn: (format: string) =>
+      api.post(`/admin/games/${id}/compress?format=${format}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["game", id] });
+      queryClient.invalidateQueries({ queryKey: ["compressionStatus"] });
+      setEditing(false);
+    },
+  });
+
+  const tagFolderMutation = useMutation({
+    mutationFn: () => api.post<Game>(`/admin/games/${id}/tag-folder`),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["game", id], data);
+      queryClient.invalidateQueries({ queryKey: ["games"] });
     },
   });
 
@@ -424,6 +504,8 @@ export default function GameDetail() {
       series: game.series ?? "",
       franchise: game.franchise ?? "",
       gameEngine: game.gameEngine ?? "",
+      igdbId: game.igdbId?.toString() ?? "",
+      igdbSlug: game.igdbSlug ?? "",
     });
     setEditing(true);
   }
@@ -446,6 +528,8 @@ export default function GameDetail() {
       series: editForm.series || null,
       franchise: editForm.franchise || null,
       gameEngine: editForm.gameEngine || null,
+      igdbId: editForm.igdbId ? parseInt(editForm.igdbId) : null,
+      igdbSlug: editForm.igdbSlug || null,
     });
   }
 
@@ -743,6 +827,49 @@ export default function GameDetail() {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      IGDB ID
+                    </label>
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        type="number"
+                        value={editForm.igdbId}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, igdbId: e.target.value })
+                        }
+                        placeholder="e.g. 12345"
+                        className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                      />
+                      {game.igdbId && !game.folderName.includes(`igdb-${game.igdbId}`) && (
+                        <button
+                          type="button"
+                          onClick={() => tagFolderMutation.mutate()}
+                          disabled={tagFolderMutation.isPending}
+                          className="shrink-0 px-3 py-2 rounded-lg text-xs text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
+                          title={`Rename folder to add (igdb-${game.igdbId})`}
+                        >
+                          {tagFolderMutation.isPending ? "Tagging..." : "Tag folder"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      IGDB Slug
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.igdbSlug}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, igdbSlug: e.target.value })
+                      }
+                      placeholder="e.g. the-witcher-3"
+                      className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                    />
+                  </div>
+                </div>
                 <div>
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
@@ -761,6 +888,29 @@ export default function GameDetail() {
                     value={editForm.coverUrl}
                     onChange={(e) =>
                       setEditForm({ ...editForm, coverUrl: e.target.value })
+                    }
+                    placeholder="https://..."
+                    className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                      Hero URL
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openSgdbDialog("heroes")}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      Search SteamGridDB
+                    </button>
+                  </div>
+                  <input
+                    type="url"
+                    value={editForm.heroUrl}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, heroUrl: e.target.value })
                     }
                     placeholder="https://..."
                     className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
@@ -836,7 +986,34 @@ export default function GameDetail() {
                   >
                     Cancel
                   </button>
+                  {!game.isArchive && !game.isProcessing && (
+                    <div className="ml-auto flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => compressMutation.mutate("zip")}
+                        disabled={compressMutation.isPending}
+                        className="px-4 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
+                      >
+                        {compressMutation.isPending ? "Queuing..." : "Package as ZIP"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => compressMutation.mutate("tar")}
+                        disabled={compressMutation.isPending}
+                        className="px-4 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
+                      >
+                        {compressMutation.isPending ? "Queuing..." : "Package as TAR"}
+                      </button>
+                    </div>
+                  )}
                 </div>
+                {compressMutation.isError && (
+                  <p className="text-sm text-red-400">
+                    {compressMutation.error instanceof Error
+                      ? compressMutation.error.message
+                      : "Compression failed"}
+                  </p>
+                )}
               </form>
             ) : (
               /* Display view */
@@ -848,8 +1025,9 @@ export default function GameDetail() {
                   {user?.role === "admin" && (<>
                     <button
                       onClick={startEditing}
-                      className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
-                      title="Edit game"
+                      disabled={game.isProcessing}
+                      className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={game.isProcessing ? "Cannot edit while processing" : "Edit game"}
                     >
                       <svg
                         className="w-4 h-4"
@@ -931,6 +1109,19 @@ export default function GameDetail() {
                         ? "Installer"
                         : "Portable"}
                     </span>
+                  )}
+                  {game.igdbSlug && (
+                    <a
+                      href={`https://www.igdb.com/games/${game.igdbSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-500/10 ring-1 ring-purple-500/20 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition"
+                    >
+                      IGDB
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                    </a>
                   )}
                 </div>
 
@@ -1044,7 +1235,11 @@ export default function GameDetail() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <DownloadButton gameId={game.id} size={game.sizeBytes} />
+                  {game.isProcessing ? (
+                    <CompressionProgress gameId={game.id} />
+                  ) : (
+                    <DownloadButton gameId={game.id} size={game.sizeBytes} />
+                  )}
                 </div>
               </>
             )}

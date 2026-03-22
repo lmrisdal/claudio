@@ -67,11 +67,13 @@ public class IgdbService(
 
                 logger.LogInformation("Matched: {Title} -> {IgdbName} (IGDB #{IgdbId})", game.Title, result.Name, result.IgdbId);
                 game.Title = result.Name;
+                if (ShouldReplaceCover(game, result.IgdbId))
+                    game.CoverUrl = result.CoverUrl;
                 game.IgdbId = result.IgdbId;
+                game.IgdbSlug = result.Slug;
                 game.Summary = result.Summary;
                 game.Genre = result.Genre;
                 game.ReleaseYear = result.ReleaseYear;
-                game.CoverUrl = result.CoverUrl;
                 game.Developer = result.Developer;
                 game.Publisher = result.Publisher;
                 game.GameMode = result.GameMode;
@@ -147,11 +149,13 @@ public class IgdbService(
             ?? throw new InvalidOperationException("IGDB game not found.");
 
         game.Title = candidate.Name;
+        if (ShouldReplaceCover(game, candidate.IgdbId))
+            game.CoverUrl = candidate.CoverUrl;
         game.IgdbId = candidate.IgdbId;
+        game.IgdbSlug = candidate.Slug;
         game.Summary = candidate.Summary;
         game.Genre = candidate.Genre;
         game.ReleaseYear = candidate.ReleaseYear;
-        game.CoverUrl = candidate.CoverUrl;
         game.Developer = candidate.Developer;
         game.Publisher = candidate.Publisher;
         game.GameMode = candidate.GameMode;
@@ -161,6 +165,14 @@ public class IgdbService(
         await db.SaveChangesAsync();
 
         logger.LogInformation("Matched: {Title} -> IGDB #{IgdbId}", game.Title, igdbId);
+    }
+
+    /// Replace cover if: no existing cover, existing cover is from IGDB, or the IGDB ID changed.
+    private static bool ShouldReplaceCover(Game game, long newIgdbId)
+    {
+        if (string.IsNullOrEmpty(game.CoverUrl)) return true;
+        if (game.IgdbId != newIgdbId) return true;
+        return game.CoverUrl.StartsWith("https://images.igdb.com", StringComparison.OrdinalIgnoreCase);
     }
 
     private void EnsureConfigured()
@@ -176,7 +188,7 @@ public class IgdbService(
         client.DefaultRequestHeaders.Add("Client-ID", config.Igdb.ClientId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var query = $"where id = {igdbId}; fields name,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name; limit 1;";
+        var query = $"where id = {igdbId}; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name; limit 1;";
         var response = await client.PostAsync("https://api.igdb.com/v4/games", new StringContent(query));
         response.EnsureSuccessStatusCode();
 
@@ -202,7 +214,7 @@ public class IgdbService(
             var end = new DateTimeOffset(year.Value, 12, 31, 23, 59, 59, TimeSpan.Zero).ToUnixTimeSeconds();
             whereClause = $" where first_release_date >= {start} & first_release_date <= {end};";
         }
-        var query = $"""search "{searchTitle}"; fields name,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name;{whereClause} limit 10;""";
+        var query = $"""search "{searchTitle}"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name;{whereClause} limit 10;""";
 
         var response = await client.PostAsync(
             "https://api.igdb.com/v4/games",
@@ -260,7 +272,7 @@ public class IgdbService(
         if (match.GameEngines is { Count: > 0 })
             gameEngine = string.Join(", ", match.GameEngines.Select(e => e.Name));
 
-        return new IgdbCandidate(match.Id, match.Name ?? "", match.Summary, genre, releaseYear, coverUrl,
+        return new IgdbCandidate(match.Id, match.Name ?? "", match.Slug, match.Summary, genre, releaseYear, coverUrl,
             developer, publisher, gameMode, series, franchise, gameEngine);
     }
 
@@ -286,7 +298,7 @@ public class IgdbService(
 
     public record IgdbScanResult(int Total, int Matched, int Skipped);
     public record IgdbCandidate(
-        long IgdbId, string Name, string? Summary, string? Genre, int? ReleaseYear, string? CoverUrl,
+        long IgdbId, string Name, string? Slug, string? Summary, string? Genre, int? ReleaseYear, string? CoverUrl,
         string? Developer, string? Publisher, string? GameMode, string? Series, string? Franchise, string? GameEngine);
 
     private class TwitchTokenResponse
@@ -305,6 +317,9 @@ public class IgdbService(
 
         [JsonPropertyName("name")]
         public string? Name { get; set; }
+
+        [JsonPropertyName("slug")]
+        public string? Slug { get; set; }
 
         [JsonPropertyName("summary")]
         public string? Summary { get; set; }

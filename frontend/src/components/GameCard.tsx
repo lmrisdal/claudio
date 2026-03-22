@@ -9,7 +9,7 @@ export default function GameCard({ game }: { game: Game }) {
       data-game-id={game.id}
       className={`group outline-none ${game.isMissing ? "opacity-50" : ""}`}
     >
-      <div className="aspect-2/3 bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:outline-2 group-focus-visible:outline-accent group-focus-visible:outline-offset-2 transition-all duration-200 relative">
+      <div className="aspect-2/3 bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:outline-2 group-focus-visible:outline-accent group-focus-visible:outline-offset-4 transition-all duration-200 relative">
         {game.isMissing && (
           <div className="absolute top-2 right-2 z-10 bg-red-500/90 text-white text-[10px] font-bold uppercase px-1.5 py-0.5 rounded">
             Missing

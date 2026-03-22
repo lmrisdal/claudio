@@ -9,8 +9,12 @@ public class DownloadService
     public async Task<string> CreateTarAsync(Game game)
     {
         var tarPath = Path.Combine(Path.GetTempPath(), $"claudio-game-{game.Id}.tar");
-        if (File.Exists(tarPath)) File.Delete(tarPath);
 
+        // Reuse existing tar if it was created recently (within 10 minutes)
+        if (File.Exists(tarPath) && File.GetLastWriteTimeUtc(tarPath) > DateTime.UtcNow.AddMinutes(-10))
+            return tarPath;
+
+        if (File.Exists(tarPath)) File.Delete(tarPath);
         await TarFile.CreateFromDirectoryAsync(game.FolderPath, tarPath, includeBaseDirectory: true);
         return tarPath;
     }

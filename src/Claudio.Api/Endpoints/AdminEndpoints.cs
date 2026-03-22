@@ -28,6 +28,10 @@ public static class AdminEndpoints
         group.MapPost("/games/{id:int}/igdb/search", SearchGameIgdb);
         group.MapPost("/igdb/search", SearchIgdbFreeText);
         group.MapPost("/games/{id:int}/igdb/apply", ApplyGameIgdb);
+        group.MapPost("/games/{id:int}/compress", QueueCompression);
+        group.MapPost("/games/{id:int}/compress/cancel", CancelCompression);
+        group.MapGet("/compress/status", GetCompressionStatus);
+        group.MapPost("/games/{id:int}/tag-folder", TagFolder);
         group.MapDelete("/games/{id:int}", DeleteGame);
         group.MapGet("/steamgriddb/search", SearchSteamGridDb);
         group.MapGet("/steamgriddb/{sgdbGameId:long}/covers", GetSteamGridDbCovers);
@@ -147,6 +151,7 @@ public static class AdminEndpoints
     {
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
+        if (game.IsProcessing) return Results.Conflict("Game is currently being processed.");
 
         game.Title = request.Title;
         game.Summary = request.Summary;
@@ -163,8 +168,77 @@ public static class AdminEndpoints
         game.Series = request.Series;
         game.Franchise = request.Franchise;
         game.GameEngine = request.GameEngine;
+        game.IgdbId = request.IgdbId;
+        game.IgdbSlug = request.IgdbId is null ? null : request.IgdbSlug;
         await db.SaveChangesAsync();
 
+        return Results.Ok(GameEndpoints.ToDto(game));
+    }
+
+    private static async Task<IResult> QueueCompression(
+        int id, [FromQuery] string? format, AppDbContext db, CompressionService compressionService)
+    {
+        var fmt = format ?? "zip";
+        if (fmt is not "zip" and not "tar")
+            return Results.BadRequest("Format must be 'zip' or 'tar'.");
+
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+        if (game.IsProcessing) return Results.Conflict("Game is already being processed.");
+
+        if (!Directory.Exists(game.FolderPath))
+            return Results.Problem("Game folder not found on disk.", statusCode: 404);
+
+        var singleArchive = GameEndpoints.FindSingleArchive(game.FolderPath);
+        if (singleArchive is not null)
+            return Results.BadRequest("Game is already a single archive.");
+
+        await compressionService.QueueCompressionAsync(id, fmt);
+        return Results.Accepted();
+    }
+
+    private static async Task<IResult> CancelCompression(int id, CompressionService compressionService)
+    {
+        await compressionService.CancelCompressionAsync(id);
+        return Results.NoContent();
+    }
+
+    private static IResult GetCompressionStatus(CompressionService compressionService)
+    {
+        return Results.Ok(compressionService.GetStatus());
+    }
+
+    private static async Task<IResult> TagFolder(int id, AppDbContext db, ILogger<AppDbContext> logger)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        if (game.IgdbId is null)
+            return Results.BadRequest("Game has no IGDB match.");
+
+        var tag = $"(igdb-{game.IgdbId})";
+
+        // Already tagged?
+        if (game.FolderName.Contains(tag, StringComparison.OrdinalIgnoreCase))
+            return Results.Ok(GameEndpoints.ToDto(game));
+
+        if (!Directory.Exists(game.FolderPath))
+            return Results.Problem("Game folder not found on disk.", statusCode: 404);
+
+        var parentDir = Path.GetDirectoryName(game.FolderPath)!;
+        var newFolderName = $"{game.FolderName} {tag}";
+        var newFolderPath = Path.Combine(parentDir, newFolderName);
+
+        if (Directory.Exists(newFolderPath))
+            return Results.Problem("Target folder already exists.", statusCode: 409);
+
+        Directory.Move(game.FolderPath, newFolderPath);
+
+        game.FolderName = newFolderName;
+        game.FolderPath = newFolderPath;
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Tagged folder: {OldName} -> {NewName}", game.FolderName, newFolderName);
         return Results.Ok(GameEndpoints.ToDto(game));
     }
 
@@ -183,7 +257,9 @@ public static class AdminEndpoints
         string? GameMode,
         string? Series,
         string? Franchise,
-        string? GameEngine);
+        string? GameEngine,
+        long? IgdbId,
+        string? IgdbSlug);
     public record IgdbApplyRequest(long IgdbId);
     public record IgdbSearchRequest(string Query);
 

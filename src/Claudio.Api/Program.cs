@@ -59,6 +59,8 @@ builder.Services.AddSingleton<DownloadTicketService>();
 builder.Services.AddSingleton<LibraryScanService>();
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddSingleton<IgdbService>();
+builder.Services.AddSingleton<CompressionService>();
+builder.Services.AddHostedService<CompressionBackgroundService>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();

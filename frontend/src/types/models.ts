@@ -10,6 +10,7 @@ export interface Game {
   coverUrl?: string;
   heroUrl?: string;
   igdbId?: number;
+  igdbSlug?: string;
   sizeBytes: number;
   isMissing: boolean;
   installerExe?: string;
@@ -20,6 +21,20 @@ export interface Game {
   series?: string;
   franchise?: string;
   gameEngine?: string;
+  isProcessing: boolean;
+  isArchive: boolean;
+}
+
+export interface CompressionJobInfo {
+  gameId: number;
+  gameTitle: string;
+  progressPercent?: number;
+  format: string;
+}
+
+export interface CompressionStatus {
+  current: CompressionJobInfo | null;
+  queued: CompressionJobInfo[];
 }
 
 export interface User {

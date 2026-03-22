@@ -15,6 +15,7 @@ public class GameDto
     public string? CoverUrl { get; set; }
     public string? HeroUrl { get; set; }
     public long? IgdbId { get; set; }
+    public string? IgdbSlug { get; set; }
     public long SizeBytes { get; set; }
     public bool IsMissing { get; set; }
     public string? InstallerExe { get; set; }
@@ -25,4 +26,6 @@ public class GameDto
     public string? Series { get; set; }
     public string? Franchise { get; set; }
     public string? GameEngine { get; set; }
+    public bool IsProcessing { get; set; }
+    public bool IsArchive { get; set; }
 }

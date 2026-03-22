@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Claudio.Api.Services;
 
-public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig config, IHttpClientFactory httpClientFactory, ILogger<LibraryScanService> logger)
+public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig config, IHttpClientFactory httpClientFactory, CompressionService compressionService, ILogger<LibraryScanService> logger)
 {
     public async Task<ScanResult> ScanAsync()
     {
@@ -43,6 +43,9 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
 
                     var existing = await db.Games
                         .FirstOrDefaultAsync(g => g.Platform == platform && g.FolderName == folderName);
+
+                    // Clean up leftover compression temp files
+                    CleanupTempFiles(gameDir);
 
                     if (existing is not null)
                     {
@@ -122,6 +125,28 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
             gamesFound, gamesAdded, gamesMissing);
 
         return new ScanResult(gamesFound, gamesAdded, gamesMissing);
+    }
+
+    private void CleanupTempFiles(string gameDir)
+    {
+        try
+        {
+            foreach (var tmpFile in Directory.GetFiles(gameDir, ".claudio-compress-*.zip.tmp"))
+            {
+                // Extract game ID from filename pattern: .claudio-compress-{id}.zip.tmp
+                var fileName = Path.GetFileName(tmpFile);
+                var idStr = fileName.Replace(".claudio-compress-", "").Replace(".zip.tmp", "");
+                if (int.TryParse(idStr, out var gameId) && compressionService.IsGameActive(gameId))
+                    continue;
+
+                logger.LogInformation("Cleaning up stale compression temp file: {Path}", tmpFile);
+                File.Delete(tmpFile);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to clean up temp files in {Dir}", gameDir);
+        }
     }
 
     private static InstallType DetectInstallType(string directory)

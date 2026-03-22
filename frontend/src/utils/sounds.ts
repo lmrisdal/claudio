@@ -49,5 +49,5 @@ export async function playSound(url: string, volume: number, lpFreq = 1000) {
 export const sounds = {
   navigate: () => playSound("/tap_01.wav", 0.8, 300),
   select: () => playSound("/toggle_on.wav", 0.7, 700),
-  back: () => playSound("/toggle_off.wav", 0.4, 700),
+  back: () => playSound("/toggle_off.wav", 0.7, 700),
 };

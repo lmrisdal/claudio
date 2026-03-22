@@ -50,13 +50,19 @@ public static class GameEndpoints
         return Results.Ok(ToDto(game));
     }
 
-    private static async Task<IResult> CreateDownloadTicket(int id, AppDbContext db, DownloadTicketService ticketService)
+    private static async Task<IResult> CreateDownloadTicket(int id, AppDbContext db, DownloadTicketService ticketService, DownloadService downloadService)
     {
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
+        if (game.IsProcessing) return Results.Conflict("Game is currently being processed.");
 
         if (!Directory.Exists(game.FolderPath))
             return Results.Problem("Game files not found on disk.", statusCode: 500);
+
+        // Pre-build tar if needed so the download endpoint can serve it immediately
+        var singleArchive = FindSingleArchive(game.FolderPath);
+        if (singleArchive is null)
+            await downloadService.CreateTarAsync(game);
 
         var ticket = ticketService.CreateTicket(id);
         return Results.Ok(new { ticket });
@@ -120,6 +126,7 @@ public static class GameEndpoints
         CoverUrl = game.CoverUrl,
         HeroUrl = game.HeroUrl,
         IgdbId = game.IgdbId,
+        IgdbSlug = game.IgdbSlug,
         SizeBytes = game.SizeBytes,
         IsMissing = game.IsMissing,
         InstallerExe = game.InstallerExe,
@@ -130,6 +137,8 @@ public static class GameEndpoints
         Series = game.Series,
         Franchise = game.Franchise,
         GameEngine = game.GameEngine,
+        IsProcessing = game.IsProcessing,
+        IsArchive = Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is not null,
     };
 
     public record BrowseEntry(string Name, bool IsDirectory, long? Size);

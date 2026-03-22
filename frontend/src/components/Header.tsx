@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import Logo from "./Logo";
 import SearchDialog from "./SearchDialog";
+import TasksPopover from "./TasksPopover";
 
 export default function Header() {
   const { isLoggedIn, isAdmin, user, logout } = useAuth();
@@ -99,12 +100,15 @@ export default function Header() {
             {isLoggedIn ? (
               <>
                 {isAdmin && (
-                  <Link
-                    to="/admin"
-                    className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
-                  >
-                    Admin
-                  </Link>
+                  <>
+                    <TasksPopover />
+                    <Link
+                      to="/admin"
+                      className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
+                    >
+                      Admin
+                    </Link>
+                  </>
                 )}
                 <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
                   <Link
