@@ -37,6 +37,28 @@ export interface CompressionStatus {
   queued: CompressionJobInfo[];
 }
 
+export interface IgdbScanStatus {
+  isRunning: boolean;
+  currentGame: string | null;
+  total: number;
+  processed: number;
+  matched: number;
+}
+
+export interface SteamGridDbScanStatus {
+  isRunning: boolean;
+  currentGame: string | null;
+  total: number;
+  processed: number;
+  matched: number;
+}
+
+export interface TasksStatus {
+  compression: CompressionStatus;
+  igdb: IgdbScanStatus;
+  steamGridDb: SteamGridDbScanStatus;
+}
+
 export interface User {
   id: number;
   username: string;

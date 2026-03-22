@@ -1,13 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { Game } from '../types/models'
+import type { Game, TasksStatus } from '../types/models'
 import GameCard from '../components/GameCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { formatPlatform } from '../utils/platforms'
 import { sounds } from '../utils/sounds'
 import { isGamepadEvent } from '../hooks/useGamepad'
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react'
 
 let lastFocusedGameId: string | null = null
 
@@ -22,7 +21,20 @@ function formatSize(bytes: number): string {
 
 export default function Library() {
   const navigate = useNavigate()
-  const [platform, setPlatform] = useState('')
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('library-platforms')
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
+    } catch { return new Set() }
+  })
+  const [platformOrder, setPlatformOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('library-platform-order')
+      return saved ? JSON.parse(saved) as string[] : []
+    } catch { return [] }
+  })
+  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false)
+  const platformDropdownRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<ViewMode>(() =>
     (localStorage.getItem('library-view') as ViewMode) || 'grouped'
   )
@@ -41,9 +53,18 @@ export default function Library() {
     } catch { return new Set() }
   })
 
+  // Subscribe to tasks status cache (populated by TasksPopover for admins)
+  const { data: tasksData } = useQuery({
+    queryKey: ['tasksStatus'],
+    queryFn: () => api.get<TasksStatus>('/admin/tasks/status'),
+    enabled: false,
+  })
+  const hasActiveTasks = tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning
+
   const { data: games = [], isLoading } = useQuery({
     queryKey: ['games'],
     queryFn: () => api.get<Game[]>('/games'),
+    refetchInterval: hasActiveTasks ? 5000 : false,
   })
 
   const gridRef = useRef<HTMLDivElement>(null)
@@ -139,6 +160,7 @@ export default function Library() {
             sounds.navigate()
           } else if (toggleIndex + 1 < toggles.length) {
             toggles[toggleIndex + 1].focus()
+            toggles[toggleIndex + 1].scrollIntoView({ block: 'nearest' })
             sounds.navigate()
           }
           return
@@ -156,6 +178,7 @@ export default function Library() {
               prevLinks[lastRowStart].focus()
             } else {
               toggles[toggleIndex - 1].focus()
+              toggles[toggleIndex - 1].scrollIntoView({ block: 'nearest' })
             }
             sounds.navigate()
           } else {
@@ -249,6 +272,7 @@ export default function Library() {
             if (nextToggle) {
               e.preventDefault()
               nextToggle.focus()
+              nextToggle.scrollIntoView({ block: 'nearest' })
               sounds.navigate()
             }
           }
@@ -268,6 +292,7 @@ export default function Library() {
           if (toggle) {
             e.preventDefault()
             toggle.focus()
+            toggle.scrollIntoView({ block: 'nearest' })
             sounds.navigate()
           } else {
             e.preventDefault()
@@ -291,12 +316,39 @@ export default function Library() {
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [])
 
-  const platforms = [...new Set(games.map((g) => g.platform))].sort()
+  const allPlatforms = [...new Set(games.map((g) => g.platform))].sort()
+
+  // Merge saved order with any new platforms (new ones go at the end)
+  const platforms = [
+    ...platformOrder.filter(p => allPlatforms.includes(p)),
+    ...allPlatforms.filter(p => !platformOrder.includes(p)),
+  ]
 
   const filtered = games.filter((g) => {
-    if (platform && g.platform !== platform) return false
+    if (selectedPlatforms.size > 0 && !selectedPlatforms.has(g.platform)) return false
     return true
   })
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!platformDropdownOpen) return
+    function handleClick(e: MouseEvent) {
+      if (!platformDropdownRef.current?.contains(e.target as Node)) {
+        setPlatformDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [platformDropdownOpen])
+
+  function movePlatform(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= platforms.length) return
+    const newOrder = [...platforms]
+    ;[newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]]
+    setPlatformOrder(newOrder)
+    localStorage.setItem('library-platform-order', JSON.stringify(newOrder))
+  }
 
   const sorted = view === 'list'
     ? [...filtered].sort((a, b) => {
@@ -346,33 +398,81 @@ export default function Library() {
     >
       {/* Toolbar */}
       <div className="flex gap-3 mb-8 items-center" onKeyDown={handleToolbarKeyDown}>
-        <Listbox value={platform} onChange={setPlatform}>
-          <div className="relative min-w-[160px]">
-            <ListboxButton className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition flex items-center justify-between gap-2">
-              <span>{platform ? formatPlatform(platform) : 'All platforms'}</span>
-              <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-              </svg>
-            </ListboxButton>
-            <ListboxOptions className="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm focus:outline-none">
-              <ListboxOption
-                value=""
-                className="px-4 py-2 cursor-pointer data-[focus]:bg-surface-raised data-[selected]:text-accent transition-colors"
+        <div className="relative min-w-[160px]" ref={platformDropdownRef}>
+          <button
+            onClick={() => setPlatformDropdownOpen(v => !v)}
+            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition flex items-center justify-between gap-2"
+          >
+            <span className="truncate">
+              {selectedPlatforms.size === 0
+                ? 'All platforms'
+                : selectedPlatforms.size === 1
+                  ? formatPlatform([...selectedPlatforms][0])
+                  : `${selectedPlatforms.size} platforms`}
+            </span>
+            <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+            </svg>
+          </button>
+          {platformDropdownOpen && (
+            <div className="absolute z-20 mt-1 w-full min-w-[200px] max-h-80 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm">
+              <button
+                onClick={() => {
+                  setSelectedPlatforms(new Set())
+                  localStorage.setItem('library-platforms', '[]')
+                }}
+                className={`w-full px-4 py-2 text-left transition-colors hover:bg-surface-raised ${selectedPlatforms.size === 0 ? 'text-accent' : ''}`}
               >
                 All platforms
-              </ListboxOption>
-              {platforms.map((p) => (
-                <ListboxOption
+              </button>
+              {platforms.map((p, i) => (
+                <div
                   key={p}
-                  value={p}
-                  className="px-4 py-2 cursor-pointer data-[focus]:bg-surface-raised data-[selected]:text-accent transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-surface-raised transition-colors cursor-pointer"
+                  onClick={() => {
+                    setSelectedPlatforms(prev => {
+                      const next = new Set(prev)
+                      next.has(p) ? next.delete(p) : next.add(p)
+                      localStorage.setItem('library-platforms', JSON.stringify([...next]))
+                      return next
+                    })
+                  }}
                 >
-                  {formatPlatform(p)}
-                </ListboxOption>
+                  <div className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-colors ${selectedPlatforms.has(p) ? 'bg-accent border-accent' : 'border-border'}`}>
+                    {selectedPlatforms.has(p) && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="flex-1">{formatPlatform(p)}</span>
+                  {view === 'grouped' && (
+                    <div className="flex flex-col -my-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); movePlatform(i, -1) }}
+                        disabled={i === 0}
+                        className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:hover:text-text-muted transition-colors p-0.5"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); movePlatform(i, 1) }}
+                        disabled={i === platforms.length - 1}
+                        className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:hover:text-text-muted transition-colors p-0.5"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
-            </ListboxOptions>
-          </div>
-        </Listbox>
+            </div>
+          )}
+        </div>
         <div className="flex rounded-lg border border-border overflow-hidden ml-auto">
           <button
             onClick={() => { setView('grid'); localStorage.setItem('library-view', 'grid') }}
@@ -408,7 +508,8 @@ export default function Library() {
       {!isLoading && (
         <p className="text-xs text-text-muted mb-4 font-mono">
           {filtered.length} {filtered.length === 1 ? 'game' : 'games'}
-          {platform && ` in ${formatPlatform(platform)}`}
+          {selectedPlatforms.size === 1 && ` in ${formatPlatform([...selectedPlatforms][0])}`}
+          {selectedPlatforms.size > 1 && ` across ${selectedPlatforms.size} platforms`}
         </p>
       )}
 

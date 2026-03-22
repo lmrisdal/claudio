@@ -8,8 +8,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Claudio.Api.Services;
 
-public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig config, IHttpClientFactory httpClientFactory, CompressionService compressionService, ILogger<LibraryScanService> logger)
+public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig config, IHttpClientFactory httpClientFactory, CompressionService compressionService, IgdbService igdbService, ILogger<LibraryScanService> logger)
 {
+    private readonly Lock _statusLock = new();
+    private SteamGridDbScanStatus _sgdbStatus = new(false, null, 0, 0, 0);
+
+    public SteamGridDbScanStatus GetSteamGridDbStatus()
+    {
+        lock (_statusLock) { return _sgdbStatus; }
+    }
+
     public async Task<ScanResult> ScanAsync()
     {
         using var scope = scopeFactory.CreateScope();
@@ -131,39 +139,42 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
 
         await db.SaveChangesAsync();
 
-        // Auto-match new games against IGDB
-        if (gamesAdded > 0 && !string.IsNullOrEmpty(config.Igdb.ClientId))
-        {
-            try
-            {
-                var igdbService = scope.ServiceProvider.GetRequiredService<IgdbService>();
-                var igdbResult = await igdbService.ScanAsync();
-                logger.LogInformation("IGDB auto-match: {Matched} matched, {Skipped} skipped",
-                    igdbResult.Matched, igdbResult.Skipped);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "IGDB auto-match failed");
-            }
-        }
-
-        // Auto-fetch hero images from SteamGridDB
-        if (!string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
-        {
-            try
-            {
-                var heroCount = await FetchSteamGridDbHeroesAsync(db);
-                if (heroCount > 0)
-                    logger.LogInformation("SteamGridDB: added hero images for {Count} games", heroCount);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "SteamGridDB hero fetch failed");
-            }
-        }
-
         logger.LogInformation("Scan complete: {Found} found, {Added} added, {Missing} missing",
             gamesFound, gamesAdded, gamesMissing);
+
+        // Kick off IGDB matching in the background
+        if (gamesAdded > 0 && !string.IsNullOrEmpty(config.Igdb.ClientId))
+        {
+            try { igdbService.StartScanInBackground(); }
+            catch (InvalidOperationException) { /* already running */ }
+        }
+
+        // Kick off SteamGridDB hero fetch in the background
+        if (!string.IsNullOrEmpty(config.Steamgriddb.ApiKey))
+        {
+            lock (_statusLock)
+            {
+                _sgdbStatus = new SteamGridDbScanStatus(true, null, 0, 0, 0);
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var bgScope = scopeFactory.CreateScope();
+                    var bgDb = bgScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    await FetchSteamGridDbHeroesStreamingAsync(bgDb);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "SteamGridDB hero fetch failed");
+                    lock (_statusLock)
+                    {
+                        _sgdbStatus = new SteamGridDbScanStatus(false, null, 0, 0, 0);
+                    }
+                }
+            });
+        }
 
         return new ScanResult(gamesFound, gamesAdded, gamesMissing);
     }
@@ -228,56 +239,201 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
             .Sum(f => f.Length);
     }
 
+    /// Processes games as they get IGDB-matched, without waiting for the full IGDB scan to finish.
+    private async Task FetchSteamGridDbHeroesStreamingAsync(AppDbContext db)
+    {
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
+
+        var processed = new HashSet<int>();
+        var matched = 0;
+        var totalProcessed = 0;
+
+        try
+        {
+            while (true)
+            {
+                // Find games that have an IGDB match but no hero, excluding already-processed ones
+                var candidates = await db.Games
+                    .Where(g => g.IgdbId != null && g.HeroUrl == null && !g.IsMissing)
+                    .ToListAsync();
+
+                var batch = candidates.Where(g => !processed.Contains(g.Id)).ToList();
+
+                if (batch.Count == 0)
+                {
+                    // If IGDB is still running, wait for more matches
+                    if (igdbService.GetScanStatus().IsRunning)
+                    {
+                        await Task.Delay(2000);
+                        continue;
+                    }
+                    // One final check after IGDB finished
+                    candidates = await db.Games
+                        .Where(g => g.IgdbId != null && g.HeroUrl == null && !g.IsMissing)
+                        .ToListAsync();
+                    batch = candidates.Where(g => !processed.Contains(g.Id)).ToList();
+                    if (batch.Count == 0) break;
+                }
+
+                lock (_statusLock)
+                {
+                    _sgdbStatus = new SteamGridDbScanStatus(true, null, totalProcessed + batch.Count, totalProcessed, matched);
+                }
+
+                foreach (var game in batch)
+                {
+                    lock (_statusLock)
+                    {
+                        _sgdbStatus = _sgdbStatus with { CurrentGame = game.Title };
+                    }
+
+                    processed.Add(game.Id);
+                    try
+                    {
+                        var searchRes = await client.GetAsync(
+                            $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(game.Title)}");
+                        if (!searchRes.IsSuccessStatusCode) { totalProcessed++; continue; }
+
+                        var searchJson = await searchRes.Content.ReadAsStringAsync();
+                        var searchResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbGame>>>(searchJson);
+                        var sgdbGame = searchResult?.Data?.FirstOrDefault();
+                        if (sgdbGame is null) { totalProcessed++; continue; }
+
+                        var heroesRes = await client.GetAsync(
+                            $"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGame.Id}");
+                        if (!heroesRes.IsSuccessStatusCode) { totalProcessed++; continue; }
+
+                        var heroesJson = await heroesRes.Content.ReadAsStringAsync();
+                        var heroesResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbImage>>>(heroesJson);
+                        var heroUrl = heroesResult?.Data?.FirstOrDefault()?.Url;
+                        if (heroUrl is null) { totalProcessed++; continue; }
+
+                        game.HeroUrl = heroUrl;
+                        matched++;
+                        totalProcessed++;
+                        await db.SaveChangesAsync();
+                        logger.LogInformation("SteamGridDB hero: {Title} -> {Url}", game.Title, heroUrl);
+
+                        lock (_statusLock)
+                        {
+                            _sgdbStatus = _sgdbStatus with { Matched = matched, Processed = totalProcessed };
+                        }
+
+                        await Task.Delay(250);
+                    }
+                    catch (Exception ex)
+                    {
+                        totalProcessed++;
+                        logger.LogWarning(ex, "SteamGridDB hero fetch failed for: {Title}", game.Title);
+                        lock (_statusLock)
+                        {
+                            _sgdbStatus = _sgdbStatus with { Processed = totalProcessed };
+                        }
+                    }
+                }
+            }
+
+            if (matched > 0)
+                logger.LogInformation("SteamGridDB: added hero images for {Count} games", matched);
+        }
+        finally
+        {
+            lock (_statusLock)
+            {
+                _sgdbStatus = new SteamGridDbScanStatus(false, null, 0, 0, 0);
+            }
+        }
+    }
+
     private async Task<int> FetchSteamGridDbHeroesAsync(AppDbContext db)
     {
         var games = await db.Games
             .Where(g => g.HeroUrl == null && !g.IsMissing)
             .ToListAsync();
 
-        if (games.Count == 0) return 0;
+        if (games.Count == 0)
+        {
+            lock (_statusLock) { _sgdbStatus = new SteamGridDbScanStatus(false, null, 0, 0, 0); }
+            return 0;
+        }
 
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
 
         var count = 0;
-        foreach (var game in games)
+        var processed = 0;
+
+        lock (_statusLock)
         {
-            try
+            _sgdbStatus = new SteamGridDbScanStatus(true, null, games.Count, 0, 0);
+        }
+
+        try
+        {
+            foreach (var game in games)
             {
-                // Search for the game on SteamGridDB
-                var searchRes = await client.GetAsync(
-                    $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(game.Title)}");
-                if (!searchRes.IsSuccessStatusCode) continue;
+                lock (_statusLock)
+                {
+                    _sgdbStatus = _sgdbStatus with { CurrentGame = game.Title };
+                }
 
-                var searchJson = await searchRes.Content.ReadAsStringAsync();
-                var searchResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbGame>>>(searchJson);
-                var sgdbGame = searchResult?.Data?.FirstOrDefault();
-                if (sgdbGame is null) continue;
+                try
+                {
+                    // Search for the game on SteamGridDB
+                    var searchRes = await client.GetAsync(
+                        $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(game.Title)}");
+                    if (!searchRes.IsSuccessStatusCode) { processed++; continue; }
 
-                // Fetch heroes for the game
-                var heroesRes = await client.GetAsync(
-                    $"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGame.Id}");
-                if (!heroesRes.IsSuccessStatusCode) continue;
+                    var searchJson = await searchRes.Content.ReadAsStringAsync();
+                    var searchResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbGame>>>(searchJson);
+                    var sgdbGame = searchResult?.Data?.FirstOrDefault();
+                    if (sgdbGame is null) { processed++; continue; }
 
-                var heroesJson = await heroesRes.Content.ReadAsStringAsync();
-                var heroesResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbImage>>>(heroesJson);
-                var heroUrl = heroesResult?.Data?.FirstOrDefault()?.Url;
-                if (heroUrl is null) continue;
+                    // Fetch heroes for the game
+                    var heroesRes = await client.GetAsync(
+                        $"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGame.Id}");
+                    if (!heroesRes.IsSuccessStatusCode) { processed++; continue; }
 
-                game.HeroUrl = heroUrl;
-                count++;
-                logger.LogInformation("SteamGridDB hero: {Title} -> {Url}", game.Title, heroUrl);
+                    var heroesJson = await heroesRes.Content.ReadAsStringAsync();
+                    var heroesResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbImage>>>(heroesJson);
+                    var heroUrl = heroesResult?.Data?.FirstOrDefault()?.Url;
+                    if (heroUrl is null) { processed++; continue; }
 
-                // Rate limit
-                await Task.Delay(250);
+                    game.HeroUrl = heroUrl;
+                    count++;
+                    processed++;
+                    await db.SaveChangesAsync();
+                    logger.LogInformation("SteamGridDB hero: {Title} -> {Url}", game.Title, heroUrl);
+
+                    lock (_statusLock)
+                    {
+                        _sgdbStatus = _sgdbStatus with { Matched = count, Processed = processed };
+                    }
+
+                    // Rate limit
+                    await Task.Delay(250);
+                }
+                catch (Exception ex)
+                {
+                    processed++;
+                    logger.LogWarning(ex, "SteamGridDB hero fetch failed for: {Title}", game.Title);
+
+                    lock (_statusLock)
+                    {
+                        _sgdbStatus = _sgdbStatus with { Processed = processed };
+                    }
+                }
             }
-            catch (Exception ex)
+        }
+        finally
+        {
+            lock (_statusLock)
             {
-                logger.LogWarning(ex, "SteamGridDB hero fetch failed for: {Title}", game.Title);
+                _sgdbStatus = new SteamGridDbScanStatus(false, null, 0, 0, 0);
             }
         }
 
-        if (count > 0) await db.SaveChangesAsync();
         return count;
     }
 
@@ -300,4 +456,5 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
     }
 
     public record ScanResult(int GamesFound, int GamesAdded, int GamesMissing);
+    public record SteamGridDbScanStatus(bool IsRunning, string? CurrentGame, int Total, int Processed, int Matched);
 }

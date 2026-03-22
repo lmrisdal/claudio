@@ -1,28 +1,38 @@
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { CompressionStatus } from "../types/models";
+import type { TasksStatus } from "../types/models";
 
 export default function TasksPopover() {
   const queryClient = useQueryClient();
 
-  const { data: status } = useQuery({
-    queryKey: ["compressionStatus"],
-    queryFn: () => api.get<CompressionStatus>("/admin/compress/status"),
-    refetchInterval: 2000,
+  const { data: tasks } = useQuery({
+    queryKey: ["tasksStatus"],
+    queryFn: () => api.get<TasksStatus>("/admin/tasks/status"),
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      if (!d) return 30000;
+      return d.compression.current || d.compression.queued.length || d.igdb.isRunning || d.steamGridDb.isRunning
+        ? 2000
+        : 30000;
+    },
   });
+
+  const status = tasks?.compression;
+  const igdbStatus = tasks?.igdb;
+  const sgdbStatus = tasks?.steamGridDb;
 
   const cancelMutation = useMutation({
     mutationFn: (gameId: number) =>
       api.post(`/admin/games/${gameId}/compress/cancel`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["compressionStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
       queryClient.invalidateQueries({ queryKey: ["games"] });
     },
   });
 
   const taskCount =
-    (status?.current ? 1 : 0) + (status?.queued.length ?? 0);
+    (status?.current ? 1 : 0) + (status?.queued.length ?? 0) + (igdbStatus?.isRunning ? 1 : 0) + (sgdbStatus?.isRunning ? 1 : 0);
 
   return (
     <Popover className="relative">
@@ -55,10 +65,52 @@ export default function TasksPopover() {
           Tasks
         </h3>
 
-        {!status?.current && !status?.queued.length ? (
+        {!status?.current && !status?.queued.length && !igdbStatus?.isRunning && !sgdbStatus?.isRunning ? (
           <p className="text-sm text-text-muted py-2">No active tasks</p>
         ) : (
           <div className="space-y-3">
+            {igdbStatus?.isRunning && (
+              <div className="space-y-2">
+                <div className="min-w-0">
+                  <p className="text-sm text-text-primary truncate">
+                    IGDB Scan
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {igdbStatus.currentGame
+                      ? `Matching: ${igdbStatus.currentGame}`
+                      : "Starting..."}
+                    {igdbStatus.total > 0 &&
+                      ` (${igdbStatus.processed}/${igdbStatus.total})`}
+                  </p>
+                </div>
+                {igdbStatus.total > 0 && (
+                  <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all duration-500"
+                      style={{
+                        width: `${Math.round((igdbStatus.processed / igdbStatus.total) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {sgdbStatus?.isRunning && (
+              <div>
+                <div className="min-w-0">
+                  <p className="text-sm text-text-primary truncate">
+                    SteamGridDB Heroes
+                  </p>
+                  <p className="text-xs text-text-muted truncate">
+                    {sgdbStatus.currentGame
+                      ? `Fetching: ${sgdbStatus.currentGame}`
+                      : "Starting..."}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {status?.current && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">

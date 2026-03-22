@@ -7,6 +7,18 @@ public class LibraryScanBackgroundService(LibraryScanService scanService, ILogge
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Scan immediately on startup
+        try
+        {
+            var result = await scanService.ScanAsync();
+            logger.LogInformation("Startup scan complete: {Found} found, {Added} added, {Missing} missing",
+                result.GamesFound, result.GamesAdded, result.GamesMissing);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Startup library scan failed");
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             await Task.Delay(Interval, stoppingToken);

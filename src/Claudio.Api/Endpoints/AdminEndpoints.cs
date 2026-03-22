@@ -23,6 +23,7 @@ public static class AdminEndpoints
         group.MapPut("/users/{id:int}/role", UpdateUserRole);
         group.MapPost("/scan", TriggerScan);
         group.MapPost("/scan/igdb", TriggerIgdbScan);
+        group.MapGet("/scan/igdb/status", GetIgdbScanStatus);
         group.MapPut("/games/{id:int}", UpdateGame);
         group.MapGet("/games/{id:int}/executables", ListExecutables);
         group.MapPost("/games/{id:int}/igdb/search", SearchGameIgdb);
@@ -31,8 +32,10 @@ public static class AdminEndpoints
         group.MapPost("/games/{id:int}/compress", QueueCompression);
         group.MapPost("/games/{id:int}/compress/cancel", CancelCompression);
         group.MapGet("/compress/status", GetCompressionStatus);
+        group.MapGet("/tasks/status", GetTasksStatus);
         group.MapPost("/games/{id:int}/tag-folder", TagFolder);
         group.MapDelete("/games/{id:int}", DeleteGame);
+        group.MapDelete("/games/missing", DeleteMissingGames);
         group.MapGet("/steamgriddb/search", SearchSteamGridDb);
         group.MapGet("/steamgriddb/{sgdbGameId:long}/covers", GetSteamGridDbCovers);
         group.MapGet("/steamgriddb/{sgdbGameId:long}/heroes", GetSteamGridDbHeroes);
@@ -86,10 +89,15 @@ public static class AdminEndpoints
         return Results.Ok(result);
     }
 
-    private static async Task<IResult> TriggerIgdbScan(IgdbService igdbService)
+    private static IResult TriggerIgdbScan(IgdbService igdbService)
     {
-        var result = await igdbService.ScanAsync();
-        return Results.Ok(result);
+        igdbService.StartScanInBackground();
+        return Results.Accepted();
+    }
+
+    private static IResult GetIgdbScanStatus(IgdbService igdbService)
+    {
+        return Results.Ok(igdbService.GetScanStatus());
     }
 
     private static async Task<IResult> SearchGameIgdb(int id, AppDbContext db, IgdbService igdbService)
@@ -213,6 +221,16 @@ public static class AdminEndpoints
     private static IResult GetCompressionStatus(CompressionService compressionService)
     {
         return Results.Ok(compressionService.GetStatus());
+    }
+
+    private static IResult GetTasksStatus(CompressionService compressionService, IgdbService igdbService, LibraryScanService scanService)
+    {
+        return Results.Ok(new
+        {
+            compression = compressionService.GetStatus(),
+            igdb = igdbService.GetScanStatus(),
+            steamGridDb = scanService.GetSteamGridDbStatus(),
+        });
     }
 
     private static async Task<IResult> TagFolder(int id, AppDbContext db, ILogger<AppDbContext> logger)
@@ -442,6 +460,16 @@ public static class AdminEndpoints
 
         var url = $"/images/{fileName}";
         return Results.Ok(new { url });
+    }
+
+    private static async Task<IResult> DeleteMissingGames(AppDbContext db)
+    {
+        var missing = await db.Games.Where(g => g.IsMissing).ToListAsync();
+        if (missing.Count == 0) return Results.Ok(new { removed = 0 });
+
+        db.Games.RemoveRange(missing);
+        await db.SaveChangesAsync();
+        return Results.Ok(new { removed = missing.Count });
     }
 
     public record RoleUpdateRequest(string Role);

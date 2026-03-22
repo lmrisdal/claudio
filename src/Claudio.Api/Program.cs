@@ -72,13 +72,6 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-// Scan library on startup (non-blocking)
-_ = Task.Run(async () =>
-{
-    var scanService = app.Services.GetRequiredService<LibraryScanService>();
-    await scanService.ScanAsync();
-});
-
 app.UseStaticFiles();
 
 // Serve uploaded game images from /config/images/ under /images/

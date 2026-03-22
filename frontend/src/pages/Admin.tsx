@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import type { User, Game } from '../types/models'
+import type { User, Game, TasksStatus } from '../types/models'
 import { useAuth } from '../hooks/useAuth'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { formatPlatform } from '../utils/platforms'
 
@@ -256,6 +256,14 @@ function GamesTab() {
     },
   })
 
+  const removeMissingMutation = useMutation({
+    mutationFn: () => api.delete<{ removed: number }>('/admin/games/missing'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['games'] })
+      setShowMissingOnly(false)
+    },
+  })
+
   const filtered = games.filter((g) => {
     if (showMissingOnly && !g.isMissing) return false
     if (search) {
@@ -286,16 +294,25 @@ function GamesTab() {
           {missingCount > 0 && <span className="text-red-400 ml-1">({missingCount} missing)</span>}
         </p>
         {missingCount > 0 && (
-          <button
-            onClick={() => setShowMissingOnly(!showMissingOnly)}
-            className={`text-xs px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-              showMissingOnly
-                ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/30'
-                : 'bg-surface-raised text-text-secondary ring-1 ring-border hover:ring-accent/50'
-            }`}
-          >
-            {showMissingOnly ? 'Show all' : 'Show missing only'}
-          </button>
+          <>
+            <button
+              onClick={() => setShowMissingOnly(!showMissingOnly)}
+              className={`text-xs px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
+                showMissingOnly
+                  ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/30'
+                  : 'bg-surface-raised text-text-secondary ring-1 ring-border hover:ring-accent/50'
+              }`}
+            >
+              {showMissingOnly ? 'Show all' : 'Show missing only'}
+            </button>
+            <button
+              onClick={() => { if (confirm(`Remove ${missingCount} missing game${missingCount > 1 ? 's' : ''} from the library?`)) removeMissingMutation.mutate() }}
+              disabled={removeMissingMutation.isPending}
+              className="text-xs px-3 py-1.5 rounded-lg transition whitespace-nowrap bg-surface-raised text-red-400 ring-1 ring-border hover:ring-red-500/50 disabled:opacity-50"
+            >
+              Remove all missing
+            </button>
+          </>
         )}
       </div>
 
@@ -399,9 +416,24 @@ function ScanTab() {
   const [result, setResult] = useState<{ gamesFound: number; gamesAdded: number; gamesMissing: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [igdbScanning, setIgdbScanning] = useState(false)
-  const [igdbResult, setIgdbResult] = useState<{ total: number; matched: number; skipped: number } | null>(null)
   const [igdbError, setIgdbError] = useState<string | null>(null)
+
+  const { data: tasks } = useQuery({
+    queryKey: ['tasksStatus'],
+    queryFn: () => api.get<TasksStatus>('/admin/tasks/status'),
+    enabled: false,
+  })
+  const igdbStatus = tasks?.igdb
+
+  const wasRunning = useRef(false)
+  useEffect(() => {
+    if (igdbStatus?.isRunning) {
+      wasRunning.current = true
+    } else if (wasRunning.current) {
+      wasRunning.current = false
+      queryClient.invalidateQueries({ queryKey: ['games'] })
+    }
+  }, [igdbStatus?.isRunning, queryClient])
 
   async function triggerScan() {
     setScanning(true)
@@ -411,6 +443,7 @@ function ScanTab() {
       const res = await api.post<{ gamesFound: number; gamesAdded: number; gamesMissing: number }>('/admin/scan')
       setResult(res)
       queryClient.invalidateQueries({ queryKey: ['games'] })
+      queryClient.invalidateQueries({ queryKey: ['tasksStatus'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan failed')
     } finally {
@@ -419,17 +452,12 @@ function ScanTab() {
   }
 
   async function triggerIgdbScan() {
-    setIgdbScanning(true)
-    setIgdbResult(null)
     setIgdbError(null)
     try {
-      const res = await api.post<{ total: number; matched: number; skipped: number }>('/admin/scan/igdb')
-      setIgdbResult(res)
-      queryClient.invalidateQueries({ queryKey: ['games'] })
+      await api.post('/admin/scan/igdb')
+      queryClient.invalidateQueries({ queryKey: ['tasksStatus'] })
     } catch (err) {
       setIgdbError(err instanceof Error ? err.message : 'IGDB scan failed')
-    } finally {
-      setIgdbScanning(false)
     }
   }
 
@@ -498,16 +526,18 @@ function ScanTab() {
             </p>
             <button
               onClick={triggerIgdbScan}
-              disabled={igdbScanning}
+              disabled={igdbStatus?.isRunning}
               className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-lg transition text-sm"
             >
-              {igdbScanning ? (
+              {igdbStatus?.isRunning ? (
                 <>
                   <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Fetching metadata...
+                  {igdbStatus.total > 0
+                    ? `Matching ${igdbStatus.processed}/${igdbStatus.total}...`
+                    : 'Starting...'}
                 </>
               ) : (
                 'Fetch from IGDB'
@@ -516,11 +546,19 @@ function ScanTab() {
           </div>
         </div>
 
-        {igdbResult && (
-          <div className="mt-4 ml-14 bg-purple-500/10 rounded-lg px-4 py-3">
-            <p className="text-sm text-purple-300 font-medium">
-              Done — {igdbResult.matched} matched, {igdbResult.skipped} skipped out of {igdbResult.total} unmatched games
-            </p>
+        {igdbStatus?.isRunning && igdbStatus.total > 0 && (
+          <div className="mt-4 ml-14">
+            <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
+              <div
+                className="h-full rounded-full bg-purple-500 transition-all duration-500"
+                style={{ width: `${Math.round((igdbStatus.processed / igdbStatus.total) * 100)}%` }}
+              />
+            </div>
+            {igdbStatus.currentGame && (
+              <p className="text-xs text-text-muted mt-1.5">
+                Matching: {igdbStatus.currentGame}
+              </p>
+            )}
           </div>
         )}
 

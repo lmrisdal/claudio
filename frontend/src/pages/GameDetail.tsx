@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import type { CompressionStatus, Game } from "../types/models";
+import type { TasksStatus, Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 import { sounds } from "../utils/sounds";
 
@@ -87,11 +87,12 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
 }
 
 function CompressionProgress({ gameId }: { gameId: number }) {
-  const { data: status } = useQuery({
-    queryKey: ["compressionStatus"],
-    queryFn: () => api.get<CompressionStatus>("/admin/compress/status"),
+  const { data: tasks } = useQuery({
+    queryKey: ["tasksStatus"],
+    queryFn: () => api.get<TasksStatus>("/admin/tasks/status"),
     refetchInterval: 2000,
   });
+  const status = tasks?.compression;
 
   const job =
     status?.current?.gameId === gameId
@@ -239,6 +240,7 @@ interface IgdbCandidate {
   series?: string;
   franchise?: string;
   gameEngine?: string;
+  platform?: string;
 }
 
 export default function GameDetail() {
@@ -478,7 +480,7 @@ export default function GameDetail() {
       api.post(`/admin/games/${id}/compress?format=${format}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["game", id] });
-      queryClient.invalidateQueries({ queryKey: ["compressionStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
       setEditing(false);
     },
   });
@@ -1311,7 +1313,14 @@ export default function GameDetail() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {game.isProcessing ? (
+                  {game.isMissing ? (
+                    <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-red-400 bg-red-500/10 ring-1 ring-red-500/30">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      </svg>
+                      Missing from disk
+                    </span>
+                  ) : game.isProcessing ? (
                     <CompressionProgress gameId={game.id} />
                   ) : (
                     <DownloadButton gameId={game.id} size={game.sizeBytes} />
@@ -1815,6 +1824,11 @@ export default function GameDetail() {
                               <span className="truncate">{c.genre}</span>
                             )}
                           </div>
+                          {c.platform && (
+                            <p className="text-xs text-text-muted mt-0.5 truncate">
+                              {c.platform}
+                            </p>
+                          )}
                           {c.summary && (
                             <p className="text-xs text-text-secondary mt-1 line-clamp-2">
                               {c.summary}
