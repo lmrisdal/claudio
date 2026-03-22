@@ -8,6 +8,7 @@ import { formatPlatform } from '../utils/platforms'
 export default function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
@@ -16,7 +17,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
     queryFn: () => api.get<Game[]>('/games'),
   })
 
-  const normalize = (s: string) => s.toLowerCase().replace(/[.\-]/g, '')
+  const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[.\-]/g, '')
   const filtered = query.length > 0
     ? games.filter((g) => normalize(g.title).includes(normalize(query))).slice(0, 20)
     : []
@@ -31,12 +32,27 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
 
   useEffect(() => {
     setSelectedIndex(0)
+    if (listRef.current) listRef.current.scrollTop = 0
   }, [query])
+
+  useEffect(() => {
+    const list = listRef.current
+    const item = list?.children[selectedIndex] as HTMLElement | undefined
+    if (!list || !item) return
+    const listRect = list.getBoundingClientRect()
+    const itemRect = item.getBoundingClientRect()
+    if (itemRect.bottom > listRect.bottom) {
+      list.scrollTop += itemRect.bottom - listRect.bottom
+    } else if (itemRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - itemRect.top
+    }
+  }, [selectedIndex])
 
   useEffect(() => {
     if (!open) return
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation()
         onClose()
       } else if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -57,7 +73,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={onClose}>
+    <div data-search-dialog className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]" onClick={onClose}>
       <div className="fixed inset-0 bg-black/60" />
       <div
         className="relative w-full max-w-lg mx-4 bg-surface rounded-xl ring-1 ring-border shadow-2xl overflow-hidden"
@@ -81,7 +97,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
         </div>
 
         {query.length > 0 && (
-          <div className="max-h-72 overflow-y-auto py-1">
+          <div ref={listRef} className="max-h-72 overflow-y-auto py-1">
             {filtered.length === 0 ? (
               <p className="px-4 py-6 text-sm text-text-muted text-center">No games found</p>
             ) : (

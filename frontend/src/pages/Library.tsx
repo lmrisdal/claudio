@@ -146,12 +146,14 @@ export default function Library() {
         case 'ArrowUp': {
           e.preventDefault()
           if (toggleIndex > 0) {
-            // Go to previous group's last game, or previous toggle if collapsed
+            // Go to previous group's last row first column, or previous toggle if collapsed
             const prevSection = toggles[toggleIndex - 1].closest('section')
             const prevGrid = prevSection?.querySelector<HTMLElement>('.grid')
             const prevLinks = prevGrid ? Array.from(prevGrid.querySelectorAll<HTMLElement>('a')) : []
             if (prevLinks.length > 0) {
-              prevLinks[prevLinks.length - 1].focus()
+              const prevCols = prevGrid ? getComputedStyle(prevGrid).gridTemplateColumns?.split(' ').length || 1 : 1
+              const lastRowStart = Math.floor((prevLinks.length - 1) / prevCols) * prevCols
+              prevLinks[lastRowStart].focus()
             } else {
               toggles[toggleIndex - 1].focus()
             }

@@ -282,6 +282,8 @@ export default function GameDetail() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
+      // Don't navigate back if search dialog or other overlay is open
+      if (document.querySelector('[data-search-dialog]')) return;
       if (browsePath !== null) {
         setBrowsePath(null);
         sounds.back();
