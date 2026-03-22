@@ -50,4 +50,5 @@ export const sounds = {
   navigate: () => playSound("/tap_01.wav", 0.8, 300),
   select: () => playSound("/toggle_on.wav", 0.7, 700),
   back: () => playSound("/toggle_off.wav", 0.7, 700),
+  download: () => playSound("/download.wav", 0.25, 1000),
 };

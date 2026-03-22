@@ -41,6 +41,7 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   return (
     <button
       onClick={handleDownload}
+      onKeyDown={(e) => { if (e.key === 'Enter') sounds.download() }}
       disabled={preparing}
       data-nav
       className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-6 py-3 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
