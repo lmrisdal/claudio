@@ -253,7 +253,7 @@ public class IgdbService(
         client.DefaultRequestHeaders.Add("Client-ID", config.Igdb.ClientId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var query = $"where id = {igdbId}; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name; limit 1;";
+        var query = $"where id = {igdbId}; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name,platforms.slug; limit 1;";
         var response = await client.PostAsync("https://api.igdb.com/v4/games", new StringContent(query));
         response.EnsureSuccessStatusCode();
 
@@ -279,7 +279,7 @@ public class IgdbService(
             var end = new DateTimeOffset(year.Value, 12, 31, 23, 59, 59, TimeSpan.Zero).ToUnixTimeSeconds();
             whereClause = $" where first_release_date >= {start} & first_release_date <= {end};";
         }
-        var query = $"""search "{searchTitle}"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name;{whereClause} limit 20;""";
+        var query = $"""search "{searchTitle}"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name,platforms.slug;{whereClause} limit 20;""";
 
         var response = await client.PostAsync(
             "https://api.igdb.com/v4/games",
@@ -341,8 +341,12 @@ public class IgdbService(
         if (match.Platforms is { Count: > 0 })
             platform = string.Join(", ", match.Platforms.Select(p => p.Name));
 
+        string? platformSlug = null;
+        if (match.Platforms is { Count: > 0 })
+            platformSlug = string.Join(", ", match.Platforms.Select(p => p.Slug));
+
         return new IgdbCandidate(match.Id, match.Name ?? "", match.Slug, match.Summary, genre, releaseYear, coverUrl,
-            developer, publisher, gameMode, series, franchise, gameEngine, platform);
+            developer, publisher, gameMode, series, franchise, gameEngine, platform, platformSlug);
     }
 
     private async Task<string> GetAccessTokenAsync()
@@ -370,7 +374,7 @@ public class IgdbService(
     public record IgdbCandidate(
         long IgdbId, string Name, string? Slug, string? Summary, string? Genre, int? ReleaseYear, string? CoverUrl,
         string? Developer, string? Publisher, string? GameMode, string? Series, string? Franchise, string? GameEngine,
-        string? Platform);
+        string? Platform, string? PlatformSlug);
 
     private class TwitchTokenResponse
     {
@@ -421,12 +425,17 @@ public class IgdbService(
 
         [JsonPropertyName("platforms")]
         public List<IgdbNamedEntity>? Platforms { get; set; }
+
+        [JsonPropertyName("platform_slugs")]
+        public List<IgdbNamedEntity>? PlatformSlugs { get; set; }
     }
 
     private class IgdbNamedEntity
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("slug")]
+        public string? Slug { get; set; }
     }
 
     private class IgdbCover

@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import type { TasksStatus, Game } from "../types/models";
+import type { Game, TasksStatus } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 import { sounds } from "../utils/sounds";
 
@@ -41,7 +41,9 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   return (
     <button
       onClick={handleDownload}
-      onKeyDown={(e) => { if (e.key === 'Enter') sounds.download() }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") sounds.download();
+      }}
       disabled={preparing}
       data-nav
       className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-6 py-3 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
@@ -109,8 +111,18 @@ function CompressionProgress({ gameId }: { gameId: number }) {
   return (
     <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-amber-400 bg-amber-500/10 ring-1 ring-amber-500/30">
       {isQueued ? (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+          />
         </svg>
       ) : (
         <svg className="w-5 h-5 -rotate-90" viewBox="0 0 24 24">
@@ -242,6 +254,7 @@ interface IgdbCandidate {
   franchise?: string;
   gameEngine?: string;
   platform?: string;
+  platformSlug?: string;
 }
 
 export default function GameDetail() {
@@ -256,10 +269,15 @@ export default function GameDetail() {
   const [browsePath, setBrowsePath] = useState<string | null>(null);
 
   const [editing, setEditing] = useState(false);
-  const [sgdbDialog, setSgdbDialog] = useState<{ open: boolean; mode: "covers" | "heroes" }>({ open: false, mode: "covers" });
+  const [sgdbDialog, setSgdbDialog] = useState<{
+    open: boolean;
+    mode: "covers" | "heroes";
+  }>({ open: false, mode: "covers" });
   const [sgdbQuery, setSgdbQuery] = useState("");
   const [sgdbSearching, setSgdbSearching] = useState(false);
-  const [sgdbGames, setSgdbGames] = useState<{ id: number; name: string; year?: number }[] | null>(null);
+  const [sgdbGames, setSgdbGames] = useState<
+    { id: number; name: string; year?: number }[] | null
+  >(null);
   const [sgdbImages, setSgdbImages] = useState<string[] | null>(null);
   const [sgdbLoadingImages, setSgdbLoadingImages] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -286,7 +304,7 @@ export default function GameDetail() {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       // Don't navigate back if search dialog or other overlay is open
-      if (document.querySelector('[data-search-dialog]')) return;
+      if (document.querySelector("[data-search-dialog]")) return;
       if (browsePath !== null) {
         setBrowsePath(null);
         sounds.back();
@@ -299,43 +317,52 @@ export default function GameDetail() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [browsePath, editing, sgdbDialog.open, candidates, navigate]);
 
-  const mainRef = useRef<HTMLElement>(null)
-  const backLinkRef = useRef<HTMLAnchorElement>(null)
-  const focusAnchorRef = useRef<HTMLDivElement>(null)
-  const coverFileRef = useRef<HTMLInputElement>(null)
-  const heroFileRef = useRef<HTMLInputElement>(null)
-  const [pendingFiles, setPendingFiles] = useState<{ cover?: File; hero?: File }>({})
+  const mainRef = useRef<HTMLElement>(null);
+  const backLinkRef = useRef<HTMLAnchorElement>(null);
+  const focusAnchorRef = useRef<HTMLDivElement>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
+  const heroFileRef = useRef<HTMLInputElement>(null);
+  const [pendingFiles, setPendingFiles] = useState<{
+    cover?: File;
+    hero?: File;
+  }>({});
 
   // Arrow key navigation between back link and download button
-  const handleMainKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!['ArrowUp', 'ArrowDown'].includes(e.key)) return
-    if (editing || sgdbDialog.open || candidates || browsePath !== null) return
+  const handleMainKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!["ArrowUp", "ArrowDown"].includes(e.key)) return;
+      if (editing || sgdbDialog.open || candidates || browsePath !== null)
+        return;
 
-    const main = mainRef.current
-    if (!main) return
+      const main = mainRef.current;
+      if (!main) return;
 
-    const focusables = Array.from(
-      main.querySelectorAll<HTMLElement>('a[data-nav], button[data-nav]')
-    )
-    if (focusables.length === 0) return
+      const focusables = Array.from(
+        main.querySelectorAll<HTMLElement>("a[data-nav], button[data-nav]"),
+      );
+      if (focusables.length === 0) return;
 
-    const currentIndex = focusables.indexOf(document.activeElement as HTMLElement)
-    let nextIndex: number
+      const currentIndex = focusables.indexOf(
+        document.activeElement as HTMLElement,
+      );
+      let nextIndex: number;
 
-    if (currentIndex === -1) {
-      nextIndex = e.key === 'ArrowDown' ? 0 : focusables.length - 1
-    } else if (e.key === 'ArrowDown') {
-      nextIndex = Math.min(currentIndex + 1, focusables.length - 1)
-    } else {
-      nextIndex = Math.max(currentIndex - 1, 0)
-    }
+      if (currentIndex === -1) {
+        nextIndex = e.key === "ArrowDown" ? 0 : focusables.length - 1;
+      } else if (e.key === "ArrowDown") {
+        nextIndex = Math.min(currentIndex + 1, focusables.length - 1);
+      } else {
+        nextIndex = Math.max(currentIndex - 1, 0);
+      }
 
-    if (nextIndex !== currentIndex) {
-      e.preventDefault()
-      focusables[nextIndex].focus()
-      sounds.navigate()
-    }
-  }, [editing, sgdbDialog.open, candidates, browsePath])
+      if (nextIndex !== currentIndex) {
+        e.preventDefault();
+        focusables[nextIndex].focus();
+        sounds.navigate();
+      }
+    },
+    [editing, sgdbDialog.open, candidates, browsePath],
+  );
 
   const { data: exeList } = useQuery({
     queryKey: ["executables", id],
@@ -346,8 +373,7 @@ export default function GameDetail() {
   const { data: game, isLoading } = useQuery({
     queryKey: ["game", id],
     queryFn: () => api.get<Game>(`/games/${id}`),
-    refetchInterval: (query) =>
-      query.state.data?.isProcessing ? 3000 : false,
+    refetchInterval: (query) => (query.state.data?.isProcessing ? 3000 : false),
   });
 
   const { data: browseData, isLoading: browseLoading } = useQuery({
@@ -361,9 +387,9 @@ export default function GameDetail() {
 
   useEffect(() => {
     if (!isLoading && game) {
-      requestAnimationFrame(() => focusAnchorRef.current?.focus())
+      requestAnimationFrame(() => focusAnchorRef.current?.focus());
     }
-  }, [isLoading, game])
+  }, [isLoading, game]);
 
   async function searchIgdb(customQuery?: string) {
     setSearching(true);
@@ -374,11 +400,22 @@ export default function GameDetail() {
             query: customQuery,
           })
         : await api.post<IgdbCandidate[]>(`/admin/games/${id}/igdb/search`);
+
+      let gamePlatformSlug = game?.platform;
+      if (gamePlatformSlug === "pc") gamePlatformSlug = "win"; // IGDB uses "win" slug for PC games
+
       if (results.length === 0) {
         setSearchError("No results found on IGDB.");
         if (!candidates) setCandidates([]); // open modal even with no results so user can refine
       } else {
-        setCandidates(results);
+        const sorted = gamePlatformSlug
+          ? results.sort((a, b) => {
+              const aMatch = a.platformSlug === gamePlatformSlug ? 0 : 1;
+              const bMatch = b.platformSlug === gamePlatformSlug ? 0 : 1;
+              return aMatch - bMatch;
+            })
+          : results;
+        setCandidates(sorted);
         setSearchError(null);
       }
     } catch (err) {
@@ -400,9 +437,9 @@ export default function GameDetail() {
     setSgdbDialog({ open: true, mode });
     setSgdbSearching(true);
     try {
-      const games = await api.get<{ id: number; name: string; year?: number }[]>(
-        `/admin/steamgriddb/search?query=${encodeURIComponent(q)}`,
-      );
+      const games = await api.get<
+        { id: number; name: string; year?: number }[]
+      >(`/admin/steamgriddb/search?query=${encodeURIComponent(q)}`);
       if (sgdbRequestRef.current !== requestId) return;
       setSgdbGames(games);
       if (games.length === 1) selectSgdbGame(games[0].id, mode);
@@ -414,12 +451,17 @@ export default function GameDetail() {
     }
   }
 
-  async function selectSgdbGame(sgdbGameId: number, mode?: "covers" | "heroes") {
+  async function selectSgdbGame(
+    sgdbGameId: number,
+    mode?: "covers" | "heroes",
+  ) {
     setSgdbImages(null);
     setSgdbLoadingImages(true);
     const endpoint = mode ?? sgdbDialog.mode;
     try {
-      const urls = await api.get<string[]>(`/admin/steamgriddb/${sgdbGameId}/${endpoint}`);
+      const urls = await api.get<string[]>(
+        `/admin/steamgriddb/${sgdbGameId}/${endpoint}`,
+      );
       setSgdbImages(urls);
     } catch {
       setSgdbImages([]);
@@ -611,7 +653,11 @@ export default function GameDetail() {
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/60 to-transparent" />
         </div>
       )}
-      <main ref={mainRef} onKeyDown={handleMainKeyDown} className="max-w-5xl mx-auto px-6 py-12 relative">
+      <main
+        ref={mainRef}
+        onKeyDown={handleMainKeyDown}
+        className="max-w-5xl mx-auto px-6 py-12 relative"
+      >
         {user?.role === "admin" && (
           <button
             onClick={() => openSgdbDialog("heroes")}
@@ -643,10 +689,14 @@ export default function GameDetail() {
           ref={focusAnchorRef}
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-              e.preventDefault()
-              const first = mainRef.current?.querySelector<HTMLElement>('[data-nav]')
-              if (first) { first.focus(); sounds.navigate() }
+            if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+              e.preventDefault();
+              const first =
+                mainRef.current?.querySelector<HTMLElement>("[data-nav]");
+              if (first) {
+                first.focus();
+                sounds.navigate();
+              }
             }
           }}
           className="outline-none h-0 overflow-hidden"
@@ -656,7 +706,9 @@ export default function GameDetail() {
           ref={backLinkRef}
           to="/"
           data-nav
-          onKeyDown={(e) => { if (e.key === 'Enter') sounds.back() }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") sounds.back();
+          }}
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 outline-2 outline-offset-4 outline-transparent focus-visible:outline-accent rounded ${
             game.heroUrl
               ? "text-text-primary/80 hover:text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
@@ -685,7 +737,9 @@ export default function GameDetail() {
             <div
               className={`aspect-[2/3] bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
               onClick={
-                user?.role === "admin" ? () => openSgdbDialog("covers") : undefined
+                user?.role === "admin"
+                  ? () => openSgdbDialog("covers")
+                  : undefined
               }
             >
               {(editing ? editForm.coverUrl : game.coverUrl) ? (
@@ -879,17 +933,20 @@ export default function GameDetail() {
                         placeholder="e.g. 12345"
                         className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                       />
-                      {game.igdbId && !game.folderName.includes(`igdb-${game.igdbId}`) && (
-                        <button
-                          type="button"
-                          onClick={() => tagFolderMutation.mutate()}
-                          disabled={tagFolderMutation.isPending}
-                          className="shrink-0 px-3 py-2 rounded-lg text-xs text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
-                          title={`Rename folder to add (igdb-${game.igdbId})`}
-                        >
-                          {tagFolderMutation.isPending ? "Tagging..." : "Tag folder"}
-                        </button>
-                      )}
+                      {game.igdbId &&
+                        !game.folderName.includes(`igdb-${game.igdbId}`) && (
+                          <button
+                            type="button"
+                            onClick={() => tagFolderMutation.mutate()}
+                            disabled={tagFolderMutation.isPending}
+                            className="shrink-0 px-3 py-2 rounded-lg text-xs text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
+                            title={`Rename folder to add (igdb-${game.igdbId})`}
+                          >
+                            {tagFolderMutation.isPending
+                              ? "Tagging..."
+                              : "Tag folder"}
+                          </button>
+                        )}
                     </div>
                   </div>
                   <div>
@@ -1060,7 +1117,10 @@ export default function GameDetail() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setEditing(false); setPendingFiles({}); }}
+                    onClick={() => {
+                      setEditing(false);
+                      setPendingFiles({});
+                    }}
                     className="px-5 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition"
                   >
                     Cancel
@@ -1073,7 +1133,9 @@ export default function GameDetail() {
                         disabled={compressMutation.isPending}
                         className="px-4 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
                       >
-                        {compressMutation.isPending ? "Queuing..." : "Package as ZIP"}
+                        {compressMutation.isPending
+                          ? "Queuing..."
+                          : "Package as ZIP"}
                       </button>
                       <button
                         type="button"
@@ -1081,7 +1143,9 @@ export default function GameDetail() {
                         disabled={compressMutation.isPending}
                         className="px-4 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
                       >
-                        {compressMutation.isPending ? "Queuing..." : "Package as TAR"}
+                        {compressMutation.isPending
+                          ? "Queuing..."
+                          : "Package as TAR"}
                       </button>
                     </div>
                   )}
@@ -1101,48 +1165,56 @@ export default function GameDetail() {
                   <h1 className="font-display text-4xl font-bold text-text-primary">
                     {game.title}
                   </h1>
-                  {user?.role === "admin" && (<>
-                    <button
-                      onClick={startEditing}
-                      disabled={game.isProcessing}
-                      className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={game.isProcessing ? "Cannot edit while processing" : "Edit game"}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                  {user?.role === "admin" && (
+                    <>
+                      <button
+                        onClick={startEditing}
+                        disabled={game.isProcessing}
+                        className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={
+                          game.isProcessing
+                            ? "Cannot edit while processing"
+                            : "Edit game"
+                        }
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={openIgdbSearch}
-                      disabled={searching}
-                      className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50"
-                      title={game.igdbId ? "Re-match on IGDB" : "Match on IGDB"}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={openIgdbSearch}
+                        disabled={searching}
+                        className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50"
+                        title={
+                          game.igdbId ? "Re-match on IGDB" : "Match on IGDB"
+                        }
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                        />
-                      </svg>
-                    </button>
-                  </>)}
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                          />
+                        </svg>
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {/* Meta tags */}
@@ -1197,8 +1269,18 @@ export default function GameDetail() {
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-500/10 ring-1 ring-purple-500/20 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition"
                     >
                       IGDB
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                        />
                       </svg>
                     </a>
                   )}
@@ -1316,8 +1398,18 @@ export default function GameDetail() {
                 <div className="flex flex-wrap items-center gap-3">
                   {game.isMissing ? (
                     <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-red-400 bg-red-500/10 ring-1 ring-red-500/30">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+                        />
                       </svg>
                       Missing from disk
                     </span>
@@ -1530,15 +1622,28 @@ export default function GameDetail() {
                 <DialogPanel className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-text-primary font-medium">
-                      SteamGridDB {sgdbDialog.mode === "covers" ? "Covers" : "Heroes"}
+                      SteamGridDB{" "}
+                      {sgdbDialog.mode === "covers" ? "Covers" : "Heroes"}
                     </h3>
                     <button
                       type="button"
-                      onClick={() => setSgdbDialog({ ...sgdbDialog, open: false })}
+                      onClick={() =>
+                        setSgdbDialog({ ...sgdbDialog, open: false })
+                      }
                       className="text-text-muted hover:text-text-primary transition p-1"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -1553,7 +1658,9 @@ export default function GameDetail() {
                       setSgdbLoadingImages(false);
                       setSgdbSearching(true);
                       try {
-                        const games = await api.get<{ id: number; name: string; year?: number }[]>(
+                        const games = await api.get<
+                          { id: number; name: string; year?: number }[]
+                        >(
                           `/admin/steamgriddb/search?query=${encodeURIComponent(sgdbQuery.trim())}`,
                         );
                         if (sgdbRequestRef.current !== requestId) return;
@@ -1563,7 +1670,8 @@ export default function GameDetail() {
                         if (sgdbRequestRef.current !== requestId) return;
                         setSgdbGames([]);
                       } finally {
-                        if (sgdbRequestRef.current === requestId) setSgdbSearching(false);
+                        if (sgdbRequestRef.current === requestId)
+                          setSgdbSearching(false);
                       }
                     }}
                   >
@@ -1590,7 +1698,9 @@ export default function GameDetail() {
                       {sgdbSearching ? (
                         <p className="text-sm text-text-muted">Searching...</p>
                       ) : sgdbGames !== null && sgdbGames.length === 0 ? (
-                        <p className="text-sm text-text-muted">No games found.</p>
+                        <p className="text-sm text-text-muted">
+                          No games found.
+                        </p>
                       ) : sgdbGames !== null ? (
                         <div className="overflow-y-auto flex-1 min-h-0 space-y-1">
                           {sgdbGames.map((g) => (
@@ -1600,7 +1710,8 @@ export default function GameDetail() {
                               onClick={() => selectSgdbGame(g.id)}
                               className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-surface-raised transition text-text-secondary hover:text-text-primary"
                             >
-                              {g.name}{g.year ? ` (${g.year})` : ""}
+                              {g.name}
+                              {g.year ? ` (${g.year})` : ""}
                             </button>
                           ))}
                         </div>
@@ -1616,15 +1727,29 @@ export default function GameDetail() {
                         onClick={() => setSgdbImages(null)}
                         className="text-xs text-text-muted hover:text-text-primary transition mb-3 self-start flex items-center gap-1"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15.75 19.5L8.25 12l7.5-7.5"
+                          />
                         </svg>
                         Back to results
                       </button>
                       {sgdbLoadingImages ? (
-                        <p className="text-sm text-text-muted">Loading images...</p>
+                        <p className="text-sm text-text-muted">
+                          Loading images...
+                        </p>
                       ) : sgdbImages.length === 0 ? (
-                        <p className="text-sm text-text-muted">No {sgdbDialog.mode} found.</p>
+                        <p className="text-sm text-text-muted">
+                          No {sgdbDialog.mode} found.
+                        </p>
                       ) : sgdbDialog.mode === "covers" ? (
                         <div className="grid grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
                           {sgdbImages.map((url) => (
@@ -1658,10 +1783,18 @@ export default function GameDetail() {
                                 setSgdbDialog({ ...sgdbDialog, open: false });
                               }}
                               className={`aspect-[2/3] rounded-lg ring-2 transition hover:ring-accent ${
-                                (editing ? editForm.coverUrl : game.coverUrl) === url ? "ring-accent" : "ring-transparent"
+                                (editing
+                                  ? editForm.coverUrl
+                                  : game.coverUrl) === url
+                                  ? "ring-accent"
+                                  : "ring-transparent"
                               }`}
                             >
-                              <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+                              <img
+                                src={url}
+                                alt=""
+                                className="w-full h-full object-cover rounded-lg"
+                              />
                             </button>
                           ))}
                         </div>
@@ -1698,10 +1831,17 @@ export default function GameDetail() {
                                 setSgdbDialog({ ...sgdbDialog, open: false });
                               }}
                               className={`rounded-lg ring-2 transition hover:ring-accent ${
-                                (editing ? editForm.heroUrl : game.heroUrl) === url ? "ring-accent" : "ring-transparent"
+                                (editing ? editForm.heroUrl : game.heroUrl) ===
+                                url
+                                  ? "ring-accent"
+                                  : "ring-transparent"
                               }`}
                             >
-                              <img src={url} alt="" className="w-full rounded-lg object-cover" />
+                              <img
+                                src={url}
+                                alt=""
+                                className="w-full rounded-lg object-cover"
+                              />
                             </button>
                           ))}
                         </div>
@@ -1771,9 +1911,13 @@ export default function GameDetail() {
                     <p className="text-sm text-red-400 mb-3">{searchError}</p>
                   )}
                   <div className="overflow-y-auto space-y-2 flex-1">
-                    {searching && candidates.length === 0 && (
+                    {searching &&
+                      candidates.length === 0 &&
                       Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="flex gap-4 p-3 rounded-lg animate-pulse">
+                        <div
+                          key={i}
+                          className="flex gap-4 p-3 rounded-lg animate-pulse"
+                        >
                           <div className="w-16 h-20 shrink-0 rounded-md bg-surface-raised" />
                           <div className="flex-1 space-y-2 py-1">
                             <div className="h-4 bg-surface-raised rounded w-3/4" />
@@ -1781,8 +1925,7 @@ export default function GameDetail() {
                             <div className="h-3 bg-surface-raised rounded w-full mt-2" />
                           </div>
                         </div>
-                      ))
-                    )}
+                      ))}
                     {candidates.map((c) => (
                       <button
                         key={c.igdbId}
