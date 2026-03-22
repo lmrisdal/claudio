@@ -311,6 +311,42 @@ export default function Library() {
     }
   }, [collapsedGroups])
 
+  // RB/LB bumpers: jump to next/previous group toggle
+  useEffect(() => {
+    if (view !== 'grouped') return
+    function jumpGroup(direction: 1 | -1) {
+      const grid = gridRef.current
+      if (!grid) return
+      const toggles = Array.from(grid.querySelectorAll<HTMLElement>('[data-group-toggle]'))
+      if (toggles.length === 0) return
+      const activeEl = document.activeElement as HTMLElement
+      // Find which group the active element belongs to
+      const currentSection = activeEl?.closest('section')
+      const currentToggle = currentSection?.querySelector<HTMLElement>('[data-group-toggle]')
+      const currentIndex = currentToggle ? toggles.indexOf(currentToggle) : -1
+      let targetIndex: number
+      if (currentIndex === -1) {
+        targetIndex = direction === 1 ? 0 : toggles.length - 1
+      } else {
+        targetIndex = currentIndex + direction
+        if (targetIndex < 0 || targetIndex >= toggles.length) return
+      }
+      const targetSection = toggles[targetIndex].closest('section')
+      const firstLink = targetSection?.querySelector<HTMLElement>('.grid a')
+      const target = firstLink ?? toggles[targetIndex]
+      focusVisible(target)
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      sounds.navigate()
+    }
+    function onRt() { jumpGroup(1) }
+    function onLt() { jumpGroup(-1) }
+    window.addEventListener('gamepad-rt', onRt)
+    window.addEventListener('gamepad-lt', onLt)
+    return () => {
+      window.removeEventListener('gamepad-rt', onRt)
+      window.removeEventListener('gamepad-lt', onLt)
+    }
+  }, [view])
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {

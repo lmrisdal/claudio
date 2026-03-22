@@ -23,8 +23,8 @@ export function useGamepad() {
 
     function dispatchKey(key: string) {
       // Custom gamepad actions
-      if (key === "gamepad-search") {
-        window.dispatchEvent(new CustomEvent("gamepad-search"));
+      if (key.startsWith("gamepad-")) {
+        window.dispatchEvent(new CustomEvent(key));
         return;
       }
 
@@ -112,6 +112,10 @@ export function useGamepad() {
         handleInput("btn-a", "Enter", gp.buttons[0]?.pressed ?? false, false);
         handleInput("btn-b", "Escape", gp.buttons[1]?.pressed ?? false, false);
         handleInput("btn-y", "gamepad-search", gp.buttons[3]?.pressed ?? false, false);
+
+        // LT/RT → previous/next group
+        handleInput("btn-lt", "gamepad-lt", (gp.buttons[6]?.value ?? 0) > 0.5);
+        handleInput("btn-rt", "gamepad-rt", (gp.buttons[7]?.value ?? 0) > 0.5);
 
         // Only handle first connected gamepad
         break;

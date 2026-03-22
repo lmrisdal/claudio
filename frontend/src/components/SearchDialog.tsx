@@ -22,11 +22,17 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
     ? games.filter((g) => normalize(g.title).includes(normalize(query))).slice(0, 20)
     : []
 
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
   useEffect(() => {
     if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null
       setQuery('')
       setSelectedIndex(0)
       setTimeout(() => inputRef.current?.focus(), 0)
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus({ focusVisible: true } as FocusOptions)
+      previousFocusRef.current = null
     }
   }, [open])
 
