@@ -651,6 +651,7 @@ export default function GameDetail() {
           ref={backLinkRef}
           to="/"
           data-nav
+          onKeyDown={(e) => { if (e.key === 'Enter') sounds.back() }}
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 outline-2 outline-offset-4 outline-transparent focus-visible:outline-accent rounded ${
             game.heroUrl
               ? "text-text-primary/80 hover:text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"

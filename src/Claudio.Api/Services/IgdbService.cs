@@ -222,7 +222,7 @@ public class IgdbService(
             var end = new DateTimeOffset(year.Value, 12, 31, 23, 59, 59, TimeSpan.Zero).ToUnixTimeSeconds();
             whereClause = $" where first_release_date >= {start} & first_release_date <= {end};";
         }
-        var query = $"""search "{searchTitle}"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name;{whereClause} limit 10;""";
+        var query = $"""search "{searchTitle}"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name;{whereClause} limit 20;""";
 
         var response = await client.PostAsync(
             "https://api.igdb.com/v4/games",

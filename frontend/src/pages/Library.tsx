@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { Game } from '../types/models'
 import GameCard from '../components/GameCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { formatPlatform } from '../utils/platforms'
 import { sounds } from '../utils/sounds'
 import { isGamepadEvent } from '../hooks/useGamepad'
@@ -10,9 +11,35 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headless
 
 let lastFocusedGameId: string | null = null
 
+type ViewMode = 'grid' | 'grouped' | 'list'
+
+function formatSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / 1024 ** i).toFixed(i > 0 ? 1 : 0)} ${units[i]}`
+}
+
 export default function Library() {
-  const [search, setSearch] = useState('')
+  const navigate = useNavigate()
   const [platform, setPlatform] = useState('')
+  const [view, setView] = useState<ViewMode>(() =>
+    (localStorage.getItem('library-view') as ViewMode) || 'grouped'
+  )
+  const [sortBy, setSortBy] = useState<'platform' | 'title' | 'year' | 'size'>('title')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function toggleSort(col: typeof sortBy) {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir('asc') }
+  }
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('library-collapsed')
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
+    } catch { return new Set() }
+  })
 
   const { data: games = [], isLoading } = useQuery({
     queryKey: ['games'],
@@ -20,23 +47,21 @@ export default function Library() {
   })
 
   const gridRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
   const focusAnchorRef = useRef<HTMLDivElement>(null)
 
 
   const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
     const grid = gridRef.current
     if (!grid) return
-    const firstLink = grid.querySelector<HTMLElement>('a')
+    const firstEl = grid.querySelector<HTMLElement>('[data-group-toggle], a')
     switch (e.key) {
       case 'ArrowDown':
       case 'ArrowRight':
         e.preventDefault()
-        if (firstLink) { firstLink.focus(); sounds.navigate() }
+        if (firstEl) { firstEl.focus(); sounds.navigate() }
         break
       case 'ArrowUp':
         e.preventDefault()
-        searchRef.current?.focus()
         sounds.navigate()
         break
     }
@@ -46,10 +71,10 @@ export default function Library() {
     if (e.key !== 'ArrowDown') return
     const grid = gridRef.current
     if (!grid) return
-    const firstLink = grid.querySelector<HTMLElement>('a')
-    if (firstLink) {
+    const firstEl = grid.querySelector<HTMLElement>('[data-group-toggle], a')
+    if (firstEl) {
       e.preventDefault()
-      firstLink.focus()
+      firstEl.focus()
       sounds.navigate()
     }
   }, [])
@@ -95,43 +120,162 @@ export default function Library() {
     const grid = gridRef.current
     if (!grid) return
 
-    const links = Array.from(grid.querySelectorAll<HTMLElement>('a'))
-    const currentIndex = links.indexOf(document.activeElement as HTMLElement)
-    if (currentIndex === -1) return
+    const activeEl = document.activeElement as HTMLElement
 
-    const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length
+    // Handle navigation from a group toggle button
+    if (activeEl.hasAttribute('data-group-toggle')) {
+      const toggles = Array.from(grid.querySelectorAll<HTMLElement>('[data-group-toggle]'))
+      const toggleIndex = toggles.indexOf(activeEl)
+      const section = activeEl.closest('section')
+
+      switch (e.key) {
+        case 'ArrowDown': {
+          e.preventDefault()
+          // If group is expanded, go to first game card; otherwise next toggle
+          const groupGrid = section?.querySelector<HTMLElement>('.grid')
+          const firstLink = groupGrid?.querySelector<HTMLElement>('a')
+          if (firstLink) {
+            firstLink.focus()
+            sounds.navigate()
+          } else if (toggleIndex + 1 < toggles.length) {
+            toggles[toggleIndex + 1].focus()
+            sounds.navigate()
+          }
+          return
+        }
+        case 'ArrowUp': {
+          e.preventDefault()
+          if (toggleIndex > 0) {
+            // Go to previous group's last game, or previous toggle if collapsed
+            const prevSection = toggles[toggleIndex - 1].closest('section')
+            const prevGrid = prevSection?.querySelector<HTMLElement>('.grid')
+            const prevLinks = prevGrid ? Array.from(prevGrid.querySelectorAll<HTMLElement>('a')) : []
+            if (prevLinks.length > 0) {
+              prevLinks[prevLinks.length - 1].focus()
+            } else {
+              toggles[toggleIndex - 1].focus()
+            }
+            sounds.navigate()
+          } else {
+            focusAnchorRef.current?.focus()
+            sounds.navigate()
+          }
+          return
+        }
+        case 'ArrowRight': {
+          e.preventDefault()
+          const platform = activeEl.dataset.groupToggle!
+          if (collapsedGroups.has(platform)) {
+            setCollapsedGroups(prev => {
+              const next = new Set(prev)
+              next.delete(platform)
+              localStorage.setItem('library-collapsed', JSON.stringify([...next]))
+              return next
+            })
+            sounds.select()
+          }
+          return
+        }
+        case 'ArrowLeft': {
+          e.preventDefault()
+          const platform = activeEl.dataset.groupToggle!
+          if (!collapsedGroups.has(platform)) {
+            setCollapsedGroups(prev => {
+              const next = new Set(prev)
+              next.add(platform)
+              localStorage.setItem('library-collapsed', JSON.stringify([...next]))
+              return next
+            })
+            sounds.select()
+          }
+          return
+        }
+      }
+      return
+    }
+
+    const allLinks = Array.from(grid.querySelectorAll<HTMLElement>('a'))
+    const allIndex = allLinks.indexOf(activeEl)
+    if (allIndex === -1) return
+
+    // Find the nearest CSS grid container for accurate column count and scoped navigation
+    const gridContainer = activeEl.closest<HTMLElement>('.grid') ?? grid
+    const cols = getComputedStyle(gridContainer).gridTemplateColumns?.split(' ').length || 1
+    const scopedLinks = Array.from(gridContainer.querySelectorAll<HTMLElement>('a'))
+    const scopedIndex = scopedLinks.indexOf(activeEl)
     let nextIndex = -1
 
     switch (e.key) {
       case 'ArrowRight':
-        nextIndex = currentIndex + 1
-        break
+        // Move to next item across all groups
+        nextIndex = allIndex + 1
+        if (nextIndex < allLinks.length) {
+          e.preventDefault()
+          allLinks[nextIndex].focus()
+          sounds.navigate()
+        }
+        return
       case 'ArrowLeft':
-        nextIndex = currentIndex - 1
-        break
-      case 'ArrowDown':
-        nextIndex = currentIndex + cols
-        // If beyond last item, go to last item in next row (or last item overall)
-        if (nextIndex >= links.length) nextIndex = links.length - 1
-        break
+        nextIndex = allIndex - 1
+        if (nextIndex >= 0) {
+          e.preventDefault()
+          allLinks[nextIndex].focus()
+          sounds.navigate()
+        }
+        return
+      case 'ArrowDown': {
+        nextIndex = scopedIndex + cols
+        if (nextIndex < scopedLinks.length) {
+          e.preventDefault()
+          scopedLinks[nextIndex].focus()
+          sounds.navigate()
+        } else {
+          const currentCol = scopedIndex % cols
+          const lastRowStart = Math.floor((scopedLinks.length - 1) / cols) * cols
+          const currentRowStart = Math.floor(scopedIndex / cols) * cols
+          if (currentRowStart < lastRowStart) {
+            // Not on the last row yet — go to same column on last row
+            const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1)
+            e.preventDefault()
+            scopedLinks[target].focus()
+            sounds.navigate()
+          } else {
+            // On the last row — jump to next group's toggle button
+            const section = activeEl.closest('section')
+            const nextSection = section?.nextElementSibling as HTMLElement | null
+            const nextToggle = nextSection?.querySelector<HTMLElement>('[data-group-toggle]')
+            if (nextToggle) {
+              e.preventDefault()
+              nextToggle.focus()
+              sounds.navigate()
+            }
+          }
+        }
+        return
+      }
       case 'ArrowUp':
-        nextIndex = currentIndex - cols
-        break
+        nextIndex = scopedIndex - cols
+        if (nextIndex >= 0) {
+          e.preventDefault()
+          scopedLinks[nextIndex].focus()
+          sounds.navigate()
+        } else {
+          // On first row — go to this group's toggle button
+          const section = activeEl.closest('section')
+          const toggle = section?.querySelector<HTMLElement>('[data-group-toggle]')
+          if (toggle) {
+            e.preventDefault()
+            toggle.focus()
+            sounds.navigate()
+          } else {
+            e.preventDefault()
+            focusAnchorRef.current?.focus()
+            sounds.navigate()
+          }
+        }
+        return
     }
-
-    if (e.key === 'ArrowUp' && nextIndex < 0) {
-      e.preventDefault()
-      focusAnchorRef.current?.focus()
-      sounds.navigate()
-      return
-    }
-
-    if (nextIndex >= 0 && nextIndex < links.length) {
-      e.preventDefault()
-      links[nextIndex].focus()
-      sounds.navigate()
-    }
-  }, [])
+  }, [collapsedGroups])
 
 
   useEffect(() => {
@@ -149,12 +293,29 @@ export default function Library() {
 
   const filtered = games.filter((g) => {
     if (platform && g.platform !== platform) return false
-    if (search) {
-      const normalize = (s: string) => s.toLowerCase().replace(/[.\-]/g, '')
-      if (!normalize(g.title).includes(normalize(search))) return false
-    }
     return true
   })
+
+  const sorted = view === 'list'
+    ? [...filtered].sort((a, b) => {
+        const dir = sortDir === 'asc' ? 1 : -1
+        switch (sortBy) {
+          case 'platform': return dir * a.platform.localeCompare(b.platform)
+          case 'title': return dir * a.title.localeCompare(b.title)
+          case 'year': return dir * ((a.releaseYear ?? 0) - (b.releaseYear ?? 0))
+          case 'size': return dir * (a.sizeBytes - b.sizeBytes)
+          default: return 0
+        }
+      })
+    : filtered
+
+  const grouped = view === 'grouped'
+    ? platforms.reduce<Record<string, Game[]>>((acc, p) => {
+        const games = filtered.filter(g => g.platform === p)
+        if (games.length > 0) acc[p] = games
+        return acc
+      }, {})
+    : {}
 
   // Restore focus to previously selected game, or focus anchor (on mount only)
   useEffect(() => {
@@ -182,20 +343,7 @@ export default function Library() {
       className="max-w-7xl mx-auto px-6 py-8"
     >
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-8" onKeyDown={handleToolbarKeyDown}>
-        <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            ref={searchRef}
-            type="text"
-            placeholder="Search games..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input-field w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
-          />
-        </div>
+      <div className="flex gap-3 mb-8 items-center" onKeyDown={handleToolbarKeyDown}>
         <Listbox value={platform} onChange={setPlatform}>
           <div className="relative min-w-[160px]">
             <ListboxButton className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition flex items-center justify-between gap-2">
@@ -223,6 +371,35 @@ export default function Library() {
             </ListboxOptions>
           </div>
         </Listbox>
+        <div className="flex rounded-lg border border-border overflow-hidden ml-auto">
+          <button
+            onClick={() => { setView('grid'); localStorage.setItem('library-view', 'grid') }}
+            className={`p-2 transition ${view === 'grid' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            title="Grid view"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => { setView('grouped'); localStorage.setItem('library-view', 'grouped') }}
+            className={`p-2 transition ${view === 'grouped' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            title="Grouped by platform"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM2.25 16.875c0-.621.504-1.125 1.125-1.125h6c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-2.25z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => { setView('list'); localStorage.setItem('library-view', 'list') }}
+            className={`p-2 transition ${view === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            title="List view"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 5.25h16.5m-16.5-10.5h16.5" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Game count */}
@@ -230,7 +407,6 @@ export default function Library() {
         <p className="text-xs text-text-muted mb-4 font-mono">
           {filtered.length} {filtered.length === 1 ? 'game' : 'games'}
           {platform && ` in ${formatPlatform(platform)}`}
-          {search && ` matching "${search}"`}
         </p>
       )}
 
@@ -242,17 +418,25 @@ export default function Library() {
         className="outline-none h-0 overflow-hidden"
       />
 
-      {/* Grid */}
+      {/* Games */}
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[2/3] bg-surface-raised rounded-lg mb-2" />
-              <div className="h-3 bg-surface-raised rounded w-3/4 mb-1.5" />
-              <div className="h-2.5 bg-surface-raised rounded w-1/2" />
-            </div>
-          ))}
-        </div>
+        view === 'grid' || view === 'grouped' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[2/3] bg-surface-raised rounded-lg mb-2" />
+                <div className="h-3 bg-surface-raised rounded w-3/4 mb-1.5" />
+                <div className="h-2.5 bg-surface-raised rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-1 animate-pulse">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-12 bg-surface-raised rounded-lg" />
+            ))}
+          </div>
+        )
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-text-muted">
           <svg className="w-12 h-12 mb-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -261,7 +445,7 @@ export default function Library() {
           <p className="text-sm">No games found</p>
           <p className="text-xs mt-1">Try adjusting your search or filters</p>
         </div>
-      ) : (
+      ) : view === 'grid' ? (
         <div
           ref={gridRef}
           onKeyDown={handleGridKeyDown}
@@ -271,6 +455,113 @@ export default function Library() {
           {filtered.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}
+        </div>
+      ) : view === 'grouped' ? (
+        <div ref={gridRef} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
+          {Object.entries(grouped).map(([p, games]) => (
+            <section key={p} className="mb-10">
+              <button
+                data-group-toggle={p}
+                onClick={() => setCollapsedGroups(prev => {
+                  const next = new Set(prev)
+                  next.has(p) ? next.delete(p) : next.add(p)
+                  localStorage.setItem('library-collapsed', JSON.stringify([...next]))
+                  return next
+                })}
+                className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4 hover:text-accent transition-colors outline-none focus:text-accent focus:ring-2 focus:ring-accent/50 focus:ring-offset-4 focus:ring-offset-surface rounded px-1 -ml-1"
+              >
+                <svg className={`w-4 h-4 transition-transform ${collapsedGroups.has(p) ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+                {formatPlatform(p)}<span className="text-text-muted font-normal text-sm">({games.length})</span>
+              </button>
+              {!collapsedGroups.has(p) && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+                  {games.map((game) => (
+                    <GameCard key={game.id} game={game} />
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div ref={gridRef} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[100px]" />
+              <col />
+              <col className="w-[70px] hidden md:table-column" />
+              <col className="w-[200px] hidden lg:table-column" />
+              <col className="w-[90px] hidden sm:table-column" />
+              <col className="w-[40px]" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-text-muted tracking-wider">
+                {([
+                  { col: 'platform' as const, className: 'pl-3 pr-4' },
+                  { col: 'title' as const, className: 'pr-4' },
+                  { col: 'year' as const, className: 'pr-4 hidden md:table-cell' },
+                ] as const).map(({ col, className }) => (
+                  <th key={col} className={`pb-2 ${className} font-medium`}>
+                    <button onClick={() => toggleSort(col)} className="hover:text-text-primary transition-colors inline-flex items-center gap-1">
+                      {col.charAt(0).toUpperCase() + col.slice(1)}
+                      {sortBy === col && <span>{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                    </button>
+                  </th>
+                ))}
+                <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Genre</th>
+                <th className="pb-2 pr-3 text-right font-medium hidden sm:table-cell">
+                  <button onClick={() => toggleSort('size')} className="hover:text-text-primary transition-colors inline-flex items-center gap-1 ml-auto">
+                    Size
+                    {sortBy === 'size' && <span>{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                  </button>
+                </th>
+                <th className="pb-2 pr-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((game) => (
+                <tr key={game.id} onClick={() => navigate(`/games/${game.id}`)} className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors cursor-pointer">
+                  <td className="py-2.5 pl-3 pr-4 text-text-secondary truncate">{formatPlatform(game.platform)}</td>
+                  <td className="py-2.5 pr-4 truncate">
+                    <Link
+                      to={`/games/${game.id}`}
+                      data-game-id={game.id}
+                      className={`font-medium hover:text-accent transition-colors outline-none focus-visible:text-accent ${game.isMissing ? 'opacity-50' : ''}`}
+                    >
+                      {game.title}
+                    </Link>
+                  </td>
+                  <td className="py-2.5 pr-4 text-text-secondary hidden md:table-cell">{game.releaseYear ?? ''}</td>
+                  <td className="py-2.5 pr-4 text-text-secondary truncate hidden lg:table-cell">{game.genre ?? ''}</td>
+                  <td className="py-2.5 pr-3 text-right text-text-secondary font-mono text-xs hidden sm:table-cell">{formatSize(game.sizeBytes)}</td>
+                  <td className="py-2.5 pr-3 text-right">
+                    {!game.isMissing && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const { ticket } = await api.post<{ ticket: string }>(`/games/${game.id}/download-ticket`)
+                          const a = document.createElement('a')
+                          a.href = `/api/games/${game.id}/download?ticket=${encodeURIComponent(ticket)}`
+                          a.download = ''
+                          document.body.appendChild(a)
+                          a.click()
+                          document.body.removeChild(a)
+                        }}
+                        className="text-text-muted hover:text-accent transition-colors"
+                        title="Download"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </main>
