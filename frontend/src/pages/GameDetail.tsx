@@ -297,6 +297,9 @@ export default function GameDetail() {
   const mainRef = useRef<HTMLElement>(null)
   const backLinkRef = useRef<HTMLAnchorElement>(null)
   const focusAnchorRef = useRef<HTMLDivElement>(null)
+  const coverFileRef = useRef<HTMLInputElement>(null)
+  const heroFileRef = useRef<HTMLInputElement>(null)
+  const [pendingFiles, setPendingFiles] = useState<{ cover?: File; hero?: File }>({})
 
   // Arrow key navigation between back link and download button
   const handleMainKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -510,15 +513,35 @@ export default function GameDetail() {
     setEditing(true);
   }
 
-  function handleEditSubmit(e: React.FormEvent) {
+  async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
+    let coverUrl = editForm.coverUrl || null;
+    let heroUrl = editForm.heroUrl || null;
+
+    // Upload any pending files first
+    const cacheBust = `?v=${Date.now()}`;
+    if (pendingFiles.cover) {
+      const res = await api.upload<{ url: string }>(
+        `/admin/games/${id}/upload-image?type=cover`,
+        pendingFiles.cover,
+      );
+      coverUrl = res.url + cacheBust;
+    }
+    if (pendingFiles.hero) {
+      const res = await api.upload<{ url: string }>(
+        `/admin/games/${id}/upload-image?type=hero`,
+        pendingFiles.hero,
+      );
+      heroUrl = res.url + cacheBust;
+    }
+
     updateMutation.mutate({
       title: editForm.title,
       summary: editForm.summary || null,
       genre: editForm.genre || null,
       releaseYear: editForm.releaseYear ? parseInt(editForm.releaseYear) : null,
-      coverUrl: editForm.coverUrl || null,
-      heroUrl: editForm.heroUrl || null,
+      coverUrl,
+      heroUrl,
       installType: editForm.installType,
       installerExe: editForm.installerExe || null,
       gameExe: editForm.gameExe || null,
@@ -531,6 +554,14 @@ export default function GameDetail() {
       igdbId: editForm.igdbId ? parseInt(editForm.igdbId) : null,
       igdbSlug: editForm.igdbSlug || null,
     });
+    setPendingFiles({});
+  }
+
+  function handleImageSelect(type: "cover" | "hero", file: File) {
+    const field = type === "cover" ? "coverUrl" : "heroUrl";
+    const blobUrl = URL.createObjectURL(file);
+    setEditForm((f) => ({ ...f, [field]: blobUrl }));
+    setPendingFiles((p) => ({ ...p, [type]: file }));
   }
 
   if (isLoading) {
@@ -565,10 +596,10 @@ export default function GameDetail() {
   return (
     <>
       {/* Hero banner */}
-      {game.heroUrl && (
+      {(editing ? editForm.heroUrl : game.heroUrl) && (
         <div className="absolute inset-x-0 top-0 h-72 overflow-hidden -z-10">
           <img
-            src={game.heroUrl}
+            src={editing ? editForm.heroUrl : game.heroUrl}
             alt=""
             className="w-full h-full object-cover"
           />
@@ -651,9 +682,9 @@ export default function GameDetail() {
                 user?.role === "admin" ? () => openSgdbDialog("covers") : undefined
               }
             >
-              {game.coverUrl ? (
+              {(editing ? editForm.coverUrl : game.coverUrl) ? (
                 <img
-                  src={game.coverUrl}
+                  src={editing ? editForm.coverUrl : game.coverUrl}
                   alt={game.title}
                   className="w-full h-full object-cover"
                 />
@@ -875,16 +906,37 @@ export default function GameDetail() {
                     <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
                       Cover URL
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => openSgdbDialog("covers")}
-                      className="text-xs text-accent hover:underline"
-                    >
-                      Search SteamGridDB
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => coverFileRef.current?.click()}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Upload
+                      </button>
+                      <input
+                        ref={coverFileRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageSelect("cover", file);
+                          e.target.value = "";
+                        }}
+                      />
+                      <span className="text-text-muted">|</span>
+                      <button
+                        type="button"
+                        onClick={() => openSgdbDialog("covers")}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        SteamGridDB
+                      </button>
+                    </div>
                   </div>
                   <input
-                    type="url"
+                    type="text"
                     value={editForm.coverUrl}
                     onChange={(e) =>
                       setEditForm({ ...editForm, coverUrl: e.target.value })
@@ -898,16 +950,37 @@ export default function GameDetail() {
                     <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
                       Hero URL
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => openSgdbDialog("heroes")}
-                      className="text-xs text-accent hover:underline"
-                    >
-                      Search SteamGridDB
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => heroFileRef.current?.click()}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Upload
+                      </button>
+                      <input
+                        ref={heroFileRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageSelect("hero", file);
+                          e.target.value = "";
+                        }}
+                      />
+                      <span className="text-text-muted">|</span>
+                      <button
+                        type="button"
+                        onClick={() => openSgdbDialog("heroes")}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        SteamGridDB
+                      </button>
+                    </div>
                   </div>
                   <input
-                    type="url"
+                    type="text"
                     value={editForm.heroUrl}
                     onChange={(e) =>
                       setEditForm({ ...editForm, heroUrl: e.target.value })
@@ -981,7 +1054,7 @@ export default function GameDetail() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditing(false)}
+                    onClick={() => { setEditing(false); setPendingFiles({}); }}
                     className="px-5 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition"
                   >
                     Cancel

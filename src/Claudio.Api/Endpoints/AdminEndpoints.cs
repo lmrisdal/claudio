@@ -36,6 +36,7 @@ public static class AdminEndpoints
         group.MapGet("/steamgriddb/search", SearchSteamGridDb);
         group.MapGet("/steamgriddb/{sgdbGameId:long}/covers", GetSteamGridDbCovers);
         group.MapGet("/steamgriddb/{sgdbGameId:long}/heroes", GetSteamGridDbHeroes);
+        group.MapPost("/games/{id:int}/upload-image", UploadImage).DisableAntiforgery();
 
         return group;
     }
@@ -319,7 +320,7 @@ public static class AdminEndpoints
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
 
-        var gridsRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/grids/game/{sgdbGameId}?dimensions=600x900");
+        var gridsRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/grids/game/{sgdbGameId}?dimensions=600x900&types=static,animated");
         if (!gridsRes.IsSuccessStatusCode)
             return Results.Ok(Array.Empty<string>());
 
@@ -339,7 +340,7 @@ public static class AdminEndpoints
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Steamgriddb.ApiKey);
 
-        var heroesRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGameId}");
+        var heroesRes = await client.GetAsync($"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGameId}?types=static,animated");
         if (!heroesRes.IsSuccessStatusCode)
             return Results.Ok(Array.Empty<string>());
 
@@ -372,6 +373,52 @@ public static class AdminEndpoints
     {
         [JsonPropertyName("url")]
         public string? Url { get; set; }
+    }
+
+    private static async Task<IResult> UploadImage(
+        int id,
+        [FromQuery] string type,
+        IFormFile file,
+        AppDbContext db,
+        ClaudioConfig config)
+    {
+        if (type is not "cover" and not "hero")
+            return Results.BadRequest("Type must be 'cover' or 'hero'.");
+
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        // Validate content type
+        if (!file.ContentType.StartsWith("image/"))
+            return Results.BadRequest("File must be an image.");
+
+        if (file.Length > 10 * 1024 * 1024)
+            return Results.BadRequest("File must be under 10 MB.");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not ".jpg" and not ".jpeg" and not ".png" and not ".webp" and not ".gif")
+            return Results.BadRequest("Supported formats: jpg, png, webp, gif.");
+
+        // Store in /config/images/ (same volume as database)
+        var configDir = Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
+        var imagesDir = Path.Combine(configDir, "images");
+        Directory.CreateDirectory(imagesDir);
+
+        // Filename: {gameId}-{type}{ext}
+        var fileName = $"{id}-{type}{ext}";
+        var filePath = Path.Combine(imagesDir, fileName);
+
+        // Delete previous upload for this game+type if different extension
+        foreach (var existing in Directory.GetFiles(imagesDir, $"{id}-{type}.*"))
+        {
+            if (existing != filePath) File.Delete(existing);
+        }
+
+        await using var stream = new FileStream(filePath, FileMode.Create);
+        await file.CopyToAsync(stream);
+
+        var url = $"/images/{fileName}";
+        return Results.Ok(new { url });
     }
 
     public record RoleUpdateRequest(string Role);

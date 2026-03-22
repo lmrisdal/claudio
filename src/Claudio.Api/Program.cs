@@ -80,6 +80,17 @@ _ = Task.Run(async () =>
 });
 
 app.UseStaticFiles();
+
+// Serve uploaded game images from /config/images/ under /images/
+var configDir = Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
+var imagesDir = Path.Combine(configDir, "images");
+Directory.CreateDirectory(imagesDir);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(imagesDir),
+    RequestPath = "/images",
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
