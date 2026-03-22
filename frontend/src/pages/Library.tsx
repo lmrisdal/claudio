@@ -12,6 +12,11 @@ let lastFocusedGameId: string | null = null
 
 type ViewMode = 'grid' | 'grouped' | 'list'
 
+/** Focus with visible ring — needed after mouse interactions reset the :focus-visible heuristic */
+function focusVisible(el: HTMLElement) {
+  el.focus({ focusVisible: true } as FocusOptions)
+}
+
 function formatSize(bytes: number): string {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -79,7 +84,7 @@ export default function Library() {
       case 'ArrowDown':
       case 'ArrowRight':
         e.preventDefault()
-        if (firstEl) { firstEl.focus(); sounds.navigate() }
+        if (firstEl) { focusVisible(firstEl); sounds.navigate() }
         break
       case 'ArrowUp':
         e.preventDefault()
@@ -95,7 +100,7 @@ export default function Library() {
     const firstEl = grid.querySelector<HTMLElement>('[data-group-toggle], a')
     if (firstEl) {
       e.preventDefault()
-      firstEl.focus()
+      focusVisible(firstEl)
       sounds.navigate()
     }
   }, [])
@@ -156,10 +161,10 @@ export default function Library() {
           const groupGrid = section?.querySelector<HTMLElement>('.grid')
           const firstLink = groupGrid?.querySelector<HTMLElement>('a')
           if (firstLink) {
-            firstLink.focus()
+            focusVisible(firstLink)
             sounds.navigate()
           } else if (toggleIndex + 1 < toggles.length) {
-            toggles[toggleIndex + 1].focus()
+            focusVisible(toggles[toggleIndex + 1])
             toggles[toggleIndex + 1].scrollIntoView({ block: 'nearest' })
             sounds.navigate()
           }
@@ -175,9 +180,9 @@ export default function Library() {
             if (prevLinks.length > 0) {
               const prevCols = prevGrid ? getComputedStyle(prevGrid).gridTemplateColumns?.split(' ').length || 1 : 1
               const lastRowStart = Math.floor((prevLinks.length - 1) / prevCols) * prevCols
-              prevLinks[lastRowStart].focus()
+              focusVisible(prevLinks[lastRowStart])
             } else {
-              toggles[toggleIndex - 1].focus()
+              focusVisible(toggles[toggleIndex - 1])
               toggles[toggleIndex - 1].scrollIntoView({ block: 'nearest' })
             }
             sounds.navigate()
@@ -237,7 +242,7 @@ export default function Library() {
         nextIndex = allIndex + 1
         if (nextIndex < allLinks.length) {
           e.preventDefault()
-          allLinks[nextIndex].focus()
+          focusVisible(allLinks[nextIndex])
           sounds.navigate()
         }
         return
@@ -245,7 +250,7 @@ export default function Library() {
         nextIndex = allIndex - 1
         if (nextIndex >= 0) {
           e.preventDefault()
-          allLinks[nextIndex].focus()
+          focusVisible(allLinks[nextIndex])
           sounds.navigate()
         }
         return
@@ -253,7 +258,7 @@ export default function Library() {
         nextIndex = scopedIndex + cols
         if (nextIndex < scopedLinks.length) {
           e.preventDefault()
-          scopedLinks[nextIndex].focus()
+          focusVisible(scopedLinks[nextIndex])
           sounds.navigate()
         } else {
           const currentCol = scopedIndex % cols
@@ -263,7 +268,7 @@ export default function Library() {
             // Not on the last row yet — go to same column on last row
             const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1)
             e.preventDefault()
-            scopedLinks[target].focus()
+            focusVisible(scopedLinks[target])
             sounds.navigate()
           } else {
             // On the last row — jump to next group's toggle button
@@ -272,7 +277,7 @@ export default function Library() {
             const nextToggle = nextSection?.querySelector<HTMLElement>('[data-group-toggle]')
             if (nextToggle) {
               e.preventDefault()
-              nextToggle.focus()
+              focusVisible(nextToggle)
               nextToggle.scrollIntoView({ block: 'nearest' })
               sounds.navigate()
             }
@@ -284,7 +289,7 @@ export default function Library() {
         nextIndex = scopedIndex - cols
         if (nextIndex >= 0) {
           e.preventDefault()
-          scopedLinks[nextIndex].focus()
+          focusVisible(scopedLinks[nextIndex])
           sounds.navigate()
         } else {
           // On first row — go to this group's toggle button
@@ -292,7 +297,7 @@ export default function Library() {
           const toggle = section?.querySelector<HTMLElement>('[data-group-toggle]')
           if (toggle) {
             e.preventDefault()
-            toggle.focus()
+            focusVisible(toggle)
             toggle.scrollIntoView({ block: 'nearest' })
             sounds.navigate()
           } else {
@@ -382,7 +387,7 @@ export default function Library() {
       requestAnimationFrame(() => {
         const link = gridRef.current?.querySelector<HTMLElement>(`[data-game-id="${gameId}"]`)
         if (link) {
-          link.focus()
+          focusVisible(link)
           link.scrollIntoView({ block: 'center' })
         } else {
           focusAnchorRef.current?.focus()
