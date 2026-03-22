@@ -183,6 +183,7 @@ export default function Library() {
             sounds.navigate()
           } else {
             focusAnchorRef.current?.focus()
+            window.scrollTo({ top: 0, behavior: 'smooth' })
             sounds.navigate()
           }
           return
@@ -297,6 +298,7 @@ export default function Library() {
           } else {
             e.preventDefault()
             focusAnchorRef.current?.focus()
+            window.scrollTo({ top: 0, behavior: 'smooth' })
             sounds.navigate()
           }
         }
