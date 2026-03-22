@@ -144,7 +144,7 @@ public class CompressionService(
 
             lock (_lock) { _currentGameTitle = game.Title; }
 
-            if (!Directory.Exists(game.FolderPath))
+            if (!Endpoints.GameEndpoints.ExistsOnDisk(game))
             {
                 logger.LogWarning("Game folder not found for {Title}, skipping compression", game.Title);
                 game.IsProcessing = false;

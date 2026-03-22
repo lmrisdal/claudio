@@ -3,10 +3,16 @@ import { api } from '../api/client'
 import type { User, Game } from '../types/models'
 import { useAuth } from '../hooks/useAuth'
 import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { formatPlatform } from '../utils/platforms'
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'users' | 'games' | 'scan'>('users')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const validTabs = ['users', 'games', 'scan'] as const
+  type Tab = typeof validTabs[number]
+  const tabParam = searchParams.get('tab') as Tab
+  const activeTab: Tab = validTabs.includes(tabParam) ? tabParam : 'users'
+  const setActiveTab = (tab: Tab) => setSearchParams({ tab }, { replace: false })
 
   const tabs = [
     { id: 'users' as const, label: 'Users' },
@@ -317,7 +323,7 @@ function GamesTab() {
             ) : (
               filtered.map((game) => (
                 <tr key={game.id} className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium">{game.title}</td>
+                  <td className="px-5 py-3.5 font-medium"><Link to={`/games/${game.id}`} className="text-accent hover:underline">{game.title}</Link></td>
                   <td className="px-5 py-3.5 text-text-secondary">{formatPlatform(game.platform)}</td>
                   <td className="px-5 py-3.5">
                     {game.isMissing ? (

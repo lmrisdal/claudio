@@ -56,13 +56,16 @@ public static class GameEndpoints
         if (game is null) return Results.NotFound();
         if (game.IsProcessing) return Results.Conflict("Game is currently being processed.");
 
-        if (!Directory.Exists(game.FolderPath))
+        if (!ExistsOnDisk(game))
             return Results.Problem("Game files not found on disk.", statusCode: 500);
 
         // Pre-build tar if needed so the download endpoint can serve it immediately
-        var singleArchive = FindSingleArchive(game.FolderPath);
-        if (singleArchive is null)
-            await downloadService.CreateTarAsync(game);
+        if (!IsStandaloneArchive(game))
+        {
+            var singleArchive = FindSingleArchive(game.FolderPath);
+            if (singleArchive is null)
+                await downloadService.CreateTarAsync(game);
+        }
 
         var ticket = ticketService.CreateTicket(id);
         return Results.Ok(new { ticket });
@@ -86,8 +89,21 @@ public static class GameEndpoints
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
 
-        if (!Directory.Exists(game.FolderPath))
+        if (!ExistsOnDisk(game))
             return Results.Problem("Game files not found on disk.", statusCode: 500);
+
+        // Standalone archive file — serve it directly
+        if (IsStandaloneArchive(game))
+        {
+            var ext = System.IO.Path.GetExtension(game.FolderPath).ToLowerInvariant();
+            var contentType = ext == ".zip" ? "application/zip" : ext == ".iso" ? "application/x-iso9660-image" : "application/x-tar";
+            var fileName = $"{game.Title}{ext}";
+            return Results.File(
+                game.FolderPath,
+                contentType: contentType,
+                fileDownloadName: fileName,
+                enableRangeProcessing: true);
+        }
 
         // If the folder contains a single archive, serve it directly
         var singleArchive = FindSingleArchive(game.FolderPath);
@@ -138,7 +154,7 @@ public static class GameEndpoints
         Franchise = game.Franchise,
         GameEngine = game.GameEngine,
         IsProcessing = game.IsProcessing,
-        IsArchive = Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is not null,
+        IsArchive = IsStandaloneArchive(game) || (Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is not null),
     };
 
     public record BrowseEntry(string Name, bool IsDirectory, long? Size);
@@ -147,13 +163,21 @@ public static class GameEndpoints
     internal static readonly HashSet<string> HiddenNames = new(StringComparer.OrdinalIgnoreCase)
         { "__MACOSX", ".DS_Store", "@eaDir", "#recycle", "Thumbs.db" };
 
-    private static readonly string[] ArchiveExtensions = [".zip", ".tar", ".tar.gz", ".tgz"];
+    private static readonly string[] ArchiveExtensions = [".zip", ".tar", ".tar.gz", ".tgz", ".iso"];
 
     internal static bool IsArchiveFile(string path)
     {
         var lower = path.ToLowerInvariant();
         return ArchiveExtensions.Any(ext => lower.EndsWith(ext));
     }
+
+    /// Returns true if the game's FolderPath exists on disk (either as a directory or a standalone archive file).
+    internal static bool ExistsOnDisk(Game game)
+        => Directory.Exists(game.FolderPath) || File.Exists(game.FolderPath);
+
+    /// Returns true if the game is a standalone archive file (not a folder).
+    internal static bool IsStandaloneArchive(Game game)
+        => File.Exists(game.FolderPath) && IsArchiveFile(game.FolderPath);
 
     internal static string? FindSingleArchive(string folderPath)
     {
@@ -266,13 +290,21 @@ public static class GameEndpoints
     {
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
-        if (!Directory.Exists(game.FolderPath))
+        if (!ExistsOnDisk(game))
             return Results.Problem("Game folder not found on disk.", statusCode: 404);
 
         var relativePath = (path ?? "").Replace('\\', '/').Trim('/');
         var segments = relativePath.Length > 0
             ? relativePath.Split('/')
             : Array.Empty<string>();
+
+        // Standalone archive file — browse inside it directly
+        if (IsStandaloneArchive(game))
+        {
+            var internalPrefix = segments.Length > 0 ? string.Join("/", segments) + "/" : "";
+            var entries = BrowseArchiveEntries(game.FolderPath, internalPrefix);
+            return Results.Ok(new BrowseResult(relativePath, true, entries));
+        }
 
         // Check if the game folder contains a single archive — if so, browse inside it transparently
         var fsPath = game.FolderPath;

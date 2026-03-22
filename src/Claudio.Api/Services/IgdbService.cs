@@ -112,6 +112,11 @@ public class IgdbService(
         long? igdbId = null;
         int? year = null;
 
+        // Strip file extension for standalone archives
+        var ext = Path.GetExtension(title);
+        if (Endpoints.GameEndpoints.IsArchiveFile(title))
+            title = Path.GetFileNameWithoutExtension(title);
+
         // Extract igdb-NNNNN tag (with or without parentheses)
         var igdbMatch = Regex.Match(title, @"\(?igdb-(\d+)\)?");
         if (igdbMatch.Success)
@@ -120,13 +125,16 @@ public class IgdbService(
             title = title.Remove(igdbMatch.Index, igdbMatch.Length).Trim();
         }
 
-        // Extract (YYYY) year
-        var yearMatch = Regex.Match(title, @"\((\d{4})\)\s*$");
+        // Extract (YYYY) year — keep it for search filtering
+        var yearMatch = Regex.Match(title, @"\((\d{4})\)");
         if (yearMatch.Success)
         {
             year = int.Parse(yearMatch.Groups[1].Value);
-            title = title[..yearMatch.Index].Trim();
+            title = title.Remove(yearMatch.Index, yearMatch.Length).Trim();
         }
+
+        // Strip all remaining parenthesized parts (e.g. region, language, enhancement tags)
+        title = Regex.Replace(title, @"\([^)]*\)", "").Trim();
 
         // Replace periods and dashes with spaces
         var cleaned = title.Replace('.', ' ').Replace('-', ' ').Trim();

@@ -118,7 +118,10 @@ public static class AdminEndpoints
     {
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
-        if (!Directory.Exists(game.FolderPath))
+        if (!GameEndpoints.ExistsOnDisk(game))
+            return Results.Ok(Array.Empty<string>());
+
+        if (GameEndpoints.IsStandaloneArchive(game))
             return Results.Ok(Array.Empty<string>());
 
         var exes = new List<string>();
@@ -187,8 +190,11 @@ public static class AdminEndpoints
         if (game is null) return Results.NotFound();
         if (game.IsProcessing) return Results.Conflict("Game is already being processed.");
 
-        if (!Directory.Exists(game.FolderPath))
+        if (!GameEndpoints.ExistsOnDisk(game))
             return Results.Problem("Game folder not found on disk.", statusCode: 404);
+
+        if (GameEndpoints.IsStandaloneArchive(game))
+            return Results.BadRequest("Game is already a standalone archive.");
 
         var singleArchive = GameEndpoints.FindSingleArchive(game.FolderPath);
         if (singleArchive is not null)
@@ -223,17 +229,31 @@ public static class AdminEndpoints
         if (game.FolderName.Contains(tag, StringComparison.OrdinalIgnoreCase))
             return Results.Ok(GameEndpoints.ToDto(game));
 
-        if (!Directory.Exists(game.FolderPath))
-            return Results.Problem("Game folder not found on disk.", statusCode: 404);
+        if (!GameEndpoints.ExistsOnDisk(game))
+            return Results.Problem("Game not found on disk.", statusCode: 404);
 
+        var isFile = GameEndpoints.IsStandaloneArchive(game);
         var parentDir = Path.GetDirectoryName(game.FolderPath)!;
-        var newFolderName = $"{game.FolderName} {tag}";
+        string newFolderName;
+        if (isFile)
+        {
+            var ext = Path.GetExtension(game.FolderName);
+            var baseName = Path.GetFileNameWithoutExtension(game.FolderName);
+            newFolderName = $"{baseName} {tag}{ext}";
+        }
+        else
+        {
+            newFolderName = $"{game.FolderName} {tag}";
+        }
         var newFolderPath = Path.Combine(parentDir, newFolderName);
 
-        if (Directory.Exists(newFolderPath))
-            return Results.Problem("Target folder already exists.", statusCode: 409);
+        if (Directory.Exists(newFolderPath) || File.Exists(newFolderPath))
+            return Results.Problem("Target already exists.", statusCode: 409);
 
-        Directory.Move(game.FolderPath, newFolderPath);
+        if (isFile)
+            File.Move(game.FolderPath, newFolderPath);
+        else
+            Directory.Move(game.FolderPath, newFolderPath);
 
         game.FolderName = newFolderName;
         game.FolderPath = newFolderPath;
@@ -273,10 +293,13 @@ public static class AdminEndpoints
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
 
-        if (deleteFiles && Directory.Exists(game.FolderPath))
+        if (deleteFiles && GameEndpoints.ExistsOnDisk(game))
         {
             loggerFactory.CreateLogger("AdminEndpoints").LogWarning("Deleting game files from disk: {Path}", game.FolderPath);
-            Directory.Delete(game.FolderPath, recursive: true);
+            if (GameEndpoints.IsStandaloneArchive(game))
+                File.Delete(game.FolderPath);
+            else
+                Directory.Delete(game.FolderPath, recursive: true);
         }
 
         db.Games.Remove(game);

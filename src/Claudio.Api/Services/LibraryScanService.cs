@@ -34,6 +34,7 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
                 if (Endpoints.GameEndpoints.HiddenNames.Contains(platform))
                     continue;
 
+                // Scan subdirectories (folder-based games)
                 foreach (var gameDir in Directory.GetDirectories(platformDir))
                 {
                     var folderName = Path.GetFileName(gameDir);
@@ -64,6 +65,46 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
                         FolderPath = gameDir,
                         InstallType = DetectInstallType(gameDir),
                         SizeBytes = GetDirectorySize(gameDir),
+                        IsMissing = false,
+                    };
+
+                    db.Games.Add(game);
+                    gamesFound++;
+                    gamesAdded++;
+                }
+
+                // Scan standalone archive files directly in the platform directory
+                foreach (var archiveFile in Directory.GetFiles(platformDir))
+                {
+                    var fileName = Path.GetFileName(archiveFile);
+                    if (Endpoints.GameEndpoints.HiddenNames.Contains(fileName))
+                        continue;
+                    if (!Endpoints.GameEndpoints.IsArchiveFile(fileName))
+                        continue;
+
+                    foundPaths.Add($"{platform}/{fileName}");
+
+                    var existing = await db.Games
+                        .FirstOrDefaultAsync(g => g.Platform == platform && g.FolderName == fileName);
+
+                    if (existing is not null)
+                    {
+                        existing.SizeBytes = new FileInfo(archiveFile).Length;
+                        existing.FolderPath = archiveFile;
+                        existing.IsMissing = false;
+                        gamesFound++;
+                        continue;
+                    }
+
+                    var title = Path.GetFileNameWithoutExtension(fileName);
+                    var game = new Game
+                    {
+                        Title = title,
+                        Platform = platform,
+                        FolderName = fileName,
+                        FolderPath = archiveFile,
+                        InstallType = InstallType.Portable,
+                        SizeBytes = new FileInfo(archiveFile).Length,
                         IsMissing = false,
                     };
 
