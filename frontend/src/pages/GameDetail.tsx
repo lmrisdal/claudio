@@ -1565,6 +1565,8 @@ export default function GameDetail() {
                                     series: game.series ?? null,
                                     franchise: game.franchise ?? null,
                                     gameEngine: game.gameEngine ?? null,
+                                    igdbId: game.igdbId ?? null,
+                                    igdbSlug: game.igdbSlug ?? null,
                                   });
                                 }
                                 setSgdbDialog({ ...sgdbDialog, open: false });
@@ -1603,6 +1605,8 @@ export default function GameDetail() {
                                     series: game.series ?? null,
                                     franchise: game.franchise ?? null,
                                     gameEngine: game.gameEngine ?? null,
+                                    igdbId: game.igdbId ?? null,
+                                    igdbSlug: game.igdbSlug ?? null,
                                   });
                                 }
                                 setSgdbDialog({ ...sgdbDialog, open: false });
