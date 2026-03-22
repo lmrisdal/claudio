@@ -26,6 +26,8 @@ public class AuthConfig
 {
     public string JwtSecret { get; set; } = string.Empty;
     public int TokenExpiryHours { get; set; } = 168;
+    public string ProxyAuthHeader { get; set; } = string.Empty;
+    public bool ProxyAuthAutoCreate { get; set; } = false;
 }
 
 public class IgdbConfig

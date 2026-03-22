@@ -45,6 +45,12 @@ public static class ConfigLoader
         if (Environment.GetEnvironmentVariable("CLAUDIO_STEAMGRIDDB_API_KEY") is { Length: > 0 } sgdbKey)
             config.Steamgriddb.ApiKey = sgdbKey;
 
+        if (Environment.GetEnvironmentVariable("CLAUDIO_PROXY_AUTH_HEADER") is { Length: > 0 } proxyHeader)
+            config.Auth.ProxyAuthHeader = proxyHeader;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_PROXY_AUTH_AUTO_CREATE") is { Length: > 0 } proxyAutoCreate)
+            config.Auth.ProxyAuthAutoCreate = proxyAutoCreate.Equals("true", StringComparison.OrdinalIgnoreCase);
+
         // Auto-generate JWT secret if not configured
         if (string.IsNullOrEmpty(config.Auth.JwtSecret))
             config.Auth.JwtSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));

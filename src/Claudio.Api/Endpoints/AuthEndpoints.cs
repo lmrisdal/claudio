@@ -15,6 +15,7 @@ public static class AuthEndpoints
 
         group.MapPost("/register", Register);
         group.MapPost("/login", Login);
+        group.MapGet("/proxy", ProxyLogin);
         group.MapGet("/me", GetMe).RequireAuthorization();
         group.MapPut("/change-password", ChangePassword).RequireAuthorization();
 
@@ -61,6 +62,42 @@ public static class AuthEndpoints
 
         if (user is null || !PasswordHasher.Verify(request.Password, user.PasswordHash))
             return Results.Unauthorized();
+
+        var token = tokenService.GenerateToken(user);
+        return Results.Ok(new AuthResponse(token, ToDto(user)));
+    }
+
+    private static async Task<IResult> ProxyLogin(
+        HttpContext httpContext,
+        AppDbContext db,
+        TokenService tokenService,
+        ClaudioConfig config)
+    {
+        var header = config.Auth.ProxyAuthHeader;
+        if (string.IsNullOrWhiteSpace(header))
+            return Results.NotFound();
+
+        var username = httpContext.Request.Headers[header].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(username))
+            return Results.Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        if (user is null)
+        {
+            if (!config.Auth.ProxyAuthAutoCreate)
+                return Results.Unauthorized();
+
+            var isFirstUser = !await db.Users.AnyAsync();
+            user = new User
+            {
+                Username = username,
+                PasswordHash = "",
+                Role = isFirstUser ? UserRole.Admin : UserRole.User,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+        }
 
         var token = tokenService.GenerateToken(user);
         return Results.Ok(new AuthResponse(token, ToDto(user)));

@@ -51,6 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token])
 
+  // Try proxy authentication on mount if not logged in
+  useEffect(() => {
+    if (token) return
+    api.get<AuthResponse>('/auth/proxy')
+      .then(res => {
+        localStorage.setItem('token', res.token)
+        setToken(res.token)
+        setUser(res.user)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleAuth = useCallback(async (endpoint: string, username: string, password: string) => {
     const res = await api.post<AuthResponse>(endpoint, { username, password })
     localStorage.setItem('token', res.token)
