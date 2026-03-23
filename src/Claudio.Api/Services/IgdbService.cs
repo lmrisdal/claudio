@@ -102,10 +102,7 @@ public class IgdbService(
                         continue;
                     }
 
-                    // Auto-pick: prefer exact title match, then first result
-                    result = candidates.FirstOrDefault(c =>
-                        string.Equals(c.Name, cleanedTitle, StringComparison.OrdinalIgnoreCase))
-                        ?? candidates[0];
+                    result = SelectBestCandidate(candidates, cleanedTitle, game.Platform);
                 }
 
                 logger.LogInformation("Matched: {Title} -> {IgdbName} (IGDB #{IgdbId})", game.Title, result.Name, result.IgdbId);
@@ -198,6 +195,34 @@ public class IgdbService(
 
         return (cleaned, year, igdbId);
     }
+
+    private static IgdbCandidate SelectBestCandidate(
+        List<IgdbCandidate> candidates,
+        string cleanedTitle,
+        string platform)
+    {
+        var expectedPlatformSlug = NormalizePlatformSlug(platform);
+
+        return candidates
+            .OrderByDescending(c => CandidateHasPlatformSlug(c, expectedPlatformSlug))
+            .ThenByDescending(c => string.Equals(c.Name, cleanedTitle, StringComparison.OrdinalIgnoreCase))
+            .First();
+    }
+
+    private static bool CandidateHasPlatformSlug(IgdbCandidate candidate, string expectedPlatformSlug)
+    {
+        if (string.IsNullOrWhiteSpace(expectedPlatformSlug) || string.IsNullOrWhiteSpace(candidate.PlatformSlug))
+            return false;
+
+        return candidate.PlatformSlug
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Any(slug => string.Equals(slug, expectedPlatformSlug, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizePlatformSlug(string platform) =>
+        string.Equals(platform, "pc", StringComparison.OrdinalIgnoreCase)
+            ? "win"
+            : platform.Trim().ToLowerInvariant();
 
     public async Task ApplyMatchAsync(int gameId, long igdbId)
     {

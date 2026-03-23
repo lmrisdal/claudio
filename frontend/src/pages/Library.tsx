@@ -1,470 +1,556 @@
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../api/client'
-import type { Game, TasksStatus } from '../types/models'
-import GameCard from '../components/GameCard'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { formatPlatform } from '../utils/platforms'
-import { sounds } from '../utils/sounds'
-import { isGamepadEvent } from '../hooks/useGamepad'
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { api } from "../api/client";
+import GameCard from "../components/GameCard";
+import { isGamepadEvent } from "../hooks/useGamepad";
+import type { Game, TasksStatus } from "../types/models";
+import { formatPlatform } from "../utils/platforms";
+import { sounds } from "../utils/sounds";
 
-let lastFocusedGameId: string | null = null
+let lastFocusedGameId: string | null = null;
 
-type ViewMode = 'grid' | 'grouped' | 'list'
+type ViewMode = "grid" | "grouped" | "list";
 
 /** Focus with visible ring — needed after mouse interactions reset the :focus-visible heuristic */
-function focusVisible(el: HTMLElement) {
-  el.focus({ focusVisible: true } as FocusOptions)
+function focusVisible(el: HTMLElement, preventScroll = false) {
+  el.focus({ focusVisible: true, preventScroll } as FocusOptions);
 }
 
 function formatSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / 1024 ** i).toFixed(i > 0 ? 1 : 0)} ${units[i]}`
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / 1024 ** i).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 export default function Library() {
-  const navigate = useNavigate()
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem('library-platforms')
-      return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
-    } catch { return new Set() }
-  })
+  const navigate = useNavigate();
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(
+    () => {
+      try {
+        const saved = localStorage.getItem("library-platforms");
+        return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+      } catch {
+        return new Set();
+      }
+    },
+  );
   const [platformOrder, setPlatformOrder] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('library-platform-order')
-      return saved ? JSON.parse(saved) as string[] : []
-    } catch { return [] }
-  })
-  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false)
-  const platformDropdownRef = useRef<HTMLDivElement>(null)
-  const [view, setView] = useState<ViewMode>(() =>
-    (localStorage.getItem('library-view') as ViewMode) || 'grouped'
-  )
-  const [sortBy, setSortBy] = useState<'platform' | 'title' | 'year' | 'size'>('title')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+      const saved = localStorage.getItem("library-platform-order");
+      return saved ? (JSON.parse(saved) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
+  const platformDropdownRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<ViewMode>(
+    () => (localStorage.getItem("library-view") as ViewMode) || "grouped",
+  );
+  const [sortBy, setSortBy] = useState<"platform" | "title" | "year" | "size">(
+    "title",
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   function toggleSort(col: typeof sortBy) {
-    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortBy(col); setSortDir('asc') }
+    if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortBy(col);
+      setSortDir("asc");
+    }
   }
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem('library-collapsed')
-      return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
-    } catch { return new Set() }
-  })
+      const saved = localStorage.getItem("library-collapsed");
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   // Subscribe to tasks status cache (populated by TasksPopover for admins)
   const { data: tasksData } = useQuery({
-    queryKey: ['tasksStatus'],
-    queryFn: () => api.get<TasksStatus>('/admin/tasks/status'),
+    queryKey: ["tasksStatus"],
+    queryFn: () => api.get<TasksStatus>("/admin/tasks/status"),
     enabled: false,
-  })
-  const hasActiveTasks = tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning
+  });
+  const hasActiveTasks =
+    tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning;
 
   const { data: games = [], isLoading } = useQuery({
-    queryKey: ['games'],
-    queryFn: () => api.get<Game[]>('/games'),
+    queryKey: ["games"],
+    queryFn: () => api.get<Game[]>("/games"),
     refetchInterval: hasActiveTasks ? 5000 : false,
-  })
+  });
 
-  const gridRef = useRef<HTMLDivElement>(null)
-  const focusAnchorRef = useRef<HTMLDivElement>(null)
-
+  const gridRef = useRef<HTMLDivElement>(null);
+  const focusAnchorRef = useRef<HTMLDivElement>(null);
 
   const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const grid = gridRef.current
-    if (!grid) return
-    const firstEl = grid.querySelector<HTMLElement>('[data-group-toggle], a')
+    const grid = gridRef.current;
+    if (!grid) return;
+    const firstEl = grid.querySelector<HTMLElement>("[data-group-toggle], a");
     switch (e.key) {
-      case 'ArrowDown':
-      case 'ArrowRight':
-        e.preventDefault()
-        if (firstEl) { focusVisible(firstEl); sounds.navigate() }
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        sounds.navigate()
-        break
+      case "ArrowDown":
+      case "ArrowRight":
+        e.preventDefault();
+        if (firstEl) {
+          focusVisible(firstEl);
+          sounds.navigate();
+        }
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        sounds.navigate();
+        break;
     }
-  }, [])
+  }, []);
 
   const handleToolbarKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== 'ArrowDown') return
-    const grid = gridRef.current
-    if (!grid) return
-    const firstEl = grid.querySelector<HTMLElement>('[data-group-toggle], a')
+    if (e.key !== "ArrowDown") return;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const firstEl = grid.querySelector<HTMLElement>("[data-group-toggle], a");
     if (firstEl) {
-      e.preventDefault()
-      focusVisible(firstEl)
-      sounds.navigate()
+      e.preventDefault();
+      focusVisible(firstEl);
+      sounds.navigate();
     }
-  }, [])
+  }, []);
 
   const keyRepeatState = useRef<{ key: string; count: number; time: number }>({
-    key: '', count: 0, time: 0,
-  })
+    key: "",
+    count: 0,
+    time: 0,
+  });
 
   const saveGridFocus = useCallback(() => {
-    const active = document.activeElement as HTMLElement
-    const gameId = active?.closest<HTMLElement>('[data-game-id]')?.dataset.gameId
-    if (gameId) lastFocusedGameId = gameId
-  }, [])
+    const active = document.activeElement as HTMLElement;
+    const gameId =
+      active?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
+    if (gameId) lastFocusedGameId = gameId;
+  }, []);
 
-  const handleGridKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      saveGridFocus()
-      sounds.select()
-      return
-    }
-    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return
-
-    // Throttle held keys with acceleration (gamepad handles its own throttle)
-    if (e.repeat && !isGamepadEvent) {
-      const now = performance.now()
-      const rs = keyRepeatState.current
-      if (rs.key !== e.key) {
-        rs.key = e.key
-        rs.count = 0
-        rs.time = now
+  const handleGridKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        saveGridFocus();
+        sounds.select();
+        return;
       }
-      const interval = Math.max(50, 180 * 0.8 ** rs.count)
-      if (now - rs.time < interval) {
-        e.preventDefault()
-        return
+      if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key))
+        return;
+
+      // Throttle held keys with acceleration (gamepad handles its own throttle)
+      if (e.repeat && !isGamepadEvent) {
+        const now = performance.now();
+        const rs = keyRepeatState.current;
+        if (rs.key !== e.key) {
+          rs.key = e.key;
+          rs.count = 0;
+          rs.time = now;
+        }
+        const interval = Math.max(50, 180 * 0.8 ** rs.count);
+        if (now - rs.time < interval) {
+          e.preventDefault();
+          return;
+        }
+        rs.count++;
+        rs.time = now;
+      } else {
+        keyRepeatState.current = {
+          key: e.key,
+          count: 0,
+          time: performance.now(),
+        };
       }
-      rs.count++
-      rs.time = now
-    } else {
-      keyRepeatState.current = { key: e.key, count: 0, time: performance.now() }
-    }
 
-    const grid = gridRef.current
-    if (!grid) return
+      const grid = gridRef.current;
+      if (!grid) return;
 
-    const activeEl = document.activeElement as HTMLElement
+      const activeEl = document.activeElement as HTMLElement;
 
-    // Handle navigation from a group toggle button
-    if (activeEl.hasAttribute('data-group-toggle')) {
-      const toggles = Array.from(grid.querySelectorAll<HTMLElement>('[data-group-toggle]'))
-      const toggleIndex = toggles.indexOf(activeEl)
-      const section = activeEl.closest('section')
+      // Handle navigation from a group toggle button
+      if (activeEl.hasAttribute("data-group-toggle")) {
+        const toggles = Array.from(
+          grid.querySelectorAll<HTMLElement>("[data-group-toggle]"),
+        );
+        const toggleIndex = toggles.indexOf(activeEl);
+        const section = activeEl.closest("section");
+
+        switch (e.key) {
+          case "ArrowDown": {
+            e.preventDefault();
+            // If group is expanded, go to first game card; otherwise next toggle
+            const groupGrid = section?.querySelector<HTMLElement>(".grid");
+            const firstLink = groupGrid?.querySelector<HTMLElement>("a");
+            if (firstLink) {
+              focusVisible(firstLink);
+              sounds.navigate();
+            } else if (toggleIndex + 1 < toggles.length) {
+              focusVisible(toggles[toggleIndex + 1]);
+              toggles[toggleIndex + 1].scrollIntoView({ block: "nearest" });
+              sounds.navigate();
+            }
+            return;
+          }
+          case "ArrowUp": {
+            e.preventDefault();
+            if (toggleIndex > 0) {
+              // Go to previous group's last row first column, or previous toggle if collapsed
+              const prevSection = toggles[toggleIndex - 1].closest("section");
+              const prevGrid = prevSection?.querySelector<HTMLElement>(".grid");
+              const prevLinks = prevGrid
+                ? Array.from(prevGrid.querySelectorAll<HTMLElement>("a"))
+                : [];
+              if (prevLinks.length > 0) {
+                const prevCols = prevGrid
+                  ? getComputedStyle(prevGrid).gridTemplateColumns?.split(" ")
+                      .length || 1
+                  : 1;
+                const lastRowStart =
+                  Math.floor((prevLinks.length - 1) / prevCols) * prevCols;
+                focusVisible(prevLinks[lastRowStart]);
+              } else {
+                focusVisible(toggles[toggleIndex - 1]);
+                toggles[toggleIndex - 1].scrollIntoView({ block: "nearest" });
+              }
+              sounds.navigate();
+            } else {
+              focusAnchorRef.current?.focus();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              sounds.navigate();
+            }
+            return;
+          }
+          case "ArrowRight": {
+            e.preventDefault();
+            const platform = activeEl.dataset.groupToggle!;
+            if (collapsedGroups.has(platform)) {
+              setCollapsedGroups((prev) => {
+                const next = new Set(prev);
+                next.delete(platform);
+                localStorage.setItem(
+                  "library-collapsed",
+                  JSON.stringify([...next]),
+                );
+                return next;
+              });
+              sounds.select();
+            }
+            return;
+          }
+          case "ArrowLeft": {
+            e.preventDefault();
+            const platform = activeEl.dataset.groupToggle!;
+            if (!collapsedGroups.has(platform)) {
+              setCollapsedGroups((prev) => {
+                const next = new Set(prev);
+                next.add(platform);
+                localStorage.setItem(
+                  "library-collapsed",
+                  JSON.stringify([...next]),
+                );
+                return next;
+              });
+              sounds.select();
+            }
+            return;
+          }
+        }
+        return;
+      }
+
+      const allLinks = Array.from(grid.querySelectorAll<HTMLElement>("a"));
+      const allIndex = allLinks.indexOf(activeEl);
+      if (allIndex === -1) return;
+
+      // Find the nearest CSS grid container for accurate column count and scoped navigation
+      const gridContainer = activeEl.closest<HTMLElement>(".grid") ?? grid;
+      const cols =
+        getComputedStyle(gridContainer).gridTemplateColumns?.split(" ")
+          .length || 1;
+      const scopedLinks = Array.from(
+        gridContainer.querySelectorAll<HTMLElement>("a"),
+      );
+      const scopedIndex = scopedLinks.indexOf(activeEl);
+      let nextIndex = -1;
 
       switch (e.key) {
-        case 'ArrowDown': {
-          e.preventDefault()
-          // If group is expanded, go to first game card; otherwise next toggle
-          const groupGrid = section?.querySelector<HTMLElement>('.grid')
-          const firstLink = groupGrid?.querySelector<HTMLElement>('a')
-          if (firstLink) {
-            focusVisible(firstLink)
-            sounds.navigate()
-          } else if (toggleIndex + 1 < toggles.length) {
-            focusVisible(toggles[toggleIndex + 1])
-            toggles[toggleIndex + 1].scrollIntoView({ block: 'nearest' })
-            sounds.navigate()
+        case "ArrowRight":
+          // Move to next item across all groups
+          nextIndex = allIndex + 1;
+          if (nextIndex < allLinks.length) {
+            e.preventDefault();
+            focusVisible(allLinks[nextIndex]);
+            sounds.navigate();
           }
-          return
-        }
-        case 'ArrowUp': {
-          e.preventDefault()
-          if (toggleIndex > 0) {
-            // Go to previous group's last row first column, or previous toggle if collapsed
-            const prevSection = toggles[toggleIndex - 1].closest('section')
-            const prevGrid = prevSection?.querySelector<HTMLElement>('.grid')
-            const prevLinks = prevGrid ? Array.from(prevGrid.querySelectorAll<HTMLElement>('a')) : []
-            if (prevLinks.length > 0) {
-              const prevCols = prevGrid ? getComputedStyle(prevGrid).gridTemplateColumns?.split(' ').length || 1 : 1
-              const lastRowStart = Math.floor((prevLinks.length - 1) / prevCols) * prevCols
-              focusVisible(prevLinks[lastRowStart])
+          return;
+        case "ArrowLeft":
+          nextIndex = allIndex - 1;
+          if (nextIndex >= 0) {
+            e.preventDefault();
+            focusVisible(allLinks[nextIndex]);
+            sounds.navigate();
+          }
+          return;
+        case "ArrowDown": {
+          nextIndex = scopedIndex + cols;
+          if (nextIndex < scopedLinks.length) {
+            e.preventDefault();
+            focusVisible(scopedLinks[nextIndex]);
+            sounds.navigate();
+          } else {
+            const currentCol = scopedIndex % cols;
+            const lastRowStart =
+              Math.floor((scopedLinks.length - 1) / cols) * cols;
+            const currentRowStart = Math.floor(scopedIndex / cols) * cols;
+            if (currentRowStart < lastRowStart) {
+              // Not on the last row yet — go to same column on last row
+              const target = Math.min(
+                lastRowStart + currentCol,
+                scopedLinks.length - 1,
+              );
+              e.preventDefault();
+              focusVisible(scopedLinks[target]);
+              sounds.navigate();
             } else {
-              focusVisible(toggles[toggleIndex - 1])
-              toggles[toggleIndex - 1].scrollIntoView({ block: 'nearest' })
-            }
-            sounds.navigate()
-          } else {
-            focusAnchorRef.current?.focus()
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-            sounds.navigate()
-          }
-          return
-        }
-        case 'ArrowRight': {
-          e.preventDefault()
-          const platform = activeEl.dataset.groupToggle!
-          if (collapsedGroups.has(platform)) {
-            setCollapsedGroups(prev => {
-              const next = new Set(prev)
-              next.delete(platform)
-              localStorage.setItem('library-collapsed', JSON.stringify([...next]))
-              return next
-            })
-            sounds.select()
-          }
-          return
-        }
-        case 'ArrowLeft': {
-          e.preventDefault()
-          const platform = activeEl.dataset.groupToggle!
-          if (!collapsedGroups.has(platform)) {
-            setCollapsedGroups(prev => {
-              const next = new Set(prev)
-              next.add(platform)
-              localStorage.setItem('library-collapsed', JSON.stringify([...next]))
-              return next
-            })
-            sounds.select()
-          }
-          return
-        }
-      }
-      return
-    }
-
-    const allLinks = Array.from(grid.querySelectorAll<HTMLElement>('a'))
-    const allIndex = allLinks.indexOf(activeEl)
-    if (allIndex === -1) return
-
-    // Find the nearest CSS grid container for accurate column count and scoped navigation
-    const gridContainer = activeEl.closest<HTMLElement>('.grid') ?? grid
-    const cols = getComputedStyle(gridContainer).gridTemplateColumns?.split(' ').length || 1
-    const scopedLinks = Array.from(gridContainer.querySelectorAll<HTMLElement>('a'))
-    const scopedIndex = scopedLinks.indexOf(activeEl)
-    let nextIndex = -1
-
-    switch (e.key) {
-      case 'ArrowRight':
-        // Move to next item across all groups
-        nextIndex = allIndex + 1
-        if (nextIndex < allLinks.length) {
-          e.preventDefault()
-          focusVisible(allLinks[nextIndex])
-          sounds.navigate()
-        }
-        return
-      case 'ArrowLeft':
-        nextIndex = allIndex - 1
-        if (nextIndex >= 0) {
-          e.preventDefault()
-          focusVisible(allLinks[nextIndex])
-          sounds.navigate()
-        }
-        return
-      case 'ArrowDown': {
-        nextIndex = scopedIndex + cols
-        if (nextIndex < scopedLinks.length) {
-          e.preventDefault()
-          focusVisible(scopedLinks[nextIndex])
-          sounds.navigate()
-        } else {
-          const currentCol = scopedIndex % cols
-          const lastRowStart = Math.floor((scopedLinks.length - 1) / cols) * cols
-          const currentRowStart = Math.floor(scopedIndex / cols) * cols
-          if (currentRowStart < lastRowStart) {
-            // Not on the last row yet — go to same column on last row
-            const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1)
-            e.preventDefault()
-            focusVisible(scopedLinks[target])
-            sounds.navigate()
-          } else {
-            // On the last row — jump to next group's toggle button
-            const section = activeEl.closest('section')
-            const nextSection = section?.nextElementSibling as HTMLElement | null
-            const nextToggle = nextSection?.querySelector<HTMLElement>('[data-group-toggle]')
-            if (nextToggle) {
-              e.preventDefault()
-              focusVisible(nextToggle)
-              nextToggle.scrollIntoView({ block: 'nearest' })
-              sounds.navigate()
+              // On the last row — jump to next group's toggle button
+              const section = activeEl.closest("section");
+              const nextSection =
+                section?.nextElementSibling as HTMLElement | null;
+              const nextToggle = nextSection?.querySelector<HTMLElement>(
+                "[data-group-toggle]",
+              );
+              if (nextToggle) {
+                e.preventDefault();
+                focusVisible(nextToggle);
+                nextToggle.scrollIntoView({ block: "nearest" });
+                sounds.navigate();
+              }
             }
           }
+          return;
         }
-        return
-      }
-      case 'ArrowUp':
-        nextIndex = scopedIndex - cols
-        if (nextIndex >= 0) {
-          e.preventDefault()
-          focusVisible(scopedLinks[nextIndex])
-          sounds.navigate()
-        } else {
-          // On first row — go to this group's toggle button
-          const section = activeEl.closest('section')
-          const toggle = section?.querySelector<HTMLElement>('[data-group-toggle]')
-          if (toggle) {
-            e.preventDefault()
-            focusVisible(toggle)
-            toggle.scrollIntoView({ block: 'nearest' })
-            sounds.navigate()
+        case "ArrowUp":
+          nextIndex = scopedIndex - cols;
+          if (nextIndex >= 0) {
+            e.preventDefault();
+            focusVisible(scopedLinks[nextIndex]);
+            sounds.navigate();
           } else {
-            e.preventDefault()
-            focusAnchorRef.current?.focus()
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-            sounds.navigate()
+            // On first row — go to this group's toggle button
+            const section = activeEl.closest("section");
+            const toggle = section?.querySelector<HTMLElement>(
+              "[data-group-toggle]",
+            );
+            if (toggle) {
+              e.preventDefault();
+              focusVisible(toggle);
+              toggle.scrollIntoView({ block: "nearest" });
+              sounds.navigate();
+            } else {
+              e.preventDefault();
+              focusAnchorRef.current?.focus();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              sounds.navigate();
+            }
           }
-        }
-        return
-    }
-  }, [collapsedGroups])
+          return;
+      }
+    },
+    [collapsedGroups, saveGridFocus],
+  );
 
   // RB/LB bumpers: jump to next/previous group toggle
   useEffect(() => {
-    if (view !== 'grouped') return
+    if (view !== "grouped") return;
     function jumpGroup(direction: 1 | -1) {
-      const grid = gridRef.current
-      if (!grid) return
-      const toggles = Array.from(grid.querySelectorAll<HTMLElement>('[data-group-toggle]'))
-      if (toggles.length === 0) return
-      const activeEl = document.activeElement as HTMLElement
+      const grid = gridRef.current;
+      if (!grid) return;
+      const toggles = Array.from(
+        grid.querySelectorAll<HTMLElement>("[data-group-toggle]"),
+      );
+      if (toggles.length === 0) return;
+      const activeEl = document.activeElement as HTMLElement;
       // Find which group the active element belongs to
-      const currentSection = activeEl?.closest('section')
-      const currentToggle = currentSection?.querySelector<HTMLElement>('[data-group-toggle]')
-      const currentIndex = currentToggle ? toggles.indexOf(currentToggle) : -1
-      let targetIndex: number
+      const currentSection = activeEl?.closest("section");
+      const currentToggle = currentSection?.querySelector<HTMLElement>(
+        "[data-group-toggle]",
+      );
+      const currentIndex = currentToggle ? toggles.indexOf(currentToggle) : -1;
+      let targetIndex: number;
       if (currentIndex === -1) {
-        targetIndex = direction === 1 ? 0 : toggles.length - 1
+        targetIndex = direction === 1 ? 0 : toggles.length - 1;
       } else {
-        targetIndex = currentIndex + direction
-        if (targetIndex < 0 || targetIndex >= toggles.length) return
+        targetIndex = currentIndex + direction;
+        if (targetIndex < 0 || targetIndex >= toggles.length) return;
       }
-      const targetSection = toggles[targetIndex].closest('section')
-      const firstLink = targetSection?.querySelector<HTMLElement>('.grid a')
-      const target = firstLink ?? toggles[targetIndex]
-      focusVisible(target)
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      sounds.navigate()
+      const targetSection = toggles[targetIndex].closest("section");
+      const firstLink = targetSection?.querySelector<HTMLElement>(".grid a");
+      const target = firstLink ?? toggles[targetIndex];
+      focusVisible(target);
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      sounds.navigate();
     }
-    function onRt() { jumpGroup(1) }
-    function onLt() { jumpGroup(-1) }
-    window.addEventListener('gamepad-rt', onRt)
-    window.addEventListener('gamepad-lt', onLt)
+    function onRt() {
+      jumpGroup(1);
+    }
+    function onLt() {
+      jumpGroup(-1);
+    }
+    window.addEventListener("gamepad-rt", onRt);
+    window.addEventListener("gamepad-lt", onLt);
     return () => {
-      window.removeEventListener('gamepad-rt', onRt)
-      window.removeEventListener('gamepad-lt', onLt)
-    }
-  }, [view])
+      window.removeEventListener("gamepad-rt", onRt);
+      window.removeEventListener("gamepad-lt", onLt);
+    };
+  }, [view]);
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('a, button, input, [role="listbox"]')) {
-        e.preventDefault()
-        focusAnchorRef.current?.focus()
+      if (
+        !(e.target as HTMLElement).closest('a, button, input, [role="listbox"]')
+      ) {
+        e.preventDefault();
+        if (focusAnchorRef.current) focusVisible(focusAnchorRef.current, true);
       }
     }
-    document.addEventListener('mousedown', handleMouseDown)
-    return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [])
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
 
-  const allPlatforms = [...new Set(games.map((g) => g.platform))].sort()
+  const allPlatforms = [...new Set(games.map((g) => g.platform))].sort();
 
   // Merge saved order with any new platforms (new ones go at the end)
   const platforms = [
-    ...platformOrder.filter(p => allPlatforms.includes(p)),
-    ...allPlatforms.filter(p => !platformOrder.includes(p)),
-  ]
+    ...platformOrder.filter((p) => allPlatforms.includes(p)),
+    ...allPlatforms.filter((p) => !platformOrder.includes(p)),
+  ];
 
   const filtered = games.filter((g) => {
-    if (selectedPlatforms.size > 0 && !selectedPlatforms.has(g.platform)) return false
-    return true
-  })
+    if (selectedPlatforms.size > 0 && !selectedPlatforms.has(g.platform))
+      return false;
+    return true;
+  });
 
   // Close dropdown on outside click
   useEffect(() => {
-    if (!platformDropdownOpen) return
+    if (!platformDropdownOpen) return;
     function handleClick(e: MouseEvent) {
       if (!platformDropdownRef.current?.contains(e.target as Node)) {
-        setPlatformDropdownOpen(false)
+        setPlatformDropdownOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [platformDropdownOpen])
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [platformDropdownOpen]);
 
   function movePlatform(index: number, direction: -1 | 1) {
-    const target = index + direction
-    if (target < 0 || target >= platforms.length) return
-    const newOrder = [...platforms]
-    ;[newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]]
-    setPlatformOrder(newOrder)
-    localStorage.setItem('library-platform-order', JSON.stringify(newOrder))
+    const target = index + direction;
+    if (target < 0 || target >= platforms.length) return;
+    const newOrder = [...platforms];
+    [newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]];
+    setPlatformOrder(newOrder);
+    localStorage.setItem("library-platform-order", JSON.stringify(newOrder));
   }
 
-  const sorted = view === 'list'
-    ? [...filtered].sort((a, b) => {
-        const dir = sortDir === 'asc' ? 1 : -1
-        switch (sortBy) {
-          case 'platform': return dir * a.platform.localeCompare(b.platform)
-          case 'title': return dir * a.title.localeCompare(b.title)
-          case 'year': return dir * ((a.releaseYear ?? 0) - (b.releaseYear ?? 0))
-          case 'size': return dir * (a.sizeBytes - b.sizeBytes)
-          default: return 0
-        }
-      })
-    : filtered
+  const sorted =
+    view === "list"
+      ? [...filtered].sort((a, b) => {
+          const dir = sortDir === "asc" ? 1 : -1;
+          switch (sortBy) {
+            case "platform":
+              return dir * a.platform.localeCompare(b.platform);
+            case "title":
+              return dir * a.title.localeCompare(b.title);
+            case "year":
+              return dir * ((a.releaseYear ?? 0) - (b.releaseYear ?? 0));
+            case "size":
+              return dir * (a.sizeBytes - b.sizeBytes);
+            default:
+              return 0;
+          }
+        })
+      : filtered;
 
-  const grouped = view === 'grouped'
-    ? platforms.reduce<Record<string, Game[]>>((acc, p) => {
-        const games = filtered.filter(g => g.platform === p)
-        if (games.length > 0) acc[p] = games
-        return acc
-      }, {})
-    : {}
+  const grouped =
+    view === "grouped"
+      ? platforms.reduce<Record<string, Game[]>>((acc, p) => {
+          const games = filtered.filter((g) => g.platform === p);
+          if (games.length > 0) acc[p] = games;
+          return acc;
+        }, {})
+      : {};
 
   // Restore focus to previously selected game, or focus anchor (on mount only)
   useEffect(() => {
-    if (isLoading) return
-    const gameId = lastFocusedGameId
-    lastFocusedGameId = null
+    if (isLoading) return;
+    const gameId = lastFocusedGameId;
+    lastFocusedGameId = null;
     if (gameId && filtered.length > 0) {
       requestAnimationFrame(() => {
-        const link = gridRef.current?.querySelector<HTMLElement>(`[data-game-id="${gameId}"]`)
+        const link = gridRef.current?.querySelector<HTMLElement>(
+          `[data-game-id="${gameId}"]`,
+        );
         if (link) {
-          focusVisible(link)
-          link.scrollIntoView({ block: 'center' })
+          focusVisible(link);
+          link.scrollIntoView({ block: "center" });
         } else {
-          focusAnchorRef.current?.focus()
+          if (focusAnchorRef.current)
+            focusVisible(focusAnchorRef.current, true);
         }
-      })
-      return
+      });
+      return;
     }
-    focusAnchorRef.current?.focus()
+    if (focusAnchorRef.current) focusVisible(focusAnchorRef.current, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading])
+  }, [isLoading]);
 
   return (
-    <main
-      className="max-w-7xl mx-auto px-6 py-8"
-    >
+    <main className="max-w-7xl mx-auto px-6 py-8">
       {/* Toolbar */}
-      <div className="flex gap-3 mb-8 items-center" onKeyDown={handleToolbarKeyDown}>
-        <div className="relative min-w-[160px]" ref={platformDropdownRef}>
+      <div
+        className="flex gap-3 mb-8 items-center"
+        onKeyDown={handleToolbarKeyDown}
+      >
+        <div className="relative min-w-40" ref={platformDropdownRef}>
           <button
-            onClick={() => setPlatformDropdownOpen(v => !v)}
+            onClick={() => setPlatformDropdownOpen((v) => !v)}
             className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition flex items-center justify-between gap-2"
           >
             <span className="truncate">
               {selectedPlatforms.size === 0
-                ? 'All platforms'
+                ? "All platforms"
                 : selectedPlatforms.size === 1
                   ? formatPlatform([...selectedPlatforms][0])
                   : `${selectedPlatforms.size} platforms`}
             </span>
-            <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+            <svg
+              className="w-4 h-4 text-text-muted shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9"
+              />
             </svg>
           </button>
           {platformDropdownOpen && (
-            <div className="absolute z-20 mt-1 w-full min-w-[200px] max-h-80 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm">
+            <div className="absolute z-20 mt-1 w-full min-w-50 max-h-80 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm">
               <button
                 onClick={() => {
-                  setSelectedPlatforms(new Set())
-                  localStorage.setItem('library-platforms', '[]')
+                  setSelectedPlatforms(new Set());
+                  localStorage.setItem("library-platforms", "[]");
                 }}
-                className={`w-full px-4 py-2 text-left transition-colors hover:bg-surface-raised ${selectedPlatforms.size === 0 ? 'text-accent' : ''}`}
+                className={`w-full px-4 py-2 text-left transition-colors hover:bg-surface-raised ${selectedPlatforms.size === 0 ? "text-accent" : ""}`}
               >
                 All platforms
               </button>
@@ -473,40 +559,82 @@ export default function Library() {
                   key={p}
                   className="flex items-center gap-2 px-4 py-2 hover:bg-surface-raised transition-colors cursor-pointer"
                   onClick={() => {
-                    setSelectedPlatforms(prev => {
-                      const next = new Set(prev)
-                      next.has(p) ? next.delete(p) : next.add(p)
-                      localStorage.setItem('library-platforms', JSON.stringify([...next]))
-                      return next
-                    })
+                    setSelectedPlatforms((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(p)) next.delete(p);
+                      else next.add(p);
+                      localStorage.setItem(
+                        "library-platforms",
+                        JSON.stringify([...next]),
+                      );
+                      return next;
+                    });
                   }}
                 >
-                  <div className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-colors ${selectedPlatforms.has(p) ? 'bg-accent border-accent' : 'border-border'}`}>
+                  <div
+                    className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-colors ${selectedPlatforms.has(p) ? "bg-accent border-accent" : "border-border"}`}
+                  >
                     {selectedPlatforms.has(p) && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      <svg
+                        className="w-2.5 h-2.5 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4.5 12.75l6 6 9-13.5"
+                        />
                       </svg>
                     )}
                   </div>
                   <span className="flex-1">{formatPlatform(p)}</span>
-                  {view === 'grouped' && (
+                  {view === "grouped" && (
                     <div className="flex flex-col -my-1">
                       <button
-                        onClick={(e) => { e.stopPropagation(); movePlatform(i, -1) }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePlatform(i, -1);
+                        }}
                         disabled={i === 0}
                         className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:hover:text-text-muted transition-colors p-0.5"
                       >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4.5 15.75l7.5-7.5 7.5 7.5"
+                          />
                         </svg>
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); movePlatform(i, 1) }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePlatform(i, 1);
+                        }}
                         disabled={i === platforms.length - 1}
                         className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:hover:text-text-muted transition-colors p-0.5"
                       >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                          />
                         </svg>
                       </button>
                     </div>
@@ -518,30 +646,69 @@ export default function Library() {
         </div>
         <div className="flex rounded-lg border border-border overflow-hidden ml-auto">
           <button
-            onClick={() => { setView('grid'); localStorage.setItem('library-view', 'grid') }}
-            className={`p-2 transition ${view === 'grid' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            onClick={() => {
+              setView("grid");
+              localStorage.setItem("library-view", "grid");
+            }}
+            className={`p-2 transition ${view === "grid" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"}`}
             title="Grid view"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
+              />
             </svg>
           </button>
           <button
-            onClick={() => { setView('grouped'); localStorage.setItem('library-view', 'grouped') }}
-            className={`p-2 transition ${view === 'grouped' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            onClick={() => {
+              setView("grouped");
+              localStorage.setItem("library-view", "grouped");
+            }}
+            className={`p-2 transition ${view === "grouped" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"}`}
             title="Grouped by platform"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM2.25 16.875c0-.621.504-1.125 1.125-1.125h6c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-2.25z" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM2.25 16.875c0-.621.504-1.125 1.125-1.125h6c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-2.25z"
+              />
             </svg>
           </button>
           <button
-            onClick={() => { setView('list'); localStorage.setItem('library-view', 'list') }}
-            className={`p-2 transition ${view === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            onClick={() => {
+              setView("list");
+              localStorage.setItem("library-view", "list");
+            }}
+            className={`p-2 transition ${view === "list" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"}`}
             title="List view"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 5.25h16.5m-16.5-10.5h16.5" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 12h16.5m-16.5 5.25h16.5m-16.5-10.5h16.5"
+              />
             </svg>
           </button>
         </div>
@@ -550,9 +717,11 @@ export default function Library() {
       {/* Game count */}
       {!isLoading && (
         <p className="text-xs text-text-muted mb-4 font-mono">
-          {filtered.length} {filtered.length === 1 ? 'game' : 'games'}
-          {selectedPlatforms.size === 1 && ` in ${formatPlatform([...selectedPlatforms][0])}`}
-          {selectedPlatforms.size > 1 && ` across ${selectedPlatforms.size} platforms`}
+          {filtered.length} {filtered.length === 1 ? "game" : "games"}
+          {selectedPlatforms.size === 1 &&
+            ` in ${formatPlatform([...selectedPlatforms][0])}`}
+          {selectedPlatforms.size > 1 &&
+            ` across ${selectedPlatforms.size} platforms`}
         </p>
       )}
 
@@ -566,11 +735,11 @@ export default function Library() {
 
       {/* Games */}
       {isLoading ? (
-        view === 'grid' || view === 'grouped' ? (
+        view === "grid" || view === "grouped" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="animate-pulse">
-                <div className="aspect-[2/3] bg-surface-raised rounded-lg mb-2" />
+                <div className="aspect-2/3 bg-surface-raised rounded-lg mb-2" />
                 <div className="h-3 bg-surface-raised rounded w-3/4 mb-1.5" />
                 <div className="h-2.5 bg-surface-raised rounded w-1/2" />
               </div>
@@ -585,13 +754,23 @@ export default function Library() {
         )
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-text-muted">
-          <svg className="w-12 h-12 mb-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+          <svg
+            className="w-12 h-12 mb-4 text-text-muted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z"
+            />
           </svg>
           <p className="text-sm">No games found</p>
           <p className="text-xs mt-1">Try adjusting your search or filters</p>
         </div>
-      ) : view === 'grid' ? (
+      ) : view === "grid" ? (
         <div
           ref={gridRef}
           onKeyDown={handleGridKeyDown}
@@ -602,24 +781,47 @@ export default function Library() {
             <GameCard key={game.id} game={game} />
           ))}
         </div>
-      ) : view === 'grouped' ? (
-        <div ref={gridRef} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
+      ) : view === "grouped" ? (
+        <div
+          ref={gridRef}
+          onKeyDown={handleGridKeyDown}
+          onClick={saveGridFocus}
+        >
           {Object.entries(grouped).map(([p, games]) => (
             <section key={p} className="mb-10">
               <button
                 data-group-toggle={p}
-                onClick={() => setCollapsedGroups(prev => {
-                  const next = new Set(prev)
-                  next.has(p) ? next.delete(p) : next.add(p)
-                  localStorage.setItem('library-collapsed', JSON.stringify([...next]))
-                  return next
-                })}
+                onClick={() =>
+                  setCollapsedGroups((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(p)) next.delete(p);
+                    else next.add(p);
+                    localStorage.setItem(
+                      "library-collapsed",
+                      JSON.stringify([...next]),
+                    );
+                    return next;
+                  })
+                }
                 className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4 hover:text-accent transition-colors outline-none focus:text-accent focus:ring-2 focus:ring-accent/50 focus:ring-offset-4 focus:ring-offset-surface rounded px-1 -ml-1"
               >
-                <svg className={`w-4 h-4 transition-transform ${collapsedGroups.has(p) ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                <svg
+                  className={`w-4 h-4 transition-transform ${collapsedGroups.has(p) ? "-rotate-90" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
                 </svg>
-                {formatPlatform(p)}<span className="text-text-muted font-normal text-sm">({games.length})</span>
+                {formatPlatform(p)}
+                <span className="text-text-muted font-normal text-sm">
+                  ({games.length})
+                </span>
               </button>
               {!collapsedGroups.has(p) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -632,35 +834,56 @@ export default function Library() {
           ))}
         </div>
       ) : (
-        <div ref={gridRef} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
+        <div
+          ref={gridRef}
+          onKeyDown={handleGridKeyDown}
+          onClick={saveGridFocus}
+        >
           <table className="w-full text-sm table-fixed">
             <colgroup>
-              <col className="w-[100px]" />
+              <col className="w-25" />
               <col />
-              <col className="w-[70px] hidden md:table-column" />
-              <col className="w-[200px] hidden lg:table-column" />
-              <col className="w-[90px] hidden sm:table-column" />
-              <col className="w-[40px]" />
+              <col className="w-17.5 hidden md:table-column" />
+              <col className="w-50 hidden lg:table-column" />
+              <col className="w-22.5 hidden sm:table-column" />
+              <col className="w-10" />
             </colgroup>
             <thead>
               <tr className="border-b border-border text-left text-xs text-text-muted tracking-wider">
-                {([
-                  { col: 'platform' as const, className: 'pl-3 pr-4' },
-                  { col: 'title' as const, className: 'pr-4' },
-                  { col: 'year' as const, className: 'pr-4 hidden md:table-cell' },
-                ] as const).map(({ col, className }) => (
+                {(
+                  [
+                    { col: "platform" as const, className: "pl-3 pr-4" },
+                    { col: "title" as const, className: "pr-4" },
+                    {
+                      col: "year" as const,
+                      className: "pr-4 hidden md:table-cell",
+                    },
+                  ] as const
+                ).map(({ col, className }) => (
                   <th key={col} className={`pb-2 ${className} font-medium`}>
-                    <button onClick={() => toggleSort(col)} className="hover:text-text-primary transition-colors inline-flex items-center gap-1">
+                    <button
+                      onClick={() => toggleSort(col)}
+                      className="hover:text-text-primary transition-colors inline-flex items-center gap-1"
+                    >
                       {col.charAt(0).toUpperCase() + col.slice(1)}
-                      {sortBy === col && <span>{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                      {sortBy === col && (
+                        <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
+                      )}
                     </button>
                   </th>
                 ))}
-                <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Genre</th>
+                <th className="pb-2 pr-4 font-medium hidden lg:table-cell">
+                  Genre
+                </th>
                 <th className="pb-2 pr-3 text-right font-medium hidden sm:table-cell">
-                  <button onClick={() => toggleSort('size')} className="hover:text-text-primary transition-colors inline-flex items-center gap-1 ml-auto">
+                  <button
+                    onClick={() => toggleSort("size")}
+                    className="hover:text-text-primary transition-colors inline-flex items-center gap-1 ml-auto"
+                  >
                     Size
-                    {sortBy === 'size' && <span>{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                    {sortBy === "size" && (
+                      <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
+                    )}
                   </button>
                 </th>
                 <th className="pb-2 pr-3"></th>
@@ -668,38 +891,62 @@ export default function Library() {
             </thead>
             <tbody>
               {sorted.map((game) => (
-                <tr key={game.id} onClick={() => navigate(`/games/${game.id}`)} className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors cursor-pointer">
-                  <td className="py-2.5 pl-3 pr-4 text-text-secondary truncate">{formatPlatform(game.platform)}</td>
+                <tr
+                  key={game.id}
+                  onClick={() => navigate(`/games/${game.id}`)}
+                  className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors cursor-pointer"
+                >
+                  <td className="py-2.5 pl-3 pr-4 text-text-secondary truncate">
+                    {formatPlatform(game.platform)}
+                  </td>
                   <td className="py-2.5 pr-4 truncate">
                     <Link
                       to={`/games/${game.id}`}
                       data-game-id={game.id}
-                      className={`font-medium hover:text-accent transition-colors outline-none focus-visible:text-accent ${game.isMissing ? 'opacity-50' : ''}`}
+                      className={`font-medium hover:text-accent transition-colors outline-none focus-visible:text-accent ${game.isMissing ? "opacity-50" : ""}`}
                     >
                       {game.title}
                     </Link>
                   </td>
-                  <td className="py-2.5 pr-4 text-text-secondary hidden md:table-cell">{game.releaseYear ?? ''}</td>
-                  <td className="py-2.5 pr-4 text-text-secondary truncate hidden lg:table-cell">{game.genre ?? ''}</td>
-                  <td className="py-2.5 pr-3 text-right text-text-secondary font-mono text-xs hidden sm:table-cell">{formatSize(game.sizeBytes)}</td>
+                  <td className="py-2.5 pr-4 text-text-secondary hidden md:table-cell">
+                    {game.releaseYear ?? ""}
+                  </td>
+                  <td className="py-2.5 pr-4 text-text-secondary truncate hidden lg:table-cell">
+                    {game.genre ?? ""}
+                  </td>
+                  <td className="py-2.5 pr-3 text-right text-text-secondary font-mono text-xs hidden sm:table-cell">
+                    {formatSize(game.sizeBytes)}
+                  </td>
                   <td className="py-2.5 pr-3 text-right">
                     {!game.isMissing && (
                       <button
                         onClick={async (e) => {
-                          e.stopPropagation()
-                          const { ticket } = await api.post<{ ticket: string }>(`/games/${game.id}/download-ticket`)
-                          const a = document.createElement('a')
-                          a.href = `/api/games/${game.id}/download?ticket=${encodeURIComponent(ticket)}`
-                          a.download = ''
-                          document.body.appendChild(a)
-                          a.click()
-                          document.body.removeChild(a)
+                          e.stopPropagation();
+                          const { ticket } = await api.post<{ ticket: string }>(
+                            `/games/${game.id}/download-ticket`,
+                          );
+                          const a = document.createElement("a");
+                          a.href = `/api/games/${game.id}/download?ticket=${encodeURIComponent(ticket)}`;
+                          a.download = "";
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
                         }}
                         className="text-text-muted hover:text-accent transition-colors"
                         title="Download"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                          />
                         </svg>
                       </button>
                     )}
@@ -711,5 +958,5 @@ export default function Library() {
         </div>
       )}
     </main>
-  )
+  );
 }
