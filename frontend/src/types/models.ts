@@ -3,7 +3,7 @@ export interface Game {
   title: string;
   platform: string;
   folderName: string;
-  installType: 'portable' | 'installer';
+  installType: "portable" | "installer";
   summary?: string;
   genre?: string;
   releaseYear?: number;
@@ -62,7 +62,7 @@ export interface TasksStatus {
 export interface User {
   id: number;
   username: string;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
   createdAt: string;
 }
 

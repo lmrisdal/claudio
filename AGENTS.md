@@ -1,4 +1,4 @@
-# AGENTS.md
+@DESIGN_SKILL.md
 
 This file provides guidance to Claude Code (claude.ai/code) and other AI agents when working with code in this repository.
 

@@ -14,6 +14,14 @@ interface InputState {
 
 // Set on gamepad-dispatched events so other handlers can skip their own throttle
 export let isGamepadEvent = false;
+const lastGamepadDispatchTimes: Record<string, number> = {};
+
+export function wasRecentlyDispatchedFromGamepad(key: string, withinMs = 250) {
+  const lastTime = lastGamepadDispatchTimes[key];
+  return (
+    typeof lastTime === "number" && performance.now() - lastTime <= withinMs
+  );
+}
 
 export function useGamepad() {
   const stateRef = useRef<Record<string, InputState>>({});
@@ -22,9 +30,19 @@ export function useGamepad() {
     let rafId: number;
 
     function dispatchKey(key: string) {
-      // Custom gamepad actions
+      // Custom gamepad actions always fire (e.g. guide button overlay)
       if (key.startsWith("gamepad-")) {
         window.dispatchEvent(new CustomEvent(key));
+        return;
+      }
+
+      // When the emulator is active, let the iframe handle all input natively.
+      if (document.body.dataset.emulatorActive) {
+        return;
+      }
+
+      // When focus is inside an iframe, let that embedded app handle gamepad input.
+      if (document.activeElement instanceof HTMLIFrameElement) {
         return;
       }
 
@@ -36,6 +54,7 @@ export function useGamepad() {
 
       // Flag so Library handler skips its own throttle
       isGamepadEvent = true;
+      lastGamepadDispatchTimes[key] = performance.now();
 
       // Dispatch on active element (for React onKeyDown handlers)
       const target = document.activeElement ?? document.body;
@@ -52,7 +71,12 @@ export function useGamepad() {
       isGamepadEvent = false;
     }
 
-    function handleInput(id: string, key: string, pressed: boolean, repeatable = true) {
+    function handleInput(
+      id: string,
+      key: string,
+      pressed: boolean,
+      repeatable = true,
+    ) {
       const now = performance.now();
       const prev = stateRef.current[id];
 
@@ -111,11 +135,46 @@ export function useGamepad() {
         // A → Enter/click, B → Escape, Y → toggle search (no repeat)
         handleInput("btn-a", "Enter", gp.buttons[0]?.pressed ?? false, false);
         handleInput("btn-b", "Escape", gp.buttons[1]?.pressed ?? false, false);
-        handleInput("btn-y", "gamepad-search", gp.buttons[3]?.pressed ?? false, false);
+        handleInput(
+          "btn-y",
+          "gamepad-search",
+          gp.buttons[3]?.pressed ?? false,
+          false,
+        );
+
+        // LB/RB → bumpers
+        handleInput(
+          "btn-lb",
+          "gamepad-lb",
+          gp.buttons[4]?.pressed ?? false,
+          false,
+        );
+        handleInput(
+          "btn-rb",
+          "gamepad-rb",
+          gp.buttons[5]?.pressed ?? false,
+          false,
+        );
 
         // LT/RT → previous/next group
         handleInput("btn-lt", "gamepad-lt", (gp.buttons[6]?.value ?? 0) > 0.5);
         handleInput("btn-rt", "gamepad-rt", (gp.buttons[7]?.value ?? 0) > 0.5);
+
+        // Start / Options / Menu button (button 9)
+        handleInput(
+          "btn-start",
+          "gamepad-start",
+          gp.buttons[9]?.pressed ?? false,
+          false,
+        );
+
+        // Guide / Xbox / PS button (button 16)
+        handleInput(
+          "btn-guide",
+          "gamepad-guide",
+          gp.buttons[16]?.pressed ?? false,
+          false,
+        );
 
         // Only handle first connected gamepad
         break;

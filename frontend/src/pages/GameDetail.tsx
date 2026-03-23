@@ -8,10 +8,12 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
+import { useArrowNav } from "../hooks/useArrowNav";
 import { useAuth } from "../hooks/useAuth";
+import { useShortcut } from "../hooks/useShortcut";
 import type { Game, TasksStatus } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 import { sounds } from "../utils/sounds";
@@ -46,7 +48,9 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
       }}
       disabled={preparing}
       data-nav
-      className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-6 py-3 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+      aria-label={preparing ? "Preparing download" : `Download ${size} bytes`}
+      title={preparing ? "Preparing download" : `Download ${formatSize(size)}`}
+      className="inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-3 py-3 sm:px-6 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
     >
       {preparing ? (
         <>
@@ -65,7 +69,7 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          Preparing...
+          <span className="hidden sm:inline">Preparing...</span>
         </>
       ) : (
         <>
@@ -82,7 +86,9 @@ function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
               d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
             />
           </svg>
-          Download ({formatSize(size)})
+          <span className="hidden sm:inline">
+            Download ({formatSize(size)})
+          </span>
         </>
       )}
     </button>
@@ -204,11 +210,11 @@ function ExeListbox({
           </ListboxButton>
           <ListboxOptions
             anchor="bottom start"
-            className="z-20 w-[var(--button-width)] max-h-48 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm focus:outline-none"
+            className="z-20 w-(--button-width) max-h-48 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm focus:outline-none"
           >
             <ListboxOption
               value=""
-              className="px-3 py-2 cursor-pointer data-[focus]:bg-surface-raised data-[selected]:text-accent transition-colors"
+              className="px-3 py-2 cursor-pointer data-focus:bg-surface-raised data-selected:text-accent transition-colors"
             >
               None
             </ListboxOption>
@@ -216,7 +222,7 @@ function ExeListbox({
               <ListboxOption
                 key={exe}
                 value={exe}
-                className="px-3 py-2 cursor-pointer data-[focus]:bg-surface-raised data-[selected]:text-accent transition-colors truncate"
+                className="px-3 py-2 cursor-pointer data-focus:bg-surface-raised data-selected:text-accent transition-colors truncate"
               >
                 {exe}
               </ListboxOption>
@@ -300,22 +306,17 @@ export default function GameDetail() {
     igdbSlug: "",
   });
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      // Don't navigate back if search dialog or other overlay is open
-      if (document.querySelector("[data-search-dialog]")) return;
-      if (browsePath !== null) {
-        setBrowsePath(null);
-        sounds.back();
-      } else if (!editing && !sgdbDialog.open && !candidates) {
-        sounds.back();
-        navigate("/");
-      }
+  useShortcut("escape", () => {
+    // Don't navigate back if search dialog or other overlay is open
+    if (document.querySelector("[data-search-dialog]")) return;
+    if (browsePath !== null) {
+      setBrowsePath(null);
+      sounds.back();
+    } else if (!editing && !sgdbDialog.open && !candidates) {
+      sounds.back();
+      navigate("/");
     }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [browsePath, editing, sgdbDialog.open, candidates, navigate]);
+  });
 
   const mainRef = useRef<HTMLElement>(null);
   const backLinkRef = useRef<HTMLAnchorElement>(null);
@@ -328,41 +329,9 @@ export default function GameDetail() {
   }>({});
 
   // Arrow key navigation between back link and download button
-  const handleMainKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (!["ArrowUp", "ArrowDown"].includes(e.key)) return;
-      if (editing || sgdbDialog.open || candidates || browsePath !== null)
-        return;
-
-      const main = mainRef.current;
-      if (!main) return;
-
-      const focusables = Array.from(
-        main.querySelectorAll<HTMLElement>("a[data-nav], button[data-nav]"),
-      );
-      if (focusables.length === 0) return;
-
-      const currentIndex = focusables.indexOf(
-        document.activeElement as HTMLElement,
-      );
-      let nextIndex: number;
-
-      if (currentIndex === -1) {
-        nextIndex = e.key === "ArrowDown" ? 0 : focusables.length - 1;
-      } else if (e.key === "ArrowDown") {
-        nextIndex = Math.min(currentIndex + 1, focusables.length - 1);
-      } else {
-        nextIndex = Math.max(currentIndex - 1, 0);
-      }
-
-      if (nextIndex !== currentIndex) {
-        e.preventDefault();
-        focusables[nextIndex].focus();
-        sounds.navigate();
-      }
-    },
-    [editing, sgdbDialog.open, candidates, browsePath],
-  );
+  const handleMainKeyDown = useArrowNav(mainRef, {
+    enabled: !editing && !sgdbDialog.open && !candidates && browsePath === null,
+  });
 
   const { data: exeList } = useQuery({
     queryKey: ["executables", id],
@@ -383,6 +352,15 @@ export default function GameDetail() {
         `/games/${id}/browse?path=${encodeURIComponent(browsePath ?? "")}`,
       ),
     enabled: browsePath !== null,
+  });
+
+  const { data: emulation } = useQuery({
+    queryKey: ["emulation", id],
+    queryFn: () =>
+      api.get<{
+        supported: boolean;
+        reason?: string;
+      }>(`/games/${id}/emulation`),
   });
 
   useEffect(() => {
@@ -615,7 +593,7 @@ export default function GameDetail() {
     return (
       <main className="max-w-5xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row gap-10 animate-pulse">
-          <div className="w-72 shrink-0 aspect-[2/3] bg-surface-raised rounded-xl" />
+          <div className="w-72 shrink-0 aspect-2/3 bg-surface-raised rounded-xl" />
           <div className="flex-1 space-y-4 pt-2">
             <div className="h-8 bg-surface-raised rounded w-2/3" />
             <div className="h-4 bg-surface-raised rounded w-1/3" />
@@ -650,7 +628,7 @@ export default function GameDetail() {
             alt=""
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/60 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-(--bg) via-(--bg)/60 to-transparent" />
         </div>
       )}
       <main
@@ -688,6 +666,7 @@ export default function GameDetail() {
         <div
           ref={focusAnchorRef}
           tabIndex={0}
+          className="outline-none h-0 overflow-hidden"
           onKeyDown={(e) => {
             if (e.key === "ArrowDown" || e.key === "ArrowRight") {
               e.preventDefault();
@@ -699,7 +678,6 @@ export default function GameDetail() {
               }
             }
           }}
-          className="outline-none h-0 overflow-hidden"
         />
         {/* Back link */}
         <Link
@@ -709,7 +687,7 @@ export default function GameDetail() {
           onKeyDown={(e) => {
             if (e.key === "Enter") sounds.back();
           }}
-          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 outline-2 outline-offset-4 outline-transparent focus-visible:outline-accent rounded ${
+          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8] ${
             game.heroUrl
               ? "text-text-primary/80 hover:text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
               : "text-text-muted hover:text-text-primary"
@@ -733,9 +711,9 @@ export default function GameDetail() {
 
         <div className="flex flex-col md:flex-row gap-10">
           {/* Cover */}
-          <div className="w-72 shrink-0">
+          <div className="w-72 shrink-0 mx-auto md:mx-0">
             <div
-              className={`aspect-[2/3] bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
+              className={`aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
               onClick={
                 user?.role === "admin"
                   ? () => openSgdbDialog("covers")
@@ -1245,7 +1223,7 @@ export default function GameDetail() {
                       {game.genre}
                     </span>
                   )}
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-muted">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-secondary">
                     {formatSize(game.sizeBytes)}
                   </span>
                   {isPcPlatform(game.platform) && (
@@ -1396,6 +1374,31 @@ export default function GameDetail() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3">
+                  {emulation?.supported && !game.isMissing && (
+                    <Link
+                      to={`/games/${game.id}/play`}
+                      data-nav
+                      onClick={(e) => {
+                        if (e.detail === 0) sounds.download();
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.25}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z"
+                        />
+                      </svg>
+                      Play in Browser
+                    </Link>
+                  )}
                   {game.isMissing ? (
                     <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-red-400 bg-red-500/10 ring-1 ring-red-500/30">
                       <svg
@@ -1782,7 +1785,7 @@ export default function GameDetail() {
                                 }
                                 setSgdbDialog({ ...sgdbDialog, open: false });
                               }}
-                              className={`aspect-[2/3] rounded-lg ring-2 transition hover:ring-accent ${
+                              className={`aspect-2/3 rounded-lg ring-2 transition hover:ring-accent ${
                                 (editing
                                   ? editForm.coverUrl
                                   : game.coverUrl) === url

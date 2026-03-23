@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../hooks/useAuth";
+import { useNavigation } from "../hooks/useNavigation";
 import { useTheme } from "../hooks/useTheme";
 import Logo from "./Logo";
 import SearchDialog from "./SearchDialog";
@@ -9,27 +9,7 @@ import TasksPopover from "./TasksPopover";
 export default function Header() {
   const { isLoggedIn, isAdmin, user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const [searchOpen, setSearchOpen] = useState(false);
-
-  const toggleSearch = useCallback(() => setSearchOpen((v) => !v), []);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setSearchOpen((v) => !v);
-      }
-    }
-    function handleGamepadSearch() {
-      setSearchOpen((v) => !v);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("gamepad-search", handleGamepadSearch);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("gamepad-search", handleGamepadSearch);
-    };
-  }, []);
+  const { searchOpen, closeSearch, toggleSearch } = useNavigation();
 
   return (
     <>
@@ -136,7 +116,7 @@ export default function Header() {
           </div>
         </div>
       </header>
-      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchDialog open={searchOpen} onClose={closeSearch} />
     </>
   );
 }

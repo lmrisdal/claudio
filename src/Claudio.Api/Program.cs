@@ -56,6 +56,7 @@ builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddTransient<DownloadService>();
 builder.Services.AddSingleton<DownloadTicketService>();
+builder.Services.AddSingleton<EmulationTicketService>();
 builder.Services.AddSingleton<LibraryScanService>();
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddSingleton<IgdbService>();

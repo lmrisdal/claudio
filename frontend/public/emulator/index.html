@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Claudio Emulator</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(255, 200, 87, 0.18),
+            transparent 38%
+          ),
+          linear-gradient(180deg, #0a0e14 0%, #020305 100%);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: transparent;
+        color: #edf2f7;
+      }
+
+      #game {
+        width: 100%;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const core = params.get("core");
+      const gameUrl = params.get("gameUrl");
+
+      function bootstrap() {
+        if (!core || !gameUrl) {
+          document.body.innerHTML =
+            "<p style='padding:24px;font:16px IBM Plex Sans,sans-serif;color:#fca5a5'>Missing emulator launch parameters.</p>";
+        } else {
+          window.EJS_player = "#game";
+          window.EJS_core = core;
+          window.EJS_gameUrl = gameUrl;
+          window.EJS_gameName = params.get("gameName") || "Game";
+          window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+          window.EJS_startOnLoaded = true;
+          window.EJS_color = "#f6c247";
+          if (params.get("threads") === "1") {
+            window.EJS_threads = true;
+          }
+
+          const script = document.createElement("script");
+          script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+          document.body.appendChild(script);
+        }
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>

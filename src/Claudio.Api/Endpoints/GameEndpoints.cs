@@ -1,5 +1,6 @@
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Security.Claims;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
 using Claudio.Shared.Enums;
@@ -22,6 +23,9 @@ public static class GameEndpoints
         group.MapPost("/{id:int}/download-ticket", CreateDownloadTicket);
         group.MapGet("/{id:int}/download", Download).AllowAnonymous();
         group.MapGet("/{id:int}/browse", BrowseGameFiles);
+        group.MapGet("/{id:int}/emulation", GetEmulationInfo);
+        group.MapPost("/{id:int}/emulation/session", CreateEmulationSession);
+        group.MapMethods("/{id:int}/emulation/files/{ticket}/{**path}", ["GET", "HEAD"], GetEmulationFile).AllowAnonymous();
 
         return group;
     }
@@ -157,6 +161,17 @@ public static class GameEndpoints
         IsArchive = IsStandaloneArchive(game) || (Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is not null),
     };
 
+    public record EmulationInfoResponse(
+        bool Supported,
+        string? Core,
+        bool RequiresThreads,
+        string? Reason,
+        string? PreferredPath,
+        List<string> Candidates);
+
+    public record EmulationSessionRequest(string Path);
+    public record EmulationSessionResponse(string Ticket, string GameUrl);
+
     public record BrowseEntry(string Name, bool IsDirectory, long? Size);
     public record BrowseResult(string Path, bool InsideArchive, List<BrowseEntry> Entries);
 
@@ -164,6 +179,28 @@ public static class GameEndpoints
         { "__MACOSX", ".DS_Store", "@eaDir", "#recycle", "Thumbs.db" };
 
     private static readonly string[] ArchiveExtensions = [".zip", ".tar", ".tar.gz", ".tgz", ".iso"];
+
+    private static readonly Dictionary<string, EmulationPlatformDefinition> EmulationPlatforms =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["gb"] = new("gb", false, [".gb", ".gbc", ".zip"], [".gbc", ".gb", ".zip"]),
+            ["gbc"] = new("gb", false, [".gbc", ".gb", ".zip"], [".gbc", ".gb", ".zip"]),
+            ["gba"] = new("gba", false, [".gba", ".zip"], [".gba", ".zip"]),
+            ["nes"] = new("nes", false, [".nes", ".fds", ".unf", ".unif", ".zip"], [".nes", ".fds", ".unif", ".unf", ".zip"]),
+            ["snes"] = new("snes", false, [".sfc", ".smc", ".fig", ".bs", ".st", ".zip"], [".sfc", ".smc", ".fig", ".bs", ".st", ".zip"]),
+            ["n64"] = new("n64", false, [".z64", ".n64", ".v64", ".zip"], [".z64", ".n64", ".v64", ".zip"]),
+            ["ds"] = new("nds", false, [".nds", ".zip"], [".nds", ".zip"]),
+            ["ps1"] = new("psx", false, [".chd", ".cue", ".pbp", ".m3u", ".ccd", ".iso", ".bin", ".zip"], [".chd", ".cue", ".pbp", ".m3u", ".ccd", ".iso", ".zip", ".bin"]),
+            ["psp"] = new("psp", true, [".iso", ".cso", ".pbp", ".zip"], [".iso", ".cso", ".pbp", ".zip"]),
+            ["genesis"] = new("segaMD", false, [".md", ".gen", ".bin", ".smd", ".zip"], [".md", ".gen", ".bin", ".smd", ".zip"]),
+            ["saturn"] = new("segaSaturn", false, [".chd", ".cue", ".m3u", ".iso", ".zip"], [".chd", ".cue", ".m3u", ".iso", ".zip"]),
+        };
+
+    private sealed record EmulationPlatformDefinition(
+        string Core,
+        bool RequiresThreads,
+        string[] Extensions,
+        string[] PreferredExtensions);
 
     internal static bool IsArchiveFile(string path)
     {
@@ -186,6 +223,237 @@ public static class GameEndpoints
         var files = Directory.GetFiles(folderPath);
         var archives = files.Where(f => IsArchiveFile(f)).ToArray();
         return archives.Length == 1 ? archives[0] : null;
+    }
+
+    private static async Task<IResult> GetEmulationInfo(int id, AppDbContext db)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        var info = BuildEmulationInfo(game);
+        return Results.Ok(info);
+    }
+
+    private static async Task<IResult> CreateEmulationSession(
+        int id,
+        EmulationSessionRequest request,
+        AppDbContext db,
+        EmulationTicketService ticketService)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        var info = BuildEmulationInfo(game);
+        if (!info.Supported || string.IsNullOrWhiteSpace(info.Core))
+            return Results.BadRequest(info.Reason ?? "This game cannot be emulated in the browser.");
+
+        if (!info.Candidates.Contains(request.Path, StringComparer.OrdinalIgnoreCase))
+            return Results.BadRequest("Invalid ROM path.");
+
+        var ticket = ticketService.CreateTicket(id);
+        var encodedSegments = request.Path
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(Uri.EscapeDataString);
+        var gameUrl = $"/api/games/{id}/emulation/files/{Uri.EscapeDataString(ticket)}/{string.Join("/", encodedSegments)}";
+
+        return Results.Ok(new EmulationSessionResponse(ticket, gameUrl));
+    }
+
+    private static async Task<IResult> GetEmulationFile(
+        int id,
+        string ticket,
+        string path,
+        AppDbContext db,
+        EmulationTicketService ticketService,
+        HttpContext httpContext)
+    {
+        var isAuthenticated = httpContext.User.Identity?.IsAuthenticated == true;
+        if (!isAuthenticated && !ticketService.IsValid(ticket, id))
+            return Results.Unauthorized();
+
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        var info = BuildEmulationInfo(game);
+        if (!info.Supported)
+            return Results.BadRequest(info.Reason ?? "This game cannot be emulated in the browser.");
+
+        var normalizedPath = NormalizeRelativePath(path);
+        if (normalizedPath is null)
+            return Results.BadRequest("Invalid path.");
+
+        if (!TryResolveGameFilePath(game, normalizedPath, out var fullPath))
+            return Results.NotFound();
+
+        return Results.File(fullPath, "application/octet-stream", enableRangeProcessing: true);
+    }
+
+    private static int? GetUserId(ClaimsPrincipal principal)
+    {
+        var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(value, out var userId) ? userId : null;
+    }
+
+    private static EmulationInfoResponse BuildEmulationInfo(Game game)
+    {
+        if (!ExistsOnDisk(game))
+            return new(false, null, false, "Game files are missing from disk.", null, []);
+
+        if (!EmulationPlatforms.TryGetValue(game.Platform, out var definition))
+            return new(false, null, false, $"Platform '{game.Platform}' is not mapped to an EmulatorJS core yet.", null, []);
+
+        var candidates = FindEmulationCandidates(game, definition);
+        if (candidates.Count == 0)
+            return new(false, definition.Core, definition.RequiresThreads, "No supported ROM files were found for this game.", null, []);
+
+        var preferred = candidates[0];
+        return new(
+            true,
+            definition.Core,
+            definition.RequiresThreads,
+            null,
+            preferred,
+            candidates);
+    }
+
+    private static List<string> FindEmulationCandidates(Game game, EmulationPlatformDefinition definition)
+    {
+        var candidates = new List<string>();
+
+        if (IsStandaloneArchive(game))
+        {
+            var ext = GetFullExtension(game.FolderPath);
+            if (definition.Extensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                candidates.Add(Path.GetFileName(game.FolderPath));
+            return OrderEmulationCandidates(candidates, definition);
+        }
+
+        if (!Directory.Exists(game.FolderPath))
+            return [];
+
+        var singleArchive = FindSingleArchive(game.FolderPath);
+        if (singleArchive is not null)
+        {
+            var ext = GetFullExtension(singleArchive);
+            if (definition.Extensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                candidates.Add(Path.GetFileName(singleArchive));
+            return OrderEmulationCandidates(candidates, definition);
+        }
+
+        foreach (var file in Directory.GetFiles(game.FolderPath, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(game.FolderPath, file).Replace('\\', '/');
+            if (relativePath.Split('/').Any(HiddenNames.Contains))
+                continue;
+
+            var ext = GetFullExtension(relativePath);
+            if (!definition.Extensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                continue;
+
+            candidates.Add(relativePath);
+        }
+
+        return OrderEmulationCandidates(candidates, definition);
+    }
+
+    private static List<string> OrderEmulationCandidates(
+        List<string> candidates,
+        EmulationPlatformDefinition definition)
+    {
+        return candidates
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path =>
+            {
+                var ext = GetFullExtension(path);
+                var idx = Array.FindIndex(
+                    definition.PreferredExtensions,
+                    preferred => string.Equals(preferred, ext, StringComparison.OrdinalIgnoreCase));
+                return idx >= 0 ? idx : int.MaxValue;
+            })
+            .ThenBy(path => path.Count(c => c == '/'))
+            .ThenBy(path => path.Length)
+            .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string GetFullExtension(string path)
+    {
+        var lower = path.ToLowerInvariant();
+        if (lower.EndsWith(".tar.gz"))
+            return ".tar.gz";
+        return Path.GetExtension(lower);
+    }
+
+    private static string? NormalizeRelativePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        string decoded;
+        try
+        {
+            decoded = Uri.UnescapeDataString(path);
+        }
+        catch
+        {
+            return null;
+        }
+
+        var normalized = decoded.Replace('\\', '/').Trim('/');
+        if (normalized.Length == 0)
+            return null;
+
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Any(segment => segment is "." or ".."))
+            return null;
+
+        return string.Join("/", segments);
+    }
+
+    private static bool TryResolveGameFilePath(Game game, string relativePath, out string fullPath)
+    {
+        fullPath = string.Empty;
+
+        if (IsStandaloneArchive(game))
+        {
+            var fileName = Path.GetFileName(game.FolderPath);
+            if (string.Equals(relativePath, fileName, StringComparison.OrdinalIgnoreCase))
+            {
+                fullPath = game.FolderPath;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (!Directory.Exists(game.FolderPath))
+            return false;
+
+        var singleArchive = FindSingleArchive(game.FolderPath);
+        if (singleArchive is not null)
+        {
+            var archiveName = Path.GetFileName(singleArchive);
+            if (string.Equals(relativePath, archiveName, StringComparison.OrdinalIgnoreCase))
+            {
+                fullPath = singleArchive;
+                return true;
+            }
+        }
+
+        var candidate = Path.GetFullPath(Path.Combine(game.FolderPath, relativePath));
+        var root = Path.GetFullPath(game.FolderPath);
+        var rootWithSeparator = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        if (!candidate.StartsWith(rootWithSeparator, StringComparison.Ordinal) &&
+            !string.Equals(candidate, root, StringComparison.Ordinal))
+            return false;
+
+        if (!File.Exists(candidate))
+            return false;
+
+        fullPath = candidate;
+        return true;
     }
 
     /// Enumerates all (path, size) entries inside a zip, tar, or tar.gz archive.

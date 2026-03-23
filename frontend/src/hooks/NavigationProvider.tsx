@@ -1,0 +1,49 @@
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useGamepad } from "./useGamepad";
+import { useGuide } from "./useGuide";
+import { NavigationContext } from "./useNavigation";
+import { useGamepadEvent, useShortcut } from "./useShortcut";
+
+export default function NavigationProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  // Gamepad polling (converts gamepad input to keyboard/custom events)
+  useGamepad();
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const guide = useGuide();
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const toggleSearch = useCallback(() => setSearchOpen((v) => !v), []);
+
+  // Ctrl+K / Cmd+K toggles search
+  useShortcut("mod+k", (e) => {
+    e.preventDefault();
+    toggleSearch();
+  });
+
+  // Gamepad Y button toggles search (unless emulator is active)
+  useGamepadEvent("gamepad-search", () => {
+    if (document.body.dataset.emulatorActive) return;
+    toggleSearch();
+  });
+
+  // Gamepad guide button toggles the guide overlay
+  useGamepadEvent("gamepad-guide", () => {
+    guide.toggle();
+  });
+
+  const value = useMemo(
+    () => ({ searchOpen, openSearch, closeSearch, toggleSearch }),
+    [searchOpen, openSearch, closeSearch, toggleSearch],
+  );
+
+  return (
+    <NavigationContext.Provider value={value}>
+      {children}
+    </NavigationContext.Provider>
+  );
+}
