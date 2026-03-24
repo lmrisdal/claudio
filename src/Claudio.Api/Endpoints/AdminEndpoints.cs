@@ -16,7 +16,7 @@ public static class AdminEndpoints
     {
         var group = app.MapGroup("/api/admin")
             .WithTags("Admin")
-            .RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
+            .RequireAuthorization(policy => policy.RequireClaim("role", "admin"));
 
         group.MapGet("/users", GetUsers);
         group.MapDelete("/users/{id:int}", DeleteUser);
@@ -47,11 +47,11 @@ public static class AdminEndpoints
     private static async Task<IResult> GetUsers(AppDbContext db)
     {
         var users = await db.Users
-            .OrderBy(u => u.Username)
+            .OrderBy(u => u.UserName)
             .Select(u => new UserDto
             {
                 Id = u.Id,
-                Username = u.Username,
+                Username = u.UserName!,
                 Role = u.Role,
                 CreatedAt = u.CreatedAt,
             })

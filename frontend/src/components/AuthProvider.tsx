@@ -2,7 +2,14 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { AuthContext } from "../hooks/useAuth";
-import type { AuthResponse, User } from "../types/models";
+import type { User } from "../types/models";
+
+interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  token_type: string;
+}
 
 function parseToken(token: string): User | null {
   try {
@@ -10,18 +17,9 @@ function parseToken(token: string): User | null {
     const exp = payload.exp * 1000;
     if (Date.now() > exp) return null;
     return {
-      id: Number(
-        payload[
-          "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-        ],
-      ),
-      username:
-        payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"],
-      role: (
-        payload[
-          "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
-        ] as string
-      ).toLowerCase() as "user" | "admin",
+      id: Number(payload.sub),
+      username: payload.name,
+      role: (payload.role as string).toLowerCase() as "user" | "admin",
       createdAt: "",
     };
   } catch {
@@ -29,8 +27,34 @@ function parseToken(token: string): User | null {
   }
 }
 
+async function exchangeTokens(
+  params: Record<string, string>,
+): Promise<TokenResponse> {
+  const body = new URLSearchParams({ ...params, client_id: "claudio-spa" });
+  const res = await fetch("/connect/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    try {
+      const json = JSON.parse(text);
+      const description: string =
+        json.error_description || json.error || "Authentication failed";
+      throw new Error(description);
+    } catch (parseErr) {
+      if (parseErr instanceof SyntaxError) {
+        throw new Error(text || "Authentication failed");
+      }
+      throw parseErr;
+    }
+  }
+  return res.json();
+}
+
 export default function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
+  const [token, setTokenState] = useState<string | null>(() =>
     localStorage.getItem("token"),
   );
   const [user, setUser] = useState<User | null>(() => {
@@ -38,63 +62,79 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     return t ? parseToken(t) : null;
   });
 
-  // Validate token: if expired, clear it (adjust state during render)
+  // Validate token: if expired, clear it
   if (token) {
     const parsed = parseToken(token);
     if (!parsed && user !== null) {
       localStorage.removeItem("token");
-      setToken(null);
+      localStorage.removeItem("refresh_token");
+      setTokenState(null);
       setUser(null);
     }
   }
+
+  const applyTokenResponse = useCallback((res: TokenResponse) => {
+    localStorage.setItem("token", res.access_token);
+    if (res.refresh_token) {
+      localStorage.setItem("refresh_token", res.refresh_token);
+    }
+    setTokenState(res.access_token);
+    setUser(parseToken(res.access_token));
+  }, []);
 
   // Try proxy authentication on mount if not logged in
   useEffect(() => {
     if (token) return;
     api
-      .get<AuthResponse>("/auth/proxy")
-      .then((res) => {
-        localStorage.setItem("token", res.token);
-        setToken(res.token);
-        setUser(res.user);
+      .post<{ nonce: string }>("/auth/remote", {})
+      .then(async ({ nonce }) => {
+        const res = await exchangeTokens({
+          grant_type: "urn:claudio:proxy_nonce",
+          nonce,
+          scope: "openid offline_access roles",
+        });
+        applyTokenResponse(res);
       })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAuth = useCallback(
-    async (endpoint: string, username: string, password: string) => {
-      const res = await api.post<AuthResponse>(endpoint, {
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const res = await exchangeTokens({
+        grant_type: "password",
         username,
         password,
+        scope: "openid offline_access roles",
       });
-      localStorage.setItem("token", res.token);
-      setToken(res.token);
-      setUser(res.user);
+      applyTokenResponse(res);
     },
-    [],
-  );
-
-  const login = useCallback(
-    (username: string, password: string) =>
-      handleAuth("/auth/login", username, password),
-    [handleAuth],
+    [applyTokenResponse],
   );
 
   const register = useCallback(
-    (username: string, password: string) =>
-      handleAuth("/auth/register", username, password),
-    [handleAuth],
+    async (username: string, password: string) => {
+      await api.post("/auth/register", { username, password });
+      const res = await exchangeTokens({
+        grant_type: "password",
+        username,
+        password,
+        scope: "openid offline_access roles",
+      });
+      applyTokenResponse(res);
+    },
+    [applyTokenResponse],
   );
 
   const logout = useCallback(() => {
     localStorage.removeItem("token");
-    setToken(null);
+    localStorage.removeItem("refresh_token");
+    setTokenState(null);
     setUser(null);
   }, []);
 
   const updateToken = useCallback((newToken: string) => {
     localStorage.setItem("token", newToken);
-    setToken(newToken);
+    setTokenState(newToken);
   }, []);
 
   const updateUser = useCallback((newUser: User) => {

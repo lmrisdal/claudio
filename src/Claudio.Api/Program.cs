@@ -1,12 +1,13 @@
-using System.Text;
-using Claudio.Api.Auth;
+using System.Security.Cryptography;
+using Microsoft.IdentityModel.Tokens;
 using Claudio.Api.Configuration;
 using Claudio.Api.Data;
 using Claudio.Api.Endpoints;
 using Claudio.Api.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using OpenIddict.Abstractions;
+using OpenIddict.Validation.AspNetCore;
 
 var configPath = Environment.GetEnvironmentVariable("CLAUDIO_CONFIG_PATH")
     ?? "/config/config.toml";
@@ -21,29 +22,94 @@ builder.WebHost.UseUrls($"http://+:{port}");
 if (config.Database.Provider == "postgres" && config.Database.PostgresConnection is not null)
 {
     builder.Services.AddDbContext<AppDbContext>(opt =>
-        opt.UseNpgsql(config.Database.PostgresConnection));
+        opt.UseNpgsql(config.Database.PostgresConnection)
+           .UseOpenIddict()
+           .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 }
 else
 {
     builder.Services.AddDbContext<AppDbContext>(opt =>
         opt.UseSqlite($"Data Source={config.Database.SqlitePath}")
+           .UseOpenIddict()
            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 }
 
-// Auth
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opt =>
+// Identity
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
+{
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 8;
+    options.User.RequireUniqueEmail = false;
+})
+.AddRoles<IdentityRole<int>>()
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders()
+.AddSignInManager();
+
+// OpenIddict
+// Load or generate a persistent RSA signing key stored alongside the config.
+var configDir = config.Database.Provider == "postgres"
+    ? Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? "/config"
+    : Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
+Directory.CreateDirectory(configDir);
+
+var signingKeyPath = Path.Combine(configDir, "claudio-signing.key");
+RsaSecurityKey signingKey;
+var rsa = RSA.Create(2048);
+if (File.Exists(signingKeyPath))
+{
+    rsa.ImportRSAPrivateKey(Convert.FromBase64String(File.ReadAllText(signingKeyPath)), out _);
+}
+else
+{
+    File.WriteAllText(signingKeyPath, Convert.ToBase64String(rsa.ExportRSAPrivateKey()));
+}
+signingKey = new RsaSecurityKey(rsa);
+
+builder.Services.AddOpenIddict()
+    .AddCore(options =>
     {
-        opt.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(config.Auth.JwtSecret))
-        };
+        options.UseEntityFrameworkCore()
+            .UseDbContext<AppDbContext>();
+    })
+    .AddServer(options =>
+    {
+        options.SetTokenEndpointUris("/connect/token");
+        options.SetUserInfoEndpointUris("/connect/userinfo");
+
+        options.AllowPasswordFlow();
+        options.AllowRefreshTokenFlow();
+        options.AllowCustomFlow(ConnectEndpoints.ProxyNonceGrantType);
+
+        options.RegisterScopes(
+            OpenIddictConstants.Scopes.OpenId,
+            OpenIddictConstants.Scopes.Profile,
+            OpenIddictConstants.Scopes.OfflineAccess,
+            "roles");
+
+        options.UseReferenceRefreshTokens();
+
+        // Persistent RSA key — tokens survive restarts. Encryption disabled so the SPA
+        // can read the JWT payload directly. Refresh tokens are opaque handles in the DB.
+        options.AddSigningKey(signingKey);
+        options.AddEphemeralEncryptionKey();
+        options.DisableAccessTokenEncryption();
+
+        options.UseAspNetCore()
+            .EnableTokenEndpointPassthrough()
+            .EnableUserInfoEndpointPassthrough()
+            .DisableTransportSecurityRequirement();
+    })
+    .AddValidation(options =>
+    {
+        options.UseLocalServer();
+        options.UseAspNetCore();
     });
+
+builder.Services.AddAuthentication(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
 builder.Services.AddAuthorization();
 
 // JSON serialization
@@ -54,7 +120,7 @@ builder.Services.ConfigureHttpJsonOptions(opt =>
 
 // Services
 builder.Services.AddSingleton(config);
-builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<ProxyNonceStore>();
 builder.Services.AddTransient<DownloadService>();
 builder.Services.AddSingleton<DownloadTicketService>();
 builder.Services.AddSingleton<EmulationTicketService>();
@@ -67,19 +133,41 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// Auto-migrate database
+// Auto-migrate database and seed OpenIddict application
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+    var existingApp = await applicationManager.FindByClientIdAsync("claudio-spa");
+    if (existingApp is not null)
+        await applicationManager.DeleteAsync(existingApp);
+
+    {
+        var descriptor = new OpenIddictApplicationDescriptor
+        {
+            ClientId = "claudio-spa",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "Claudio SPA",
+        };
+        descriptor.AddGrantTypePermissions(
+            OpenIddictConstants.GrantTypes.Password,
+            OpenIddictConstants.GrantTypes.RefreshToken,
+            ConnectEndpoints.ProxyNonceGrantType);
+        descriptor.AddScopePermissions(
+            OpenIddictConstants.Scopes.OpenId,
+            OpenIddictConstants.Scopes.Profile,
+            OpenIddictConstants.Scopes.OfflineAccess,
+            "roles");
+        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
+        await applicationManager.CreateAsync(descriptor);
+    }
 }
 
 app.UseStaticFiles();
 
 // Serve uploaded game images from /config/images/ under /images/
-var configDir = config.Database.Provider == "postgres"
-    ? Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? "/config"
-    : Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
 var imagesDir = Path.Combine(configDir, "images");
 Directory.CreateDirectory(imagesDir);
 app.UseStaticFiles(new StaticFileOptions
@@ -92,6 +180,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Minimal API endpoints
+app.MapConnectEndpoints();
 app.MapAuthEndpoints();
 app.MapGameEndpoints();
 app.MapAdminEndpoints();

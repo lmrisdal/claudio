@@ -1,9 +1,11 @@
 using System.Security.Claims;
-using Claudio.Api.Auth;
 using Claudio.Api.Data;
+using Claudio.Api.Services;
 using Claudio.Shared.Enums;
 using Claudio.Shared.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using OpenIddict.Abstractions;
 
 namespace Claudio.Api.Endpoints;
 
@@ -14,8 +16,7 @@ public static class AuthEndpoints
         var group = app.MapGroup("/api/auth").WithTags("Auth");
 
         group.MapPost("/register", Register);
-        group.MapPost("/login", Login);
-        group.MapGet("/proxy", ProxyLogin);
+        group.MapPost("/remote", ProxyLogin);
         group.MapGet("/me", GetMe).RequireAuthorization();
         group.MapPut("/change-password", ChangePassword).RequireAuthorization();
 
@@ -24,8 +25,8 @@ public static class AuthEndpoints
 
     private static async Task<IResult> Register(
         LoginRequest request,
-        AppDbContext db,
-        TokenService tokenService)
+        UserManager<ApplicationUser> userManager,
+        AppDbContext db)
     {
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             return Results.BadRequest("Username and password are required.");
@@ -33,44 +34,32 @@ public static class AuthEndpoints
         if (request.Password.Length < 8)
             return Results.BadRequest("Password must be at least 8 characters.");
 
-        if (await db.Users.AnyAsync(u => u.Username == request.Username))
-            return Results.Conflict("Username already taken.");
-
         var isFirstUser = !await db.Users.AnyAsync();
 
-        var user = new User
+        var user = new ApplicationUser
         {
-            Username = request.Username,
-            PasswordHash = PasswordHasher.Hash(request.Password),
+            UserName = request.Username,
             Role = isFirstUser ? UserRole.Admin : UserRole.User,
             CreatedAt = DateTime.UtcNow,
         };
 
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        var result = await userManager.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            var error = result.Errors.FirstOrDefault();
+            return error?.Code == "DuplicateUserName"
+                ? Results.Conflict("Username already taken.")
+                : Results.BadRequest(error?.Description ?? "Registration failed.");
+        }
 
-        var token = tokenService.GenerateToken(user);
-        return Results.Ok(new AuthResponse(token, ToDto(user)));
-    }
-
-    private static async Task<IResult> Login(
-        LoginRequest request,
-        AppDbContext db,
-        TokenService tokenService)
-    {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
-
-        if (user is null || !PasswordHasher.Verify(request.Password, user.PasswordHash))
-            return Results.Unauthorized();
-
-        var token = tokenService.GenerateToken(user);
-        return Results.Ok(new AuthResponse(token, ToDto(user)));
+        return Results.Ok(ToDto(user));
     }
 
     private static async Task<IResult> ProxyLogin(
         HttpContext httpContext,
+        UserManager<ApplicationUser> userManager,
         AppDbContext db,
-        TokenService tokenService,
+        ProxyNonceStore nonceStore,
         ClaudioConfig config)
     {
         var header = config.Auth.ProxyAuthHeader;
@@ -81,32 +70,35 @@ public static class AuthEndpoints
         if (string.IsNullOrWhiteSpace(username))
             return Results.Unauthorized();
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        var user = await userManager.FindByNameAsync(username);
         if (user is null)
         {
             if (!config.Auth.ProxyAuthAutoCreate)
                 return Results.Unauthorized();
 
             var isFirstUser = !await db.Users.AnyAsync();
-            user = new User
+            user = new ApplicationUser
             {
-                Username = username,
-                PasswordHash = "",
+                UserName = username,
                 Role = isFirstUser ? UserRole.Admin : UserRole.User,
                 CreatedAt = DateTime.UtcNow,
             };
-            db.Users.Add(user);
-            await db.SaveChangesAsync();
+            var result = await userManager.CreateAsync(user);
+            if (!result.Succeeded)
+                return Results.Problem("Failed to create proxy user.");
         }
 
-        var token = tokenService.GenerateToken(user);
-        return Results.Ok(new AuthResponse(token, ToDto(user)));
+        var nonce = nonceStore.CreateNonce(user.Id);
+        return Results.Ok(new ProxyNonceResponse(nonce));
     }
 
-    private static async Task<IResult> GetMe(ClaimsPrincipal principal, AppDbContext db)
+    private static async Task<IResult> GetMe(
+        ClaimsPrincipal principal,
+        UserManager<ApplicationUser> userManager)
     {
-        var userId = int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var user = await db.Users.FindAsync(userId);
+        var userId = principal.FindFirstValue(OpenIddictConstants.Claims.Subject);
+        if (userId is null) return Results.Unauthorized();
+        var user = await userManager.FindByIdAsync(userId);
         if (user is null) return Results.NotFound();
         return Results.Ok(ToDto(user));
     }
@@ -114,35 +106,32 @@ public static class AuthEndpoints
     private static async Task<IResult> ChangePassword(
         ChangePasswordRequest request,
         ClaimsPrincipal principal,
-        AppDbContext db,
-        TokenService tokenService)
+        UserManager<ApplicationUser> userManager)
     {
         if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
             return Results.BadRequest("New password must be at least 8 characters.");
 
-        var userId = int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var user = await db.Users.FindAsync(userId);
+        var userId = principal.FindFirstValue(OpenIddictConstants.Claims.Subject);
+        if (userId is null) return Results.Unauthorized();
+        var user = await userManager.FindByIdAsync(userId);
         if (user is null) return Results.NotFound();
 
-        if (!PasswordHasher.Verify(request.CurrentPassword, user.PasswordHash))
-            return Results.BadRequest("Current password is incorrect.");
+        var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+            return Results.BadRequest(result.Errors.FirstOrDefault()?.Description ?? "Password change failed.");
 
-        user.PasswordHash = PasswordHasher.Hash(request.NewPassword);
-        await db.SaveChangesAsync();
-
-        var token = tokenService.GenerateToken(user);
-        return Results.Ok(new AuthResponse(token, ToDto(user)));
+        return Results.NoContent();
     }
 
-    private static UserDto ToDto(User user) => new()
+    private static UserDto ToDto(ApplicationUser user) => new()
     {
         Id = user.Id,
-        Username = user.Username,
+        Username = user.UserName!,
         Role = user.Role,
         CreatedAt = user.CreatedAt,
     };
 
     public record LoginRequest(string Username, string Password);
     public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
-    public record AuthResponse(string Token, UserDto User);
+    public record ProxyNonceResponse(string Nonce);
 }

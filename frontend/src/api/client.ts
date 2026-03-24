@@ -1,10 +1,36 @@
-const BASE = '/api';
+const BASE = "/api";
+
+async function tryRefreshToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return null;
+  try {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: "claudio-spa",
+    });
+    const res = await fetch("/connect/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const newToken: string = data.access_token;
+    localStorage.setItem("token", newToken);
+    if (data.refresh_token)
+      localStorage.setItem("refresh_token", data.refresh_token);
+    return newToken;
+  } catch {
+    return null;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   const isFormData = init?.body instanceof FormData;
   const headers: HeadersInit = {
-    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...init?.headers,
   };
@@ -12,13 +38,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
 
   if (res.status === 401) {
-    const isAuthEndpoint = path.startsWith('/auth/');
+    const isAuthEndpoint = path.startsWith("/auth/");
     if (!isAuthEndpoint) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Attempt silent token refresh before giving up
+      const newToken = await tryRefreshToken();
+      if (newToken) {
+        const retryHeaders: HeadersInit = {
+          ...(isFormData ? {} : { "Content-Type": "application/json" }),
+          Authorization: `Bearer ${newToken}`,
+          ...init?.headers,
+        };
+        const retryRes = await fetch(`${BASE}${path}`, {
+          ...init,
+          headers: retryHeaders,
+        });
+        if (retryRes.ok) {
+          if (retryRes.status === 204 || retryRes.status === 202)
+            return undefined as T;
+          return retryRes.json();
+        }
+      }
+      localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
     }
     const body = await res.text();
-    throw new Error(body || 'Unauthorized');
+    throw new Error(body || "Unauthorized");
   }
 
   if (!res.ok) {
@@ -33,13 +78,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+    request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   put: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   upload: <T>(path: string, file: File) => {
     const form = new FormData();
-    form.append('file', file);
-    return request<T>(path, { method: 'POST', body: form });
+    form.append("file", file);
+    return request<T>(path, { method: "POST", body: form });
   },
 };

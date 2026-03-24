@@ -65,8 +65,3 @@ export interface User {
   role: "user" | "admin";
   createdAt: string;
 }
-
-export interface AuthResponse {
-  token: string;
-  user: User;
-}

@@ -1,34 +1,25 @@
 using Claudio.Shared.Enums;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Claudio.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
-    public DbSet<User> Users => Set<User>();
     public DbSet<Game> Games => Set<Game>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>(e =>
-        {
-            e.HasIndex(u => u.Username).IsUnique();
-        });
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.UseOpenIddict();
 
         modelBuilder.Entity<Game>(e =>
         {
             e.HasIndex(g => new { g.Platform, g.FolderName }).IsUnique();
         });
     }
-}
-
-public class User
-{
-    public int Id { get; set; }
-    public string Username { get; set; } = string.Empty;
-    public string PasswordHash { get; set; } = string.Empty;
-    public UserRole Role { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class Game
