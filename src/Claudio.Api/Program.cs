@@ -26,7 +26,8 @@ if (config.Database.Provider == "postgres" && config.Database.PostgresConnection
 else
 {
     builder.Services.AddDbContext<AppDbContext>(opt =>
-        opt.UseSqlite($"Data Source={config.Database.SqlitePath}"));
+        opt.UseSqlite($"Data Source={config.Database.SqlitePath}")
+           .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 }
 
 // Auth
@@ -76,7 +77,9 @@ using (var scope = app.Services.CreateScope())
 app.UseStaticFiles();
 
 // Serve uploaded game images from /config/images/ under /images/
-var configDir = Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
+var configDir = config.Database.Provider == "postgres"
+    ? Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? "/config"
+    : Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
 var imagesDir = Path.Combine(configDir, "images");
 Directory.CreateDirectory(imagesDir);
 app.UseStaticFiles(new StaticFileOptions

@@ -1,0 +1,36 @@
+services:
+  claudio:
+    image: ghcr.io/lmrisdal/claudio:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - claudio-config:/config
+      - /path/to/games:/games:ro
+    environment:
+      - CLAUDIO_DB_PROVIDER=postgres
+      - CLAUDIO_DB_POSTGRES=Host=db;Database=claudio;Username=claudio;Password=secret
+      # - CLAUDIO_IGDB_CLIENT_ID=
+      # - CLAUDIO_IGDB_CLIENT_SECRET=
+      # - CLAUDIO_JWT_SECRET=
+      # - CLAUDIO_PORT=8080
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_DB=claudio
+      - POSTGRES_USER=claudio
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claudio -d claudio"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  claudio-config:
+  postgres-data:
