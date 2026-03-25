@@ -1,11 +1,13 @@
 name: Build and Push Docker Image
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     tags: ["v*"]
     paths:
       - "src/**"
+      - "tests/**"
       - "frontend/**"
       - "docker/**"
       - "Directory.Build.props"
