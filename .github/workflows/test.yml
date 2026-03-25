@@ -1,8 +1,6 @@
 name: Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -25,14 +23,14 @@ jobs:
         run: >
           dotnet run --project tests/Claudio.Api.Tests --no-build
           --coverage
-          --coverage-output ./TestResults/
+          --coverage-output ${{ github.workspace }}/TestResults/
           --coverage-output-format cobertura
 
       - name: Generate coverage report
         if: always()
         uses: danielpalme/ReportGenerator-GitHub-Action@5
         with:
-          reports: TestResults/coverage.cobertura.xml
+          reports: ${{ github.workspace }}/TestResults/*.cobertura.xml
           targetdir: TestResults/report
           reporttypes: MarkdownSummaryGithub;Html
 
