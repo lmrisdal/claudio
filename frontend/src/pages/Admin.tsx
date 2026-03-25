@@ -774,28 +774,26 @@ interface AdminConfig {
 }
 
 function SettingsTab() {
-  const queryClient = useQueryClient();
   const { data: config, isLoading } = useQuery({
     queryKey: ["adminConfig"],
     queryFn: () => api.get<AdminConfig>("/admin/config"),
   });
 
-  const [igdbClientId, setIgdbClientId] = useState("");
-  const [igdbClientSecret, setIgdbClientSecret] = useState("");
-  const [sgdbApiKey, setSgdbApiKey] = useState("");
-  const [initialized, setInitialized] = useState(false);
+  if (isLoading || !config) {
+    return <p className="text-sm text-text-muted">Loading settings…</p>;
+  }
+
+  return <SettingsForm initialConfig={config} />;
+}
+
+function SettingsForm({ initialConfig }: { initialConfig: AdminConfig }) {
+  const queryClient = useQueryClient();
+
+  const [igdbClientId, setIgdbClientId] = useState(initialConfig.igdb.clientId);
+  const [igdbClientSecret, setIgdbClientSecret] = useState(initialConfig.igdb.clientSecret);
+  const [sgdbApiKey, setSgdbApiKey] = useState(initialConfig.steamgriddb.apiKey);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-
-  // Initialize form values from server data
-  useEffect(() => {
-    if (config && !initialized) {
-      setIgdbClientId(config.igdb.clientId);
-      setIgdbClientSecret(config.igdb.clientSecret);
-      setSgdbApiKey(config.steamgriddb.apiKey);
-      setInitialized(true);
-    }
-  }, [config, initialized]);
 
   const saveMutation = useMutation({
     mutationFn: (body: object) => api.put<AdminConfig>("/admin/config", body),
@@ -829,10 +827,6 @@ function SettingsTab() {
     if (!isMasked(sgdbApiKey)) body.steamgriddb.apiKey = sgdbApiKey;
 
     saveMutation.mutate(body);
-  }
-
-  if (isLoading) {
-    return <p className="text-sm text-text-muted">Loading settings…</p>;
   }
 
   return (
