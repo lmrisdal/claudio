@@ -7,7 +7,7 @@ import SearchDialog from "./SearchDialog";
 import TasksPopover from "./TasksPopover";
 
 export default function Header() {
-  const { isLoggedIn, isAdmin, user, logout } = useAuth();
+  const { isLoggedIn, isAdmin, user, logout, authDisabled } = useAuth();
   const { theme, toggle } = useTheme();
   const { searchOpen, closeSearch, toggleSearch } = useNavigation();
 
@@ -90,20 +90,22 @@ export default function Header() {
                     </Link>
                   </>
                 )}
-                <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
-                  <Link
-                    to="/account"
-                    className="text-sm text-text-secondary hover:text-text-primary font-mono transition"
-                  >
-                    {user?.username}
-                  </Link>
-                  <button
-                    onClick={logout}
-                    className="px-3 py-1.5 rounded-lg text-sm text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
-                  >
-                    Sign out
-                  </button>
-                </div>
+                {!authDisabled && (
+                  <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
+                    <Link
+                      to="/account"
+                      className="text-sm text-text-secondary hover:text-text-primary font-mono transition"
+                    >
+                      {user?.username}
+                    </Link>
+                    <button
+                      onClick={logout}
+                      className="px-3 py-1.5 rounded-lg text-sm text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <Link

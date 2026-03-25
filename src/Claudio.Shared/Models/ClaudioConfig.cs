@@ -24,10 +24,63 @@ public class DatabaseConfig
 
 public class AuthConfig
 {
-    public string JwtSecret { get; set; } = string.Empty;
-    public int TokenExpiryHours { get; set; } = 168;
+    public bool DisableAuth { get; set; } = false;
+    public bool DisableLocalLogin { get; set; } = false;
+    public bool DisableUserCreation { get; set; } = false;
     public string ProxyAuthHeader { get; set; } = string.Empty;
     public bool ProxyAuthAutoCreate { get; set; } = false;
+    public GitHubOAuthConfig Github { get; set; } = new();
+    public GoogleOAuthConfig Google { get; set; } = new();
+    public List<OidcProviderConfig> OidcProviders { get; set; } = [];
+}
+
+public class GitHubOAuthConfig
+{
+    public string ClientId { get; set; } = string.Empty;
+    public string ClientSecret { get; set; } = string.Empty;
+    public string RedirectUri { get; set; } = string.Empty;
+
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(ClientId) &&
+        !string.IsNullOrWhiteSpace(ClientSecret) &&
+        !string.IsNullOrWhiteSpace(RedirectUri);
+}
+
+public class GoogleOAuthConfig
+{
+    public string ClientId { get; set; } = string.Empty;
+    public string ClientSecret { get; set; } = string.Empty;
+    public string RedirectUri { get; set; } = string.Empty;
+
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(ClientId) &&
+        !string.IsNullOrWhiteSpace(ClientSecret) &&
+        !string.IsNullOrWhiteSpace(RedirectUri);
+}
+
+public class OidcProviderConfig
+{
+    public string Slug { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string? LogoUrl { get; set; }
+    public string DiscoveryUrl { get; set; } = string.Empty;
+    public string Authority { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty;
+    public string ClientSecret { get; set; } = string.Empty;
+    public string RedirectUri { get; set; } = string.Empty;
+    public string Scope { get; set; } = "openid profile email";
+    public string UserIdClaim { get; set; } = "sub";
+    public string UsernameClaim { get; set; } = "preferred_username";
+    public string NameClaim { get; set; } = "name";
+    public string EmailClaim { get; set; } = "email";
+
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(Slug) &&
+        !string.IsNullOrWhiteSpace(DisplayName) &&
+        !string.IsNullOrWhiteSpace(DiscoveryUrl) &&
+        !string.IsNullOrWhiteSpace(ClientId) &&
+        !string.IsNullOrWhiteSpace(ClientSecret) &&
+        !string.IsNullOrWhiteSpace(RedirectUri);
 }
 
 public class IgdbConfig

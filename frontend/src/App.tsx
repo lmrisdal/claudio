@@ -10,6 +10,7 @@ const GameDetail = lazy(() => import("./pages/GameDetail"));
 const GameEmulator = lazy(() => import("./pages/GameEmulator"));
 const Library = lazy(() => import("./pages/Library"));
 const Login = lazy(() => import("./pages/Login"));
+const ExternalAuthCallback = lazy(() => import("./pages/ExternalAuthCallback"));
 const Register = lazy(() => import("./pages/Register"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,7 @@ export default function App() {
               </GuestRoute>
             }
           />
+          <Route path="/auth/callback" element={<ExternalAuthCallback />} />
           <Route
             path="/"
             element={

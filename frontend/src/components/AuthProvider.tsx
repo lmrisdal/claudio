@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { AuthContext } from "../hooks/useAuth";
+import type { AuthProviders } from "../hooks/useAuth";
+import type { AuthProvider } from "../hooks/useAuth";
 import type { User } from "../types/models";
 
 interface TokenResponse {
@@ -10,6 +12,19 @@ interface TokenResponse {
   expires_in: number;
   token_type: string;
 }
+
+interface AuthProvidersResponse {
+  providers: AuthProvider[];
+  localLoginEnabled: boolean;
+  userCreationEnabled: boolean;
+}
+
+const noAuthUser: User = {
+  id: 0,
+  username: "admin",
+  role: "admin",
+  createdAt: "",
+};
 
 function parseToken(token: string): User | null {
   try {
@@ -57,6 +72,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() =>
     localStorage.getItem("token"),
   );
+  const [authDisabled, setAuthDisabled] = useState(false);
+  const [providers, setProviders] = useState<AuthProviders>({
+    providers: [],
+    localLoginEnabled: true,
+    userCreationEnabled: true,
+  });
   const [user, setUser] = useState<User | null>(() => {
     const t = localStorage.getItem("token");
     return t ? parseToken(t) : null;
@@ -82,7 +103,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     setUser(parseToken(res.access_token));
   }, []);
 
-  // Try proxy authentication on mount if not logged in
+  // Fetch auth providers; 404 means auth is disabled
+  useEffect(() => {
+    api
+      .get<AuthProvidersResponse>("/auth/providers")
+      .then((response) => {
+        setProviders(response);
+      })
+      .catch(() => {
+        // Auth endpoints not available — auth is disabled, act as admin
+        setAuthDisabled(true);
+        setUser(noAuthUser);
+      });
+  }, []);
+
   useEffect(() => {
     if (token) return;
     api
@@ -125,6 +159,18 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     [applyTokenResponse],
   );
 
+  const completeExternalLogin = useCallback(
+    async (nonce: string) => {
+      const res = await exchangeTokens({
+        grant_type: "urn:claudio:external_login_nonce",
+        nonce,
+        scope: "openid offline_access roles",
+      });
+      applyTokenResponse(res);
+    },
+    [applyTokenResponse],
+  );
+
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("refresh_token");
@@ -148,9 +194,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         token,
         login,
         register,
+        completeExternalLogin,
         logout,
         setToken: updateToken,
         setUser: updateUser,
+        providers,
+        authDisabled,
         isAdmin: user?.role === "admin",
         isLoggedIn: !!user,
       }}

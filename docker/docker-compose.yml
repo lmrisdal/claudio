@@ -9,6 +9,12 @@ services:
     # environment:
     #   - CLAUDIO_IGDB_CLIENT_ID=
     #   - CLAUDIO_IGDB_CLIENT_SECRET=
+    #   - CLAUDIO_GITHUB_CLIENT_ID=
+    #   - CLAUDIO_GITHUB_CLIENT_SECRET=
+    #   - CLAUDIO_GITHUB_REDIRECT_URI=http://localhost:8080/api/auth/github/callback
+    #   - CLAUDIO_GOOGLE_CLIENT_ID=
+    #   - CLAUDIO_GOOGLE_CLIENT_SECRET=
+    #   - CLAUDIO_GOOGLE_REDIRECT_URI=http://localhost:8080/api/auth/google/callback
     #   - CLAUDIO_PORT=8080
 
 volumes:

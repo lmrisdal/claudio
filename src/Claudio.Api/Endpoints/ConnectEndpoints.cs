@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
+using Claudio.Shared.Models;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +13,7 @@ namespace Claudio.Api.Endpoints;
 public static class ConnectEndpoints
 {
     public const string ProxyNonceGrantType = "urn:claudio:proxy_nonce";
+    public const string ExternalLoginNonceGrantType = "urn:claudio:external_login_nonce";
 
     public static IEndpointRouteBuilder MapConnectEndpoints(this IEndpointRouteBuilder app)
     {
@@ -22,14 +24,19 @@ public static class ConnectEndpoints
 
     private static async Task<IResult> Token(
         HttpContext httpContext,
+        ClaudioConfig config,
         UserManager<ApplicationUser> userManager,
-        ProxyNonceStore nonceStore)
+        ProxyNonceStore nonceStore,
+        ExternalLoginNonceStore externalLoginNonceStore)
     {
         var request = httpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("OpenIddict request cannot be retrieved.");
 
         if (request.GrantType == OpenIddictConstants.GrantTypes.Password)
         {
+            if (config.Auth.DisableLocalLogin)
+                return InvalidGrant("Username/password login is disabled.");
+
             var user = await userManager.FindByNameAsync(request.Username!);
             if (user is null || !await userManager.CheckPasswordAsync(user, request.Password!))
                 return InvalidGrant("Invalid username or password.");
@@ -56,6 +63,23 @@ public static class ConnectEndpoints
                 return InvalidGrant("Missing nonce.");
 
             var userId = nonceStore.ConsumeNonce(nonce);
+            if (userId is null)
+                return InvalidGrant("Invalid or expired nonce.");
+
+            var user = await userManager.FindByIdAsync(userId.Value.ToString());
+            if (user is null)
+                return InvalidGrant("User not found.");
+
+            return SignIn(user, request.GetScopes());
+        }
+
+        if (request.GrantType == ExternalLoginNonceGrantType)
+        {
+            string? nonce = (string?)request["nonce"];
+            if (string.IsNullOrWhiteSpace(nonce))
+                return InvalidGrant("Missing nonce.");
+
+            var userId = externalLoginNonceStore.ConsumeNonce(nonce);
             if (userId is null)
                 return InvalidGrant("Invalid or expired nonce.");
 

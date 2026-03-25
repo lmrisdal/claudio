@@ -51,7 +51,7 @@ export default function Admin() {
 }
 
 function UsersTab() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, providers } = useAuth()
   const queryClient = useQueryClient()
   const [showAddUser, setShowAddUser] = useState(false)
   const [newUsername, setNewUsername] = useState('')
@@ -91,19 +91,27 @@ function UsersTab() {
   return (
     <div className="space-y-6">
       {/* Add user */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowAddUser(!showAddUser)}
-          className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-surface-raised ring-1 ring-border hover:ring-accent/50 text-text-secondary transition"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Add user
-        </button>
-      </div>
+      {providers.localLoginEnabled && providers.userCreationEnabled ? (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowAddUser(!showAddUser)}
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-surface-raised ring-1 ring-border hover:ring-accent/50 text-text-secondary transition"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add user
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-text-muted">
+          {providers.userCreationEnabled
+            ? 'Local username/password accounts are disabled. Users must sign in through a configured external provider.'
+            : 'User creation is disabled. Existing users can still sign in, but new accounts cannot be created here.'}
+        </p>
+      )}
 
-      {showAddUser && (
+      {providers.localLoginEnabled && providers.userCreationEnabled && showAddUser && (
         <div className="card bg-surface rounded-xl p-5 ring-1 ring-border">
           <h3 className="text-sm font-medium mb-4">New user</h3>
           <form

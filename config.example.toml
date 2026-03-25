@@ -7,8 +7,34 @@ sqlite_path = "/config/claudio.db"
 # postgres_connection = "Host=localhost;Database=claudio;Username=claudio;Password=secret"
 
 [auth]
-jwt_secret = "CHANGE-ME-TO-A-RANDOM-SECRET"
-token_expiry_hours = 168        # 7 days
+disable_auth = false             # Set to true to disable authentication entirely (open access)
+disable_local_login = false      # Set to true to require OIDC/external login
+disable_user_creation = false    # Set to true to prevent new local or external accounts
+
+[auth.github]
+client_id = ""
+client_secret = ""
+redirect_uri = "http://localhost:8080/api/auth/github/callback"
+
+[auth.google]
+client_id = ""
+client_secret = ""
+redirect_uri = "http://localhost:8080/api/auth/google/callback"
+
+[[auth.oidc_providers]]
+slug = "authentik"
+display_name = "Authentik"
+logo_url = "https://goauthentik.io/img/icon.png"
+discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"
+client_id = "your_oidc_client_id"
+client_secret = "your_oidc_client_secret"
+redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
+# Optional overrides if your provider uses non-default values:
+# scope = "openid profile email"
+# user_id_claim = "sub"
+# username_claim = "preferred_username"
+# name_claim = "name"
+# email_claim = "email"
 
 [igdb]
 client_id = ""

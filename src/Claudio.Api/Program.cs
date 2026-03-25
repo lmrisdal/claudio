@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
+using Claudio.Api.Auth;
 using Claudio.Api.Configuration;
 using Claudio.Api.Data;
 using Claudio.Api.Endpoints;
@@ -83,6 +84,7 @@ builder.Services.AddOpenIddict()
         options.AllowPasswordFlow();
         options.AllowRefreshTokenFlow();
         options.AllowCustomFlow(ConnectEndpoints.ProxyNonceGrantType);
+        options.AllowCustomFlow(ConnectEndpoints.ExternalLoginNonceGrantType);
 
         options.RegisterScopes(
             OpenIddictConstants.Scopes.OpenId,
@@ -121,12 +123,19 @@ builder.Services.ConfigureHttpJsonOptions(opt =>
 // Services
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<ProxyNonceStore>();
+builder.Services.AddSingleton<ExternalLoginNonceStore>();
+builder.Services.AddSingleton<GitHubOAuthStateStore>();
+builder.Services.AddSingleton<GoogleOAuthStateStore>();
+builder.Services.AddSingleton<OidcStateStore>();
 builder.Services.AddTransient<DownloadService>();
 builder.Services.AddSingleton<DownloadTicketService>();
 builder.Services.AddSingleton<EmulationTicketService>();
 builder.Services.AddSingleton<LibraryScanService>();
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddSingleton<IgdbService>();
+builder.Services.AddSingleton<GitHubOAuthService>();
+builder.Services.AddSingleton<GoogleOAuthService>();
+builder.Services.AddSingleton<OidcOAuthService>();
 builder.Services.AddSingleton<CompressionService>();
 builder.Services.AddHostedService<CompressionBackgroundService>();
 builder.Services.AddHttpClient();
@@ -140,10 +149,7 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 
     var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
-    var existingApp = await applicationManager.FindByClientIdAsync("claudio-spa");
-    if (existingApp is not null)
-        await applicationManager.DeleteAsync(existingApp);
-
+    if (await applicationManager.FindByClientIdAsync("claudio-spa") is null)
     {
         var descriptor = new OpenIddictApplicationDescriptor
         {
@@ -154,7 +160,8 @@ using (var scope = app.Services.CreateScope())
         descriptor.AddGrantTypePermissions(
             OpenIddictConstants.GrantTypes.Password,
             OpenIddictConstants.GrantTypes.RefreshToken,
-            ConnectEndpoints.ProxyNonceGrantType);
+            ConnectEndpoints.ProxyNonceGrantType,
+            ConnectEndpoints.ExternalLoginNonceGrantType);
         descriptor.AddScopePermissions(
             OpenIddictConstants.Scopes.OpenId,
             OpenIddictConstants.Scopes.Profile,
@@ -176,12 +183,18 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/images",
 });
 
-app.UseAuthentication();
+if (config.Auth.DisableAuth)
+    app.UseMiddleware<NoAuthMiddleware>();
+else
+    app.UseAuthentication();
 app.UseAuthorization();
 
 // Minimal API endpoints
-app.MapConnectEndpoints();
-app.MapAuthEndpoints();
+if (!config.Auth.DisableAuth)
+{
+    app.MapConnectEndpoints();
+    app.MapAuthEndpoints();
+}
 app.MapGameEndpoints();
 app.MapAdminEndpoints();
 

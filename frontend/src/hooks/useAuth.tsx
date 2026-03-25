@@ -1,5 +1,18 @@
 import { createContext, useContext } from "react";
 
+export interface AuthProviders {
+  providers: AuthProvider[];
+  localLoginEnabled: boolean;
+  userCreationEnabled: boolean;
+}
+
+export interface AuthProvider {
+  slug: string;
+  displayName: string;
+  logoUrl: string | null;
+  startUrl: string;
+}
+
 export interface AuthState {
   user: {
     id: number;
@@ -10,6 +23,7 @@ export interface AuthState {
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
+  completeExternalLogin: (nonce: string) => Promise<void>;
   logout: () => void;
   setToken: (token: string) => void;
   setUser: (user: {
@@ -18,6 +32,8 @@ export interface AuthState {
     role: "user" | "admin";
     createdAt: string;
   }) => void;
+  providers: AuthProviders;
+  authDisabled: boolean;
   isAdmin: boolean;
   isLoggedIn: boolean;
 }

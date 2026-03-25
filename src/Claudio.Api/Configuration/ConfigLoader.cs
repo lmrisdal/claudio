@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Claudio.Shared.Models;
 using Tomlyn;
 
@@ -20,6 +19,12 @@ public static class ConfigLoader
             config = new ClaudioConfig();
         }
 
+        foreach (var provider in config.Auth.OidcProviders)
+        {
+            if (string.IsNullOrWhiteSpace(provider.DiscoveryUrl) && !string.IsNullOrWhiteSpace(provider.Authority))
+                provider.DiscoveryUrl = provider.Authority;
+        }
+
         // Environment variable overrides
         if (Environment.GetEnvironmentVariable("CLAUDIO_LIBRARY_PATHS") is { Length: > 0 } libPaths)
             config.Library.LibraryPaths = libPaths.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -30,8 +35,14 @@ public static class ConfigLoader
         if (Environment.GetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_SECRET") is { Length: > 0 } igdbSecret)
             config.Igdb.ClientSecret = igdbSecret;
 
-        if (Environment.GetEnvironmentVariable("CLAUDIO_JWT_SECRET") is { Length: > 0 } jwtSecret)
-            config.Auth.JwtSecret = jwtSecret;
+        if (Environment.GetEnvironmentVariable("CLAUDIO_DISABLE_AUTH") is { Length: > 0 } disableAuth)
+            config.Auth.DisableAuth = disableAuth.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_DISABLE_LOCAL_LOGIN") is { Length: > 0 } disableLocalLogin)
+            config.Auth.DisableLocalLogin = disableLocalLogin.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_DISABLE_USER_CREATION") is { Length: > 0 } disableUserCreation)
+            config.Auth.DisableUserCreation = disableUserCreation.Equals("true", StringComparison.OrdinalIgnoreCase);
 
         if (Environment.GetEnvironmentVariable("CLAUDIO_DB_PROVIDER") is { Length: > 0 } dbProvider)
             config.Database.Provider = dbProvider;
@@ -51,9 +62,23 @@ public static class ConfigLoader
         if (Environment.GetEnvironmentVariable("CLAUDIO_PROXY_AUTH_AUTO_CREATE") is { Length: > 0 } proxyAutoCreate)
             config.Auth.ProxyAuthAutoCreate = proxyAutoCreate.Equals("true", StringComparison.OrdinalIgnoreCase);
 
-        // Auto-generate JWT secret if not configured
-        if (string.IsNullOrEmpty(config.Auth.JwtSecret))
-            config.Auth.JwtSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        if (Environment.GetEnvironmentVariable("CLAUDIO_GITHUB_CLIENT_ID") is { Length: > 0 } githubClientId)
+            config.Auth.Github.ClientId = githubClientId;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_GITHUB_CLIENT_SECRET") is { Length: > 0 } githubClientSecret)
+            config.Auth.Github.ClientSecret = githubClientSecret;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_GITHUB_REDIRECT_URI") is { Length: > 0 } githubRedirectUri)
+            config.Auth.Github.RedirectUri = githubRedirectUri;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_GOOGLE_CLIENT_ID") is { Length: > 0 } googleClientId)
+            config.Auth.Google.ClientId = googleClientId;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_GOOGLE_CLIENT_SECRET") is { Length: > 0 } googleClientSecret)
+            config.Auth.Google.ClientSecret = googleClientSecret;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_GOOGLE_REDIRECT_URI") is { Length: > 0 } googleRedirectUri)
+            config.Auth.Google.RedirectUri = googleRedirectUri;
 
         return config;
     }

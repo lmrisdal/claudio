@@ -1,0 +1,41 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+
+namespace Claudio.Api.Services;
+
+public class GoogleOAuthStateStore
+{
+    private readonly ConcurrentDictionary<string, (string ReturnTo, DateTimeOffset Expiry)> _states = new();
+    private DateTimeOffset _lastPurge = DateTimeOffset.UtcNow;
+
+    public string CreateState(string returnTo)
+    {
+        PurgeExpired();
+        var state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        _states[state] = (returnTo, DateTimeOffset.UtcNow.AddMinutes(5));
+        return state;
+    }
+
+    public string? ConsumeState(string state)
+    {
+        if (_states.TryRemove(state, out var entry) && DateTimeOffset.UtcNow <= entry.Expiry)
+            return entry.ReturnTo;
+
+        return null;
+    }
+
+    private void PurgeExpired()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastPurge < TimeSpan.FromMinutes(2))
+            return;
+
+        _lastPurge = now;
+        foreach (var kvp in _states)
+        {
+            if (now > kvp.Value.Expiry)
+                _states.TryRemove(kvp.Key, out _);
+        }
+    }
+}

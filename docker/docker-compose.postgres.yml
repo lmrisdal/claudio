@@ -11,7 +11,6 @@ services:
       - CLAUDIO_DB_POSTGRES=Host=db;Database=claudio;Username=claudio;Password=secret
       # - CLAUDIO_IGDB_CLIENT_ID=
       # - CLAUDIO_IGDB_CLIENT_SECRET=
-      # - CLAUDIO_JWT_SECRET=
       # - CLAUDIO_PORT=8080
     depends_on:
       db:

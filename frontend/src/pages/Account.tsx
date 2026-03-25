@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { isSoundsEnabled, setSoundsEnabled } from "../utils/sounds";
 
 export default function Account() {
-  const { user } = useAuth();
+  const { user, providers } = useAuth();
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-8">
@@ -44,8 +44,7 @@ export default function Account() {
       {/* Preferences */}
       <PreferencesSection />
 
-      {/* Change password */}
-      <ChangePasswordForm onSuccess={() => {}} />
+      {providers.localLoginEnabled && <ChangePasswordForm onSuccess={() => {}} />}
     </main>
   );
 }

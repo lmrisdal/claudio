@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace Claudio.Api.Services;
 
-public class ProxyNonceStore
+public class ExternalLoginNonceStore
 {
     private readonly ConcurrentDictionary<string, (int UserId, DateTimeOffset Expiry)> _nonces = new();
     private DateTimeOffset _lastPurge = DateTimeOffset.UtcNow;
@@ -21,6 +21,7 @@ public class ProxyNonceStore
     {
         if (_nonces.TryRemove(nonce, out var entry) && DateTimeOffset.UtcNow <= entry.Expiry)
             return entry.UserId;
+
         return null;
     }
 
