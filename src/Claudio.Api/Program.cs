@@ -203,3 +203,6 @@ app.MapAdminEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+// Make Program accessible to integration tests via WebApplicationFactory<Program>
+public partial class Program;

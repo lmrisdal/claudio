@@ -1,2 +1,1 @@
 @AGENTS.md
-@DESIGN_SKILL.md

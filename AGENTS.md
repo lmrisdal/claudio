@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) and other AI agents 
 
 ## Build & Run Commands
 
-### Backend (.NET 10 Preview)
+### Backend (.NET 10)
 
 ```bash
 dotnet build src/Claudio.Api              # build API
@@ -45,11 +45,11 @@ Monorepo with three .NET projects and a React frontend:
 - **`src/Claudio.Shared`** — Shared DTOs (`GameDto`, `UserDto`, `ClaudioConfig`) and enums (`UserRole`, `InstallType`). Referenced by both API and Desktop.
 - **`src/Claudio.Desktop`** — Future Avalonia UI client (stub).
 - **`frontend/`** — React 19 SPA built with Vite. Output goes to `src/Claudio.Api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
-- **`tests/Claudio.Api.Tests/`** — MSTest project.
+- **`tests/Claudio.Api.Tests/`** — TUnit + AwesomeAssertions test project.
 
 ### Backend structure
 
-Endpoints are in `src/Claudio.Api/Endpoints/` as static classes with extension methods (`MapAuthEndpoints`, `MapGameEndpoints`, `MapAdminEndpoints`). Services are singletons registered in `Program.cs`: `LibraryScanService`, `DownloadService`, `IgdbService`, `TokenService`. Database is EF Core with `AppDbContext` containing `Users` and `Games` tables, supporting SQLite (default) and PostgreSQL.
+Endpoints are in `src/Claudio.Api/Endpoints/` as static classes with extension methods. Services are singletons registered in `Program.cs`. Database is EF Core with `AppDbContext` containing `Users` and `Games` tables, supporting SQLite and PostgreSQL.
 
 ### Configuration
 
@@ -73,3 +73,11 @@ NuGet versions are centralized in `Directory.Packages.props` — add versions th
 - The SPA is served via `UseStaticFiles` + `MapFallbackToFile("index.html")`.
 - Game downloads use streaming with `enableRangeProcessing` for resume support.
 - IGDB integration authenticates via Twitch OAuth (client credentials flow).
+
+## Testing
+
+- **New features must include tests.** Write unit tests for isolated logic (services, stores) and integration tests using `WebApplicationFactory<Program>` for endpoint behavior.
+- **Changes to existing code must run relevant tests** (`dotnet test`). If changes break existing tests, update the tests to match the new behavior — do not delete tests without replacement.
+- Tests use **TUnit** (`[Test]` attribute) and **AwesomeAssertions** (`.Should()` fluent API).
+- Use `[NotInParallel]` for tests that mutate process-global state (e.g. environment variables, shared `WebApplicationFactory` instances).
+- Integration tests use `ClaudioWebApplicationFactory` (in the test project) which provides an isolated SQLite DB and test config per factory instance.

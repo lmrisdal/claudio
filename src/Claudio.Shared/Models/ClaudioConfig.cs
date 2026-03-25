@@ -97,4 +97,5 @@ public class SteamGridDbConfig
 public class LibraryConfig
 {
     public string[] LibraryPaths { get; set; } = ["/games"];
+    public string[] ExcludePlatforms { get; set; } = [];
 }

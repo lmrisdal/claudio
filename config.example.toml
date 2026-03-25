@@ -45,3 +45,4 @@ api_key = ""
 
 [library]
 library_paths = ["/games"]
+exclude_platforms = []                  # Platform folders to skip during scan, e.g. ["ps", "ngc", "gba"]

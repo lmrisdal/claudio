@@ -29,6 +29,9 @@ public static class ConfigLoader
         if (Environment.GetEnvironmentVariable("CLAUDIO_LIBRARY_PATHS") is { Length: > 0 } libPaths)
             config.Library.LibraryPaths = libPaths.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+        if (Environment.GetEnvironmentVariable("CLAUDIO_EXCLUDE_PLATFORMS") is { Length: > 0 } excludePlatforms)
+            config.Library.ExcludePlatforms = excludePlatforms.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
         if (Environment.GetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_ID") is { Length: > 0 } igdbId)
             config.Igdb.ClientId = igdbId;
 

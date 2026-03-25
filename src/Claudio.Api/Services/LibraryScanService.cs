@@ -41,6 +41,8 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
                 var platform = Path.GetFileName(platformDir);
                 if (Endpoints.GameEndpoints.HiddenNames.Contains(platform))
                     continue;
+                if (config.Library.ExcludePlatforms.Contains(platform, StringComparer.OrdinalIgnoreCase))
+                    continue;
 
                 // Scan subdirectories (folder-based games)
                 foreach (var gameDir in Directory.GetDirectories(platformDir))
