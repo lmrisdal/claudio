@@ -120,7 +120,7 @@ export default function Login() {
                   href={provider.startUrl}
                   onClick={() => setProviderLoading(provider.displayName)}
                   aria-disabled={providerLoading !== null}
-                  className={`${providers.localLoginEnabled ? "mt-3 " : ""}flex min-h-11 w-full items-center justify-center rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm font-semibold text-text-primary transition hover:border-accent/40 hover:bg-surface disabled:opacity-50`}
+                  className={`${providers.localLoginEnabled ? "mt-3 " : ""}flex not-last:mb-3 min-h-11 w-full items-center justify-center rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm font-semibold text-text-primary transition hover:border-accent/40 hover:bg-surface disabled:opacity-50`}
                 >
                   {provider.logoUrl ? (
                     <img
