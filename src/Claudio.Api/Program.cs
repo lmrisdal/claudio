@@ -122,6 +122,7 @@ builder.Services.ConfigureHttpJsonOptions(opt =>
 
 // Services
 builder.Services.AddSingleton(config);
+builder.Services.AddSingleton(new ConfigFileService(configPath, config));
 builder.Services.AddSingleton<ProxyNonceStore>();
 builder.Services.AddSingleton<ExternalLoginNonceStore>();
 builder.Services.AddSingleton<GitHubOAuthStateStore>();

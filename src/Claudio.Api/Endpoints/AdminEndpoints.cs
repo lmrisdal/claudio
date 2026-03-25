@@ -40,6 +40,8 @@ public static class AdminEndpoints
         group.MapGet("/steamgriddb/{sgdbGameId:long}/covers", GetSteamGridDbCovers);
         group.MapGet("/steamgriddb/{sgdbGameId:long}/heroes", GetSteamGridDbHeroes);
         group.MapPost("/games/{id:int}/upload-image", UploadImage).DisableAntiforgery();
+        group.MapGet("/config", GetConfig);
+        group.MapPut("/config", UpdateConfig);
 
         return group;
     }
@@ -472,5 +474,48 @@ public static class AdminEndpoints
         return Results.Ok(new { removed = missing.Count });
     }
 
+    private static IResult GetConfig(ClaudioConfig config) =>
+        Results.Ok(new ConfigResponse(
+            new ConfigResponse.IgdbConfigDto(
+                config.Igdb.ClientId,
+                MaskSecret(config.Igdb.ClientSecret)),
+            new ConfigResponse.SteamGridDbConfigDto(
+                MaskSecret(config.Steamgriddb.ApiKey))));
+
+    private static IResult UpdateConfig(
+        ConfigUpdateRequest request,
+        ClaudioConfig config,
+        ConfigFileService configFileService)
+    {
+        configFileService.UpdateApiCredentials(
+            request.Igdb?.ClientId,
+            request.Igdb?.ClientSecret,
+            request.Steamgriddb?.ApiKey);
+
+        return Results.Ok(new ConfigResponse(
+            new ConfigResponse.IgdbConfigDto(
+                config.Igdb.ClientId,
+                MaskSecret(config.Igdb.ClientSecret)),
+            new ConfigResponse.SteamGridDbConfigDto(
+                MaskSecret(config.Steamgriddb.ApiKey))));
+    }
+
+    private static string MaskSecret(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+        if (value.Length <= 6) return "••••••";
+        return value[..3] + "••••••" + value[^3..];
+    }
+
     public record RoleUpdateRequest(string Role);
+    public record ConfigResponse(ConfigResponse.IgdbConfigDto Igdb, ConfigResponse.SteamGridDbConfigDto Steamgriddb)
+    {
+        public record IgdbConfigDto(string ClientId, string ClientSecret);
+        public record SteamGridDbConfigDto(string ApiKey);
+    }
+    public record ConfigUpdateRequest(ConfigUpdateRequest.IgdbUpdate? Igdb, ConfigUpdateRequest.SteamGridDbUpdate? Steamgriddb)
+    {
+        public record IgdbUpdate(string? ClientId, string? ClientSecret);
+        public record SteamGridDbUpdate(string? ApiKey);
+    }
 }
