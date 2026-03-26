@@ -66,6 +66,11 @@ TOML config loaded from `CLAUDIO_CONFIG_PATH` env var or `/config/config.toml`. 
 
 NuGet versions are centralized in `Directory.Packages.props` — add versions there, not in individual `.csproj` files.
 
+## Git Conventions
+
+- All changes must be made in a feature branch, never directly on `main`.
+- Feature branches must use the `feature/` prefix (e.g. `feature/normalize-pc-to-win-platform`).
+
 ## Key Conventions
 
 - **Minimal APIs only** — never use MVC controllers.
