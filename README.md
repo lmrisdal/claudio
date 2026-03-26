@@ -80,6 +80,14 @@ volumes:
 | `CLAUDIO_GOOGLE_CLIENT_ID` | Google OAuth client ID | |
 | `CLAUDIO_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | |
 | `CLAUDIO_GOOGLE_REDIRECT_URI` | Google OAuth callback URL | |
+| `CLAUDIO_OIDC_SLUG` | OIDC provider identifier (used in callback URLs) | |
+| `CLAUDIO_OIDC_DISPLAY_NAME` | OIDC provider button label | |
+| `CLAUDIO_OIDC_LOGO_URL` | OIDC provider button image | |
+| `CLAUDIO_OIDC_DISCOVERY_URL` | OIDC discovery document URL | |
+| `CLAUDIO_OIDC_CLIENT_ID` | OIDC client ID | |
+| `CLAUDIO_OIDC_CLIENT_SECRET` | OIDC client secret | |
+| `CLAUDIO_OIDC_REDIRECT_URI` | OIDC callback URL | |
+| `CLAUDIO_OIDC_SCOPE` | OIDC scopes | `openid profile email` |
 
 Alternatively, create a `config.toml` file — see [config.example.toml](config.example.toml) for the schema.
 
@@ -113,14 +121,26 @@ Notes:
 - Set `CLAUDIO_DISABLE_LOCAL_LOGIN=true` to require external providers only.
 - Set `CLAUDIO_DISABLE_USER_CREATION=true` to block new account creation. Existing users can still sign in, but first-time registration and first-time external sign-in will be rejected.
 
-### Custom OIDC Providers
+### Custom OIDC Provider
 
-Claudio also supports custom OpenID Connect providers through `config.toml`. This is intended for self-hosted identity systems such as Authentik, Authelia, and Pocket ID.
+Claudio supports a custom OpenID Connect provider for self-hosted identity systems such as Authentik, Authelia, and Pocket ID.
 
-Each provider is defined as an `[[auth.oidc_providers]]` block:
+Configure via environment variables:
+
+```bash
+CLAUDIO_OIDC_SLUG=authentik
+CLAUDIO_OIDC_DISPLAY_NAME=Authentik
+CLAUDIO_OIDC_LOGO_URL=https://auth.example.com/static/dist/assets/icons/icon.png
+CLAUDIO_OIDC_DISCOVERY_URL=https://auth.example.com/application/o/claudio/.well-known/openid-configuration
+CLAUDIO_OIDC_CLIENT_ID=your_oidc_client_id
+CLAUDIO_OIDC_CLIENT_SECRET=your_oidc_client_secret
+CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/authentik/callback
+```
+
+Or via `config.toml`:
 
 ```toml
-[[auth.oidc_providers]]
+[auth.oidc_provider]
 slug = "authentik"
 display_name = "Authentik"
 logo_url = "https://auth.example.com/static/dist/assets/icons/icon.png"
@@ -145,16 +165,9 @@ Provider fields:
 
 If your provider uses the standard OIDC claim names, you can omit `scope` and the claim mapping fields entirely. Only set them when your provider needs non-default values.
 
-Examples:
-
-- Authentik: `discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"`
-- Authelia: `discovery_url = "https://auth.example.com/.well-known/openid-configuration"`
-- Pocket ID: use Pocket ID's full `/.well-known/openid-configuration` URL as `discovery_url`
-
 Notes:
 
-- Custom OIDC providers are currently configured through `config.toml`, not environment variables.
-- The login UI renders every configured provider and uses `logo_url` when present.
+- The login UI shows the OIDC provider button and uses `logo_url` when present.
 - Existing users are linked by verified email when a matching OIDC login succeeds.
 - If discovery returns HTML instead of JSON, the configured `discovery_url` is probably pointing at a login page or app URL rather than the actual discovery document.
 

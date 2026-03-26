@@ -36,7 +36,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', slug: 'authentication/overview' },
 						{ label: 'OAuth Providers', slug: 'authentication/oauth-providers' },
-						{ label: 'Custom OIDC', slug: 'authentication/custom-oidc' },
+						{ label: 'Custom OIDC Provider', slug: 'authentication/custom-oidc' },
 						{ label: 'Proxy Authentication', slug: 'authentication/proxy-auth' },
 					],
 				},

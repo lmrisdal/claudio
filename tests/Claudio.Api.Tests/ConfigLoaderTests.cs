@@ -177,7 +177,7 @@ public class ConfigLoaderTests
         try
         {
             File.WriteAllText(path, """
-                [[auth.oidc_providers]]
+                [auth.oidc_provider]
                 slug = "test"
                 display_name = "Test"
                 authority = "https://auth.example.com"
@@ -188,12 +188,45 @@ public class ConfigLoaderTests
 
             var config = ConfigLoader.Load(path);
 
-            config.Auth.OidcProviders.Should().ContainSingle();
-            config.Auth.OidcProviders[0].DiscoveryUrl.Should().Be("https://auth.example.com");
+            config.Auth.OidcProvider.DiscoveryUrl.Should().Be("https://auth.example.com");
+            config.Auth.OidcProvider.Slug.Should().Be("test");
         }
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Test]
+    [NotInParallel(nameof(EnvironmentVariables))]
+    public void Load_EnvVarOverridesOidcProvider()
+    {
+        Environment.SetEnvironmentVariable("CLAUDIO_OIDC_SLUG", "authentik");
+        Environment.SetEnvironmentVariable("CLAUDIO_OIDC_DISPLAY_NAME", "Authentik");
+        Environment.SetEnvironmentVariable("CLAUDIO_OIDC_DISCOVERY_URL", "https://auth.example.com/.well-known/openid-configuration");
+        Environment.SetEnvironmentVariable("CLAUDIO_OIDC_CLIENT_ID", "my-id");
+        Environment.SetEnvironmentVariable("CLAUDIO_OIDC_CLIENT_SECRET", "my-secret");
+        Environment.SetEnvironmentVariable("CLAUDIO_OIDC_REDIRECT_URI", "https://app/callback");
+        try
+        {
+            var config = ConfigLoader.Load("/nonexistent.toml");
+
+            config.Auth.OidcProvider.Slug.Should().Be("authentik");
+            config.Auth.OidcProvider.DisplayName.Should().Be("Authentik");
+            config.Auth.OidcProvider.DiscoveryUrl.Should().Be("https://auth.example.com/.well-known/openid-configuration");
+            config.Auth.OidcProvider.ClientId.Should().Be("my-id");
+            config.Auth.OidcProvider.ClientSecret.Should().Be("my-secret");
+            config.Auth.OidcProvider.RedirectUri.Should().Be("https://app/callback");
+            config.Auth.OidcProvider.IsConfigured.Should().BeTrue();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CLAUDIO_OIDC_SLUG", null);
+            Environment.SetEnvironmentVariable("CLAUDIO_OIDC_DISPLAY_NAME", null);
+            Environment.SetEnvironmentVariable("CLAUDIO_OIDC_DISCOVERY_URL", null);
+            Environment.SetEnvironmentVariable("CLAUDIO_OIDC_CLIENT_ID", null);
+            Environment.SetEnvironmentVariable("CLAUDIO_OIDC_CLIENT_SECRET", null);
+            Environment.SetEnvironmentVariable("CLAUDIO_OIDC_REDIRECT_URI", null);
         }
     }
 }

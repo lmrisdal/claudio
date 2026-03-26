@@ -1,16 +1,26 @@
 ---
-title: Custom OIDC Providers
-description: Configure custom OpenID Connect providers for Claudio.
+title: Custom OIDC Provider
+description: Configure a custom OpenID Connect provider for Claudio.
 ---
 
-Claudio supports custom OpenID Connect providers through `config.toml`. This is intended for self-hosted identity systems such as Authentik, Authelia, and Pocket ID.
+Claudio supports a custom OpenID Connect provider for self-hosted identity systems such as Authentik, Authelia, and Pocket ID.
 
-## Configuration
+## Environment Variables
 
-Each provider is defined as an `[[auth.oidc_providers]]` block:
+```bash
+CLAUDIO_OIDC_SLUG=authentik
+CLAUDIO_OIDC_DISPLAY_NAME=Authentik
+CLAUDIO_OIDC_LOGO_URL=https://auth.example.com/static/dist/assets/icons/icon.png
+CLAUDIO_OIDC_DISCOVERY_URL=https://auth.example.com/application/o/claudio/.well-known/openid-configuration
+CLAUDIO_OIDC_CLIENT_ID=your_oidc_client_id
+CLAUDIO_OIDC_CLIENT_SECRET=your_oidc_client_secret
+CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/authentik/callback
+```
+
+## Config File
 
 ```toml
-[[auth.oidc_providers]]
+[auth.oidc_provider]
 slug = "authentik"
 display_name = "Authentik"
 logo_url = "https://auth.example.com/static/dist/assets/icons/icon.png"
@@ -43,43 +53,36 @@ If your provider uses standard OIDC claim names, you can omit `scope` and the cl
 
 ### Authentik
 
-```toml
-[[auth.oidc_providers]]
-slug = "authentik"
-display_name = "Authentik"
-discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"
-client_id = "your_client_id"
-client_secret = "your_client_secret"
-redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
+```bash
+CLAUDIO_OIDC_SLUG=authentik
+CLAUDIO_OIDC_DISPLAY_NAME=Authentik
+CLAUDIO_OIDC_DISCOVERY_URL=https://auth.example.com/application/o/claudio/.well-known/openid-configuration
+CLAUDIO_OIDC_CLIENT_ID=your_client_id
+CLAUDIO_OIDC_CLIENT_SECRET=your_client_secret
+CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/authentik/callback
 ```
 
 ### Authelia
 
-```toml
-[[auth.oidc_providers]]
-slug = "authelia"
-display_name = "Authelia"
-discovery_url = "https://auth.example.com/.well-known/openid-configuration"
-client_id = "your_client_id"
-client_secret = "your_client_secret"
-redirect_uri = "https://claudio.example.com/api/auth/oidc/authelia/callback"
+```bash
+CLAUDIO_OIDC_SLUG=authelia
+CLAUDIO_OIDC_DISPLAY_NAME=Authelia
+CLAUDIO_OIDC_DISCOVERY_URL=https://auth.example.com/.well-known/openid-configuration
+CLAUDIO_OIDC_CLIENT_ID=your_client_id
+CLAUDIO_OIDC_CLIENT_SECRET=your_client_secret
+CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/authelia/callback
 ```
 
 ### Pocket ID
 
-```toml
-[[auth.oidc_providers]]
-slug = "pocketid"
-display_name = "Pocket ID"
-discovery_url = "https://pocketid.example.com/.well-known/openid-configuration"
-client_id = "your_client_id"
-client_secret = "your_client_secret"
-redirect_uri = "https://claudio.example.com/api/auth/oidc/pocketid/callback"
+```bash
+CLAUDIO_OIDC_SLUG=pocketid
+CLAUDIO_OIDC_DISPLAY_NAME="Pocket ID"
+CLAUDIO_OIDC_DISCOVERY_URL=https://pocketid.example.com/.well-known/openid-configuration
+CLAUDIO_OIDC_CLIENT_ID=your_client_id
+CLAUDIO_OIDC_CLIENT_SECRET=your_client_secret
+CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/pocketid/callback
 ```
-
-:::note
-Custom OIDC providers can only be configured through `config.toml`, not environment variables.
-:::
 
 :::caution
 If discovery returns HTML instead of JSON, the `discovery_url` is probably pointing at a login page rather than the actual discovery document.

@@ -19,11 +19,9 @@ public static class ConfigLoader
             config = new ClaudioConfig();
         }
 
-        foreach (var provider in config.Auth.OidcProviders)
-        {
-            if (string.IsNullOrWhiteSpace(provider.DiscoveryUrl) && !string.IsNullOrWhiteSpace(provider.Authority))
-                provider.DiscoveryUrl = provider.Authority;
-        }
+        var oidc = config.Auth.OidcProvider;
+        if (string.IsNullOrWhiteSpace(oidc.DiscoveryUrl) && !string.IsNullOrWhiteSpace(oidc.Authority))
+            oidc.DiscoveryUrl = oidc.Authority;
 
         // Environment variable overrides
         if (Environment.GetEnvironmentVariable("CLAUDIO_LIBRARY_PATHS") is { Length: > 0 } libPaths)
@@ -82,6 +80,30 @@ public static class ConfigLoader
 
         if (Environment.GetEnvironmentVariable("CLAUDIO_GOOGLE_REDIRECT_URI") is { Length: > 0 } googleRedirectUri)
             config.Auth.Google.RedirectUri = googleRedirectUri;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_SLUG") is { Length: > 0 } oidcSlug)
+            config.Auth.OidcProvider.Slug = oidcSlug;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_DISPLAY_NAME") is { Length: > 0 } oidcDisplayName)
+            config.Auth.OidcProvider.DisplayName = oidcDisplayName;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_LOGO_URL") is { Length: > 0 } oidcLogoUrl)
+            config.Auth.OidcProvider.LogoUrl = oidcLogoUrl;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_DISCOVERY_URL") is { Length: > 0 } oidcDiscoveryUrl)
+            config.Auth.OidcProvider.DiscoveryUrl = oidcDiscoveryUrl;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_CLIENT_ID") is { Length: > 0 } oidcClientId)
+            config.Auth.OidcProvider.ClientId = oidcClientId;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_CLIENT_SECRET") is { Length: > 0 } oidcClientSecret)
+            config.Auth.OidcProvider.ClientSecret = oidcClientSecret;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_REDIRECT_URI") is { Length: > 0 } oidcRedirectUri)
+            config.Auth.OidcProvider.RedirectUri = oidcRedirectUri;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_OIDC_SCOPE") is { Length: > 0 } oidcScope)
+            config.Auth.OidcProvider.Scope = oidcScope;
 
         return config;
     }

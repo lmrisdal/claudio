@@ -566,22 +566,26 @@ public static class AuthEndpoints
                 "/api/auth/google/start?returnTo=/auth/callback"));
         }
 
-        foreach (var provider in config.Auth.OidcProviders.Where(x => x.IsConfigured))
+        var oidc = config.Auth.OidcProvider;
+        if (oidc.IsConfigured)
         {
             providers.Add(new AuthProviderItem(
-                provider.Slug,
-                provider.DisplayName,
-                provider.LogoUrl,
-                $"/api/auth/oidc/{Uri.EscapeDataString(provider.Slug)}/start?returnTo=/auth/callback"));
+                oidc.Slug,
+                oidc.DisplayName,
+                oidc.LogoUrl,
+                $"/api/auth/oidc/{Uri.EscapeDataString(oidc.Slug)}/start?returnTo=/auth/callback"));
         }
 
         return providers;
     }
 
-    private static OidcProviderConfig? FindOidcProvider(ClaudioConfig config, string providerSlug) =>
-        config.Auth.OidcProviders.FirstOrDefault(x =>
-            x.IsConfigured &&
-            string.Equals(x.Slug, providerSlug, StringComparison.OrdinalIgnoreCase));
+    private static OidcProviderConfig? FindOidcProvider(ClaudioConfig config, string providerSlug)
+    {
+        var oidc = config.Auth.OidcProvider;
+        return oidc.IsConfigured && string.Equals(oidc.Slug, providerSlug, StringComparison.OrdinalIgnoreCase)
+            ? oidc
+            : null;
+    }
 
     private static async Task<string> GenerateUniqueUsernameAsync(string baseName, UserManager<ApplicationUser> userManager)
     {

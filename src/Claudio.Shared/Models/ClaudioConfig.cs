@@ -31,7 +31,7 @@ public class AuthConfig
     public bool ProxyAuthAutoCreate { get; set; } = false;
     public GitHubOAuthConfig Github { get; set; } = new();
     public GoogleOAuthConfig Google { get; set; } = new();
-    public List<OidcProviderConfig> OidcProviders { get; set; } = [];
+    public OidcProviderConfig OidcProvider { get; set; } = new();
 }
 
 public class GitHubOAuthConfig
