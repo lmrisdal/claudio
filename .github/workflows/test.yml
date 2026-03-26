@@ -20,11 +20,12 @@ jobs:
       - run: dotnet build --no-restore
 
       - name: Run tests with coverage
-        run: >
-          dotnet run --project tests/Claudio.Api.Tests --no-build
-          --coverage
-          --coverage-output ${{ github.workspace }}/TestResults/
-          --coverage-output-format cobertura
+        run: |
+          mkdir -p ${{ github.workspace }}/TestResults
+          dotnet run --project tests/Claudio.Api.Tests --no-build \
+            --coverage \
+            --coverage-output ${{ github.workspace }}/TestResults/ \
+            --coverage-output-format cobertura
 
       - name: Generate coverage report
         if: always()
