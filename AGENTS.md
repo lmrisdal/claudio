@@ -69,6 +69,7 @@ NuGet versions are centralized in `Directory.Packages.props` — add versions th
 ## Git Conventions
 
 - All changes must be made in a feature branch, never directly on `main`.
+- Make sure to pull the latest `main` and rebase your branch before pushing.
 - Feature branches must use the `feature/` prefix (e.g. `feature/normalize-pc-to-win-platform`).
 
 ## Key Conventions
