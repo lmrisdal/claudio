@@ -21,7 +21,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          dotnet run --project tests/Claudio.Api.Tests --no-build \
+          dotnet run --project tests/Claudio.Api.Tests --no-build -- \
             --coverage \
             --coverage-output $RUNNER_TEMP/TestResults/ \
             --coverage-output-format cobertura
