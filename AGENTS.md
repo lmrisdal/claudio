@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) and other AI agents 
 ### Backend (.NET 10)
 
 ```bash
-dotnet build src/Claudio.Api              # build API
-dotnet run --project src/Claudio.Api      # run API (serves on port 5118)
-dotnet test                               # run all tests
-dotnet test tests/Claudio.Api.Tests       # run API tests only
+dotnet build src/Claudio.Api                        # build API
+dotnet run --project src/Claudio.Api                # run API (serves on port 5118)
+dotnet test                                         # run all tests
+dotnet test --project tests/Claudio.Api.Tests       # run API tests only
 ```
 
 ### Frontend (React + Vite)

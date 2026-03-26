@@ -38,7 +38,7 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
 
             foreach (var platformDir in Directory.GetDirectories(scanPath))
             {
-                var platform = Path.GetFileName(platformDir);
+                var platform = NormalizePlatform(Path.GetFileName(platformDir));
                 if (Endpoints.GameEndpoints.HiddenNames.Contains(platform))
                     continue;
                 if (config.Library.ExcludePlatforms.Contains(platform, StringComparer.OrdinalIgnoreCase))
@@ -202,6 +202,9 @@ public class LibraryScanService(IServiceScopeFactory scopeFactory, ClaudioConfig
             logger.LogWarning(ex, "Failed to clean up temp files in {Dir}", gameDir);
         }
     }
+
+    private static string NormalizePlatform(string folderName) =>
+        string.Equals(folderName, "pc", StringComparison.OrdinalIgnoreCase) ? "win" : folderName;
 
     private static InstallType DetectInstallType(string directory)
     {

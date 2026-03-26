@@ -81,7 +81,7 @@ public class LibraryScanServiceTests : IDisposable
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var games = await db.Games.ToListAsync();
         games.Should().HaveCount(3);
-        games.Select(g => g.Platform).Distinct().Should().BeEquivalentTo(["pc", "ps2"]);
+        games.Select(g => g.Platform).Distinct().Should().BeEquivalentTo(["win", "ps2"]);
     }
 
     [Test]
@@ -102,7 +102,7 @@ public class LibraryScanServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var games = await db.Games.ToListAsync();
-        games.Should().ContainSingle().Which.Platform.Should().Be("pc");
+        games.Should().ContainSingle().Which.Platform.Should().Be("win");
     }
 
     [Test]
@@ -121,7 +121,7 @@ public class LibraryScanServiceTests : IDisposable
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var games = await db.Games.ToListAsync();
-        games.Should().ContainSingle().Which.Platform.Should().Be("pc");
+        games.Should().ContainSingle().Which.Platform.Should().Be("win");
     }
 
     [Test]
@@ -237,6 +237,41 @@ public class LibraryScanServiceTests : IDisposable
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var pokemon = await db.Games.FirstAsync(g => g.Title == "Pokemon");
         pokemon.IsMissing.Should().BeTrue();
+    }
+
+    [Test]
+    public async Task Scan_PcFolderNormalizesToWin()
+    {
+        CreatePlatformWithGames("pc", "Doom");
+
+        var service = CreateService();
+        var result = await service.ScanAsync();
+
+        result.GamesFound.Should().Be(1);
+
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var game = await db.Games.FirstAsync();
+        game.Platform.Should().Be("win");
+    }
+
+    [Test]
+    public async Task Scan_MergesPcAndWinFolders()
+    {
+        CreatePlatformWithGames("pc", "Doom");
+        CreatePlatformWithGames("win", "Quake");
+
+        var service = CreateService();
+        var result = await service.ScanAsync();
+
+        result.GamesFound.Should().Be(2);
+        result.GamesAdded.Should().Be(2);
+
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var games = await db.Games.ToListAsync();
+        games.Should().HaveCount(2);
+        games.Should().AllSatisfy(g => g.Platform.Should().Be("win"));
     }
 
     public void Dispose()

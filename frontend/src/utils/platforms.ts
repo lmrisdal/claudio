@@ -1,5 +1,5 @@
 const platformNames: Record<string, string> = {
-  pc: 'PC',
+  win: 'PC',
   mac: 'Mac',
   linux: 'Linux',
   switch2: 'Switch 2',
