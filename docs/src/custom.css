@@ -1,3 +1,6 @@
+/* Load fonts */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
 /* Match Claudio frontend design tokens */
 
 /* Dark mode (default) */
@@ -9,8 +12,8 @@
 	--sl-color-black: #0a0a0f;
 
 	--sl-color-bg: #0a0a0f;
-	--sl-color-bg-nav: #111118;
-	--sl-color-bg-sidebar: #111118;
+	--sl-color-bg-nav: rgba(10, 10, 15, 0.8);
+	--sl-color-bg-sidebar: transparent;
 	--sl-color-bg-inline-code: #1a1a24;
 
 	--sl-color-text: #e5e5e5;
@@ -42,8 +45,8 @@
 	--sl-color-black: #f8f8fa;
 
 	--sl-color-bg: #f8f8fa;
-	--sl-color-bg-nav: #ffffff;
-	--sl-color-bg-sidebar: #ffffff;
+	--sl-color-bg-nav: rgba(248, 248, 250, 0.85);
+	--sl-color-bg-sidebar: transparent;
 	--sl-color-bg-inline-code: #f0f0f3;
 
 	--sl-color-text: #1a1a2e;
@@ -69,9 +72,6 @@
 	--sl-color-hairline-shade: #e8e8ec;
 }
 
-/* Load fonts */
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:wght@400;500&display=swap");
-
 /* Background grid */
 body {
 	background-image:
@@ -80,14 +80,24 @@ body {
 	background-size: 28px 28px;
 }
 
+/* Frosted glass navbar */
+.header {
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+}
+
 /* Rounded corners to match frontend (rounded-lg = 0.5rem, rounded-xl = 0.75rem) */
 :root {
 	--sl-search-corners: 0.75rem;
 }
 
 /* Code blocks */
-pre {
+.expressive-code figure.frame {
 	border-radius: 0.75rem !important;
+	overflow: hidden;
+}
+.expressive-code figure.frame > figcaption.header {
+	border-radius: 0.75rem 0.75rem 0 0 !important;
 }
 
 /* Cards & link cards */

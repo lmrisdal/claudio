@@ -37,6 +37,7 @@ Open http://localhost:8080 and register your first user (automatically gets admi
 services:
   claudio:
     image: ghcr.io/lmrisdal/claudio:latest
+    container_name: claudio
     ports:
       - "8080:8080"  # host:container
     volumes:
