@@ -23,8 +23,9 @@ A self-hosted game library manager for organizing, browsing, and downloading you
 ```bash
 docker run -d \
   --name claudio \
+  --user 1000:1000 \
   -p 8080:8080 \
-  -v /path/to/games:/games:ro \
+  -v /path/to/games:/games \
   -v claudio-data:/config \
   ghcr.io/lmrisdal/claudio:latest
 ```
@@ -38,11 +39,12 @@ services:
   claudio:
     image: ghcr.io/lmrisdal/claudio:latest
     container_name: claudio
+    user: "1000:1000"
     ports:
       - "8080:8080"  # host:container
     volumes:
       - claudio-data:/config
-      - /path/to/games:/games:ro
+      - /path/to/games:/games
     environment:
       - CLAUDIO_IGDB_CLIENT_ID=your_client_id
       - CLAUDIO_IGDB_CLIENT_SECRET=your_client_secret
