@@ -47,7 +47,7 @@ export default function GameCard({ game }: { game: Game }) {
       <p className="text-xs text-text-muted mt-0.5">
         {formatPlatform(game.platform)}
         {game.releaseYear ? ` · ${game.releaseYear}` : ""}
-        {["pc", "mac", "linux"].includes(game.platform.toLowerCase()) &&
+        {["win", "mac", "linux"].includes(game.platform.toLowerCase()) &&
           ` · ${game.installType === "installer" ? "Installer" : "Portable"}`}
       </p>
     </Link>

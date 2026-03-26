@@ -162,7 +162,7 @@ function CompressionProgress({ gameId }: { gameId: number }) {
   );
 }
 
-const pcPlatforms = new Set(["pc", "mac", "linux"]);
+const pcPlatforms = new Set(["win", "mac", "linux"]);
 function isPcPlatform(platform: string) {
   return pcPlatforms.has(platform.toLowerCase());
 }
@@ -380,7 +380,6 @@ export default function GameDetail() {
         : await api.post<IgdbCandidate[]>(`/admin/games/${id}/igdb/search`);
 
       let gamePlatformSlug = game?.platform;
-      if (gamePlatformSlug === "pc") gamePlatformSlug = "win"; // IGDB uses "win" slug for PC games
 
       if (results.length === 0) {
         setSearchError("No results found on IGDB.");
