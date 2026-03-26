@@ -2,6 +2,7 @@ services:
   claudio:
     image: ghcr.io/lmrisdal/claudio:latest
     container_name: claudio
+    user: "1000:1000"
     ports:
       - "8080:8080"
     volumes:
