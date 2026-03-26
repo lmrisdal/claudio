@@ -21,10 +21,9 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          dotnet run --project tests/Claudio.Api.Tests --no-build -- \
-            --coverage \
-            --coverage-output $RUNNER_TEMP/TestResults/ \
-            --coverage-output-format cobertura
+          dotnet test tests/Claudio.Api.Tests --no-build \
+            --results-directory $RUNNER_TEMP/TestResults \
+            -- --coverage --coverage-output-format cobertura
 
       - name: Generate coverage report
         if: always()
