@@ -1,0 +1,102 @@
+---
+title: Claudio
+description: A self-hosted game library manager.
+template: splash
+hero:
+  title: Claudio Docs
+  tagline: A self-hosted game library manager for organizing, browsing, and downloading your game collection.
+  actions:
+    - text: Get Started
+      link: /claudio/getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/lmrisdal/claudio
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
+
+## Features
+
+<CardGrid>
+  <Card title="Library Management" icon="open-book">
+    Automatically scans your game directories and organizes them by platform.
+    Supports PC, Mac, Linux, Switch, PlayStation, Xbox, and more.
+  </Card>
+  <Card title="Rich Metadata" icon="star">
+    Auto-matches games against IGDB for covers, summaries, genres, developers,
+    and release dates. SteamGridDB integration for additional cover art.
+  </Card>
+  <Card title="File Browsing & Downloads" icon="document">
+    Browse game folder contents in the browser — including inside zip and tar
+    archives. Download games with resume support.
+  </Card>
+  <Card title="Flexible Authentication" icon="setting">
+    Local accounts, GitHub, Google, any OpenID Connect provider, or
+    reverse-proxy SSO. Your choice.
+  </Card>
+</CardGrid>
+
+## Quick Start
+
+<Steps>
+1. **Run the container**
+
+   ```bash
+   docker run -d \
+     --name claudio \
+     -p 8080:8080 \
+     -v /path/to/games:/games:ro \
+     -v claudio-data:/config \
+     ghcr.io/lmrisdal/claudio:latest
+   ```
+
+2. **Open the UI**
+
+   Navigate to `http://localhost:8080` and register your first user — they automatically become admin.
+
+3. **Organize your games**
+
+   Structure your library by platform:
+
+   ```
+   /games/
+     pc/
+       Hades II (2025)/
+       Celeste (2018)/
+     switch/
+       The Legend of Zelda Breath of the Wild (2017)/
+   ```
+
+4. **Add metadata** _(optional)_
+
+   Set `CLAUDIO_IGDB_CLIENT_ID` and `CLAUDIO_IGDB_CLIENT_SECRET` to pull covers, summaries, and more from IGDB automatically.
+
+</Steps>
+
+## Learn More
+
+<CardGrid>
+  <LinkCard
+    title="Installation"
+    href="/claudio/getting-started/installation/"
+    description="Docker and Docker Compose setup, including PostgreSQL."
+  />
+  <LinkCard
+    title="Configuration"
+    href="/claudio/configuration/environment-variables/"
+    description="All environment variables and config file options."
+  />
+  <LinkCard
+    title="Authentication"
+    href="/claudio/authentication/overview/"
+    description="Local accounts, OAuth, OIDC, and proxy auth."
+  />
+  <LinkCard
+    title="Development"
+    href="/claudio/development/setup/"
+    description="Set up a local dev environment and learn the architecture."
+  />
+</CardGrid>

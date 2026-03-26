@@ -1,0 +1,86 @@
+---
+title: Custom OIDC Providers
+description: Configure custom OpenID Connect providers for Claudio.
+---
+
+Claudio supports custom OpenID Connect providers through `config.toml`. This is intended for self-hosted identity systems such as Authentik, Authelia, and Pocket ID.
+
+## Configuration
+
+Each provider is defined as an `[[auth.oidc_providers]]` block:
+
+```toml
+[[auth.oidc_providers]]
+slug = "authentik"
+display_name = "Authentik"
+logo_url = "https://auth.example.com/static/dist/assets/icons/icon.png"
+discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"
+client_id = "your_oidc_client_id"
+client_secret = "your_oidc_client_secret"
+redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
+```
+
+## Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `slug` | Yes | Stable provider identifier used in callback URLs |
+| `display_name` | Yes | Button label shown in the login UI |
+| `logo_url` | No | Image shown beside the provider button |
+| `discovery_url` | Yes | Full OIDC discovery document URL (must end in `/.well-known/openid-configuration`) |
+| `client_id` | Yes | OAuth client ID |
+| `client_secret` | Yes | OAuth client secret |
+| `redirect_uri` | Yes | Must match the provider-side callback exactly |
+| `scope` | No | Defaults to `openid profile email` |
+| `user_id_claim` | No | Defaults to `sub` |
+| `username_claim` | No | Defaults to `preferred_username` |
+| `name_claim` | No | Defaults to `name` |
+| `email_claim` | No | Defaults to `email` |
+
+If your provider uses standard OIDC claim names, you can omit `scope` and the claim mapping fields.
+
+## Provider Examples
+
+### Authentik
+
+```toml
+[[auth.oidc_providers]]
+slug = "authentik"
+display_name = "Authentik"
+discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"
+client_id = "your_client_id"
+client_secret = "your_client_secret"
+redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
+```
+
+### Authelia
+
+```toml
+[[auth.oidc_providers]]
+slug = "authelia"
+display_name = "Authelia"
+discovery_url = "https://auth.example.com/.well-known/openid-configuration"
+client_id = "your_client_id"
+client_secret = "your_client_secret"
+redirect_uri = "https://claudio.example.com/api/auth/oidc/authelia/callback"
+```
+
+### Pocket ID
+
+```toml
+[[auth.oidc_providers]]
+slug = "pocketid"
+display_name = "Pocket ID"
+discovery_url = "https://pocketid.example.com/.well-known/openid-configuration"
+client_id = "your_client_id"
+client_secret = "your_client_secret"
+redirect_uri = "https://claudio.example.com/api/auth/oidc/pocketid/callback"
+```
+
+:::note
+Custom OIDC providers can only be configured through `config.toml`, not environment variables.
+:::
+
+:::caution
+If discovery returns HTML instead of JSON, the `discovery_url` is probably pointing at a login page rather than the actual discovery document.
+:::

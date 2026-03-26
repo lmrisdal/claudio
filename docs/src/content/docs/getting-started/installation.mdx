@@ -1,0 +1,73 @@
+---
+title: Installation
+description: Install Claudio using Docker or Docker Compose.
+---
+
+## Docker
+
+```yaml
+docker run -d \
+--name claudio \
+-p 8080:8080 \
+-v /path/to/games:/games:ro \
+-v claudio-data:/config \
+ghcr.io/lmrisdal/claudio:latest
+```
+
+Open `http://localhost:8080` and register your first user (automatically gets admin role).
+
+## Docker Compose
+
+```yaml
+services:
+  claudio:
+    image: ghcr.io/lmrisdal/claudio:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - claudio-data:/config
+      - /path/to/games:/games:ro
+    environment:
+      - CLAUDIO_IGDB_CLIENT_ID=your_client_id
+      - CLAUDIO_IGDB_CLIENT_SECRET=your_client_secret
+
+volumes:
+  claudio-data:
+```
+
+## Docker Compose with PostgreSQL
+
+```yaml
+services:
+  claudio:
+    image: ghcr.io/lmrisdal/claudio:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - claudio-data:/config
+      - /path/to/games:/games:ro
+    environment:
+      - CLAUDIO_DB_PROVIDER=postgres
+      - CLAUDIO_DB_POSTGRES=Host=db;Database=claudio;Username=claudio;Password=secret
+    depends_on:
+      - db
+
+  db:
+    image: postgres:18-alpine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=claudio
+      - POSTGRES_USER=claudio
+      - POSTGRES_PASSWORD=secret
+
+volumes:
+  claudio-data:
+  postgres-data:
+```
+
+## Data Persistence
+
+Claudio stores a signing key (`claudio-signing.key`) alongside the database in the config directory. This key signs authentication tokens — if it's lost, all users will need to sign in again.
+
+Make sure the `/config` volume is persistent.

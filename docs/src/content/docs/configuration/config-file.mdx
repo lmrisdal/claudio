@@ -1,0 +1,57 @@
+---
+title: Config File
+description: Configure Claudio using a TOML config file.
+---
+
+As an alternative to environment variables, Claudio can be configured with a TOML file. The config path is set via the `CLAUDIO_CONFIG_PATH` environment variable, defaulting to `/config/config.toml`.
+
+Environment variables take precedence over config file values.
+
+## Example
+
+```toml
+[server]
+port = 8080
+
+[database]
+provider = "sqlite"             # "sqlite" or "postgres"
+sqlite_path = "/config/claudio.db"
+# postgres_connection = "Host=localhost;Database=claudio;Username=claudio;Password=secret"
+
+[auth]
+jwt_secret = "CHANGE-ME-TO-A-RANDOM-SECRET"
+access_token_expiry_minutes = 15       # Short-lived access token
+refresh_token_expiry_days = 180        # Long-lived refresh token (6 months). Use -1 for infinite expiry
+# proxy_auth_header = "Remote-User"
+# proxy_auth_auto_create = false
+
+[igdb]
+client_id = ""
+client_secret = ""
+
+[library]
+library_paths = ["/games"]
+```
+
+## Sections
+
+### `[server]`
+Server configuration including the HTTP port.
+
+### `[database]`
+Database provider selection (`sqlite` or `postgres`) and connection details.
+
+### `[auth]`
+Authentication settings including JWT secrets, token expiry, and proxy authentication. See [Authentication](/claudio/authentication/overview/) for details.
+
+### `[igdb]`
+IGDB/Twitch API credentials for game metadata. See the [Twitch Developer Portal](https://dev.twitch.tv/console) to create credentials.
+
+### `[library]`
+List of paths to scan for game directories.
+
+### `[auth.github]` / `[auth.google]`
+OAuth provider credentials. See [OAuth Providers](/claudio/authentication/oauth-providers/).
+
+### `[[auth.oidc_providers]]`
+Custom OpenID Connect providers. See [Custom OIDC](/claudio/authentication/custom-oidc/).

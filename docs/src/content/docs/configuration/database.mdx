@@ -1,0 +1,42 @@
+---
+title: Database
+description: Configure SQLite or PostgreSQL for Claudio.
+---
+
+Claudio supports SQLite and PostgreSQL as database backends.
+
+## SQLite (default)
+
+SQLite is the default and requires no additional setup. The database file is stored at `/config/claudio.db` by default.
+
+```toml
+[database]
+provider = "sqlite"
+sqlite_path = "/config/claudio.db"
+```
+
+Or via environment variables:
+
+```bash
+CLAUDIO_DB_PROVIDER=sqlite
+CLAUDIO_DB_SQLITE_PATH=/config/claudio.db
+```
+
+## PostgreSQL
+
+For larger deployments, you can use PostgreSQL:
+
+```toml
+[database]
+provider = "postgres"
+postgres_connection = "Host=localhost;Database=claudio;Username=claudio;Password=secret"
+```
+
+Or via environment variables:
+
+```bash
+CLAUDIO_DB_PROVIDER=postgres
+CLAUDIO_DB_POSTGRES="Host=localhost;Database=claudio;Username=claudio;Password=secret"
+```
+
+See the [Installation page](/claudio/getting-started/installation/#docker-compose-with-postgresql) for a full Docker Compose example with PostgreSQL.

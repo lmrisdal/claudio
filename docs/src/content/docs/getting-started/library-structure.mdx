@@ -1,0 +1,35 @@
+---
+title: Library Structure
+description: How to organize your game files for Claudio.
+---
+
+Games are organized by platform in your library directories:
+
+```
+/games/
+  pc/
+    Hades II (2025)/
+    Celeste (2018) (igdb-26226)/
+  switch/
+    The Legend of Zelda Breath of the Wild (2017)/
+```
+
+## Naming Convention
+
+Folder names are parsed for **title**, **year**, and an optional **IGDB ID**:
+
+- `Game Title (Year)` — matched automatically against IGDB
+- `Game Title (Year) (igdb-NNNNN)` — forces a specific IGDB match
+
+Adding `igdb-NNNNN` is useful when automatic matching picks the wrong game.
+
+## File Formats
+
+Games can be:
+
+- **Loose files** — a directory containing the game files
+- **A single archive** — zip, tar, or tar.gz
+
+## Scanning
+
+Background scanning runs every 2 minutes to pick up changes in your library directories. You can also trigger a manual scan from the admin panel.

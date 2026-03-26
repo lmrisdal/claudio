@@ -492,5 +492,9 @@ src/Claudio.Api/wwwroot/*
 # Local config (contains secrets)
 config/
 
+# Docs build output
+docs/dist/
+docs/.astro/
+
 # Claude Code
 .claude/

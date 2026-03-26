@@ -1,0 +1,25 @@
+---
+title: Introduction
+description: A self-hosted game library manager for organizing, browsing, and downloading your game collection.
+---
+
+Claudio is a self-hosted game library manager for organizing, browsing, and downloading your game collection.
+
+## Features
+
+- **Library management** — Automatically scans configured directories and organizes games by platform
+- **IGDB integration** — Auto-matches games against IGDB for metadata including covers, summaries, genres, developers, and more
+- **SteamGridDB integration** — Search for cover art when IGDB doesn't have a match
+- **File browsing** — Browse game folder contents directly in the browser, including inside zip/tar/tar.gz archives
+- **Downloads** — Download games as tar bundles with resume support; pre-zipped games are served directly
+- **Search** — Global search dialog (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>K</kbd>) for quick access to any game
+- **Admin panel** — User management, manual library scanning, IGDB metadata fetching, and per-game editing
+- **Flexible auth** — Local accounts, GitHub, Google, or any OpenID Connect provider (Authentik, Authelia, Pocket ID, etc.). Proxy authentication for reverse-proxy SSO setups
+- **Multi-platform** — Supports PC, Mac, Linux, consoles (Switch, PlayStation, Xbox, Nintendo), and more
+- **Dark/light mode** — Theme toggle with system preference detection
+
+## Tech Stack
+
+- **Backend:** ASP.NET minimal APIs (.NET 10), Entity Framework Core, SQLite/PostgreSQL
+- **Frontend:** React 19, Vite, TanStack Query, Tailwind CSS v4, Headless UI
+- **Metadata:** IGDB API via Twitch OAuth, SteamGridDB

@@ -1,0 +1,47 @@
+---
+title: Development Setup
+description: Set up a local development environment for Claudio.
+---
+
+## Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Node.js 22+](https://nodejs.org/)
+
+## Backend
+
+```bash
+dotnet run --project src/Claudio.Api
+```
+
+The API serves on port 5118.
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite dev server runs on port 5173 and proxies API requests to the backend on port 5118.
+
+## Running Tests
+
+```bash
+dotnet test                           # all tests
+dotnet test tests/Claudio.Api.Tests   # API tests only
+```
+
+## Building for Production
+
+```bash
+# Build the frontend (outputs to src/Claudio.Api/wwwroot/)
+cd frontend && npm run build
+
+# Build the .NET app
+dotnet build src/Claudio.Api
+
+# Or build the Docker image
+docker compose -f docker/docker-compose.yml up --build
+```

@@ -1,0 +1,28 @@
+---
+title: Authentication Overview
+description: Claudio's authentication options.
+---
+
+Claudio supports multiple authentication methods that can be used together:
+
+- **Local accounts** — Username/password registration and login
+- **GitHub OAuth** — Sign in with GitHub
+- **Google OAuth** — Sign in with Google
+- **Custom OIDC** — Any OpenID Connect provider (Authentik, Authelia, Pocket ID, etc.)
+- **Proxy authentication** — Trust a header from a reverse proxy for SSO
+
+## First User
+
+The first user created (local or external) automatically becomes admin.
+
+## Account Linking
+
+When a user signs in with an external provider whose verified email matches an existing account, the accounts are automatically linked.
+
+## Disabling Auth
+
+| Variable | Effect |
+|---|---|
+| `CLAUDIO_DISABLE_AUTH=true` | Disable authentication entirely — open access, everyone is admin |
+| `CLAUDIO_DISABLE_LOCAL_LOGIN=true` | Disable username/password login, require external providers only |
+| `CLAUDIO_DISABLE_USER_CREATION=true` | Block new account creation. Existing users can still sign in |

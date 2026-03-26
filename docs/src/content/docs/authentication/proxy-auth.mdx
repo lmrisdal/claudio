@@ -1,0 +1,29 @@
+---
+title: Proxy Authentication
+description: Configure reverse-proxy SSO for Claudio.
+---
+
+For reverse-proxy SSO setups (Authelia, Authentik, etc.), Claudio can trust a header set by the proxy to identify the user.
+
+## Configuration
+
+```toml
+[auth]
+proxy_auth_header = "Remote-User"
+proxy_auth_auto_create = true
+```
+
+Or via environment variables:
+
+```bash
+CLAUDIO_PROXY_AUTH_HEADER=Remote-User
+CLAUDIO_PROXY_AUTH_AUTO_CREATE=true
+```
+
+## How It Works
+
+When a request arrives with the configured header, Claudio creates or finds the user and issues a token automatically.
+
+:::danger
+Only use proxy authentication when the reverse proxy is the **sole entry point** to Claudio. The header value is trusted unconditionally — if users can reach Claudio directly, they can forge the header and impersonate any user.
+:::

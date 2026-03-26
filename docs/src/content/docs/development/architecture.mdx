@@ -1,0 +1,39 @@
+---
+title: Architecture
+description: Overview of Claudio's codebase structure.
+---
+
+Claudio is a monorepo with three .NET projects and a React frontend.
+
+## Projects
+
+### `src/Claudio.Api`
+ASP.NET minimal API. Serves the SPA as static files and provides REST endpoints. Uses minimal APIs with route groups (no controllers).
+
+### `src/Claudio.Shared`
+Shared DTOs (`GameDto`, `UserDto`, `ClaudioConfig`) and enums (`UserRole`, `InstallType`). Referenced by both API and Desktop.
+
+### `src/Claudio.Desktop`
+Future Avalonia UI client (stub).
+
+### `frontend/`
+React 19 SPA built with Vite. Output goes to `src/Claudio.Api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, and Tailwind CSS v4.
+
+### `tests/Claudio.Api.Tests/`
+TUnit + AwesomeAssertions test project.
+
+## Backend Structure
+
+- **Endpoints** are in `src/Claudio.Api/Endpoints/` as static classes with extension methods
+- **Services** are singletons registered in `Program.cs`
+- **Database** is EF Core with `AppDbContext` containing `Users` and `Games` tables, supporting SQLite and PostgreSQL
+
+## Frontend Structure
+
+- **API client** at `frontend/src/api/client.ts` — wraps fetch with JWT auth header injection
+- **Auth context** at `frontend/src/hooks/useAuth.tsx` — JWT parsing, login/register/logout
+- **Theming** uses CSS custom properties with Tailwind semantic tokens (`text-text-primary`, `bg-surface`, etc.)
+
+## Configuration
+
+TOML config loaded from `CLAUDIO_CONFIG_PATH` or `/config/config.toml`. NuGet versions are centralized in `Directory.Packages.props`.

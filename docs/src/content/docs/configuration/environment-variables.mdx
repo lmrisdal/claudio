@@ -1,0 +1,57 @@
+---
+title: Environment Variables
+description: All environment variables supported by Claudio.
+---
+
+import { Badge } from '@astrojs/starlight/components';
+
+All settings can be configured via environment variables. These take precedence over values in `config.toml`.
+
+## Server
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDIO_PORT` | HTTP port | `8080` |
+
+## Library
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDIO_LIBRARY_PATHS` | Comma-separated game library paths | `/games` |
+
+## Database
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDIO_DB_PROVIDER` | `sqlite` or `postgres` | `sqlite` |
+| `CLAUDIO_DB_SQLITE_PATH` | SQLite database file path | `/config/claudio.db` |
+| `CLAUDIO_DB_POSTGRES` | PostgreSQL connection string | |
+
+## Metadata
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDIO_IGDB_CLIENT_ID` | IGDB/Twitch client ID | |
+| `CLAUDIO_IGDB_CLIENT_SECRET` | IGDB/Twitch client secret | |
+| `CLAUDIO_STEAMGRIDDB_API_KEY` | SteamGridDB API key (for cover art search) | |
+
+## Authentication
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDIO_DISABLE_AUTH` | Disable authentication entirely (open access, everyone is admin) | `false` |
+| `CLAUDIO_DISABLE_LOCAL_LOGIN` | Disable username/password login and registration | `false` |
+| `CLAUDIO_DISABLE_USER_CREATION` | Prevent creation of new local and external users | `false` |
+| `CLAUDIO_PROXY_AUTH_HEADER` | HTTP header for proxy authentication (e.g. `Remote-User`) | |
+| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header | `false` |
+
+## OAuth
+
+| Variable | Description | Default |
+|---|---|---|
+| `CLAUDIO_GITHUB_CLIENT_ID` | GitHub OAuth app client ID | |
+| `CLAUDIO_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret | |
+| `CLAUDIO_GITHUB_REDIRECT_URI` | GitHub OAuth callback URL | |
+| `CLAUDIO_GOOGLE_CLIENT_ID` | Google OAuth client ID | |
+| `CLAUDIO_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | |
+| `CLAUDIO_GOOGLE_REDIRECT_URI` | Google OAuth callback URL | |

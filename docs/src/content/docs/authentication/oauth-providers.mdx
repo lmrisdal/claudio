@@ -1,0 +1,48 @@
+---
+title: OAuth Providers
+description: Configure GitHub and Google OAuth for Claudio.
+---
+
+Claudio supports GitHub and Google login out of the box. If a provider is not fully configured, its login button is hidden from the UI.
+
+## GitHub
+
+1. [Create a GitHub OAuth App](https://github.com/settings/developers)
+2. Set the authorization callback URL to `https://your-host/api/auth/github/callback`
+3. Configure via environment variables or `config.toml`:
+
+```bash
+CLAUDIO_GITHUB_CLIENT_ID=your_client_id
+CLAUDIO_GITHUB_CLIENT_SECRET=your_client_secret
+CLAUDIO_GITHUB_REDIRECT_URI=https://your-host/api/auth/github/callback
+```
+
+```toml
+[auth.github]
+client_id = "your_client_id"
+client_secret = "your_client_secret"
+redirect_uri = "https://your-host/api/auth/github/callback"
+```
+
+## Google
+
+1. [Create OAuth credentials in the Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Add `https://your-host/api/auth/google/callback` as an authorized redirect URI
+3. Configure:
+
+```bash
+CLAUDIO_GOOGLE_CLIENT_ID=your_client_id
+CLAUDIO_GOOGLE_CLIENT_SECRET=your_client_secret
+CLAUDIO_GOOGLE_REDIRECT_URI=https://your-host/api/auth/google/callback
+```
+
+```toml
+[auth.google]
+client_id = "your_client_id"
+client_secret = "your_client_secret"
+redirect_uri = "https://your-host/api/auth/google/callback"
+```
+
+:::caution
+The redirect URI must **exactly** match the callback URL registered with the provider.
+:::
