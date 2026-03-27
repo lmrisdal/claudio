@@ -4,9 +4,10 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useArrowNav } from "../hooks/useArrowNav";
 import { useGuide } from "../hooks/useGuide";
-import { useGamepadEvent, useShortcut } from "../hooks/useShortcut";
+import { matchKey, useGamepadEvent, useShortcut } from "../hooks/useShortcut";
 import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
+import { getShortcuts } from "../utils/shortcuts";
 import { sounds } from "../utils/sounds";
 
 interface EmulationInfo {
@@ -108,6 +109,40 @@ export default function GameEmulator() {
       delete document.body.dataset.emulatorActive;
     };
   }, [frameUrl, guide.isOpen]);
+
+  // Forward the guide keyboard shortcut from the iframe's contentWindow
+  // (keyboard events inside a focused iframe don't reach the parent window)
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!frameUrl || !iframe) return;
+
+    function attach() {
+      const win = iframe!.contentWindow;
+      if (!win) return;
+
+      function onKeyDown(e: KeyboardEvent) {
+        if (matchKey(getShortcuts().guide, e)) {
+          e.preventDefault();
+          guide.toggle();
+        }
+      }
+
+      win.addEventListener("keydown", onKeyDown, true);
+      return () => win.removeEventListener("keydown", onKeyDown, true);
+    }
+
+    // Attach after iframe loads (contentWindow may not be ready yet)
+    let cleanup = attach();
+    function onLoad() {
+      cleanup?.();
+      cleanup = attach();
+    }
+    iframe.addEventListener("load", onLoad);
+    return () => {
+      cleanup?.();
+      iframe.removeEventListener("load", onLoad);
+    };
+  }, [frameUrl, guide]);
 
   useEffect(() => {
     if (!game || !frameUrl) return;

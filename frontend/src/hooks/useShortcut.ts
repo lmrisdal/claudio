@@ -56,7 +56,7 @@ export function useGamepadEvent(
   }, [event, enabled]);
 }
 
-function matchKey(pattern: string, e: KeyboardEvent): boolean {
+export function matchKey(pattern: string, e: KeyboardEvent): boolean {
   const parts = pattern.toLowerCase().split("+");
   const targetKey = parts.pop()!;
 

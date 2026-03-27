@@ -30,8 +30,12 @@ export function useGamepad() {
     let rafId: number;
 
     function dispatchKey(key: string) {
-      // Custom gamepad actions always fire (e.g. guide button overlay)
+      // Custom gamepad actions fire as window events
       if (key.startsWith("gamepad-")) {
+        // When the emulator is active, only the guide button breaks through
+        if (document.body.dataset.emulatorActive && key !== "gamepad-guide") {
+          return;
+        }
         window.dispatchEvent(new CustomEvent(key));
         return;
       }
