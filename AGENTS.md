@@ -62,6 +62,15 @@ TOML config loaded from `CLAUDIO_CONFIG_PATH` env var or `/config/config.toml`. 
 - CSS theming uses custom properties in `index.css` (`:root` for dark, `.light` for light mode) with Tailwind semantic tokens (`text-text-primary`, `bg-surface`, `bg-surface-raised`, etc.).
 - TypeScript strict mode with `verbatimModuleSyntax` — use `import type` for type-only imports.
 
+### Controller and keyboard navigation
+
+- SPA is fully keyboard- and controller-navigable with proper focus management and ARIA attributes.
+- All interactive elements (buttons, links) are accessible via keyboard, gamepads and screen readers.
+- Focus states are clearly visible, and the tab order is logical and intuitive.
+- Arrow keys and gamepad navigation work seamlessly for browsing game lists, menus, and dialogs.
+- Dialogs trap focus and can be dismissed with Escape key or gamepad B button. When more dialogs are added, ensure they stack properly and manage focus correctly.
+- Navigating with a controller or keyboard should play navigation sounds and provide haptic feedback (if supported) for a responsive, console-like experience if enabled with the global user preferences toggle. Navigating with a mouse should not play navigation sounds.
+
 ### Package management
 
 NuGet versions are centralized in `Directory.Packages.props` — add versions there, not in individual `.csproj` files.

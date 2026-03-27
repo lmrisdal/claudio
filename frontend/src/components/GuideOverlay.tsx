@@ -37,6 +37,10 @@ export default function GuideOverlay({
 }: GuideOverlayProps) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  function openAccountDialog() {
+    window.dispatchEvent(new CustomEvent("claudio:open-account"));
+  }
   const [visible, setVisible] = useState(false);
   const [animState, setAnimState] = useState<
     "entering" | "open" | "exiting" | "closed"
@@ -102,7 +106,11 @@ export default function GuideOverlay({
       id: "account",
       label: "Account",
       icon: AccountIcon,
-      action: () => navigateTo("/account"),
+      action: () => {
+        sounds.navigate();
+        onClose();
+        openAccountDialog();
+      },
     },
   ];
 
@@ -434,7 +442,7 @@ export default function GuideOverlay({
             )}
 
             {/* ── Menu items ── */}
-            <nav className="flex-1 overflow-y-auto p-8">
+            <nav className="flex-1 overflow-y-auto p-8 flex flex-col gap-2">
               {items.map((item, i) => (
                 <button
                   key={item.id}
@@ -485,7 +493,11 @@ export default function GuideOverlay({
                 toolbarRefs.current[1] = el;
               }}
               type="button"
-              onClick={() => navigateTo("/account")}
+              onClick={() => {
+                sounds.navigate();
+                onClose();
+                openAccountDialog();
+              }}
               className="rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
               title="Settings"
             >

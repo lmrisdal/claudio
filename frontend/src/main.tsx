@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import App from "./App";
+import AccountDialogProvider from "./components/AccountDialogProvider";
 import AuthProvider from "./components/AuthProvider";
 import GuideProvider from "./components/GuideProvider";
 import NavigationProvider from "./hooks/NavigationProvider";
@@ -23,9 +24,11 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <AuthProvider>
           <GuideProvider>
-            <NavigationProvider>
-              <App />
-            </NavigationProvider>
+            <AccountDialogProvider>
+              <NavigationProvider>
+                <App />
+              </NavigationProvider>
+            </AccountDialogProvider>
           </GuideProvider>
         </AuthProvider>
       </BrowserRouter>

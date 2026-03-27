@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useAccountDialog } from "../hooks/useAccountDialog";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigation } from "../hooks/useNavigation";
 import { useTheme } from "../hooks/useTheme";
@@ -10,6 +11,7 @@ export default function Header() {
   const { isLoggedIn, isAdmin, user, logout, authDisabled } = useAuth();
   const { theme, toggle } = useTheme();
   const { searchOpen, closeSearch, toggleSearch } = useNavigation();
+  const accountDialog = useAccountDialog();
 
   return (
     <>
@@ -92,12 +94,12 @@ export default function Header() {
                 )}
                 {!authDisabled && (
                   <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
-                    <Link
-                      to="/account"
+                    <button
+                      onClick={accountDialog.open}
                       className="text-sm text-text-secondary hover:text-text-primary font-mono transition"
                     >
                       {user?.username}
-                    </Link>
+                    </button>
                     <button
                       onClick={logout}
                       className="px-3 py-1.5 rounded-lg text-sm text-text-muted hover:text-red-400 hover:bg-surface-raised transition"

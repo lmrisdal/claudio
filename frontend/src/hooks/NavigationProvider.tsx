@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { getShortcuts } from "../utils/shortcuts";
 import { useAuth } from "./useAuth";
 import { useGamepad } from "./useGamepad";
 import { useGuide } from "./useGuide";
@@ -33,6 +40,24 @@ export default function NavigationProvider({
     if (!isLoggedIn) return;
     if (document.body.dataset.emulatorActive) return;
     toggleSearch();
+  });
+
+  // Configurable keyboard shortcut for guide overlay
+  const [guideKey, setGuideKey] = useState(() => getShortcuts().guide);
+
+  useEffect(() => {
+    function onChanged() {
+      setGuideKey(getShortcuts().guide);
+    }
+    window.addEventListener("claudio:shortcuts-changed", onChanged);
+    return () =>
+      window.removeEventListener("claudio:shortcuts-changed", onChanged);
+  }, []);
+
+  useShortcut(guideKey, (e) => {
+    if (!isLoggedIn) return;
+    e.preventDefault();
+    guide.toggle();
   });
 
   // Gamepad guide button toggles the guide overlay (only when logged in)

@@ -4,7 +4,6 @@ import { useAuth } from "./hooks/useAuth";
 
 import Header from "./components/Header";
 
-const Account = lazy(() => import("./pages/Account"));
 const Admin = lazy(() => import("./pages/Admin"));
 const GameDetail = lazy(() => import("./pages/GameDetail"));
 const GameEmulator = lazy(() => import("./pages/GameEmulator"));
@@ -83,17 +82,6 @@ export default function App() {
                 <>
                   <Header />
                   <GameEmulator />
-                </>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/account"
-            element={
-              <ProtectedRoute>
-                <>
-                  <Header />
-                  <Account />
                 </>
               </ProtectedRoute>
             }
