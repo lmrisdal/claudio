@@ -161,8 +161,11 @@ public class SaveStateEndpointTests : IAsyncDisposable
     {
         var gameId = await SeedGameAsync();
         var client = await CreateAuthenticatedClientAsync();
+        // Send a valid multipart form without the required 'state' file
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent("ignored"), "other");
 
-        var response = await client.PostAsync($"/api/games/{gameId}/save-states", new MultipartFormDataContent());
+        var response = await client.PostAsync($"/api/games/{gameId}/save-states", form);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
