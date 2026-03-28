@@ -16,9 +16,11 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/sw.js");
+    <script type="module">
+      if (import.meta.env?.PROD && "serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch((error) => {
+          console.error("Service worker registration failed:", error);
+        });
       }
     </script>
   </body>
