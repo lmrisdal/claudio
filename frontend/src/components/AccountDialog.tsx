@@ -549,7 +549,7 @@ function PreferencesTab({
 
 function ShortcutRow({
   label,
-  shortcutKey,
+  shortcutKey: _shortcutKey,
   value,
   defaultValue,
   recording,
@@ -601,7 +601,7 @@ function ShortcutRow({
 
 function SecurityTab({
   contentRefs,
-  onSuccess,
+  onSuccess: _onSuccess,
 }: {
   contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
   onSuccess: () => void;
