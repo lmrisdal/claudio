@@ -1,18 +1,30 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router";
+import { api } from "../api/client";
 import type { LastPlayedGame } from "../hooks/guideTypes";
 import { useGamepadEvent, useShortcut } from "../hooks/useShortcut";
 import { sounds } from "../utils/sounds";
 
+interface SaveStateDto {
+  id: number;
+  gameId: number;
+  screenshotUrl: string;
+  createdAt: string;
+}
+
 interface GuideOverlayProps {
   open: boolean;
   gameName: string;
+  gameId: number | null;
   hasActiveGame: boolean;
   lastPlayed: LastPlayedGame | null;
   onClose: () => void;
   onResumeGame: () => void;
   onQuitGame: () => void;
+  onRequestSaveState: () => void;
+  onLoadState: (stateData: ArrayBuffer) => void;
 }
 
 const ANIM_DURATION = 220;
@@ -29,14 +41,18 @@ interface MenuItem {
 export default function GuideOverlay({
   open,
   gameName,
+  gameId,
   hasActiveGame,
   lastPlayed,
   onClose,
   onResumeGame,
   onQuitGame,
+  onRequestSaveState,
+  onLoadState,
 }: GuideOverlayProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   function openAccountDialog() {
     window.dispatchEvent(new CustomEvent("claudio:open-account"));
@@ -47,9 +63,9 @@ export default function GuideOverlay({
   >("closed");
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [tabDir, setTabDir] = useState<"left" | "right">("right");
-  const [focusZone, setFocusZone] = useState<"tabs" | "menu" | "toolbar">(
-    "menu",
-  );
+  const [focusZone, setFocusZone] = useState<
+    "tabs" | "menu" | "savestates" | "toolbar"
+  >("menu");
   const [focusIndex, setFocusIndex] = useState(0);
   const [tabFocusIndex, setTabFocusIndex] = useState(0);
   const [toolbarFocusIndex, setToolbarFocusIndex] = useState(0);
@@ -148,6 +164,113 @@ export default function GuideOverlay({
 
   const items = activeTab === "nowplaying" ? nowPlayingItems : homeItems;
 
+  // ── Save states ──
+  const { data: saveStates } = useQuery({
+    queryKey: ["saveStates", gameId],
+    queryFn: () => api.get<SaveStateDto[]>(`/games/${gameId}/save-states`),
+    enabled: hasActiveGame && gameId !== null && open,
+  });
+
+  const hasSaveStatesSection = activeTab === "nowplaying" && hasActiveGame;
+  // Total navigable save slots: existing saves + 1 "New Save" button
+  const saveSlotCount = hasSaveStatesSection
+    ? (saveStates?.length ?? 0) + 1
+    : 0;
+
+  const [savingState, setSavingState] = useState(false);
+  const [loadingSlotId, setLoadingSlotId] = useState<number | null>(null);
+  const [saveSlotFocusIndex, setSaveSlotFocusIndex] = useState(0);
+  const [expandedSlotIndex, setExpandedSlotIndex] = useState<number | null>(
+    null,
+  );
+  const [actionFocusIndex, setActionFocusIndex] = useState(0);
+  const saveSlotRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const [overwriteSlotId, setOverwriteSlotId] = useState<number | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (saveId: number) =>
+      api.delete(`/games/${gameId}/save-states/${saveId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
+    },
+  });
+
+  // Listen for save state data from iframe
+  useEffect(() => {
+    if (!savingState || !gameId) return;
+
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type !== "claudio:stateData") return;
+
+      const stateBlob = new Blob([new Uint8Array(event.data.state)], {
+        type: "application/octet-stream",
+      });
+      const screenshotBlob = new Blob([new Uint8Array(event.data.screenshot)], {
+        type: "image/png",
+      });
+
+      const isOverwrite = overwriteSlotId !== null;
+      const path = isOverwrite
+        ? `/games/${gameId}/save-states/${overwriteSlotId}`
+        : `/games/${gameId}/save-states`;
+
+      api
+        .uploadBinary<SaveStateDto>(path, {
+          state: stateBlob,
+          screenshot: screenshotBlob,
+        }, isOverwrite ? "PUT" : "POST")
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
+        })
+        .finally(() => {
+          setSavingState(false);
+          setOverwriteSlotId(null);
+        });
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [savingState, gameId, queryClient, overwriteSlotId]);
+
+  const handleSaveState = useCallback(() => {
+    setSavingState(true);
+    onRequestSaveState();
+  }, [onRequestSaveState]);
+
+  const handleLoadState = useCallback(
+    async (saveId: number) => {
+      if (!gameId) return;
+      setLoadingSlotId(saveId);
+      try {
+        const stateData = await api.getBinary(
+          `/games/${gameId}/save-states/${saveId}/state`,
+        );
+        onLoadState(stateData);
+        onClose();
+      } finally {
+        setLoadingSlotId(null);
+      }
+    },
+    [gameId, onLoadState, onClose],
+  );
+
+  const handleOverwriteState = useCallback(
+    (saveId: number) => {
+      setOverwriteSlotId(saveId);
+      setSavingState(true);
+      onRequestSaveState();
+    },
+    [onRequestSaveState],
+  );
+
+  const handleDeleteState = useCallback(
+    (saveId: number) => {
+      deleteMutation.mutate(saveId);
+    },
+    [deleteMutation],
+  );
+
   // Handle open/close transitions (adjusting state during render pattern)
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
@@ -160,6 +283,7 @@ export default function GuideOverlay({
       setFocusIndex(0);
       setTabFocusIndex(0);
       setToolbarFocusIndex(0);
+      setExpandedSlotIndex(null);
     } else {
       setAnimState("exiting");
     }
@@ -222,13 +346,30 @@ export default function GuideOverlay({
     sounds.navigate();
   }, []);
 
+  const focusSaveSlot = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(saveSlotCount - 1, index));
+      setSaveSlotFocusIndex(clamped);
+      setExpandedSlotIndex(null);
+      saveSlotRefs.current[clamped]?.focus({
+        focusVisible: true,
+      } as FocusOptions);
+      sounds.navigate();
+    },
+    [saveSlotCount],
+  );
+
   // Keyboard navigation for the guide overlay (capture phase to intercept before other handlers)
   useShortcut(
     "escape",
     (e) => {
       e.preventDefault();
       e.stopPropagation();
-      onClose();
+      if (expandedSlotIndex !== null) {
+        setExpandedSlotIndex(null);
+      } else {
+        onClose();
+      }
     },
     { enabled: open, capture: true },
   );
@@ -249,14 +390,42 @@ export default function GuideOverlay({
         } else {
           focusItem(focusIndex - 1);
         }
+      } else if (focusZone === "savestates") {
+        if (expandedSlotIndex !== null) {
+          setExpandedSlotIndex(null);
+          return;
+        }
+        // Move up a row (subtract 2 for 2-col grid), or exit to menu
+        const newIdx = saveSlotFocusIndex - 2;
+        if (newIdx >= 0) {
+          focusSaveSlot(newIdx);
+        } else {
+          setFocusZone("menu");
+          const lastIdx = items.length - 1;
+          setFocusIndex(lastIdx);
+          itemRefs.current[lastIdx]?.focus({
+            focusVisible: true,
+          } as FocusOptions);
+          sounds.navigate();
+        }
       } else if (focusZone === "toolbar") {
-        setFocusZone("menu");
-        const lastIdx = items.length - 1;
-        setFocusIndex(lastIdx);
-        itemRefs.current[lastIdx]?.focus({
-          focusVisible: true,
-        } as FocusOptions);
-        sounds.navigate();
+        if (saveSlotCount > 0) {
+          setFocusZone("savestates");
+          const lastSlot = saveSlotCount - 1;
+          setSaveSlotFocusIndex(lastSlot);
+          saveSlotRefs.current[lastSlot]?.focus({
+            focusVisible: true,
+          } as FocusOptions);
+          sounds.navigate();
+        } else {
+          setFocusZone("menu");
+          const lastIdx = items.length - 1;
+          setFocusIndex(lastIdx);
+          itemRefs.current[lastIdx]?.focus({
+            focusVisible: true,
+          } as FocusOptions);
+          sounds.navigate();
+        }
       }
     },
     { enabled: open, capture: true },
@@ -275,14 +444,40 @@ export default function GuideOverlay({
         sounds.navigate();
       } else if (focusZone === "menu") {
         if (focusIndex === items.length - 1) {
+          if (saveSlotCount > 0) {
+            setFocusZone("savestates");
+            setSaveSlotFocusIndex(0);
+            saveSlotRefs.current[0]?.focus({
+              focusVisible: true,
+            } as FocusOptions);
+            sounds.navigate();
+          } else {
+            setFocusZone("toolbar");
+            setToolbarFocusIndex(0);
+            toolbarRefs.current[0]?.focus({
+              focusVisible: true,
+            } as FocusOptions);
+            sounds.navigate();
+          }
+        } else {
+          focusItem(focusIndex + 1);
+        }
+      } else if (focusZone === "savestates") {
+        if (expandedSlotIndex !== null) {
+          setExpandedSlotIndex(null);
+          return;
+        }
+        // Move down a row (add 2 for 2-col grid), or exit to toolbar
+        const newIdx = saveSlotFocusIndex + 2;
+        if (newIdx < saveSlotCount) {
+          focusSaveSlot(newIdx);
+        } else {
           setFocusZone("toolbar");
           setToolbarFocusIndex(0);
           toolbarRefs.current[0]?.focus({
             focusVisible: true,
           } as FocusOptions);
           sounds.navigate();
-        } else {
-          focusItem(focusIndex + 1);
         }
       }
     },
@@ -295,6 +490,13 @@ export default function GuideOverlay({
       e.preventDefault();
       if (focusZone === "tabs") {
         focusTabItem(tabFocusIndex - 1);
+      } else if (focusZone === "savestates") {
+        if (expandedSlotIndex !== null) {
+          setActionFocusIndex((prev) => Math.max(0, prev - 1));
+          sounds.navigate();
+        } else if (saveSlotFocusIndex % 2 === 1) {
+          focusSaveSlot(saveSlotFocusIndex - 1);
+        }
       } else if (focusZone === "toolbar") {
         focusToolbarItem(toolbarFocusIndex - 1);
       }
@@ -308,6 +510,16 @@ export default function GuideOverlay({
       e.preventDefault();
       if (focusZone === "tabs") {
         focusTabItem(tabFocusIndex + 1);
+      } else if (focusZone === "savestates") {
+        if (expandedSlotIndex !== null) {
+          setActionFocusIndex((prev) => Math.min(2, prev + 1));
+          sounds.navigate();
+        } else if (
+          saveSlotFocusIndex % 2 === 0 &&
+          saveSlotFocusIndex + 1 < saveSlotCount
+        ) {
+          focusSaveSlot(saveSlotFocusIndex + 1);
+        }
       } else if (focusZone === "toolbar") {
         focusToolbarItem(toolbarFocusIndex + 1);
       }
@@ -327,6 +539,25 @@ export default function GuideOverlay({
           if (tab && tab.id !== activeTab) {
             switchTab(tab.id);
           }
+        }
+      } else if (focusZone === "savestates") {
+        if (expandedSlotIndex !== null) {
+          // Execute the focused action
+          const save = saveStates?.[expandedSlotIndex];
+          if (save) {
+            if (actionFocusIndex === 0) handleLoadState(save.id);
+            else if (actionFocusIndex === 1) handleOverwriteState(save.id);
+            else if (actionFocusIndex === 2) handleDeleteState(save.id);
+          }
+          setExpandedSlotIndex(null);
+        } else if (saveSlotFocusIndex === 0) {
+          // "New Save" slot (first slot) — trigger save directly
+          saveSlotRefs.current[0]?.click();
+        } else {
+          // Expand the action overlay for this existing save slot
+          setExpandedSlotIndex(saveSlotFocusIndex - 1);
+          setActionFocusIndex(0);
+          sounds.navigate();
         }
       } else if (focusZone === "toolbar") {
         toolbarRefs.current[toolbarFocusIndex]?.click();
@@ -442,28 +673,102 @@ export default function GuideOverlay({
             )}
 
             {/* ── Menu items ── */}
-            <nav className="flex-1 overflow-y-auto p-8 flex flex-col gap-2">
-              {items.map((item, i) => (
-                <button
-                  key={item.id}
-                  ref={(el) => {
-                    itemRefs.current[i] = el;
-                  }}
-                  type="button"
-                  onClick={item.action}
-                  onMouseEnter={() => {
-                    setFocusIndex(i);
-                    itemRefs.current[i]?.focus({
-                      focusVisible: true,
-                    } as FocusOptions);
-                  }}
-                  className="group flex w-full items-center gap-5 rounded-xl px-5 py-4 text-[17px] font-normal text-white/80 transition-colors outline-none hover:bg-white/6 hover:text-white focus-visible:bg-white/8 focus-visible:text-white"
-                >
-                  <item.icon className="h-6 w-6 shrink-0 text-white/50 transition-colors group-hover:text-white/70 group-focus-visible:text-accent" />
-                  {item.label}
-                </button>
-              ))}
-            </nav>
+            <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-2">
+              <nav className="flex flex-col gap-2">
+                {items.map((item, i) => (
+                  <button
+                    key={item.id}
+                    ref={(el) => {
+                      itemRefs.current[i] = el;
+                    }}
+                    type="button"
+                    onClick={item.action}
+                    onMouseEnter={() => {
+                      setFocusIndex(i);
+                      itemRefs.current[i]?.focus({
+                        focusVisible: true,
+                      } as FocusOptions);
+                    }}
+                    className="group flex w-full items-center gap-5 rounded-xl px-5 py-4 text-[17px] font-normal text-white/80 transition-colors outline-none hover:bg-white/6 hover:text-white focus-visible:bg-white/8 focus-visible:text-white"
+                  >
+                    <item.icon className="h-6 w-6 shrink-0 text-white/50 transition-colors group-hover:text-white/70 group-focus-visible:text-accent" />
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+
+              {/* ── Save States grid (Now Playing tab only) ── */}
+              {activeTab === "nowplaying" && hasActiveGame && (
+                <div className="mt-4 border-t border-white/6 pt-4">
+                  <p className="mb-3 px-1 text-xs font-medium uppercase tracking-[0.18em] text-white/40">
+                    Save States
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* New save slot button (always first) */}
+                    <button
+                      ref={(el) => {
+                        saveSlotRefs.current[0] = el;
+                      }}
+                      type="button"
+                      disabled={savingState}
+                      onClick={handleSaveState}
+                      onMouseEnter={() => {
+                        setFocusZone("savestates");
+                        setSaveSlotFocusIndex(0);
+                      }}
+                      onFocus={() => {
+                        setFocusZone("savestates");
+                        setSaveSlotFocusIndex(0);
+                      }}
+                      className="group flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/3 text-white/40 transition-all outline-none hover:border-white/20 hover:bg-white/6 hover:text-white/60 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                    >
+                      {savingState ? (
+                        <LoadingSpinner className="h-5 w-5" />
+                      ) : (
+                        <PlusIcon className="h-5 w-5" />
+                      )}
+                      <span className="text-xs font-medium">
+                        {savingState ? "Saving\u2026" : "New Save"}
+                      </span>
+                    </button>
+                    {(saveStates ?? []).map((save, i) => (
+                      <SaveSlotCard
+                        key={save.id}
+                        ref={(el) => {
+                          saveSlotRefs.current[i + 1] = el;
+                        }}
+                        screenshotUrl={save.screenshotUrl}
+                        createdAt={save.createdAt}
+                        isLoading={loadingSlotId === save.id}
+                        isExpanded={expandedSlotIndex === i}
+                        activeActionIndex={
+                          expandedSlotIndex === i ? actionFocusIndex : 0
+                        }
+                        onToggleExpand={() => {
+                          setExpandedSlotIndex((prev) =>
+                            prev === i ? null : i,
+                          );
+                          setActionFocusIndex(0);
+                        }}
+                        onCollapse={() => setExpandedSlotIndex(null)}
+                        onSave={() => handleOverwriteState(save.id)}
+                        onLoad={() => handleLoadState(save.id)}
+                        onDelete={() => handleDeleteState(save.id)}
+                        onMouseEnter={() => {
+                          setFocusZone("savestates");
+                          setSaveSlotFocusIndex(i + 1);
+                        }}
+                        onFocus={() => {
+                          setFocusZone("savestates");
+                          setSaveSlotFocusIndex(i + 1);
+                        }}
+                        onActionHover={(idx) => setActionFocusIndex(idx)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           {/* end animated tab content */}
 
@@ -670,3 +975,231 @@ function CloseIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
+    </svg>
+  );
+}
+
+function LoadingSpinner({ className }: { className?: string }) {
+  return (
+    <svg
+      className={`${className} animate-spin`}
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
+      />
+    </svg>
+  );
+}
+
+function SaveIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12M12 16.5V3"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48 48 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48 48 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a52 52 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a49 49 0 0 0-7.5 0"
+      />
+    </svg>
+  );
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+/* ── Save Slot Card ── */
+
+import { forwardRef, type MouseEventHandler } from "react";
+
+const saveSlotActions = [
+  {
+    label: "Load",
+    icon: DownloadIcon,
+    style: "text-white/70 hover:bg-white/10 hover:text-white",
+  },
+  {
+    label: "Save",
+    icon: SaveIcon,
+    style: "text-white/70 hover:bg-white/10 hover:text-white",
+  },
+  {
+    label: "Delete",
+    icon: TrashIcon,
+    style: "text-red-400/70 hover:bg-red-500/10 hover:text-red-400",
+  },
+];
+
+const SaveSlotCard = forwardRef<
+  HTMLButtonElement,
+  {
+    screenshotUrl: string;
+    createdAt: string;
+    isLoading: boolean;
+    isExpanded: boolean;
+    activeActionIndex: number;
+    onToggleExpand: () => void;
+    onCollapse: () => void;
+    onSave: () => void;
+    onLoad: () => void;
+    onDelete: () => void;
+    onMouseEnter?: MouseEventHandler;
+    onFocus?: () => void;
+    onActionHover?: (index: number) => void;
+  }
+>(function SaveSlotCard(
+  {
+    screenshotUrl,
+    createdAt,
+    isLoading,
+    isExpanded,
+    activeActionIndex,
+    onToggleExpand,
+    onCollapse,
+    onSave,
+    onLoad,
+    onDelete,
+    onMouseEnter,
+    onFocus,
+    onActionHover,
+  },
+  ref,
+) {
+  const handlers = [onLoad, onSave, onDelete];
+
+  return (
+    <div
+      className="group relative overflow-hidden rounded-xl bg-white/5 ring-1 ring-white/8 transition-all hover:ring-white/15 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onCollapse}
+    >
+      {/* Screenshot thumbnail */}
+      <button
+        ref={ref}
+        type="button"
+        onClick={onToggleExpand}
+        onFocus={onFocus}
+        className="w-full outline-none"
+      >
+        <div className="relative aspect-video w-full overflow-hidden bg-white/5">
+          <img
+            src={`${screenshotUrl}?v=${new Date(createdAt).getTime()}`}
+            alt={`Save from ${formatRelativeTime(createdAt)}`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <LoadingSpinner className="h-6 w-6 text-accent" />
+            </div>
+          )}
+        </div>
+        <div className="px-2.5 py-2 text-left">
+          <p className="text-xs text-white/50">
+            {formatRelativeTime(createdAt)}
+          </p>
+        </div>
+      </button>
+
+      {/* Action buttons overlay */}
+      {isExpanded && (
+        <div className="absolute rounded-xl inset-0 flex items-center justify-center gap-2 bg-black/70 backdrop-blur-sm">
+          {saveSlotActions.map((action, i) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlers[i]();
+              }}
+              onMouseEnter={() => onActionHover?.(i)}
+              className={`flex flex-col items-center gap-1 rounded-lg p-2.5 transition-colors outline-none ${action.style} ${
+                i === activeActionIndex ? "ring-2 ring-accent bg-white/10" : ""
+              }`}
+              title={action.label}
+            >
+              <action.icon className="h-5 w-5" />
+              <span className="text-[10px] font-medium">{action.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});

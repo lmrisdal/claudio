@@ -75,6 +75,39 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
+  const token = localStorage.getItem("token");
+  const headers: HeadersInit = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...init?.headers,
+  };
+
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+
+  if (res.status === 401) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      const retryHeaders: HeadersInit = {
+        Authorization: `Bearer ${newToken}`,
+        ...init?.headers,
+      };
+      const retryRes = await fetch(`${BASE}${path}`, { ...init, headers: retryHeaders });
+      if (retryRes.ok) return retryRes.arrayBuffer();
+    }
+    localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || res.statusText);
+  }
+
+  return res.arrayBuffer();
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -87,4 +120,12 @@ export const api = {
     form.append("file", file);
     return request<T>(path, { method: "POST", body: form });
   },
+  uploadBinary: <T>(path: string, files: Record<string, Blob>, method: "POST" | "PUT" = "POST") => {
+    const form = new FormData();
+    for (const [name, blob] of Object.entries(files)) {
+      form.append(name, blob);
+    }
+    return request<T>(path, { method, body: form });
+  },
+  getBinary: (path: string) => requestBinary(path),
 };

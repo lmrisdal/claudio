@@ -8,6 +8,7 @@ public class ClaudioConfig
     public IgdbConfig Igdb { get; set; } = new();
     public SteamGridDbConfig Steamgriddb { get; set; } = new();
     public LibraryConfig Library { get; set; } = new();
+    public EmulationConfig Emulation { get; set; } = new();
 }
 
 public class ServerConfig
@@ -98,4 +99,9 @@ public class LibraryConfig
 {
     public string[] LibraryPaths { get; set; } = ["/games"];
     public string[] ExcludePlatforms { get; set; } = [];
+}
+
+public class EmulationConfig
+{
+    public int? MaxSaveStatesPerGame { get; set; }
 }

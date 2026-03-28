@@ -10,6 +10,7 @@ import {
   setShortcut,
   type ShortcutMap,
 } from "../utils/shortcuts";
+import { isEmulatorFullscreenEnabled, setEmulatorFullscreenEnabled } from "../utils/preferences";
 import { isSoundsEnabled, setSoundsEnabled } from "../utils/sounds";
 import { sounds } from "../utils/sounds";
 
@@ -300,9 +301,7 @@ export default function AccountDialog({
                   onMouseEnter={() => {
                     setFocusZone("sidebar");
                     setSidebarIndex(idx);
-                    sidebarRefs.current[idx]?.focus({
-                      focusVisible: true,
-                    } as FocusOptions);
+                    sidebarRefs.current[idx]?.focus();
                   }}
                   className={`shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm transition-colors outline-none ${
                     activeTab === tab.id
@@ -329,9 +328,7 @@ export default function AccountDialog({
               onMouseEnter={() => {
                 setFocusZone("sidebar");
                 setSidebarIndex(visibleTabs.length);
-                sidebarRefs.current[visibleTabs.length]?.focus({
-                  focusVisible: true,
-                } as FocusOptions);
+                sidebarRefs.current[visibleTabs.length]?.focus();
               }}
               className="hidden sm:block text-left px-3 py-2 m-5 mt-0 rounded-lg text-sm text-white/40 hover:text-red-400 hover:bg-white/6 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
@@ -420,6 +417,7 @@ function PreferencesTab({
 }: {
   contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
 }) {
+  const [fullscreenOn, setFullscreenOn] = useState(isEmulatorFullscreenEnabled);
   const [soundsOn, setSoundsOn] = useState(isSoundsEnabled);
   const [shortcuts, setShortcuts] = useState(getShortcuts);
   const [recording, setRecording] = useState<keyof ShortcutMap | null>(null);
@@ -499,6 +497,29 @@ function PreferencesTab({
         </button>
       </label>
 
+      {/* Emulator fullscreen */}
+      <label className="flex items-center justify-between cursor-pointer">
+        <span className="text-sm text-white/80">Start emulator in fullscreen</span>
+        <button
+          ref={(el) => {
+            contentRefs.current![1] = el;
+          }}
+          type="button"
+          role="switch"
+          aria-checked={fullscreenOn}
+          onClick={() => {
+            const next = !fullscreenOn;
+            setFullscreenOn(next);
+            setEmulatorFullscreenEnabled(next);
+          }}
+          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent ring-1 ${fullscreenOn ? "bg-white/14 ring-white/20" : "bg-white/8 ring-white/12"}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${fullscreenOn ? "translate-x-5" : "translate-x-0"}`}
+          />
+        </button>
+      </label>
+
       {/* Keyboard shortcuts */}
       <div>
         <h3 className="text-xs font-medium text-white/50 uppercase tracking-wider mb-3">
@@ -517,7 +538,7 @@ function PreferencesTab({
               setShortcuts(getShortcuts());
             }}
             buttonRef={(el) => {
-              contentRefs.current![1] = el;
+              contentRefs.current![2] = el;
             }}
           />
         </div>

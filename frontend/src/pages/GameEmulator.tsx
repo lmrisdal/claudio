@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
@@ -8,6 +9,7 @@ import { matchKey, useGamepadEvent, useShortcut } from "../hooks/useShortcut";
 import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 import { getShortcuts } from "../utils/shortcuts";
+import { isEmulatorFullscreenEnabled } from "../utils/preferences";
 import { sounds } from "../utils/sounds";
 
 interface EmulationInfo {
@@ -22,6 +24,13 @@ interface EmulationInfo {
 interface EmulationSession {
   ticket: string;
   gameUrl: string;
+}
+
+interface SaveStateDto {
+  id: number;
+  gameId: number;
+  screenshotUrl: string;
+  createdAt: string;
 }
 
 export default function GameEmulator() {
@@ -79,7 +88,71 @@ export default function GameEmulator() {
     },
   });
 
+  // ── Save states (non-fullscreen toolbar) ──
+  const queryClient = useQueryClient();
   const gameId = game?.id;
+
+  const { data: saveStates } = useQuery({
+    queryKey: ["saveStates", gameId],
+    queryFn: () => api.get<SaveStateDto[]>(`/games/${gameId}/save-states`),
+    enabled: Boolean(frameUrl) && gameId !== undefined,
+  });
+
+  const [savingState, setSavingState] = useState(false);
+
+  useEffect(() => {
+    if (!savingState || !gameId) return;
+
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type !== "claudio:stateData") return;
+
+      const stateBlob = new Blob([new Uint8Array(event.data.state)], {
+        type: "application/octet-stream",
+      });
+      const screenshotBlob = new Blob([new Uint8Array(event.data.screenshot)], {
+        type: "image/png",
+      });
+
+      api
+        .uploadBinary<SaveStateDto>(`/games/${gameId}/save-states`, {
+          state: stateBlob,
+          screenshot: screenshotBlob,
+        })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
+        })
+        .finally(() => {
+          setSavingState(false);
+        });
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [savingState, gameId, queryClient]);
+
+  const handleSaveState = useCallback(() => {
+    setSavingState(true);
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "claudio:requestSaveState" },
+      "*",
+    );
+  }, []);
+
+  const handleLoadState = useCallback(
+    async (saveId: number) => {
+      if (!gameId) return;
+      const stateData = await api.getBinary(
+        `/games/${gameId}/save-states/${saveId}/state`,
+      );
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "claudio:loadState", state: Array.from(new Uint8Array(stateData)) },
+        "*",
+      );
+      iframeRef.current?.focus();
+    },
+    [gameId],
+  );
+
   useEffect(() => {
     requestAnimationFrame(() => {
       const startButton = startButtonRef.current;
@@ -158,6 +231,19 @@ export default function GameEmulator() {
           document.exitFullscreen().catch(() => {});
         }
       },
+      onRequestSaveState: () => {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "claudio:requestSaveState" },
+          "*",
+        );
+      },
+      onLoadState: (stateData: ArrayBuffer) => {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "claudio:loadState", state: Array.from(new Uint8Array(stateData)) },
+          "*",
+        );
+        iframeRef.current?.focus();
+      },
     });
   }, [game, frameUrl, guide]);
 
@@ -187,10 +273,12 @@ export default function GameEmulator() {
     setActivePath(selectedPath);
     sessionMutation.mutate({ path: selectedPath });
 
-    try {
-      await emulatorSurfaceRef.current?.requestFullscreen();
-    } catch {
-      // Fullscreen may be denied (e.g. browser policy); continue without it
+    if (isEmulatorFullscreenEnabled()) {
+      try {
+        await emulatorSurfaceRef.current?.requestFullscreen();
+      } catch {
+        // Fullscreen may be denied (e.g. browser policy); continue without it
+      }
     }
   }, [selectedPath, sessionMutation]);
 
@@ -267,7 +355,56 @@ export default function GameEmulator() {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="ml-auto flex items-end gap-3">
+            {frameUrl && (
+              <div className="flex items-center gap-2">
+                {saveStates && saveStates.length > 0 && (
+                  <Menu as="div" className="relative">
+                    <MenuButton className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent">
+                      Load state…
+                      <svg className="h-4 w-4 text-white/40" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </MenuButton>
+                    <MenuItems
+                      anchor="bottom end"
+                      className="z-50 mt-1 w-64 origin-top-right rounded-xl border border-border bg-surface-raised p-1 shadow-xl transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
+                    >
+                      {saveStates.map((s) => (
+                        <MenuItem key={s.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleLoadState(s.id)}
+                            className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary transition data-[focus]:bg-white/8"
+                          >
+                            <img
+                              src={`${s.screenshotUrl}?v=${new Date(s.createdAt).getTime()}`}
+                              alt=""
+                              className="h-9 w-16 shrink-0 rounded object-cover bg-white/5"
+                            />
+                            <span className="text-xs text-white/60">
+                              {new Date(s.createdAt).toLocaleString()}
+                            </span>
+                          </button>
+                        </MenuItem>
+                      ))}
+                    </MenuItems>
+                  </Menu>
+                )}
+                <button
+                  data-nav
+                  type="button"
+                  disabled={savingState}
+                  onClick={handleSaveState}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                  </svg>
+                  {savingState ? "Saving…" : "Save state"}
+                </button>
+              </div>
+            )}
             {emulation.supported && emulation.candidates.length > 1 && (
               <div className="flex items-center gap-3">
                 <label className="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
