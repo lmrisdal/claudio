@@ -16,6 +16,7 @@ RUN dotnet publish src/Claudio.Api/Claudio.Api.csproj -c Release -o /app
 
 # Stage 3: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview-alpine AS runtime
+RUN apk add --no-cache libavif-apps
 WORKDIR /app
 COPY --from=backend /app ./
 VOLUME /config

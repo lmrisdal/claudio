@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
     public DbSet<Game> Games => Set<Game>();
+    public DbSet<SaveState> SaveStates => Set<SaveState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -19,7 +20,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.HasIndex(g => new { g.Platform, g.FolderName }).IsUnique();
         });
+
+        modelBuilder.Entity<SaveState>(e =>
+        {
+            e.HasIndex(s => new { s.UserId, s.GameId, s.CreatedAt });
+            e.HasOne(s => s.Game).WithMany().HasForeignKey(s => s.GameId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
+}
+
+public class SaveState
+{
+    public int Id { get; set; }
+    public int GameId { get; set; }
+    public int UserId { get; set; }
+    public byte[] StateData { get; set; } = [];
+    public byte[] ScreenshotData { get; set; } = [];
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Game Game { get; set; } = null!;
+    public ApplicationUser User { get; set; } = null!;
 }
 
 public class Game

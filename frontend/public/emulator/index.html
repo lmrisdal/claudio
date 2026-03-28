@@ -42,22 +42,100 @@
         if (!core || !gameUrl) {
           document.body.innerHTML =
             "<p style='padding:24px;font:16px IBM Plex Sans,sans-serif;color:#fca5a5'>Missing emulator launch parameters.</p>";
-        } else {
-          window.EJS_player = "#game";
-          window.EJS_core = core;
-          window.EJS_gameUrl = gameUrl;
-          window.EJS_gameName = params.get("gameName") || "Game";
-          window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
-          window.EJS_startOnLoaded = true;
-          window.EJS_color = "#f6c247";
-          if (params.get("threads") === "1") {
-            window.EJS_threads = true;
+          return;
+        }
+
+        window.EJS_player = "#game";
+        window.EJS_core = core;
+        window.EJS_gameUrl = gameUrl;
+        window.EJS_gameName = params.get("gameName") || "Game";
+        window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+        window.EJS_startOnLoaded = true;
+        window.EJS_color = "#f6c247";
+        if (params.get("threads") === "1") {
+          window.EJS_threads = true;
+        }
+
+        // Patch WebGL context creation to preserve the drawing buffer,
+        // so canvas.toBlob() captures the actual frame instead of black.
+        var origGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+          if (type === "webgl" || type === "webgl2") {
+            attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+          }
+          return origGetContext.call(this, type, attrs);
+        };
+
+        // Listen for messages from parent window
+        window.addEventListener("message", function (event) {
+          if (!event.data || !event.data.type) return;
+          var gm = window.EJS_emulator && window.EJS_emulator.gameManager;
+          if (!gm) return;
+
+          if (event.data.type === "claudio:requestSaveState") {
+            // Defer to next frame so the GPU has a
+            // fully composited buffer ready to read back.
+            requestAnimationFrame(function () {
+              var state = gm.getState();
+
+              var canvas = document.querySelector("#game canvas");
+              if (canvas) {
+                // Use createImageBitmap + OffscreenCanvas to encode
+                // the PNG off the main thread when possible.
+                if (typeof OffscreenCanvas !== "undefined") {
+                  createImageBitmap(canvas).then(function (bmp) {
+                    var oc = new OffscreenCanvas(bmp.width, bmp.height);
+                    var ctx = oc.getContext("2d");
+                    ctx.drawImage(bmp, 0, 0);
+                    bmp.close();
+                    return oc.convertToBlob({ type: "image/png" });
+                  }).then(function (blob) {
+                    return blob.arrayBuffer();
+                  }).then(function (buf) {
+                    var stateArr = new Uint8Array(state.buffer || state);
+                    var ssArr = new Uint8Array(buf);
+                    window.parent.postMessage({
+                      type: "claudio:stateData",
+                      state: stateArr,
+                      screenshot: ssArr,
+                    }, "*", [stateArr.buffer, ssArr.buffer]);
+                  });
+                } else {
+                  // Fallback for browsers without OffscreenCanvas
+                  canvas.toBlob(function (blob) {
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                      var stateArr = new Uint8Array(state.buffer || state);
+                      var ssArr = new Uint8Array(reader.result);
+                      window.parent.postMessage({
+                        type: "claudio:stateData",
+                        state: stateArr,
+                        screenshot: ssArr,
+                      }, "*", [stateArr.buffer, ssArr.buffer]);
+                    };
+                    reader.readAsArrayBuffer(blob);
+                  }, "image/png");
+                }
+              } else {
+                var stateArr = new Uint8Array(state.buffer || state);
+                window.parent.postMessage({
+                  type: "claudio:stateData",
+                  state: stateArr,
+                  screenshot: new Uint8Array(0),
+                }, "*", [stateArr.buffer]);
+              }
+            });
           }
 
-          const script = document.createElement("script");
-          script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
-          document.body.appendChild(script);
-        }
+          if (event.data.type === "claudio:loadState") {
+            var stateData = new Uint8Array(event.data.state);
+            gm.loadState(stateData);
+          }
+        });
+
+        const script = document.createElement("script");
+        script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+        document.body.appendChild(script);
       }
 
       bootstrap();

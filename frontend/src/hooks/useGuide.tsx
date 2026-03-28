@@ -6,6 +6,8 @@ export interface GuideActions {
   coverUrl?: string;
   onResume?: () => void;
   onQuitGame?: () => void;
+  onRequestSaveState?: () => void;
+  onLoadState?: (stateData: ArrayBuffer) => void;
 }
 
 export interface GuideContextValue {

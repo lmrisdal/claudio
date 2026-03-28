@@ -49,6 +49,7 @@ export default function GuideProvider({ children }: { children: ReactNode }) {
       <GuideOverlay
         open={isOpen}
         gameName={activeActions?.gameName ?? ""}
+        gameId={activeActions?.gameId ?? null}
         hasActiveGame={activeActions !== null}
         lastPlayed={lastPlayed}
         onClose={() => {
@@ -62,6 +63,12 @@ export default function GuideProvider({ children }: { children: ReactNode }) {
         onQuitGame={() => {
           setIsOpen(false);
           activeActions?.onQuitGame?.();
+        }}
+        onRequestSaveState={() => {
+          activeActions?.onRequestSaveState?.();
+        }}
+        onLoadState={(stateData) => {
+          activeActions?.onLoadState?.(stateData);
         }}
       />
     </GuideContext.Provider>
