@@ -25,9 +25,7 @@ jobs:
           - platform: windows-latest
             target: aarch64-pc-windows-msvc
           - platform: macos-latest
-            target: aarch64-apple-darwin
-          - platform: macos-13
-            target: x86_64-apple-darwin
+            target: universal-apple-darwin
 
     runs-on: ${{ matrix.platform }}
 
@@ -58,9 +56,11 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Install and build frontend
+        run: npm ci && npm run build
         working-directory: frontend
+        env:
+          TAURI_ENV_PLATFORM: true
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -68,7 +68,7 @@ jobs:
         with:
           projectPath: src/claudio-desktop
           tauriScript: ../../frontend/node_modules/.bin/tauri
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --config '{"build":{"beforeBuildCommand":""}}'
           tagName: v__VERSION__
           releaseName: Claudio v__VERSION__
           releaseBody: See the assets below to download and install Claudio for your platform.
