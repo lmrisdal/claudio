@@ -2,10 +2,13 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const isTauri = !!process.env.TAURI_ENV_PLATFORM;
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  clearScreen: !isTauri,
   build: {
-    outDir: "../src/Claudio.Api/wwwroot",
+    outDir: isTauri ? "dist" : "../src/Claudio.Api/wwwroot",
     emptyOutDir: true,
     rollupOptions: {
       output: {
@@ -28,10 +31,13 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      "/api": "http://localhost:8080",
-      "/connect": "http://localhost:8080",
-      "/images": "http://localhost:8080",
-    },
+    strictPort: isTauri,
+    proxy: isTauri
+      ? undefined
+      : {
+          "/api": "http://localhost:8080",
+          "/connect": "http://localhost:8080",
+          "/images": "http://localhost:8080",
+        },
   },
 });

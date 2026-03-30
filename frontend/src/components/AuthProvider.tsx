@@ -46,7 +46,8 @@ async function exchangeTokens(
   params: Record<string, string>,
 ): Promise<TokenResponse> {
   const body = new URLSearchParams({ ...params, client_id: "claudio-spa" });
-  const res = await fetch("/connect/token", {
+  const serverUrl = localStorage.getItem("claudio_server_url") ?? "";
+  const res = await fetch(`${serverUrl}/connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),

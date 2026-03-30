@@ -7,11 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri:dev": "cd ../src/claudio-desktop && ../../frontend/node_modules/.bin/tauri dev",
+    "tauri:build": "cd ../src/claudio-desktop && ../../frontend/node_modules/.bin/tauri build"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@tanstack/react-query": "^5.91.3",
+    "@tauri-apps/api": "^2.10.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router": "^7.13.1"
@@ -26,6 +29,7 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "@tauri-apps/cli": "^2.10.1",
     "globals": "^17.4.0",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",

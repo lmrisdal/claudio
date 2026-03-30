@@ -19,6 +19,18 @@ var port = Environment.GetEnvironmentVariable("CLAUDIO_PORT") ?? config.Server.P
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://+:{port}");
 
+// CORS — allow desktop app (Tauri) to connect from different origins
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.SetIsOriginAllowed(_ => true)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 // Database
 if (config.Database.Provider == "postgres" && config.Database.PostgresConnection is not null)
 {
@@ -173,6 +185,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseCors();
 app.UseStaticFiles();
 
 // Serve uploaded game images from /config/images/ under /images/

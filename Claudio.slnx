@@ -1,7 +1,6 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Claudio.Api/Claudio.Api.csproj" />
-    <Project Path="src/Claudio.Desktop/Claudio.Desktop.csproj" />
     <Project Path="src/Claudio.Shared/Claudio.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
