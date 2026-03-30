@@ -1,4 +1,12 @@
-const BASE = "/api";
+function getServerBase(): string {
+  const serverUrl = localStorage.getItem("claudio_server_url");
+  return serverUrl ? `${serverUrl}/api` : "/api";
+}
+
+function getServerOrigin(): string {
+  const serverUrl = localStorage.getItem("claudio_server_url");
+  return serverUrl ?? "";
+}
 
 async function tryRefreshToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("refresh_token");
@@ -9,7 +17,7 @@ async function tryRefreshToken(): Promise<string | null> {
       refresh_token: refreshToken,
       client_id: "claudio-spa",
     });
-    const res = await fetch("/connect/token", {
+    const res = await fetch(`${getServerOrigin()}/connect/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
@@ -35,7 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init?.headers,
   };
 
-  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  const res = await fetch(`${getServerBase()}${path}`, { ...init, headers });
 
   if (res.status === 401) {
     const isAuthEndpoint = path.startsWith("/auth/");
@@ -48,7 +56,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
           Authorization: `Bearer ${newToken}`,
           ...init?.headers,
         };
-        const retryRes = await fetch(`${BASE}${path}`, {
+        const retryRes = await fetch(`${getServerBase()}${path}`, {
           ...init,
           headers: retryHeaders,
         });
@@ -82,7 +90,7 @@ async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuf
     ...init?.headers,
   };
 
-  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  const res = await fetch(`${getServerBase()}${path}`, { ...init, headers });
 
   if (res.status === 401) {
     const newToken = await tryRefreshToken();
@@ -91,7 +99,7 @@ async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuf
         Authorization: `Bearer ${newToken}`,
         ...init?.headers,
       };
-      const retryRes = await fetch(`${BASE}${path}`, { ...init, headers: retryHeaders });
+      const retryRes = await fetch(`${getServerBase()}${path}`, { ...init, headers: retryHeaders });
       if (retryRes.ok) return retryRes.arrayBuffer();
     }
     localStorage.removeItem("token");
