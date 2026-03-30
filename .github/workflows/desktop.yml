@@ -20,14 +20,19 @@ jobs:
         include:
           - platform: ubuntu-22.04
             args: ""
+            rust-targets: ""
           - platform: windows-latest
             args: --target x86_64-pc-windows-msvc
+            rust-targets: ""
           - platform: windows-latest
             args: --target aarch64-pc-windows-msvc
+            rust-targets: aarch64-pc-windows-msvc
           - platform: macos-latest
             args: --target aarch64-apple-darwin
+            rust-targets: ""
           - platform: macos-latest
             args: --target x86_64-apple-darwin
+            rust-targets: x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
 
@@ -41,6 +46,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust cross-compilation target
+        if: matrix.rust-targets != ''
+        run: rustup target add ${{ matrix.rust-targets }}
 
       - uses: swatinem/rust-cache@v2
         with:
