@@ -28,11 +28,8 @@ jobs:
           #   args: --target aarch64-pc-windows-msvc
           #   rust-targets: aarch64-pc-windows-msvc
           - platform: macos-latest
-            args: --target aarch64-apple-darwin
-            rust-targets: ""
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-            rust-targets: x86_64-apple-darwin
+            args: --target universal-apple-darwin
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
 
@@ -47,9 +44,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Rust cross-compilation target
+      - name: Install Rust cross-compilation targets
         if: matrix.rust-targets != ''
-        run: rustup target add ${{ matrix.rust-targets }}
+        run: |
+          IFS=',' read -ra TARGETS <<< "${{ matrix.rust-targets }}"
+          for target in "${TARGETS[@]}"; do
+            rustup target add "$target"
+          done
 
       - uses: swatinem/rust-cache@v2
         with:
