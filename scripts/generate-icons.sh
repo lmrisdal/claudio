@@ -16,32 +16,43 @@ fi
 
 echo "Generating icons from $SVG"
 
-# Desktop app icons
+rm -f /tmp/desktop-icon-XXXXXX.svg /tmp/maskable-XXXXXX.svg
+
+# Desktop app icons (white background for macOS/Windows)
+DESKTOP_SVG=$(mktemp /tmp/desktop-icon-XXXXXX.svg)
+
+cat > "$DESKTOP_SVG" <<SVGEOF
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <rect width="48" height="48" fill="#ffffff"/>
+  $(grep -v '<?xml\|<svg\|</svg>' "$SVG")
+</svg>
+SVGEOF
+
 for size in 32 64 128 256; do
   echo "  ${size}x${size}.png"
-  npx --yes svgexport "$SVG" "$DESKTOP_ICONS/${size}x${size}.png" "${size}:${size}"
+  npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/${size}x${size}.png" "${size}:${size}"
 done
 
 echo "  128x128@2x.png"
-npx --yes svgexport "$SVG" "$DESKTOP_ICONS/128x128@2x.png" "256:256"
+npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/128x128@2x.png" "256:256"
 
 echo "  icon.png (512x512)"
-npx --yes svgexport "$SVG" "$DESKTOP_ICONS/icon.png" "512:512"
+npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/icon.png" "512:512"
 
 # Windows Store logos
 for size in 30 44 71 89 107 142 150 284 310; do
   echo "  Square${size}x${size}Logo.png"
-  npx --yes svgexport "$SVG" "$DESKTOP_ICONS/Square${size}x${size}Logo.png" "${size}:${size}"
+  npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/Square${size}x${size}Logo.png" "${size}:${size}"
 done
 
 echo "  StoreLogo.png (50x50)"
-npx --yes svgexport "$SVG" "$DESKTOP_ICONS/StoreLogo.png" "50:50"
+npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/StoreLogo.png" "50:50"
 
 # macOS .icns and Windows .ico
 echo "  icon.icns + icon.ico"
 npx --yes png2icons "$DESKTOP_ICONS/icon.png" "$DESKTOP_ICONS/icon" -all
 
-# PWA / web icons
+# PWA / web icons (transparent background)
 echo "  apple-touch-icon.png (180x180)"
 npx --yes svgexport "$SVG" "$PUBLIC/apple-touch-icon.png" "180:180"
 
@@ -63,6 +74,6 @@ cat > "$MASKABLE_SVG" <<SVGEOF
 </svg>
 SVGEOF
 npx --yes svgexport "$MASKABLE_SVG" "$PUBLIC/icon-maskable-512.png" "512:512"
-rm -f "$MASKABLE_SVG"
+rm -f "$MASKABLE_SVG" "$DESKTOP_SVG"
 
 echo "Done."
