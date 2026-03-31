@@ -17,7 +17,10 @@ export default function DesktopSettingsDialog({
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
   const [serverUrl, setServerUrl] = useState("");
   const [installPath, setInstallPath] = useState("");
+  const [headers, setHeaders] = useState<{ name: string; value: string }[]>([]);
+  const [showHeaders, setShowHeaders] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
 
   // Load settings when opened
@@ -28,6 +31,10 @@ export default function DesktopSettingsDialog({
       setSettings(s);
       setServerUrl(s.serverUrl ?? "");
       setInstallPath(s.defaultInstallPath ?? "");
+      const h = s.customHeaders ?? {};
+      const entries = Object.entries(h).map(([name, value]) => ({ name, value }));
+      setHeaders(entries);
+      setShowHeaders(entries.length > 0);
       setMessage("");
     });
   }, [open]);
@@ -46,6 +53,42 @@ export default function DesktopSettingsDialog({
 
   if (!open) return null;
 
+  function buildCustomHeaders() {
+    const customHeaders: Record<string, string> = {};
+    for (const h of headers) {
+      const name = h.name.trim();
+      const value = h.value.trim();
+      if (name && value) customHeaders[name] = value;
+    }
+    return customHeaders;
+  }
+
+  async function handleTest() {
+    const trimmedUrl = serverUrl.trim().replace(/\/+$/, "");
+    if (!trimmedUrl) {
+      setMessage("Server URL is required.");
+      return;
+    }
+
+    setTesting(true);
+    setMessage("");
+
+    try {
+      const res = await fetch(`${trimmedUrl}/api/auth/providers`, {
+        headers: buildCustomHeaders(),
+      });
+      if (res.ok) {
+        setMessage("Connection successful.");
+      } else {
+        setMessage(`Server responded with ${res.status}.`);
+      }
+    } catch {
+      setMessage("Could not connect. Check the URL and try again.");
+    } finally {
+      setTesting(false);
+    }
+  }
+
   async function handleSave() {
     if (!settings) return;
     const trimmedUrl = serverUrl.trim().replace(/\/+$/, "");
@@ -54,36 +97,25 @@ export default function DesktopSettingsDialog({
       return;
     }
 
+    const customHeaders = buildCustomHeaders();
+
     setSaving(true);
     setMessage("");
-
-    try {
-      // Validate the server URL
-      const res = await fetch(`${trimmedUrl}/api/auth/providers`);
-      if (!res.ok) {
-        setMessage(
-          `Server responded with ${res.status}. Make sure this is a Claudio server.`,
-        );
-        setSaving(false);
-        return;
-      }
-    } catch {
-      setMessage("Could not connect. Check the URL and try again.");
-      setSaving(false);
-      return;
-    }
 
     try {
       const updated: DesktopSettings = {
         ...settings,
         serverUrl: trimmedUrl,
         defaultInstallPath: installPath.trim() || null,
+        customHeaders,
       };
       await updateSettings(updated);
       localStorage.setItem("claudio_server_url", trimmedUrl);
+      localStorage.setItem("claudio_custom_headers", JSON.stringify(customHeaders));
 
       const serverChanged = trimmedUrl !== (settings.serverUrl ?? "");
-      if (serverChanged) {
+      const headersChanged = JSON.stringify(customHeaders) !== JSON.stringify(settings.customHeaders ?? {});
+      if (serverChanged || headersChanged) {
         window.location.reload();
         return;
       }
@@ -172,9 +204,77 @@ export default function DesktopSettingsDialog({
             />
           </div>
 
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowHeaders(!showHeaders)}
+              className="text-xs text-text-muted hover:text-text-secondary transition flex items-center gap-1"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform ${showHeaders ? "rotate-90" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              Custom headers
+            </button>
+            {showHeaders && (
+              <div className="mt-2 space-y-2">
+                {headers.map((h, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={h.name}
+                      onChange={(e) => {
+                        const next = [...headers];
+                        next[i] = { ...h, name: e.target.value };
+                        setHeaders(next);
+                      }}
+                      placeholder="Header name…"
+                      spellCheck={false}
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-bg border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={h.value}
+                      onChange={(e) => {
+                        const next = [...headers];
+                        next[i] = { ...h, value: e.target.value };
+                        setHeaders(next);
+                      }}
+                      placeholder="Value…"
+                      spellCheck={false}
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-bg border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setHeaders(headers.filter((_, j) => j !== i))}
+                      className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                      aria-label="Remove header"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setHeaders([...headers, { name: "", value: "" }])}
+                  className="text-xs text-accent hover:text-accent-hover transition"
+                >
+                  + Add header
+                </button>
+              </div>
+            )}
+          </div>
+
           {message && (
             <p
-              className={`text-sm ${message.includes("saved") ? "text-accent" : "text-red-400"}`}
+              className={`text-sm ${message.includes("successful") ? "text-accent" : "text-red-400"}`}
               role="alert"
             >
               {message}
@@ -182,20 +282,29 @@ export default function DesktopSettingsDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+        <div className="flex justify-between px-6 py-4 border-t border-border">
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
+            onClick={handleTest}
+            disabled={testing || !serverUrl.trim()}
+            className="px-4 py-2 rounded-lg text-sm border border-border text-text-secondary hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-60"
           >
-            Cancel
+            {testing ? "Testing…" : "Test connection"}
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-neutral-950 font-medium text-sm transition disabled:opacity-60"
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-neutral-950 font-medium text-sm transition disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

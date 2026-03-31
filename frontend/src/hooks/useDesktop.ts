@@ -10,6 +10,7 @@ interface DesktopSettings {
   windowX: number | null;
   windowY: number | null;
   defaultInstallPath: string | null;
+  customHeaders: Record<string, string>;
 }
 
 interface PingResponse {

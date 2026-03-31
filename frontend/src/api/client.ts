@@ -8,6 +8,15 @@ function getServerOrigin(): string {
   return serverUrl ?? "";
 }
 
+function getCustomHeaders(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem("claudio_custom_headers");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 async function tryRefreshToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) return null;
@@ -19,7 +28,7 @@ async function tryRefreshToken(): Promise<string | null> {
     });
     const res = await fetch(`${getServerOrigin()}/connect/token`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { ...getCustomHeaders(), "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
     if (!res.ok) return null;
@@ -38,6 +47,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem("token");
   const isFormData = init?.body instanceof FormData;
   const headers: HeadersInit = {
+    ...getCustomHeaders(),
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...init?.headers,
@@ -86,6 +96,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
   const token = localStorage.getItem("token");
   const headers: HeadersInit = {
+    ...getCustomHeaders(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...init?.headers,
   };

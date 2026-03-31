@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -11,6 +12,8 @@ pub struct DesktopSettings {
     pub window_x: Option<f64>,
     pub window_y: Option<f64>,
     pub default_install_path: Option<String>,
+    #[serde(default)]
+    pub custom_headers: HashMap<String, String>,
 }
 
 impl Default for DesktopSettings {
@@ -22,6 +25,7 @@ impl Default for DesktopSettings {
             window_x: None,
             window_y: None,
             default_install_path: None,
+            custom_headers: HashMap::new(),
         }
     }
 }

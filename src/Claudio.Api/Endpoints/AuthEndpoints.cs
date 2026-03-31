@@ -19,7 +19,7 @@ public static class AuthEndpoints
 
         group.MapPost("/register", Register);
         group.MapPost("/remote", ProxyLogin);
-        group.MapGet("/providers", GetProviders);
+        group.MapGet("/providers", GetProviders).AllowAnonymous();
         group.MapGet("/github/start", GitHubStart);
         group.MapGet("/github/callback", GitHubCallback);
         group.MapGet("/google/start", GoogleStart);

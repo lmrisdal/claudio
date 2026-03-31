@@ -50,6 +50,9 @@ function DesktopGate({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         if (settings.serverUrl) {
           localStorage.setItem("claudio_server_url", settings.serverUrl);
+          if (settings.customHeaders && Object.keys(settings.customHeaders).length > 0) {
+            localStorage.setItem("claudio_custom_headers", JSON.stringify(settings.customHeaders));
+          }
           setState("ready");
         } else {
           setState("setup");

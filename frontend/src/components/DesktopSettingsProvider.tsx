@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isDesktop } from "../hooks/useDesktop";
 import { DesktopSettingsDialogContext } from "../hooks/useDesktopSettings";
@@ -17,9 +18,14 @@ export default function DesktopSettingsProvider({
   useEffect(() => {
     window.addEventListener("claudio:open-desktop-settings", open);
     window.addEventListener("claudio:close-dialogs", close);
+
+    // Listen for native menu "Settings…" item
+    const unlisten = listen("open-settings", open);
+
     return () => {
       window.removeEventListener("claudio:open-desktop-settings", open);
       window.removeEventListener("claudio:close-dialogs", close);
+      unlisten.then((fn) => fn());
     };
   }, [open, close]);
 

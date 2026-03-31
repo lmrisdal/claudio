@@ -20,8 +20,64 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             window.set_decorations(false)?;
 
+            // Add Settings item to the native app menu (macOS Claudio menu)
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+
+                let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
+                    .accelerator("CmdOrCtrl+,")
+                    .build(app)?;
+
+                let app_submenu = SubmenuBuilder::new(app, "Claudio")
+                    .about(None)
+                    .separator()
+                    .item(&settings_item)
+                    .separator()
+                    .services()
+                    .separator()
+                    .hide()
+                    .hide_others()
+                    .show_all()
+                    .separator()
+                    .quit()
+                    .build()?;
+
+                let edit_submenu = SubmenuBuilder::new(app, "Edit")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+
+                let window_submenu = SubmenuBuilder::new(app, "Window")
+                    .minimize()
+                    .maximize()
+                    .close_window()
+                    .separator()
+                    .fullscreen()
+                    .build()?;
+
+                let menu = MenuBuilder::new(app)
+                    .item(&app_submenu)
+                    .item(&edit_submenu)
+                    .item(&window_submenu)
+                    .build()?;
+
+                app.set_menu(menu)?;
+            }
+
             let _ = window;
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == "settings" {
+                use tauri::Emitter;
+                let _ = app.emit("open-settings", ());
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running Claudio");
