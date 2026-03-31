@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri:dev": "cd ../src/claudio-desktop && ../../frontend/node_modules/.bin/tauri dev",
-    "tauri:build": "cd ../src/claudio-desktop && ../../frontend/node_modules/.bin/tauri build"
+    "tauri:build": "cd ../src/claudio-desktop && ../../frontend/node_modules/.bin/tauri build",
+    "generate-icons": "../scripts/generate-icons.sh"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
