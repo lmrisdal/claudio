@@ -31,11 +31,7 @@ impl Default for DesktopSettings {
 }
 
 fn settings_path() -> PathBuf {
-    let dir = dirs::data_local_dir()
-        .expect("could not determine local data directory")
-        .join("claudio");
-    fs::create_dir_all(&dir).expect("could not create settings directory");
-    dir.join("settings.json")
+    data_dir().join("settings.json")
 }
 
 pub fn load() -> DesktopSettings {
@@ -50,4 +46,23 @@ pub fn save(settings: &DesktopSettings) -> Result<(), String> {
     let path = settings_path();
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())
+}
+
+pub fn data_dir() -> PathBuf {
+    let dir = dirs::data_local_dir()
+        .expect("could not determine local data directory")
+        .join("claudio");
+    fs::create_dir_all(&dir).expect("could not create settings directory");
+    dir
+}
+
+pub fn resolve_install_root(settings: &DesktopSettings) -> Result<PathBuf, String> {
+    let path = settings
+        .default_install_path
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir().join("games"));
+
+    fs::create_dir_all(&path).map_err(|err| err.to_string())?;
+    Ok(path)
 }

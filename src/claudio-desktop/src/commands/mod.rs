@@ -1,3 +1,4 @@
+pub mod games;
 pub mod ping;
 
 use crate::settings;
