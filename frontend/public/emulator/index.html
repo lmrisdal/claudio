@@ -38,7 +38,30 @@
       const core = params.get("core");
       const gameUrl = params.get("gameUrl");
 
-      function bootstrap() {
+      async function loadScript(url) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = url;
+          script.onload = resolve;
+          script.onerror = () =>
+            reject(new Error(`Failed to load emulator script: ${url}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      async function loadStyle(url) {
+        await new Promise((resolve, reject) => {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = url;
+          link.onload = resolve;
+          link.onerror = () =>
+            reject(new Error(`Failed to load emulator stylesheet: ${url}`));
+          document.head.appendChild(link);
+        });
+      }
+
+      async function bootstrap() {
         if (!core || !gameUrl) {
           document.body.innerHTML =
             "<p style='padding:24px;font:16px IBM Plex Sans,sans-serif;color:#fca5a5'>Missing emulator launch parameters.</p>";
@@ -133,12 +156,29 @@
           }
         });
 
-        const script = document.createElement("script");
-        script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
-        document.body.appendChild(script);
+        try {
+          await loadScript("https://cdn.emulatorjs.org/stable/data/emulator.min.js");
+          await loadStyle("https://cdn.emulatorjs.org/stable/data/emulator.min.css");
+
+          const config = {
+            gameUrl: window.EJS_gameUrl,
+            dataPath: window.EJS_pathtodata,
+            system: window.EJS_core,
+            gameName: window.EJS_gameName,
+            color: window.EJS_color,
+            startOnLoad: window.EJS_startOnLoaded,
+            threads: window.EJS_threads,
+          };
+
+          window.EJS_emulator = new window.EmulatorJS(window.EJS_player, config);
+        } catch (error) {
+          console.error(error);
+          document.body.innerHTML =
+            "<p style='padding:24px;font:16px IBM Plex Sans,sans-serif;color:#fca5a5'>Failed to load emulator assets.</p>";
+        }
       }
 
-      bootstrap();
+      void bootstrap();
     </script>
   </body>
 </html>

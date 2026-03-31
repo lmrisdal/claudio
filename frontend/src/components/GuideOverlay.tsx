@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router";
-import { api } from "../api/client";
+import { api, resolveServerUrl } from "../api/client";
 import type { LastPlayedGame } from "../hooks/guideTypes";
 import { useGamepadEvent, useShortcut } from "../hooks/useShortcut";
 import { sounds } from "../utils/sounds";
@@ -1159,7 +1159,7 @@ const SaveSlotCard = forwardRef<
       >
         <div className="relative aspect-video w-full overflow-hidden bg-white/5">
           <img
-            src={`${screenshotUrl}?v=${new Date(createdAt).getTime()}`}
+            src={`${resolveServerUrl(screenshotUrl)}?v=${new Date(createdAt).getTime()}`}
             alt={`Save from ${formatRelativeTime(createdAt)}`}
             className="h-full w-full object-cover"
             loading="lazy"

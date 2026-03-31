@@ -47,6 +47,30 @@
   --text-muted-color: #888899;
 }
 
+/* Disable page-level overscroll and rubber-band scrolling so the UI feels more desktop-native. */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+/* Scope the desktop scroll shell to the root container. */
+[data-ui-scroll-container] {
+  height: 100vh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: none;
+}
+
+/* Vite mounts into #root, so it needs to inherit the full-height desktop shell. */
+#root {
+  height: 100%;
+}
+
 body {
   background-color: var(--bg);
   color: var(--text-primary);

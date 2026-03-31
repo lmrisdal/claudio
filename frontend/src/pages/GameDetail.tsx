@@ -379,7 +379,7 @@ export default function GameDetail() {
           })
         : await api.post<IgdbCandidate[]>(`/admin/games/${id}/igdb/search`);
 
-      let gamePlatformSlug = game?.platform;
+      const gamePlatformSlug = game?.platform;
 
       if (results.length === 0) {
         setSearchError("No results found on IGDB.");
@@ -1395,7 +1395,7 @@ export default function GameDetail() {
                           d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z"
                         />
                       </svg>
-                      Play in Browser
+                      Play
                     </Link>
                   )}
                   {game.isMissing ? (

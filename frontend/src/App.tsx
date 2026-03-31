@@ -87,7 +87,7 @@ function DesktopGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-grid flex flex-col">
+    <div className="min-h-full bg-grid flex flex-col">
       <DesktopTitleBar />
       <DesktopGate>
         <div className="flex-1">

@@ -13,6 +13,9 @@ path = "src/lib.rs"
 
 [dependencies]
 tauri = { version = "2", features = ["devtools"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }

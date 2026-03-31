@@ -28,7 +28,9 @@ createRoot(document.getElementById("root")!).render(
             <AccountDialogProvider>
               <DesktopSettingsProvider>
                 <NavigationProvider>
-                  <App />
+                  <main data-ui-scroll-container>
+                    <App />
+                  </main>
                 </NavigationProvider>
               </DesktopSettingsProvider>
             </AccountDialogProvider>

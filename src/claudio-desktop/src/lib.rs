@@ -1,6 +1,8 @@
 mod commands;
 mod settings;
 
+use tauri::webview::PageLoadEvent;
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -77,6 +79,30 @@ pub fn run() {
             if event.id() == "settings" {
                 use tauri::Emitter;
                 let _ = app.emit("open-settings", ());
+            }
+        })
+        .on_page_load(|webview, payload| {
+            if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {
+                let _ = webview.window().show();
+
+                // Enable the W3C Fullscreen API in the WKWebView so that
+                // document.fullscreenEnabled is true and element.requestFullscreen()
+                // works natively on macOS (WKWebView disables it by default).
+                // Done here rather than in setup so the webview is fully initialized.
+                #[cfg(target_os = "macos")]
+                {
+                    use objc2::runtime::AnyObject;
+                    use objc2::msg_send;
+                    let _ = webview.with_webview(|wv| unsafe {
+                        let ptr = wv.inner() as *mut AnyObject;
+                        if ptr.is_null() { return; }
+                        let config: *mut AnyObject = msg_send![&*ptr, configuration];
+                        if config.is_null() { return; }
+                        let prefs: *mut AnyObject = msg_send![&*config, preferences];
+                        if prefs.is_null() { return; }
+                        let _: () = msg_send![&*prefs, setElementFullscreenEnabled: true];
+                    });
+                }
             }
         })
         .run(tauri::generate_context!())

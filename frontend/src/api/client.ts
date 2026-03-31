@@ -8,6 +8,19 @@ function getServerOrigin(): string {
   return serverUrl ?? "";
 }
 
+export function resolveServerUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const origin = getServerOrigin();
+  if (!origin) {
+    return path;
+  }
+
+  return path.startsWith("/") ? `${origin}${path}` : `${origin}/${path}`;
+}
+
 function getCustomHeaders(): Record<string, string> {
   try {
     const raw = localStorage.getItem("claudio_custom_headers");

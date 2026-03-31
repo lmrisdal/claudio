@@ -30,6 +30,7 @@ export async function updateSettings(settings: DesktopSettings): Promise<void> {
   return invoke<void>("update_settings", { settings });
 }
 
+
 export function useDesktop() {
   return { isDesktop, ping, getSettings, updateSettings };
 }

@@ -15,6 +15,7 @@
         "title": "Claudio",
         "width": 1280,
         "height": 800,
+        "visible": false,
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,

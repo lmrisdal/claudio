@@ -2,7 +2,7 @@ import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { api } from "../api/client";
+import { api, resolveServerUrl } from "../api/client";
 import { useArrowNav } from "../hooks/useArrowNav";
 import { useGuide } from "../hooks/useGuide";
 import { matchKey, useGamepadEvent, useShortcut } from "../hooks/useShortcut";
@@ -76,7 +76,7 @@ export default function GameEmulator() {
 
       const params = new URLSearchParams({
         core: emulation.core,
-        gameUrl: session.gameUrl,
+        gameUrl: resolveServerUrl(session.gameUrl),
         gameName: game.title,
       });
 
@@ -277,7 +277,7 @@ export default function GameEmulator() {
       try {
         await emulatorSurfaceRef.current?.requestFullscreen();
       } catch {
-        // Fullscreen may be denied (e.g. browser policy); continue without it
+        // Fullscreen may be denied; continue without it
       }
     }
   }, [selectedPath, sessionMutation]);
@@ -378,7 +378,7 @@ export default function GameEmulator() {
                             className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary transition data-[focus]:bg-white/8"
                           >
                             <img
-                              src={`${s.screenshotUrl}?v=${new Date(s.createdAt).getTime()}`}
+                              src={`${resolveServerUrl(s.screenshotUrl)}?v=${new Date(s.createdAt).getTime()}`}
                               alt=""
                               className="h-9 w-16 shrink-0 rounded object-cover bg-white/5"
                             />
