@@ -1,22 +1,40 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState, useSyncExternalStore } from "react";
 
-type Theme = 'dark' | 'light'
+export type ThemePreference = "system" | "dark" | "light";
+
+function subscribeToColorScheme(callback: () => void) {
+  const mq = window.matchMedia("(prefers-color-scheme: light)");
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+
+function getColorSchemeSnapshot() {
+  return window.matchMedia("(prefers-color-scheme: light)").matches;
+}
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('theme') as Theme | null
-    if (stored) return stored
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-  })
+  const [pref, setPref] = useState<ThemePreference>(() => {
+    const stored = localStorage.getItem("theme") as ThemePreference | null;
+    if (stored === "dark" || stored === "light" || stored === "system")
+      return stored;
+    return "system";
+  });
+
+  const systemIsLight = useSyncExternalStore(
+    subscribeToColorScheme,
+    getColorSchemeSnapshot,
+    () => false,
+  );
+
+  const resolved: "dark" | "light" =
+    pref === "system" ? (systemIsLight ? "light" : "dark") : pref;
 
   useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('light', 'dark')
-    root.classList.add(theme)
-    localStorage.setItem('theme', theme)
-  }, [theme])
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(resolved);
+    localStorage.setItem("theme", pref);
+  }, [resolved, pref]);
 
-  const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
-
-  return { theme, toggle }
+  return { theme: pref, setTheme: setPref };
 }

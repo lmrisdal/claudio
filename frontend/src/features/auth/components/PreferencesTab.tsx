@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import type { ThemePreference } from "../../core/hooks/useTheme";
+import { useTheme } from "../../core/hooks/useTheme";
 import { setIndexedRef } from "../../core/utils/dom";
 import {
   isEmulatorFullscreenEnabled,
@@ -23,6 +25,13 @@ export default function PreferencesTab({
   const [shortcuts, setShortcuts] = useState(getShortcuts);
   const [recording, setRecording] = useState<keyof ShortcutMap | null>(null);
   const defaults = getShortcutDefaults();
+  const { theme, setTheme } = useTheme();
+
+  const themeOptions: { value: ThemePreference; label: string }[] = [
+    { value: "system", label: "System" },
+    { value: "dark", label: "Dark" },
+    { value: "light", label: "Light" },
+  ];
 
   function startRecording(key: keyof ShortcutMap) {
     setRecording(key);
@@ -71,10 +80,33 @@ export default function PreferencesTab({
 
   return (
     <div className="space-y-6">
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-white/80">Theme</span>
+        </div>
+        <div className="flex rounded-lg overflow-hidden ring-1 ring-white/12">
+          {themeOptions.map((opt, i) => (
+            <button
+              key={opt.value}
+              ref={(el) => setIndexedRef(contentRefs, i, el)}
+              type="button"
+              onClick={() => setTheme(opt.value)}
+              className={`flex-1 py-1.5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
+                theme === opt.value
+                  ? "bg-white/14 text-white"
+                  : "text-white/50 hover:text-white/80 hover:bg-white/6"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label className="flex items-center justify-between cursor-pointer">
         <span className="text-sm text-white/80">Navigation sounds</span>
         <button
-          ref={(el) => setIndexedRef(contentRefs, 0, el)}
+          ref={(el) => setIndexedRef(contentRefs, 3, el)}
           type="button"
           role="switch"
           aria-checked={soundsOn}
@@ -96,7 +128,7 @@ export default function PreferencesTab({
           Start emulator in fullscreen
         </span>
         <button
-          ref={(el) => setIndexedRef(contentRefs, 1, el)}
+          ref={(el) => setIndexedRef(contentRefs, 4, el)}
           type="button"
           role="switch"
           aria-checked={fullscreenOn}
@@ -128,7 +160,7 @@ export default function PreferencesTab({
               setShortcut("guide", defaults.guide);
               setShortcuts(getShortcuts());
             }}
-            buttonRef={(el) => setIndexedRef(contentRefs, 2, el)}
+            buttonRef={(el) => setIndexedRef(contentRefs, 5, el)}
           />
         </div>
       </div>
