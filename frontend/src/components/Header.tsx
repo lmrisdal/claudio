@@ -1,17 +1,19 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useAccountDialog } from "../hooks/useAccountDialog";
 import { useAuth } from "../hooks/useAuth";
 import { isDesktop } from "../hooks/useDesktop";
 import { useNavigation } from "../hooks/useNavigation";
 import { useTheme } from "../hooks/useTheme";
+import { isMac } from "./DesktopTitleBar";
 import Logo from "./Logo";
 import SearchDialog from "./SearchDialog";
 import TasksPopover from "./TasksPopover";
 
 export default function Header() {
+  const navigate = useNavigate();
   const { isLoggedIn, isAdmin, user, logout, authDisabled } = useAuth();
   const { theme, toggle } = useTheme();
-  const { searchOpen, closeSearch, toggleSearch } = useNavigation();
+  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
   const accountDialog = useAccountDialog();
 
   return (
@@ -22,14 +24,36 @@ export default function Header() {
       >
         <div
           data-tauri-drag-region={isDesktop || undefined}
-          className="max-w-7xl mx-auto h-14 flex items-center justify-between px-6"
+          className={`${isDesktop ? "w-full px-6" : "max-w-7xl mx-auto px-6"} h-14 flex items-center justify-between`}
         >
-          {!isDesktop && (
+          {isDesktop ? (
+            <div className={`flex items-center gap-0.5 ${isMac ? "ml-20" : "ml-2"}`}>
+              <button
+                onClick={() => navigate(-1)}
+                disabled={!canGoBack}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Go back"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+              <button
+                onClick={() => navigate(1)}
+                disabled={!canGoForward}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Go forward"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            </div>
+          ) : (
             <Link to="/" className="flex items-center gap-3">
               <Logo className="text-xl" />
             </Link>
           )}
-          {isDesktop && <div />}
 
           <div className="flex items-center gap-1">
             {isLoggedIn && (

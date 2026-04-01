@@ -5,6 +5,8 @@ export interface NavigationContextValue {
   openSearch: () => void;
   closeSearch: () => void;
   toggleSearch: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
 }
 
 export const NavigationContext = createContext<NavigationContextValue | null>(
