@@ -3,11 +3,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import App from "./App";
-import AccountDialogProvider from "./components/AccountDialogProvider";
-import AuthProvider from "./components/AuthProvider";
-import DesktopSettingsProvider from "./components/DesktopSettingsProvider";
-import GuideProvider from "./components/GuideProvider";
-import NavigationProvider from "./hooks/NavigationProvider";
+import AccountDialogProvider from "./features/auth/components/AccountDialogProvider";
+import AuthProvider from "./features/auth/components/AuthProvider";
+import GuideProvider from "./features/core/components/GuideProvider";
+import NavigationProvider from "./features/core/components/NavigationProvider";
+import DesktopSettingsProvider from "./features/desktop/components/DesktopSettingsProvider";
 import "./index.css";
 
 const queryClient = new QueryClient({
