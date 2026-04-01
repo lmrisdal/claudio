@@ -17,6 +17,7 @@ export default function DesktopSettingsDialog({
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
   const [serverUrl, setServerUrl] = useState("");
   const [installPath, setInstallPath] = useState("");
+  const [closeToTray, setCloseToTray] = useState(false);
   const [headers, setHeaders] = useState<{ name: string; value: string }[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -31,6 +32,7 @@ export default function DesktopSettingsDialog({
       setSettings(s);
       setServerUrl(s.serverUrl ?? "");
       setInstallPath(s.defaultInstallPath ?? "");
+      setCloseToTray(s.closeToTray ?? false);
       const h = s.customHeaders ?? {};
       const entries = Object.entries(h).map(([name, value]) => ({ name, value }));
       setHeaders(entries);
@@ -107,6 +109,7 @@ export default function DesktopSettingsDialog({
         ...settings,
         serverUrl: trimmedUrl,
         defaultInstallPath: installPath.trim() || null,
+        closeToTray,
         customHeaders,
       };
       await updateSettings(updated);
@@ -203,6 +206,23 @@ export default function DesktopSettingsDialog({
               className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-text-primary placeholder-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
+
+          <label className="flex items-start gap-3 rounded-xl border border-border bg-bg px-3 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={closeToTray}
+              onChange={(e) => setCloseToTray(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-accent focus:ring-2 focus:ring-accent"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-text-primary">
+                Close to tray
+              </span>
+              <span className="block text-xs text-text-muted mt-1">
+                Keep Claudio running in the system tray when the window is closed.
+              </span>
+            </span>
+          </label>
 
           <div>
             <button

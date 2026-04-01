@@ -13,6 +13,8 @@ pub struct DesktopSettings {
     pub window_y: Option<f64>,
     pub default_install_path: Option<String>,
     #[serde(default)]
+    pub close_to_tray: bool,
+    #[serde(default)]
     pub custom_headers: HashMap<String, String>,
 }
 
@@ -25,6 +27,7 @@ impl Default for DesktopSettings {
             window_x: None,
             window_y: None,
             default_install_path: None,
+            close_to_tray: false,
             custom_headers: HashMap::new(),
         }
     }

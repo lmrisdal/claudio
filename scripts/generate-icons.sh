@@ -8,6 +8,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SVG="$REPO_ROOT/frontend/public/favicon.svg"
 DESKTOP_ICONS="$REPO_ROOT/src/claudio-desktop/icons"
 PUBLIC="$REPO_ROOT/frontend/public"
+TRAY_SVG="$DESKTOP_ICONS/tray-icon.svg"
 
 if [ ! -f "$SVG" ]; then
   echo "Error: $SVG not found" >&2
@@ -38,6 +39,11 @@ npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/128x128@2x.png" "256:256"
 
 echo "  icon.png (512x512)"
 npx --yes svgexport "$DESKTOP_SVG" "$DESKTOP_ICONS/icon.png" "512:512"
+
+if [ -f "$TRAY_SVG" ]; then
+  echo "  tray-icon.png (64x64)"
+  npx --yes svgexport "$TRAY_SVG" "$DESKTOP_ICONS/tray-icon.png" "64:64"
+fi
 
 # Windows Store logos
 for size in 30 44 71 89 107 142 150 284 310; do

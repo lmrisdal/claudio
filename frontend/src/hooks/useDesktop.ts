@@ -11,6 +11,7 @@ interface DesktopSettings {
   windowX: number | null;
   windowY: number | null;
   defaultInstallPath: string | null;
+  closeToTray: boolean;
   customHeaders: Record<string, string>;
 }
 

@@ -4,7 +4,20 @@ mod registry;
 mod services;
 mod settings;
 
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{AppHandle, Emitter, Manager};
 use tauri::webview::PageLoadEvent;
+
+const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
+
+fn restore_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
 
 pub fn run() {
     tauri::Builder::default()
@@ -23,8 +36,17 @@ pub fn run() {
             commands::update_settings,
         ])
         .setup(|app| {
-            use tauri::Manager;
             let window = app.get_webview_window("main").unwrap();
+            let window_for_close = window.clone();
+
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if settings::load().close_to_tray {
+                        api.prevent_close();
+                        let _ = window_for_close.hide();
+                    }
+                }
+            });
 
             #[cfg(not(target_os = "macos"))]
             window.set_decorations(false)?;
@@ -78,13 +100,34 @@ pub fn run() {
                 app.set_menu(menu)?;
             }
 
+            let show_item = MenuItem::with_id(app, "tray-show", "Show Claudio", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "tray-quit", "Quit", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let tray_icon = tauri::image::Image::from_bytes(TRAY_ICON_PNG)?.to_owned();
+
+            TrayIconBuilder::new()
+                .icon(tray_icon)
+                .menu(&tray_menu)
+                .tooltip("Claudio")
+                .show_menu_on_left_click(true)
+                .icon_as_template(cfg!(target_os = "macos"))
+                .build(app)?;
+
             let _ = window;
             Ok(())
         })
         .on_menu_event(|app, event| {
-            if event.id() == "settings" {
-                use tauri::Emitter;
-                let _ = app.emit("open-settings", ());
+            match event.id().as_ref() {
+                "settings" => {
+                    let _ = app.emit("open-settings", ());
+                }
+                "tray-show" => {
+                    restore_main_window(app);
+                }
+                "tray-quit" => {
+                    app.exit(0);
+                }
+                _ => {}
             }
         })
         .on_page_load(|webview, payload| {
