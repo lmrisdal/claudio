@@ -1,94 +1,23 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
-import { useAuth } from "./hooks/useAuth";
-import { getSettings, isDesktop } from "./hooks/useDesktop";
-import { DownloadManagerProvider } from "./hooks/useDownloadManager";
 
-import DesktopLayout from "./components/DesktopLayout";
+import { isDesktop } from "./features/desktop/hooks/useDesktop";
+import { DownloadManagerProvider } from "./features/downloads/hooks/useDownloadManager";
 
-const Admin = lazy(() => import("./pages/Admin"));
-const Downloads = lazy(() => import("./pages/Downloads"));
-const GameDetail = lazy(() => import("./pages/GameDetail"));
-const GameEmulator = lazy(() => import("./pages/GameEmulator"));
-const Library = lazy(() => import("./pages/Library"));
-const Login = lazy(() => import("./pages/Login"));
-const ExternalAuthCallback = lazy(() => import("./pages/ExternalAuthCallback"));
-const Register = lazy(() => import("./pages/Register"));
-const DesktopSetup = lazy(() => import("./pages/DesktopSetup"));
+import DesktopLayout from "./features/desktop/components/DesktopLayout";
+import { ProtectedRoute } from "./features/auth/components/ProtectedRoute";
+import { AdminRoute } from "./features/auth/components/AdminRoute";
+import { GuestRoute } from "./features/auth/components/GuestRoute";
+import { DesktopGate } from "./features/desktop/components/DesktopGate";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn } = useAuth();
-  if (!isLoggedIn) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, isAdmin } = useAuth();
-  if (!isLoggedIn) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-
-function GuestRoute({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn } = useAuth();
-  if (isLoggedIn) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-
-function DesktopGate({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<"loading" | "setup" | "ready">(
-    isDesktop ? "loading" : "ready",
-  );
-
-  useEffect(() => {
-    if (!isDesktop) return;
-    let cancelled = false;
-
-    getSettings()
-      .then((settings) => {
-        if (cancelled) return;
-        if (settings.serverUrl) {
-          localStorage.setItem("claudio_server_url", settings.serverUrl);
-          if (
-            settings.customHeaders &&
-            Object.keys(settings.customHeaders).length > 0
-          ) {
-            localStorage.setItem(
-              "claudio_custom_headers",
-              JSON.stringify(settings.customHeaders),
-            );
-          }
-          setState("ready");
-        } else {
-          setState("setup");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setState("setup");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (state === "loading") return null;
-
-  if (state === "setup") {
-    return (
-      <Suspense>
-        <DesktopSetup
-          onConnected={(serverUrl) => {
-            localStorage.setItem("claudio_server_url", serverUrl);
-            setState("ready");
-          }}
-        />
-      </Suspense>
-    );
-  }
-
-  return <>{children}</>;
-}
+const Admin = lazy(() => import("./features/admin/pages/Admin"));
+const Downloads = lazy(() => import("./features/downloads/pages/Downloads"));
+const GameDetail = lazy(() => import("./features/gamedetail/pages/GameDetail"));
+const GameEmulator = lazy(() => import("./features/gamedetail/pages/GameEmulator"));
+const Library = lazy(() => import("./features/library/pages/Library"));
+const Login = lazy(() => import("./features/auth/pages/Login"));
+const ExternalAuthCallback = lazy(() => import("./features/auth/pages/ExternalAuthCallback"));
+const Register = lazy(() => import("./features/auth/pages/Register"));
 
 export default function App() {
   return (
