@@ -46,6 +46,7 @@ jobs:
 
       - name: Install Rust cross-compilation targets
         if: matrix.rust-targets != ''
+        shell: bash
         run: |
           IFS=',' read -ra TARGETS <<< "${{ matrix.rust-targets }}"
           for target in "${TARGETS[@]}"; do
