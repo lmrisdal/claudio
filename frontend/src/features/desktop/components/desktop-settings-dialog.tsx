@@ -18,6 +18,7 @@ export default function DesktopSettingsDialog({
   const [serverUrl, setServerUrl] = useState("");
   const [installPath, setInstallPath] = useState("");
   const [closeToTray, setCloseToTray] = useState(false);
+  const [speedLimit, setSpeedLimit] = useState("");
   const [headers, setHeaders] = useState<{ name: string; value: string }[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -34,6 +35,7 @@ export default function DesktopSettingsDialog({
       setServerUrl(s.serverUrl ?? "");
       setInstallPath(s.defaultInstallPath ?? "");
       setCloseToTray(s.closeToTray ?? false);
+      setSpeedLimit(s.downloadSpeedLimitKbs ? String(s.downloadSpeedLimitKbs) : "");
       const h = s.customHeaders ?? {};
       const entries = Object.entries(h).map(([name, value]) => ({
         name,
@@ -109,12 +111,14 @@ export default function DesktopSettingsDialog({
     setMessage("");
 
     try {
+      const parsedLimit = parseFloat(speedLimit);
       const updated: DesktopSettings = {
         ...settings,
         serverUrl: trimmedUrl,
         defaultInstallPath: installPath.trim() || null,
         closeToTray,
         customHeaders,
+        downloadSpeedLimitKbs: parsedLimit > 0 ? parsedLimit : null,
       };
       await updateSettings(updated);
       localStorage.setItem("claudio_server_url", trimmedUrl);
@@ -233,6 +237,28 @@ export default function DesktopSettingsDialog({
               </span>
             </span>
           </label>
+
+          <div>
+            <label
+              htmlFor="settings-speed-limit"
+              className="block text-sm font-medium text-text-secondary mb-1.5"
+            >
+              Download speed limit
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="settings-speed-limit"
+                type="number"
+                min="0"
+                step="any"
+                value={speedLimit}
+                onChange={(e) => setSpeedLimit(e.target.value)}
+                placeholder="Unlimited"
+                className="flex-1 px-3 py-2 rounded-lg bg-bg border border-border text-text-primary placeholder-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+              <span className="text-sm text-text-muted shrink-0">KB/s</span>
+            </div>
+          </div>
 
           <div>
             <button

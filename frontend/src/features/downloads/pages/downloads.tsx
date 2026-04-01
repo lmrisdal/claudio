@@ -4,6 +4,13 @@ import { cancelInstall } from "../../desktop/hooks/use-desktop";
 import CoverThumb from "../components/cover-thumb";
 import { useDownloadManager } from "../hooks/use-download-manager-hook";
 
+function formatSpeed(bytesPerSecond: number): string {
+  const mbps = bytesPerSecond / 1_000_000;
+  if (mbps >= 100) return `${Math.round(mbps)} MB/s`;
+  if (mbps >= 10) return `${mbps.toFixed(1)} MB/s`;
+  return `${mbps.toFixed(2)} MB/s`;
+}
+
 export default function Downloads() {
   const queryClient = useQueryClient();
   const { activeDownloads } = useDownloadManager();
@@ -44,7 +51,7 @@ export default function Downloads() {
             Active
           </h2>
           <div className="space-y-2">
-            {activeList.map(({ game, progress }) => (
+            {activeList.map(({ game, progress, speedBps }) => (
               <div
                 key={game.id}
                 className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-border"
@@ -53,8 +60,15 @@ export default function Downloads() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{game.title}</div>
                   <div className="text-sm text-text-muted mt-0.5">
-                    {progress.detail ??
-                      progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
+                    <span>
+                      {progress.detail ??
+                        progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
+                    </span>
+                    {speedBps != null && (
+                      <span className="ml-2 font-mono tabular-nums">
+                        {formatSpeed(speedBps)}
+                      </span>
+                    )}
                   </div>
                   {typeof progress.percent === "number" && (
                     <div className="mt-2.5 h-2 rounded-full bg-surface-raised overflow-hidden">

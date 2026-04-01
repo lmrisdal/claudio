@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   installGame,
   isDesktop,
@@ -13,6 +13,13 @@ import {
   type DownloadManagerContextValue,
 } from "./download-manager-context";
 
+interface SpeedState {
+  lastBytes: number;
+  lastTime: number;
+  speed: number | null;
+  sampleCount: number;
+}
+
 export function DownloadManagerProvider({
   children,
 }: {
@@ -21,6 +28,7 @@ export function DownloadManagerProvider({
   const [activeDownloads, setActiveDownloads] = useState<
     Map<number, ActiveDownload>
   >(new Map());
+  const speedState = useRef<Map<number, SpeedState>>(new Map());
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -30,6 +38,52 @@ export function DownloadManagerProvider({
 
     void listenToInstallProgress((progress) => {
       if (cancelled) return;
+
+      // Compute speed outside the state updater to avoid issues with
+      // React strict mode re-running updaters and corrupting the ref.
+      let speedBps: number | null = null;
+
+      if (
+        progress.status === "downloading" &&
+        progress.bytesDownloaded != null
+      ) {
+        const now = performance.now();
+        const prev = speedState.current.get(progress.gameId);
+
+        if (!prev) {
+          // Store first baseline sample, don't compute speed yet
+          speedState.current.set(progress.gameId, {
+            lastBytes: progress.bytesDownloaded,
+            lastTime: now,
+            speed: null,
+            sampleCount: 0,
+          });
+        } else {
+          const elapsed = (now - prev.lastTime) / 1000;
+          if (elapsed >= 0.5 && progress.bytesDownloaded > prev.lastBytes) {
+            const instantSpeed =
+              (progress.bytesDownloaded - prev.lastBytes) / elapsed;
+            const count = prev.sampleCount + 1;
+            // Skip the first sample (often a burst), use second as baseline
+            if (count <= 1) {
+              speedBps = null;
+            } else if (prev.speed != null) {
+              speedBps = 0.3 * instantSpeed + 0.7 * prev.speed;
+            } else {
+              speedBps = instantSpeed;
+            }
+            speedState.current.set(progress.gameId, {
+              lastBytes: progress.bytesDownloaded,
+              lastTime: now,
+              speed: speedBps,
+              sampleCount: count,
+            });
+          } else {
+            speedBps = prev.speed;
+          }
+        }
+      }
+
       setActiveDownloads((previous) => {
         const existing = previous.get(progress.gameId);
         if (!existing) return previous;
@@ -37,8 +91,9 @@ export function DownloadManagerProvider({
         const next = new Map(previous);
         if (progress.status === "completed" || progress.status === "failed") {
           next.delete(progress.gameId);
+          speedState.current.delete(progress.gameId);
         } else {
-          next.set(progress.gameId, { ...existing, progress });
+          next.set(progress.gameId, { ...existing, progress, speedBps });
         }
         return next;
       });
@@ -71,6 +126,7 @@ export function DownloadManagerProvider({
             {
               game,
               progress: { gameId: game.id, status: "starting", percent: 0 },
+              speedBps: null,
             },
           ],
         ]);
@@ -84,6 +140,7 @@ export function DownloadManagerProvider({
           next.delete(game.id);
           return next;
         });
+        speedState.current.delete(game.id);
         return result;
       } catch (error) {
         setActiveDownloads((previous) => {
@@ -91,6 +148,7 @@ export function DownloadManagerProvider({
           next.delete(game.id);
           return next;
         });
+        speedState.current.delete(game.id);
         throw error;
       }
     },

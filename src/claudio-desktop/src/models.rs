@@ -60,4 +60,6 @@ pub struct InstallProgress {
     pub status: String,
     pub percent: Option<f64>,
     pub detail: Option<String>,
+    pub bytes_downloaded: Option<u64>,
+    pub total_bytes: Option<u64>,
 }

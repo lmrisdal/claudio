@@ -16,6 +16,9 @@ pub struct DesktopSettings {
     pub close_to_tray: bool,
     #[serde(default)]
     pub custom_headers: HashMap<String, String>,
+    /// Download speed limit in megabits per second. None or 0 means unlimited.
+    #[serde(default)]
+    pub download_speed_limit_kbs: Option<f64>,
 }
 
 impl Default for DesktopSettings {
@@ -29,6 +32,7 @@ impl Default for DesktopSettings {
             default_install_path: None,
             close_to_tray: false,
             custom_headers: HashMap::new(),
+            download_speed_limit_kbs: None,
         }
     }
 }

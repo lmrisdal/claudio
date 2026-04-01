@@ -225,7 +225,7 @@ async fn download_package(
         app,
         game_id,
         "requestingTicket",
-        Some(2.0),
+        Some(0.0),
         Some("Requesting download ticket"),
     );
 
@@ -278,6 +278,20 @@ async fn download_package(
     let total_bytes = response.content_length();
     let mut downloaded = 0_u64;
     let mut stream = response.bytes_stream();
+    let mut last_progress_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
+
+    fn read_speed_limit() -> Option<u64> {
+        settings::load()
+            .download_speed_limit_kbs
+            .filter(|v| *v > 0.0)
+            .map(|kbs| (kbs * 1024.0) as u64)
+    }
+
+    let mut bytes_per_second_limit = read_speed_limit();
+    let mut window_start = std::time::Instant::now();
+    let mut window_bytes = 0_u64;
 
     while let Some(chunk) = stream.next().await {
         if cancel_token.load(Ordering::Relaxed) {
@@ -289,17 +303,44 @@ async fn download_package(
             .await
             .map_err(|err| err.to_string())?;
         downloaded += chunk.len() as u64;
+        window_bytes += chunk.len() as u64;
 
-        let percent = total_bytes
-            .filter(|total| *total > 0)
-            .map(|total| 5.0 + (downloaded as f64 / total as f64) * 55.0);
-        emit_progress(
-            app,
-            game_id,
-            "downloading",
-            percent,
-            Some("Downloading package"),
-        );
+        // Throttle download speed if limit is set
+        if let Some(limit) = bytes_per_second_limit {
+            let elapsed = window_start.elapsed();
+            let expected = std::time::Duration::from_secs_f64(window_bytes as f64 / limit as f64);
+            if expected > elapsed {
+                tokio::time::sleep(expected - elapsed).await;
+            }
+            // Reset window every second and re-read the limit from settings
+            if window_start.elapsed().as_secs() >= 1 {
+                window_start = std::time::Instant::now();
+                window_bytes = 0;
+                bytes_per_second_limit = read_speed_limit();
+            }
+        } else if window_start.elapsed().as_secs() >= 1 {
+            // Even when unlimited, periodically check if a limit was added
+            window_start = std::time::Instant::now();
+            window_bytes = 0;
+            bytes_per_second_limit = read_speed_limit();
+        }
+
+        let now = std::time::Instant::now();
+        if now.duration_since(last_progress_emit).as_millis() >= 200 {
+            last_progress_emit = now;
+            let percent = total_bytes
+                .filter(|total| *total > 0)
+                .map(|total| (downloaded as f64 / total as f64) * 60.0);
+            emit_progress_with_bytes(
+                app,
+                game_id,
+                "downloading",
+                percent,
+                Some("Downloading package"),
+                Some(downloaded),
+                total_bytes,
+            );
+        }
     }
 
     file.flush().await.map_err(|err| err.to_string())?;
@@ -318,43 +359,54 @@ async fn install_portable(
         app,
         game.id,
         "extracting",
-        Some(65.0),
+        Some(60.0),
         Some("Extracting game"),
     );
 
-    let app_clone = app.clone();
+    let app_handle = app.clone();
     let gid = game.id;
-    let mut progress_cb = move |p: f64| {
-        emit_progress(
-            &app_clone,
-            gid,
-            "extracting",
-            Some(65.0 + (p * 30.0)),
-            Some("Extracting game..."),
-        );
-    };
-
     let extract_root = target_dir.with_extension("extracting");
-    if extract_root.exists() {
-        fs::remove_dir_all(&extract_root).map_err(|err| err.to_string())?;
-    }
-    fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
+    let target_dir_owned = target_dir.to_path_buf();
+    let package_path_owned = package_path.to_path_buf();
+    let game_exe_hint = game.game_exe.clone();
 
-    extract_archive_or_copy(package_path, &extract_root, &mut progress_cb)?;
-    normalize_into_final_dir(&extract_root, target_dir)?;
+    let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+        let mut progress_cb = |p: f64| {
+            emit_progress(
+                &app_handle,
+                gid,
+                "extracting",
+                Some(60.0 + (p * 35.0)),
+                Some("Extracting game…"),
+            );
+        };
 
-    let game_exe = game
-        .game_exe
-        .as_ref()
-        .and_then(|entry| {
-            let candidate = target_dir.join(entry);
-            candidate
-                .exists()
-                .then(|| candidate.to_string_lossy().into_owned())
-        })
-        .or_else(|| {
-            detect_windows_executable(target_dir).map(|path| path.to_string_lossy().into_owned())
-        });
+        if extract_root.exists() {
+            fs::remove_dir_all(&extract_root).map_err(|err| err.to_string())?;
+        }
+        fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
+
+        extract_archive_or_copy(&package_path_owned, &extract_root, &mut progress_cb)?;
+        emit_progress(&app_handle, gid, "extracting", Some(96.0), Some("Moving files…"));
+        normalize_into_final_dir(&extract_root, &target_dir_owned)?;
+
+        let exe = game_exe_hint
+            .as_ref()
+            .and_then(|entry| {
+                let candidate = target_dir_owned.join(entry);
+                candidate
+                    .exists()
+                    .then(|| candidate.to_string_lossy().into_owned())
+            })
+            .or_else(|| {
+                detect_windows_executable(&target_dir_owned)
+                    .map(|path| path.to_string_lossy().into_owned())
+            });
+        Ok(exe)
+    })
+    .await
+    .map_err(|err| format!("Extract task failed: {err}"))?
+    ?;
 
     Ok(InstalledGame {
         remote_game_id: game.id,
@@ -392,43 +444,49 @@ async fn install_installer(
         app,
         game.id,
         "extracting",
-        Some(65.0),
+        Some(60.0),
         Some("Extracting game"),
     );
-    
-    let app_clone = app.clone();
+
+    let app_handle = app.clone();
     let gid = game.id;
-    let mut progress_cb = move |p: f64| {
-        emit_progress(
-            &app_clone,
-            gid,
-            "extracting",
-            Some(65.0 + (p * 20.0)),
-            Some("Extracting game..."),
-        );
-    };
+    let target_dir_owned = target_dir.to_path_buf();
+    let package_path_owned = package_path.to_path_buf();
+    let installer_exe_hint = game.installer_exe.clone();
+    let game_exe_hint = game.game_exe.clone();
 
-    fs::create_dir_all(target_dir).map_err(|err| err.to_string())?;
-    extract_archive_or_copy(package_path, target_dir, &mut progress_cb)?;
+    let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+        let mut progress_cb = |p: f64| {
+            emit_progress(
+                &app_handle,
+                gid,
+                "extracting",
+                Some(60.0 + (p * 25.0)),
+                Some("Extracting game…"),
+            );
+        };
 
-    let installer = resolve_installer_path(target_dir, game.installer_exe.as_deref())?;
+        fs::create_dir_all(&target_dir_owned).map_err(|err| err.to_string())?;
+        extract_archive_or_copy(&package_path_owned, &target_dir_owned, &mut progress_cb)?;
+        emit_progress(&app_handle, gid, "extracting", Some(86.0), Some("Extracting game…"));
 
-    emit_progress(
-        app,
-        game.id,
-        "installing",
-        Some(85.0),
-        Some("Running installer"),
-    );
-    run_installer(&installer)?;
+        let installer =
+            resolve_installer_path(&target_dir_owned, installer_exe_hint.as_deref())?;
 
-    let game_exe = game
-        .game_exe
-        .as_ref()
-        .map(|entry| target_dir.join(entry))
-        .filter(|path| path.exists())
-        .or_else(|| detect_windows_executable(target_dir))
-        .map(|path| path.to_string_lossy().into_owned());
+        emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer"));
+        run_installer(&installer)?;
+
+        let exe = game_exe_hint
+            .as_ref()
+            .map(|entry| target_dir_owned.join(entry))
+            .filter(|path| path.exists())
+            .or_else(|| detect_windows_executable(&target_dir_owned))
+            .map(|path| path.to_string_lossy().into_owned());
+        Ok(exe)
+    })
+    .await
+    .map_err(|err| format!("Install task failed: {err}"))?
+    ?;
 
     Ok(InstalledGame {
         remote_game_id: game.id,
@@ -787,6 +845,18 @@ fn emit_progress(
     percent: Option<f64>,
     detail: Option<&str>,
 ) {
+    emit_progress_with_bytes(app, game_id, status, percent, detail, None, None);
+}
+
+fn emit_progress_with_bytes(
+    app: &AppHandle,
+    game_id: i32,
+    status: &str,
+    percent: Option<f64>,
+    detail: Option<&str>,
+    bytes_downloaded: Option<u64>,
+    total_bytes: Option<u64>,
+) {
     let _ = app.emit(
         "install-progress",
         InstallProgress {
@@ -794,6 +864,8 @@ fn emit_progress(
             status: status.to_string(),
             percent,
             detail: detail.map(ToString::to_string),
+            bytes_downloaded,
+            total_bytes,
         },
     );
 }

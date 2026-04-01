@@ -12,6 +12,7 @@ interface DesktopSettings {
   defaultInstallPath: string | null;
   closeToTray: boolean;
   customHeaders: Record<string, string>;
+  downloadSpeedLimitKbs: number | null;
 }
 
 interface PingResponse {
@@ -70,6 +71,8 @@ interface InstallProgress {
   status: string;
   percent?: number | null;
   detail?: string | null;
+  bytesDownloaded?: number | null;
+  totalBytes?: number | null;
 }
 
 export async function ping(): Promise<PingResponse> {

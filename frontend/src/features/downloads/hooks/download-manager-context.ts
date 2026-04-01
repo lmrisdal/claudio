@@ -8,6 +8,8 @@ import type {
 export interface ActiveDownload {
   game: DesktopInstallGameInput;
   progress: InstallProgress;
+  /** Download speed in bytes per second, computed from bytesDownloaded deltas. */
+  speedBps: number | null;
 }
 
 export interface DownloadManagerContextValue {

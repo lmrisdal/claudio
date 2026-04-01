@@ -9,6 +9,7 @@ import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { formatSize } from "../../core/utils/format";
+import { isMac } from "../../core/utils/os";
 import { formatPlatform } from "../../core/utils/platforms";
 import { sounds } from "../../core/utils/sounds";
 import { uninstallGame, useDesktop } from "../../desktop/hooks/use-desktop";
@@ -264,9 +265,13 @@ export default function GameDetail() {
       void queryClient.invalidateQueries({ queryKey: ["installedGames"] });
       await refetchInstalledGame();
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
       setInstallError(
-        error instanceof Error ? error.message : "Install failed.",
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Installation failed unexpectedly. Please try again.",
       );
     },
   });
@@ -542,6 +547,7 @@ export default function GameDetail() {
 
   async function handleInstallClick() {
     if (!displayGame) return;
+    if (isMac) return;
     try {
       setInstallError(null);
 
@@ -1090,7 +1096,7 @@ export default function GameDetail() {
                       <button
                         onClick={startEditing}
                         disabled={displayGame.isProcessing}
-                        className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed!"
                         title={
                           displayGame.isProcessing
                             ? "Cannot edit while processing"
@@ -1438,12 +1444,18 @@ export default function GameDetail() {
                         type="button"
                         data-nav
                         disabled={
+                          (isMac && displayGame.installType === "installer") ||
                           installMutation.isPending ||
                           hasActiveInstallProgress ||
                           isInstalledGameLoading
                         }
                         onClick={handleInstallClick}
-                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover disabled:opacity-60 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                        title={
+                          isMac && displayGame.installType === "installer"
+                            ? "Installer-based games are only available on Windows and Linux"
+                            : undefined
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                       >
                         <svg
                           className={`h-4 w-4 ${installMutation.isPending || hasActiveInstallProgress ? "animate-spin" : ""}`}
