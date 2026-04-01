@@ -22,7 +22,7 @@ export default function Header() {
     <>
       <header
         data-tauri-drag-region={isDesktop || undefined}
-        className="border-b border-border sticky top-0 z-50 backdrop-blur-xl bg-bg-blur"
+        className={`border-b border-border z-50 backdrop-blur-xl bg-bg-blur ${isDesktop ? "fixed top-0 inset-x-0" : "sticky top-0"}`}
       >
         <div
           data-tauri-drag-region={isDesktop || undefined}

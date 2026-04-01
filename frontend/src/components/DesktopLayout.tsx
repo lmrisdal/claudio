@@ -4,6 +4,7 @@ import DesktopSidebar, {
   COLLAPSED_KEY,
   COLLAPSED_WIDTH,
   DEFAULT_WIDTH,
+  HEADER_HEIGHT,
   WIDTH_KEY,
 } from "./DesktopSidebar";
 import Header from "./Header";
@@ -56,8 +57,8 @@ function DesktopLayoutInner({ children }: { children: React.ReactNode }) {
       <DesktopSidebar />
       <Header />
       <div
-        style={{ marginLeft }}
-        className={`flex-1 flex flex-col ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
+        style={{ marginLeft, paddingTop: HEADER_HEIGHT }}
+        className={`flex-1 flex flex-col min-h-0 ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
       >
         {children}
       </div>

@@ -22,6 +22,16 @@ const allTabs: { id: Tab; label: string }[] = [
   { id: "security", label: "Security" },
 ];
 
+function setIndexedRef<T>(
+  refs: { current: (T | null)[] },
+  index: number,
+  el: T | null,
+) {
+  const next = refs.current.slice();
+  next[index] = el;
+  refs.current = next;
+}
+
 export default function AccountDialog({
   open,
   onClose,
@@ -359,7 +369,7 @@ export default function AccountDialog({
               <PreferencesTab contentRefs={contentRefs} />
             )}
             {activeTab === "security" && (
-              <SecurityTab contentRefs={contentRefs} onSuccess={onClose} />
+              <SecurityTab contentRefs={contentRefs} />
             )}
 
             {/* Sign out — mobile only, at bottom of content */}
@@ -478,9 +488,7 @@ function PreferencesTab({
       <label className="flex items-center justify-between cursor-pointer">
         <span className="text-sm text-white/80">Navigation sounds</span>
         <button
-          ref={(el) => {
-            contentRefs.current![0] = el;
-          }}
+          ref={(el) => setIndexedRef(contentRefs, 0, el)}
           type="button"
           role="switch"
           aria-checked={soundsOn}
@@ -501,9 +509,7 @@ function PreferencesTab({
       <label className="flex items-center justify-between cursor-pointer">
         <span className="text-sm text-white/80">Start emulator in fullscreen</span>
         <button
-          ref={(el) => {
-            contentRefs.current![1] = el;
-          }}
+          ref={(el) => setIndexedRef(contentRefs, 1, el)}
           type="button"
           role="switch"
           aria-checked={fullscreenOn}
@@ -528,7 +534,6 @@ function PreferencesTab({
         <div className="space-y-2">
           <ShortcutRow
             label="Open Guide"
-            shortcutKey="guide"
             value={shortcuts.guide}
             defaultValue={defaults.guide}
             recording={recording === "guide"}
@@ -537,9 +542,7 @@ function PreferencesTab({
               setShortcut("guide", defaults.guide);
               setShortcuts(getShortcuts());
             }}
-            buttonRef={(el) => {
-              contentRefs.current![2] = el;
-            }}
+            buttonRef={(el) => setIndexedRef(contentRefs, 2, el)}
           />
         </div>
       </div>
@@ -549,7 +552,6 @@ function PreferencesTab({
 
 function ShortcutRow({
   label,
-  shortcutKey: _shortcutKey,
   value,
   defaultValue,
   recording,
@@ -558,7 +560,6 @@ function ShortcutRow({
   buttonRef,
 }: {
   label: string;
-  shortcutKey: string;
   value: string;
   defaultValue: string;
   recording: boolean;
@@ -601,10 +602,8 @@ function ShortcutRow({
 
 function SecurityTab({
   contentRefs,
-  onSuccess: _onSuccess,
 }: {
   contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
-  onSuccess: () => void;
 }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -664,9 +663,7 @@ function SecurityTab({
           Current password
         </label>
         <input
-          ref={(el) => {
-            contentRefs.current![0] = el;
-          }}
+          ref={(el) => setIndexedRef(contentRefs, 0, el)}
           id="account-current-password"
           type="password"
           value={currentPassword}
@@ -683,9 +680,7 @@ function SecurityTab({
           New password
         </label>
         <input
-          ref={(el) => {
-            contentRefs.current![1] = el;
-          }}
+          ref={(el) => setIndexedRef(contentRefs, 1, el)}
           id="account-new-password"
           type="password"
           value={newPassword}
@@ -703,9 +698,7 @@ function SecurityTab({
           Confirm new password
         </label>
         <input
-          ref={(el) => {
-            contentRefs.current![2] = el;
-          }}
+          ref={(el) => setIndexedRef(contentRefs, 2, el)}
           id="account-confirm-new-password"
           type="password"
           value={confirmPassword}
@@ -716,9 +709,7 @@ function SecurityTab({
         />
       </div>
       <button
-        ref={(el) => {
-          contentRefs.current![3] = el;
-        }}
+        ref={(el) => setIndexedRef(contentRefs, 3, el)}
         type="submit"
         disabled={loading}
         className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-semibold px-5 py-2.5 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
