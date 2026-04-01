@@ -1,5 +1,5 @@
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export const isDesktop =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -26,6 +26,7 @@ interface DesktopInstallGameInput {
   installType: "portable" | "installer";
   installerExe?: string | null;
   gameExe?: string | null;
+  installPath?: string | null;
 }
 
 interface InstalledGame {
@@ -70,8 +71,23 @@ export async function getInstalledGame(
   return invoke<InstalledGame | null>("get_installed_game", { remoteGameId });
 }
 
+export async function listInstalledGames(): Promise<InstalledGame[]> {
+  return invoke<InstalledGame[]>("list_installed_games");
+}
+
 export async function openInstallFolder(remoteGameId: number): Promise<void> {
   return invoke<void>("open_install_folder", { remoteGameId });
+}
+
+export async function cancelInstall(gameId: number): Promise<void> {
+  return invoke<void>("cancel_install", { gameId });
+}
+
+export async function uninstallGame(
+  remoteGameId: number,
+  deleteFiles: boolean,
+): Promise<void> {
+  return invoke<void>("uninstall_game", { remoteGameId, deleteFiles });
 }
 
 export async function listenToInstallProgress(
@@ -90,6 +106,7 @@ export function useDesktop() {
     updateSettings,
     installGame,
     getInstalledGame,
+    listInstalledGames,
     openInstallFolder,
     listenToInstallProgress,
   };

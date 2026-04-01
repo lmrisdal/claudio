@@ -12,9 +12,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            commands::games::cancel_install,
             commands::games::get_installed_game,
             commands::games::install_game,
+            commands::games::list_installed_games,
             commands::games::open_install_folder,
+            commands::games::uninstall_game,
             commands::ping::ping,
             commands::get_settings,
             commands::update_settings,

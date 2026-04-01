@@ -11,10 +11,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
+import InstallDialog from "../components/InstallDialog";
+import UninstallDialog from "../components/UninstallDialog";
 import { useArrowNav } from "../hooks/useArrowNav";
 import { useAuth } from "../hooks/useAuth";
+import { uninstallGame, useDesktop } from "../hooks/useDesktop";
+import { useDownloadManager } from "../hooks/useDownloadManagerHook";
 import { useShortcut } from "../hooks/useShortcut";
-import { useDesktop, type InstallProgress as DesktopInstallProgress } from "../hooks/useDesktop";
 import type { Game, TasksStatus } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 import { sounds } from "../utils/sounds";
@@ -272,17 +275,18 @@ export default function GameDetail() {
   const {
     isDesktop,
     getInstalledGame: getDesktopInstalledGame,
-    installGame: installDesktopGame,
-    listenToInstallProgress,
     openInstallFolder: openDesktopInstallFolder,
   } = useDesktop();
+  const { startDownload, getProgress } = useDownloadManager();
   const [candidates, setCandidates] = useState<IgdbCandidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [igdbQuery, setIgdbQuery] = useState("");
   const [browsePath, setBrowsePath] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
-  const [installProgress, setInstallProgress] = useState<DesktopInstallProgress | null>(null);
+  const [showInstallConfirm, setShowInstallConfirm] = useState(false);
+  const [defaultInstallPath, setDefaultInstallPath] = useState("");
+  const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [sgdbDialog, setSgdbDialog] = useState<{
@@ -355,8 +359,7 @@ export default function GameDetail() {
     refetchInterval: (query) => (query.state.data?.isProcessing ? 3000 : false),
   });
 
-  const isDesktopPcGame =
-    isDesktop && !!game && isPcPlatform(game.platform);
+  const isDesktopPcGame = isDesktop && !!game && isPcPlatform(game.platform);
 
   const {
     data: installedGame,
@@ -387,69 +390,32 @@ export default function GameDetail() {
   });
 
   const installMutation = useMutation({
-    mutationFn: async (currentGame: Game) => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("You need to sign in before installing games.");
-      }
-
-      return installDesktopGame(
-        {
-          id: currentGame.id,
-          title: currentGame.title,
-          platform: currentGame.platform,
-          installType: currentGame.installType,
-          installerExe: currentGame.installerExe ?? null,
-          gameExe: currentGame.gameExe ?? null,
-        },
-        token,
-      );
+    mutationFn: async (input: Game & { installPath?: string }) => {
+      return startDownload({
+        id: input.id,
+        title: input.title,
+        platform: input.platform,
+        installType: input.installType,
+        installerExe: input.installerExe ?? null,
+        gameExe: input.gameExe ?? null,
+        installPath: input.installPath ?? null,
+      });
     },
     onMutate: () => {
       setInstallError(null);
-      setInstallProgress(null);
     },
     onSuccess: async (installed) => {
       setInstallError(null);
-      setInstallProgress({
-        gameId: installed.remoteGameId,
-        status: "completed",
-        percent: 100,
-        detail: "Install complete",
-      });
       queryClient.setQueryData(["installedGame", id], installed);
+      queryClient.invalidateQueries({ queryKey: ["installedGames"] });
       await refetchInstalledGame();
     },
     onError: (error) => {
-      setInstallError(error instanceof Error ? error.message : "Install failed.");
+      setInstallError(
+        error instanceof Error ? error.message : "Install failed.",
+      );
     },
   });
-
-  useEffect(() => {
-    if (!isDesktop || !id) return;
-
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
-
-    listenToInstallProgress((progress) => {
-      if (cancelled || progress.gameId !== Number(id)) return;
-      setInstallProgress(progress);
-      if (progress.status === "completed") {
-        void refetchInstalledGame();
-      }
-    }).then((dispose) => {
-      if (cancelled) {
-        dispose();
-        return;
-      }
-      unlisten = dispose;
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [id, isDesktop, listenToInstallProgress, refetchInstalledGame]);
 
   useEffect(() => {
     if (!isLoading && game) {
@@ -705,18 +671,33 @@ export default function GameDetail() {
     );
   }
 
+  const installProgress = game ? getProgress(game.id) : null;
   const hasActiveInstallProgress =
     installProgress?.gameId === game.id &&
     installProgress.status !== "completed" &&
     installProgress.status !== "failed";
 
-  const desktopInstallLabel =
-    installProgress?.detail ??
-    (typeof installProgress?.percent === "number"
+  const desktopInstallLabel = hasActiveInstallProgress
+    ? typeof installProgress?.percent === "number"
       ? `Installing ${Math.round(installProgress.percent)}%`
-      : installMutation.isPending
-        ? "Starting install…"
-        : "Install");
+      : "Installing..."
+    : installMutation.isPending
+      ? "Starting install…"
+      : "Install";
+
+  async function handleInstallClick() {
+    if (!game) return;
+    try {
+      setInstallError(null);
+      
+      const { getSettings } = await import("../hooks/useDesktop");
+      const settings = await getSettings();
+      setDefaultInstallPath(settings.defaultInstallPath || "");
+      setShowInstallConfirm(true);
+    } catch (err) {
+      setInstallError(err instanceof Error ? err.message : "Failed to load settings. " + String(err));
+    }
+  }
 
   return (
     <>
@@ -1520,43 +1501,83 @@ export default function GameDetail() {
                     <CompressionProgress gameId={game.id} />
                   ) : isDesktopPcGame ? (
                     installedGame ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          openDesktopInstallFolder(game.id).catch((error) => {
-                            setInstallError(
-                              error instanceof Error
-                                ? error.message
-                                : "Could not open the install folder.",
-                            );
-                          });
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.25}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openDesktopInstallFolder(game.id).catch((error) => {
+                              setInstallError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Could not open the install folder.",
+                              );
+                            });
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                          />
-                        </svg>
-                        Open Install Folder
-                      </button>
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.25}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                            />
+                          </svg>
+                          Open Install Folder
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowUninstallConfirm(true)}
+                          className="inline-flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-text-secondary ring-1 ring-border hover:text-red-400 hover:ring-red-400/30 transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                            />
+                          </svg>
+                          Uninstall
+                        </button>
+                        <UninstallDialog
+                          open={showUninstallConfirm}
+                          title={game.title}
+                          onClose={() => setShowUninstallConfirm(false)}
+                          onConfirm={async (deleteFiles) => {
+                            await uninstallGame(game.id, deleteFiles);
+                            setShowUninstallConfirm(false);
+                            queryClient.setQueryData(
+                              ["installedGame", id],
+                              null,
+                            );
+                            queryClient.invalidateQueries({
+                              queryKey: ["installedGames"],
+                            });
+                            void refetchInstalledGame();
+                          }}
+                        />
+                      </div>
                     ) : (
                       <button
                         type="button"
                         data-nav
-                        disabled={installMutation.isPending || hasActiveInstallProgress || isInstalledGameLoading}
-                        onClick={() => {
-                          setInstallError(null);
-                          installMutation.mutate(game);
-                        }}
+                        disabled={
+                          installMutation.isPending ||
+                          hasActiveInstallProgress ||
+                          isInstalledGameLoading
+                        }
+                        onClick={handleInstallClick}
                         className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover disabled:opacity-60 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                       >
                         <svg
@@ -1566,7 +1587,8 @@ export default function GameDetail() {
                           stroke="currentColor"
                           strokeWidth={2.25}
                         >
-                          {installMutation.isPending || hasActiveInstallProgress ? (
+                          {installMutation.isPending ||
+                          hasActiveInstallProgress ? (
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -1592,6 +1614,18 @@ export default function GameDetail() {
                     {installError}
                   </p>
                 )}
+                
+                <InstallDialog
+                  key={showInstallConfirm ? "open" : "closed"}
+                  open={showInstallConfirm}
+                  title={game.title}
+                  defaultPath={defaultInstallPath}
+                  onClose={() => setShowInstallConfirm(false)}
+                  onConfirm={(path) => {
+                    setShowInstallConfirm(false);
+                    installMutation.mutate({ ...game, installPath: path });
+                  }}
+                />
               </>
             )}
 

@@ -37,6 +37,27 @@
         "/consoleloggerparameters:NoSummary"
       ],
       "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "tauri dev",
+      "type": "npm",
+      "script": "tauri:dev",
+      "path": "frontend/",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": true
+      }
+    },
+    {
+      "label": "API + Tauri",
+      "dependsOn": [
+        "watch",
+        "tauri dev"
+      ],
+      "dependsOrder": "parallel"
     }
   ]
 }

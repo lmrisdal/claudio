@@ -23,6 +23,13 @@ fn save_all(games: &[InstalledGame]) -> Result<(), String> {
     fs::write(path, json).map_err(|err| err.to_string())
 }
 
+pub fn list() -> Result<Vec<InstalledGame>, String> {
+    let mut games = load_all()?;
+    games.retain(|game| Path::new(&game.install_path).exists());
+    save_all(&games)?;
+    Ok(games)
+}
+
 pub fn get(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
     let mut games = load_all()?;
     games.retain(|game| Path::new(&game.install_path).exists());
@@ -40,4 +47,14 @@ pub fn upsert(installed: InstalledGame) -> Result<InstalledGame, String> {
     games.sort_by(|a, b| a.title.cmp(&b.title));
     save_all(&games)?;
     Ok(installed)
+}
+
+pub fn remove(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
+    let mut games = load_all()?;
+    let removed = games
+        .iter()
+        .position(|g| g.remote_game_id == remote_game_id)
+        .map(|i| games.remove(i));
+    save_all(&games)?;
+    Ok(removed)
 }

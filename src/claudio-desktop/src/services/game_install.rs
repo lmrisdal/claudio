@@ -9,7 +9,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use tauri::{AppHandle, Emitter, State};
@@ -19,18 +20,20 @@ use zip::read::ZipArchive;
 
 pub struct InstallState {
     active_game_ids: Mutex<Vec<i32>>,
+    cancel_tokens: Mutex<HashMap<i32, Arc<AtomicBool>>>,
 }
 
 impl Default for InstallState {
     fn default() -> Self {
         Self {
             active_game_ids: Mutex::new(Vec::new()),
+            cancel_tokens: Mutex::new(HashMap::new()),
         }
     }
 }
 
 impl InstallState {
-    fn start(&self, game_id: i32) -> Result<(), String> {
+    fn start(&self, game_id: i32) -> Result<Arc<AtomicBool>, String> {
         let mut active = self
             .active_game_ids
             .lock()
@@ -38,14 +41,34 @@ impl InstallState {
         if active.contains(&game_id) {
             return Err("This game is already being installed.".to_string());
         }
-
         active.push(game_id);
-        Ok(())
+
+        let token = Arc::new(AtomicBool::new(false));
+        if let Ok(mut tokens) = self.cancel_tokens.lock() {
+            tokens.insert(game_id, token.clone());
+        }
+        Ok(token)
     }
 
     fn finish(&self, game_id: i32) {
         if let Ok(mut active) = self.active_game_ids.lock() {
             active.retain(|id| *id != game_id);
+        }
+        if let Ok(mut tokens) = self.cancel_tokens.lock() {
+            tokens.remove(&game_id);
+        }
+    }
+
+    pub fn cancel(&self, game_id: i32) -> Result<(), String> {
+        let tokens = self
+            .cancel_tokens
+            .lock()
+            .map_err(|_| "Install state lock poisoned.".to_string())?;
+        if let Some(token) = tokens.get(&game_id) {
+            token.store(true, Ordering::Relaxed);
+            Ok(())
+        } else {
+            Err("No active install for this game.".to_string())
         }
     }
 }
@@ -56,15 +79,41 @@ pub async fn install_game(
     game: RemoteGame,
     token: String,
 ) -> Result<InstalledGame, String> {
-    state.start(game.id)?;
+    let cancel_token = state.start(game.id)?;
     let game_id = game.id;
-    let result = install_game_inner(&app, game, token).await;
+    let result = install_game_inner(&app, game, token, &cancel_token).await;
     state.finish(game_id);
+    if cancel_token.load(Ordering::Relaxed) {
+        return Err("Install cancelled.".to_string());
+    }
     result
+}
+
+pub fn list_installed_games() -> Result<Vec<InstalledGame>, String> {
+    registry::list()
 }
 
 pub fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
     registry::get(remote_game_id)
+}
+
+pub fn cancel_install(state: &InstallState, game_id: i32) -> Result<(), String> {
+    state.cancel(game_id)
+}
+
+pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
+    let removed = registry::remove(remote_game_id)?;
+    if delete_files {
+        if let Some(installed) = removed {
+            let path = PathBuf::from(&installed.install_path);
+            if path.exists() {
+                fs::remove_dir_all(&path).map_err(|err| {
+                    format!("Failed to delete install folder: {err}")
+                })?;
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
@@ -83,6 +132,7 @@ async fn install_game_inner(
     app: &AppHandle,
     game: RemoteGame,
     token: String,
+    cancel_token: &Arc<AtomicBool>,
 ) -> Result<InstalledGame, String> {
     emit_progress(
         app,
@@ -97,7 +147,11 @@ async fn install_game_inner(
         .server_url
         .clone()
         .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
-    let install_root = settings::resolve_install_root(&settings)?;
+
+    let install_root = match game.install_path.as_deref() {
+        Some(path) => PathBuf::from(path),
+        None => settings::resolve_install_root(&settings)?,
+    };
     let target_dir = build_install_dir(&install_root, &game);
 
     if target_dir.exists() {
@@ -122,6 +176,7 @@ async fn install_game_inner(
         &token,
         game.id,
         &temp_root,
+        cancel_token,
     )
     .await?;
 
@@ -163,6 +218,7 @@ async fn download_package(
     token: &str,
     game_id: i32,
     temp_root: &Path,
+    cancel_token: &Arc<AtomicBool>,
 ) -> Result<DownloadInfo, String> {
     let client = reqwest::Client::new();
     emit_progress(
@@ -224,6 +280,10 @@ async fn download_package(
     let mut stream = response.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
+        if cancel_token.load(Ordering::Relaxed) {
+            let _ = fs::remove_dir_all(temp_root);
+            return Err("Install cancelled.".to_string());
+        }
         let chunk = chunk.map_err(|err| err.to_string())?;
         file.write_all(&chunk)
             .await
@@ -259,8 +319,20 @@ async fn install_portable(
         game.id,
         "extracting",
         Some(65.0),
-        Some("Extracting portable game"),
+        Some("Extracting game"),
     );
+
+    let app_clone = app.clone();
+    let gid = game.id;
+    let mut progress_cb = move |p: f64| {
+        emit_progress(
+            &app_clone,
+            gid,
+            "extracting",
+            Some(65.0 + (p * 30.0)),
+            Some("Extracting game..."),
+        );
+    };
 
     let extract_root = target_dir.with_extension("extracting");
     if extract_root.exists() {
@@ -268,7 +340,7 @@ async fn install_portable(
     }
     fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
 
-    extract_archive_or_copy(package_path, &extract_root)?;
+    extract_archive_or_copy(package_path, &extract_root, &mut progress_cb)?;
     normalize_into_final_dir(&extract_root, target_dir)?;
 
     let game_exe = game
@@ -310,10 +382,23 @@ async fn install_installer(
         game.id,
         "extracting",
         Some(65.0),
-        Some("Extracting installer files"),
+        Some("Extracting game"),
     );
+    
+    let app_clone = app.clone();
+    let gid = game.id;
+    let mut progress_cb = move |p: f64| {
+        emit_progress(
+            &app_clone,
+            gid,
+            "extracting",
+            Some(65.0 + (p * 20.0)),
+            Some("Extracting game..."),
+        );
+    };
+
     fs::create_dir_all(target_dir).map_err(|err| err.to_string())?;
-    extract_archive_or_copy(package_path, target_dir)?;
+    extract_archive_or_copy(package_path, target_dir, &mut progress_cb)?;
 
     let installer = resolve_installer_path(target_dir, game.installer_exe.as_deref())?;
 
@@ -363,9 +448,7 @@ fn build_headers(
 }
 
 fn build_install_dir(install_root: &Path, game: &RemoteGame) -> PathBuf {
-    install_root
-        .join(sanitize_segment(&game.platform))
-        .join(sanitize_segment(&game.title))
+    install_root.join(sanitize_segment(&game.title))
 }
 
 fn infer_filename(headers: &HeaderMap) -> Option<String> {
@@ -381,15 +464,18 @@ fn infer_filename(headers: &HeaderMap) -> Option<String> {
     })
 }
 
-fn extract_archive_or_copy(source: &Path, destination: &Path) -> Result<(), String> {
+fn extract_archive_or_copy<F>(source: &Path, destination: &Path, mut progress: F) -> Result<(), String>
+where
+    F: FnMut(f64),
+{
     let lower = source.to_string_lossy().to_lowercase();
 
     if lower.ends_with(".zip") {
-        extract_zip(source, destination)
+        extract_zip(source, destination, progress)
     } else if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
-        extract_targz(source, destination)
+        extract_targz(source, destination, progress)
     } else if lower.ends_with(".tar") {
-        extract_tar(source, destination)
+        extract_tar(source, destination, progress)
     } else {
         fs::create_dir_all(destination).map_err(|err| err.to_string())?;
         let target = destination.join(
@@ -398,16 +484,27 @@ fn extract_archive_or_copy(source: &Path, destination: &Path) -> Result<(), Stri
                 .ok_or_else(|| "Downloaded package had no file name.".to_string())?,
         );
         fs::copy(source, target).map_err(|err| err.to_string())?;
+        progress(1.0);
         Ok(())
     }
 }
 
-fn extract_zip(source: &Path, destination: &Path) -> Result<(), String> {
+fn extract_zip<F>(source: &Path, destination: &Path, mut progress: F) -> Result<(), String>
+where
+    F: FnMut(f64),
+{
     fs::create_dir_all(destination).map_err(|err| err.to_string())?;
     let file = fs::File::open(source).map_err(|err| err.to_string())?;
     let mut archive = ZipArchive::new(file).map_err(|err| err.to_string())?;
 
-    for index in 0..archive.len() {
+    let total = archive.len();
+    if total == 0 {
+        progress(1.0);
+        return Ok(());
+    }
+
+    let mut last_report = std::time::Instant::now();
+    for index in 0..total {
         let mut entry = archive.by_index(index).map_err(|err| err.to_string())?;
         let Some(path) = entry.enclosed_name().map(|path| destination.join(path)) else {
             continue;
@@ -424,24 +521,84 @@ fn extract_zip(source: &Path, destination: &Path) -> Result<(), String> {
 
         let mut out = fs::File::create(&path).map_err(|err| err.to_string())?;
         io::copy(&mut entry, &mut out).map_err(|err| err.to_string())?;
+
+        let now = std::time::Instant::now();
+        if now.duration_since(last_report).as_millis() > 100 {
+            progress(index as f64 / total as f64);
+            last_report = now;
+        }
     }
 
+    progress(1.0);
     Ok(())
 }
 
-fn extract_tar(source: &Path, destination: &Path) -> Result<(), String> {
-    fs::create_dir_all(destination).map_err(|err| err.to_string())?;
-    let file = fs::File::open(source).map_err(|err| err.to_string())?;
-    let mut archive = Archive::new(file);
-    archive.unpack(destination).map_err(|err| err.to_string())
+struct ProgressReader<R, F> {
+    inner: R,
+    callback: F,
+    bytes_read: u64,
+    total_bytes: u64,
+    last_reported: std::time::Instant,
 }
 
-fn extract_targz(source: &Path, destination: &Path) -> Result<(), String> {
+impl<R: io::Read, F: FnMut(f64)> io::Read for ProgressReader<R, F> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.bytes_read += n as u64;
+        let now = std::time::Instant::now();
+        if now.duration_since(self.last_reported).as_millis() > 100 {
+            if self.total_bytes > 0 {
+                (self.callback)(self.bytes_read as f64 / self.total_bytes as f64);
+            }
+            self.last_reported = now;
+        }
+        Ok(n)
+    }
+}
+
+fn extract_tar<F>(source: &Path, destination: &Path, mut progress: F) -> Result<(), String>
+where
+    F: FnMut(f64),
+{
     fs::create_dir_all(destination).map_err(|err| err.to_string())?;
     let file = fs::File::open(source).map_err(|err| err.to_string())?;
-    let decoder = GzDecoder::new(file);
+    let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
+
+    let reader = ProgressReader {
+        inner: file,
+        callback: &mut progress,
+        bytes_read: 0,
+        total_bytes,
+        last_reported: std::time::Instant::now(),
+    };
+
+    let mut archive = Archive::new(reader);
+    archive.unpack(destination).map_err(|err| err.to_string())?;
+    progress(1.0);
+    Ok(())
+}
+
+fn extract_targz<F>(source: &Path, destination: &Path, mut progress: F) -> Result<(), String>
+where
+    F: FnMut(f64),
+{
+    fs::create_dir_all(destination).map_err(|err| err.to_string())?;
+    let file = fs::File::open(source).map_err(|err| err.to_string())?;
+    let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
+
+    let reader = ProgressReader {
+        inner: file,
+        callback: &mut progress,
+        bytes_read: 0,
+        total_bytes,
+        last_reported: std::time::Instant::now(),
+    };
+
+    let decoder = GzDecoder::new(reader);
     let mut archive = Archive::new(decoder);
-    archive.unpack(destination).map_err(|err| err.to_string())
+    archive.unpack(destination).map_err(|err| err.to_string())?;
+    progress(1.0);
+    Ok(())
 }
 
 fn normalize_into_final_dir(staging_root: &Path, final_dir: &Path) -> Result<(), String> {

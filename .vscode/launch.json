@@ -21,12 +21,42 @@
       // },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:5118",
+        "ASPNETCORE_URLS": "http://localhost:8080",
         "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml"
       },
       "sourceFileMap": {
         "/Views": "${workspaceFolder}/Views"
       }
+    },
+    {
+      "name": "Claudio API (No Debug)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Claudio.Api/Claudio.Api.csproj"],
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:8080",
+        "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Tauri Dev",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "tauri:dev"],
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + Tauri",
+      "configurations": ["Claudio API (No Debug)", "Tauri Dev"]
     }
   ]
 }

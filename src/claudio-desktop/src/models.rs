@@ -16,6 +16,7 @@ pub struct RemoteGame {
     pub install_type: InstallType,
     pub installer_exe: Option<String>,
     pub game_exe: Option<String>,
+    pub install_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

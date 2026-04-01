@@ -13,6 +13,11 @@ pub async fn install_game(
 }
 
 #[tauri::command]
+pub fn list_installed_games() -> Result<Vec<InstalledGame>, String> {
+    game_install::list_installed_games()
+}
+
+#[tauri::command]
 pub fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
     game_install::get_installed_game(remote_game_id)
 }
@@ -20,4 +25,14 @@ pub fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledGame>, 
 #[tauri::command]
 pub fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
     game_install::open_install_folder(remote_game_id)
+}
+
+#[tauri::command]
+pub fn cancel_install(state: State<'_, InstallState>, game_id: i32) -> Result<(), String> {
+    game_install::cancel_install(&state, game_id)
+}
+
+#[tauri::command]
+pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
+    game_install::uninstall_game(remote_game_id, delete_files)
 }

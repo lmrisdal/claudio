@@ -38,9 +38,9 @@
   --bg: #f8f8fa;
   --bg-blur: rgba(248, 248, 250, 0.85);
   --surface: #ffffff;
-  --surface-raised: #f0f0f3;
-  --surface-overlay: #e8e8ec;
-  --border-color: #d8d8df;
+  --surface-raised: #e9eaef;
+  --surface-overlay: #dfe1e8;
+  --border-color: #d1d2db;
   --border-subtle: rgba(0, 0, 0, 0.04);
   --text-primary: #1a1a2e;
   --text-secondary: #555566;
@@ -102,6 +102,24 @@ body {
     linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
     linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
   background-size: 28px 28px;
+}
+
+/* Sidebar scrollbar */
+.desktop-sidebar ::-webkit-scrollbar {
+  width: 4px;
+}
+
+.desktop-sidebar ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.desktop-sidebar ::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.desktop-sidebar ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted-color);
 }
 
 /* Scrollbar */
