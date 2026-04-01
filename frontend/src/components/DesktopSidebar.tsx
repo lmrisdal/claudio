@@ -8,7 +8,6 @@ import {
   uninstallGame,
 } from "../hooks/useDesktop";
 import { useDownloadManager } from "../hooks/useDownloadManagerHook";
-import type { Game } from "../types/models";
 import UninstallDialog from "./UninstallDialog";
 
 export const COLLAPSED_KEY = "claudio_sidebar_collapsed";
@@ -76,11 +75,7 @@ function Sidebar() {
     );
   }, [width, dragging]);
 
-  const games = queryClient.getQueryData<Game[]>(["games"]);
 
-  function getCover(remoteGameId: number): string | undefined {
-    return games?.find((g) => g.id === remoteGameId)?.coverUrl;
-  }
 
   const navItems = [
     { to: "/", icon: LibraryIcon, label: "Library" },
@@ -209,7 +204,7 @@ function Sidebar() {
                 </p>
               )
             : installedGames.map((installed) => {
-                const cover = getCover(installed.remoteGameId);
+                const cover = installed.coverUrl;
                 const active =
                   location.pathname === `/games/${installed.remoteGameId}`;
                 return (

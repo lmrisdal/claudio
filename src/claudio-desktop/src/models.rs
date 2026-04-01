@@ -17,6 +17,17 @@ pub struct RemoteGame {
     pub installer_exe: Option<String>,
     pub game_exe: Option<String>,
     pub install_path: Option<String>,
+    pub summary: Option<String>,
+    pub genre: Option<String>,
+    pub release_year: Option<i32>,
+    pub cover_url: Option<String>,
+    pub hero_url: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub game_mode: Option<String>,
+    pub series: Option<String>,
+    pub franchise: Option<String>,
+    pub game_engine: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +40,17 @@ pub struct InstalledGame {
     pub install_path: String,
     pub game_exe: Option<String>,
     pub installed_at: String,
+    pub summary: Option<String>,
+    pub genre: Option<String>,
+    pub release_year: Option<i32>,
+    pub cover_url: Option<String>,
+    pub hero_url: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub game_mode: Option<String>,
+    pub series: Option<String>,
+    pub franchise: Option<String>,
+    pub game_engine: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

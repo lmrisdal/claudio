@@ -28,6 +28,19 @@ interface DesktopInstallGameInput {
   installerExe?: string | null;
   gameExe?: string | null;
   installPath?: string | null;
+  summary?: string | null;
+  genre?: string | null;
+  releaseYear?: number | null;
+  coverUrl?: string | null;
+  heroUrl?: string | null;
+  developer?: string | null;
+  publisher?: string | null;
+  gameMode?: string | null;
+  series?: string | null;
+  franchise?: string | null;
+  gameEngine?: string | null;
+  igdbId?: number | null;
+  igdbSlug?: string | null;
 }
 
 interface InstalledGame {
@@ -38,6 +51,19 @@ interface InstalledGame {
   installPath: string;
   gameExe?: string | null;
   installedAt: string;
+  summary?: string | null;
+  genre?: string | null;
+  releaseYear?: number | null;
+  coverUrl?: string | null;
+  heroUrl?: string | null;
+  developer?: string | null;
+  publisher?: string | null;
+  gameMode?: string | null;
+  series?: string | null;
+  franchise?: string | null;
+  gameEngine?: string | null;
+  igdbId?: number | null;
+  igdbSlug?: string | null;
 }
 
 interface InstallProgress {

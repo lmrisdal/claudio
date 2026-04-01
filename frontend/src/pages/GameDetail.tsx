@@ -8,7 +8,7 @@ import {
   ListboxOptions,
 } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/client";
 import InstallDialog from "../components/InstallDialog";
@@ -359,7 +359,6 @@ export default function GameDetail() {
     refetchInterval: (query) => (query.state.data?.isProcessing ? 3000 : false),
   });
 
-  const isDesktopPcGame = isDesktop && !!game && isPcPlatform(game.platform);
 
   const {
     data: installedGame,
@@ -368,7 +367,7 @@ export default function GameDetail() {
   } = useQuery({
     queryKey: ["installedGame", id],
     queryFn: () => getDesktopInstalledGame(Number(id)),
-    enabled: !!id && isDesktopPcGame,
+    enabled: isDesktop && !!id,
   });
 
   const { data: browseData, isLoading: browseLoading } = useQuery({
@@ -389,6 +388,66 @@ export default function GameDetail() {
       }>(`/games/${id}/emulation`),
   });
 
+  const displayGame = useMemo(() => {
+    if (!game && !installedGame) return null;
+    
+    if (!game && installedGame) {
+      // Offline/mismatch mode: construct a partial Game object from local metadata
+      return {
+        id: installedGame.remoteGameId,
+        title: installedGame.title,
+        platform: installedGame.platform,
+        installType: installedGame.installType,
+        summary: installedGame.summary,
+        genre: installedGame.genre,
+        releaseYear: installedGame.releaseYear,
+        coverUrl: installedGame.coverUrl,
+        heroUrl: installedGame.heroUrl,
+        developer: installedGame.developer,
+        publisher: installedGame.publisher,
+        gameMode: installedGame.gameMode,
+        series: installedGame.series,
+        franchise: installedGame.franchise,
+        gameEngine: installedGame.gameEngine,
+        igdbId: installedGame.igdbId,
+        igdbSlug: installedGame.igdbSlug,
+        // Default values for server-only fields
+        sizeBytes: 0,
+        folderName: "",
+        isArchive: false,
+        isMissing: false,
+        isProcessing: false,
+        lastPlayed: null,
+        playCount: 0,
+        playTimeSeconds: 0,
+        isFavorite: false,
+      } as Game;
+    }
+
+    if (!installedGame) return game;
+
+    return {
+      ...game!,
+      title: installedGame.title || game!.title,
+      summary: installedGame.summary || game!.summary,
+      genre: installedGame.genre || game!.genre,
+      releaseYear: installedGame.releaseYear || game!.releaseYear,
+      coverUrl: installedGame.coverUrl || game!.coverUrl,
+      heroUrl: installedGame.heroUrl || game!.heroUrl,
+      developer: installedGame.developer || game!.developer,
+      publisher: installedGame.publisher || game!.publisher,
+      gameMode: installedGame.gameMode || game!.gameMode,
+      series: installedGame.series || game!.series,
+      franchise: installedGame.franchise || game!.franchise,
+      gameEngine: installedGame.gameEngine || game!.gameEngine,
+      igdbId: installedGame.igdbId || game!.igdbId,
+      igdbSlug: installedGame.igdbSlug || game!.igdbSlug,
+    };
+  }, [game, installedGame]);
+
+  const isDesktopPcGame =
+    isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
+
   const installMutation = useMutation({
     mutationFn: async (input: Game & { installPath?: string }) => {
       return startDownload({
@@ -399,6 +458,17 @@ export default function GameDetail() {
         installerExe: input.installerExe ?? null,
         gameExe: input.gameExe ?? null,
         installPath: input.installPath ?? null,
+        summary: input.summary ?? null,
+        genre: input.genre ?? null,
+        releaseYear: input.releaseYear ?? null,
+        coverUrl: input.coverUrl ?? null,
+        heroUrl: input.heroUrl ?? null,
+        developer: input.developer ?? null,
+        publisher: input.publisher ?? null,
+        gameMode: input.gameMode ?? null,
+        series: input.series ?? null,
+        franchise: input.franchise ?? null,
+        gameEngine: input.gameEngine ?? null,
       });
     },
     onMutate: () => {
@@ -555,7 +625,6 @@ export default function GameDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["game", id] });
       queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
-      setEditing(false);
     },
   });
 
@@ -568,25 +637,25 @@ export default function GameDetail() {
   });
 
   function startEditing() {
-    if (!game) return;
+    if (!displayGame) return;
     setEditForm({
-      title: game.title,
-      summary: game.summary ?? "",
-      genre: game.genre ?? "",
-      releaseYear: game.releaseYear?.toString() ?? "",
-      coverUrl: game.coverUrl ?? "",
-      heroUrl: game.heroUrl ?? "",
-      installType: game.installType,
-      installerExe: game.installerExe ?? "",
-      gameExe: game.gameExe ?? "",
-      developer: game.developer ?? "",
-      publisher: game.publisher ?? "",
-      gameMode: game.gameMode ?? "",
-      series: game.series ?? "",
-      franchise: game.franchise ?? "",
-      gameEngine: game.gameEngine ?? "",
-      igdbId: game.igdbId?.toString() ?? "",
-      igdbSlug: game.igdbSlug ?? "",
+      title: displayGame.title,
+      summary: displayGame.summary ?? "",
+      genre: displayGame.genre ?? "",
+      releaseYear: displayGame.releaseYear?.toString() ?? "",
+      coverUrl: displayGame.coverUrl ?? "",
+      heroUrl: displayGame.heroUrl ?? "",
+      installType: displayGame.installType,
+      installerExe: displayGame.installerExe ?? "",
+      gameExe: displayGame.gameExe ?? "",
+      developer: displayGame.developer ?? "",
+      publisher: displayGame.publisher ?? "",
+      gameMode: displayGame.gameMode ?? "",
+      series: displayGame.series ?? "",
+      franchise: displayGame.franchise ?? "",
+      gameEngine: displayGame.gameEngine ?? "",
+      igdbId: displayGame.igdbId?.toString() ?? "",
+      igdbSlug: displayGame.igdbSlug ?? "",
     });
     setEditing(true);
   }
@@ -657,7 +726,7 @@ export default function GameDetail() {
     );
   }
 
-  if (!game) {
+  if (!displayGame) {
     return (
       <main className="max-w-5xl mx-auto px-6 py-24 text-center">
         <p className="text-text-muted">Game not found</p>
@@ -671,9 +740,9 @@ export default function GameDetail() {
     );
   }
 
-  const installProgress = game ? getProgress(game.id) : null;
+  const installProgress = displayGame ? getProgress(displayGame.id) : null;
   const hasActiveInstallProgress =
-    installProgress?.gameId === game.id &&
+    installProgress?.gameId === displayGame.id &&
     installProgress.status !== "completed" &&
     installProgress.status !== "failed";
 
@@ -686,7 +755,7 @@ export default function GameDetail() {
       : "Install";
 
   async function handleInstallClick() {
-    if (!game) return;
+    if (!displayGame) return;
     try {
       setInstallError(null);
       
@@ -702,10 +771,10 @@ export default function GameDetail() {
   return (
     <>
       {/* Hero banner */}
-      {(editing ? editForm.heroUrl : game.heroUrl) && (
+      {(editing ? editForm.heroUrl : displayGame.heroUrl) && (
         <div className="absolute inset-x-0 top-0 h-72 overflow-hidden -z-10">
           <img
-            src={editing ? editForm.heroUrl : game.heroUrl}
+            src={editing ? editForm.heroUrl : displayGame.heroUrl}
             alt=""
             className="w-full h-full object-cover"
           />
@@ -721,11 +790,11 @@ export default function GameDetail() {
           <button
             onClick={() => openSgdbDialog("heroes")}
             className={`fixed top-18 right-4 z-10 p-2 rounded-lg transition flex items-center gap-1.5 text-xs ${
-              game.heroUrl
+              displayGame.heroUrl
                 ? "bg-black/40 text-white/70 hover:text-white opacity-0 hover:opacity-100"
                 : "text-text-muted hover:text-text-primary bg-surface-raised ring-1 ring-border"
             }`}
-            title={game.heroUrl ? "Change hero image" : "Add hero image"}
+            title={displayGame.heroUrl ? "Change hero image" : "Add hero image"}
           >
             <svg
               className="w-3.5 h-3.5"
@@ -740,7 +809,7 @@ export default function GameDetail() {
                 d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
               />
             </svg>
-            {!game.heroUrl && "Add hero"}
+            {!displayGame.heroUrl && "Add hero"}
           </button>
         )}
         {/* Focus anchor for gamepad navigation */}
@@ -769,7 +838,7 @@ export default function GameDetail() {
             if (e.key === "Enter") sounds.back();
           }}
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8] ${
-            game.heroUrl
+            displayGame.heroUrl
               ? "text-text-primary/80 hover:text-text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
               : "text-text-muted hover:text-text-primary"
           }`}
@@ -801,10 +870,10 @@ export default function GameDetail() {
                   : undefined
               }
             >
-              {(editing ? editForm.coverUrl : game.coverUrl) ? (
+              {(editing ? editForm.coverUrl : displayGame.coverUrl) ? (
                 <img
-                  src={editing ? editForm.coverUrl : game.coverUrl}
-                  alt={game.title}
+                  src={editing ? editForm.coverUrl : displayGame.coverUrl}
+                  alt={displayGame.title}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -992,14 +1061,14 @@ export default function GameDetail() {
                         placeholder="e.g. 12345"
                         className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                       />
-                      {game.igdbId &&
-                        !game.folderName.includes(`igdb-${game.igdbId}`) && (
+                      {displayGame.igdbId &&
+                        !displayGame.folderName.includes(`igdb-${displayGame.igdbId}`) && (
                           <button
                             type="button"
                             onClick={() => tagFolderMutation.mutate()}
                             disabled={tagFolderMutation.isPending}
                             className="shrink-0 px-3 py-2 rounded-lg text-xs text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
-                            title={`Rename folder to add (igdb-${game.igdbId})`}
+                            title={`Rename folder to add (igdb-${displayGame.igdbId})`}
                           >
                             {tagFolderMutation.isPending
                               ? "Tagging..."
@@ -1112,7 +1181,7 @@ export default function GameDetail() {
                   />
                 </div>
                 {/* Install type & executables (PC games) */}
-                {isPcPlatform(game.platform) && (
+                {isPcPlatform(displayGame.platform) && (
                   <>
                     <div>
                       <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
@@ -1184,7 +1253,7 @@ export default function GameDetail() {
                   >
                     Cancel
                   </button>
-                  {!game.isArchive && !game.isProcessing && (
+                  {!displayGame.isArchive && !displayGame.isProcessing && (
                     <div className="ml-auto flex gap-2">
                       <button
                         type="button"
@@ -1222,16 +1291,16 @@ export default function GameDetail() {
               <>
                 <div className="flex items-start gap-3 mb-3">
                   <h1 className="font-display text-4xl font-bold text-text-primary">
-                    {game.title}
+                    {displayGame.title}
                   </h1>
                   {user?.role === "admin" && (
                     <>
                       <button
                         onClick={startEditing}
-                        disabled={game.isProcessing}
+                        disabled={displayGame.isProcessing}
                         className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed"
                         title={
-                          game.isProcessing
+                          displayGame.isProcessing
                             ? "Cannot edit while processing"
                             : "Edit game"
                         }
@@ -1255,7 +1324,7 @@ export default function GameDetail() {
                         disabled={searching}
                         className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50"
                         title={
-                          game.igdbId ? "Re-match on IGDB" : "Match on IGDB"
+                          displayGame.igdbId ? "Re-match on IGDB" : "Match on IGDB"
                         }
                       >
                         <svg
@@ -1292,37 +1361,37 @@ export default function GameDetail() {
                         d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"
                       />
                     </svg>
-                    {formatPlatform(game.platform)}
+                    {formatPlatform(displayGame.platform)}
                   </span>
-                  {game.releaseYear && (
+                  {displayGame.releaseYear && (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-                      {game.releaseYear}
+                      {displayGame.releaseYear}
                     </span>
                   )}
-                  {game.genre && (
+                  {displayGame.genre && (
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-                      {game.genre}
+                      {displayGame.genre}
                     </span>
                   )}
                   <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-secondary">
-                    {formatSize(game.sizeBytes)}
+                    {formatSize(displayGame.sizeBytes)}
                   </span>
-                  {isPcPlatform(game.platform) && (
+                  {isPcPlatform(displayGame.platform) && (
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ${
-                        game.installType === "installer"
+                        displayGame.installType === "installer"
                           ? "bg-blue-500/10 ring-blue-500/20 text-blue-400"
                           : "bg-accent-dim ring-accent/20 text-accent"
                       }`}
                     >
-                      {game.installType === "installer"
+                      {displayGame.installType === "installer"
                         ? "Installer"
                         : "Portable"}
                     </span>
                   )}
-                  {game.igdbSlug && (
+                  {displayGame.igdbSlug && (
                     <a
-                      href={`https://www.igdb.com/games/${game.igdbSlug}`}
+                      href={`https://www.igdb.com/games/${displayGame.igdbSlug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-500/10 ring-1 ring-purple-500/20 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition"
@@ -1347,7 +1416,7 @@ export default function GameDetail() {
 
                 <div className="mb-8 -mt-4">
                   <p className="text-xs text-text-muted font-mono">
-                    /{game.platform}/{game.folderName}
+                    /{displayGame.platform}/{displayGame.folderName}
                   </p>
                   <button
                     onClick={() => setBrowsePath("")}
@@ -1371,82 +1440,82 @@ export default function GameDetail() {
                 </div>
 
                 {/* Summary */}
-                {game.summary && (
+                {displayGame.summary && (
                   <div className="mb-8">
                     <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
                       About
                     </h2>
                     <p className="text-text-secondary leading-relaxed">
-                      {game.summary}
+                      {displayGame.summary}
                     </p>
                   </div>
                 )}
 
                 {/* Details */}
-                {(game.developer ||
-                  game.publisher ||
-                  game.gameMode ||
-                  game.series ||
-                  game.franchise ||
-                  game.gameEngine) && (
+                {(displayGame.developer ||
+                  displayGame.publisher ||
+                  displayGame.gameMode ||
+                  displayGame.series ||
+                  displayGame.franchise ||
+                  displayGame.gameEngine) && (
                   <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-8 text-sm">
-                    {game.developer && (
+                    {displayGame.developer && (
                       <div>
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Developer
                         </span>
                         <p className="text-text-secondary mt-0.5">
-                          {game.developer}
+                          {displayGame.developer}
                         </p>
                       </div>
                     )}
-                    {game.publisher && (
+                    {displayGame.publisher && (
                       <div>
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Publisher
                         </span>
                         <p className="text-text-secondary mt-0.5">
-                          {game.publisher}
+                          {displayGame.publisher}
                         </p>
                       </div>
                     )}
-                    {game.gameMode && (
+                    {displayGame.gameMode && (
                       <div>
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Game Mode
                         </span>
                         <p className="text-text-secondary mt-0.5">
-                          {game.gameMode}
+                          {displayGame.gameMode}
                         </p>
                       </div>
                     )}
-                    {game.gameEngine && (
+                    {displayGame.gameEngine && (
                       <div>
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Engine
                         </span>
                         <p className="text-text-secondary mt-0.5">
-                          {game.gameEngine}
+                          {displayGame.gameEngine}
                         </p>
                       </div>
                     )}
-                    {game.series && (
+                    {displayGame.series && (
                       <div>
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Series
                         </span>
                         <p className="text-text-secondary mt-0.5">
-                          {game.series}
+                          {displayGame.series}
                         </p>
                       </div>
                     )}
-                    {game.franchise && (
+                    {displayGame.franchise && (
                       <div>
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Franchise
                         </span>
                         <p className="text-text-secondary mt-0.5">
-                          {game.franchise}
+                          {displayGame.franchise}
                         </p>
                       </div>
                     )}
@@ -1455,9 +1524,9 @@ export default function GameDetail() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {emulation?.supported && !game.isMissing && (
+                  {emulation?.supported && !displayGame.isMissing && (
                     <Link
-                      to={`/games/${game.id}/play`}
+                      to={`/games/${displayGame.id}/play`}
                       data-nav
                       onClick={(e) => {
                         if (e.detail === 0) sounds.download();
@@ -1480,7 +1549,7 @@ export default function GameDetail() {
                       Play
                     </Link>
                   )}
-                  {game.isMissing ? (
+                  {displayGame.isMissing ? (
                     <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-red-400 bg-red-500/10 ring-1 ring-red-500/30">
                       <svg
                         className="w-4 h-4"
@@ -1497,21 +1566,23 @@ export default function GameDetail() {
                       </svg>
                       Missing from disk
                     </span>
-                  ) : game.isProcessing ? (
-                    <CompressionProgress gameId={game.id} />
+                  ) : displayGame.isProcessing ? (
+                    <CompressionProgress gameId={displayGame.id} />
                   ) : isDesktopPcGame ? (
                     installedGame ? (
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
-                            openDesktopInstallFolder(game.id).catch((error) => {
-                              setInstallError(
-                                error instanceof Error
-                                  ? error.message
-                                  : "Could not open the install folder.",
-                              );
-                            });
+                            openDesktopInstallFolder(displayGame.id).catch(
+                              (error) => {
+                                setInstallError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Could not open the install folder.",
+                                );
+                              },
+                            );
                           }}
                           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                         >
@@ -1552,10 +1623,10 @@ export default function GameDetail() {
                         </button>
                         <UninstallDialog
                           open={showUninstallConfirm}
-                          title={game.title}
+                          title={displayGame.title}
                           onClose={() => setShowUninstallConfirm(false)}
                           onConfirm={async (deleteFiles) => {
-                            await uninstallGame(game.id, deleteFiles);
+                            await uninstallGame(displayGame.id, deleteFiles);
                             setShowUninstallConfirm(false);
                             queryClient.setQueryData(
                               ["installedGame", id],
@@ -1606,7 +1677,10 @@ export default function GameDetail() {
                       </button>
                     )
                   ) : (
-                    <DownloadButton gameId={game.id} size={game.sizeBytes} />
+                    <DownloadButton
+                      gameId={displayGame.id}
+                      size={displayGame.sizeBytes}
+                    />
                   )}
                 </div>
                 {installError && (
@@ -1618,12 +1692,13 @@ export default function GameDetail() {
                 <InstallDialog
                   key={showInstallConfirm ? "open" : "closed"}
                   open={showInstallConfirm}
-                  title={game.title}
+                  title={displayGame.title}
                   defaultPath={defaultInstallPath}
                   onClose={() => setShowInstallConfirm(false)}
                   onConfirm={(path) => {
                     setShowInstallConfirm(false);
-                    installMutation.mutate({ ...game, installPath: path });
+                    // game and displayGame are guaranteed non-null here due to the guard clause
+                    installMutation.mutate({ ...game!, installPath: path });
                   }}
                 />
               </>
@@ -1968,23 +2043,23 @@ export default function GameDetail() {
                                   setEditForm({ ...editForm, coverUrl: url });
                                 } else {
                                   updateMutation.mutate({
-                                    title: game.title,
-                                    summary: game.summary ?? null,
-                                    genre: game.genre ?? null,
-                                    releaseYear: game.releaseYear ?? null,
+                                    title: displayGame.title,
+                                    summary: displayGame.summary ?? null,
+                                    genre: displayGame.genre ?? null,
+                                    releaseYear: displayGame.releaseYear ?? null,
                                     coverUrl: url,
-                                    heroUrl: game.heroUrl ?? null,
-                                    installType: game.installType,
-                                    installerExe: game.installerExe ?? null,
-                                    gameExe: game.gameExe ?? null,
-                                    developer: game.developer ?? null,
-                                    publisher: game.publisher ?? null,
-                                    gameMode: game.gameMode ?? null,
-                                    series: game.series ?? null,
-                                    franchise: game.franchise ?? null,
-                                    gameEngine: game.gameEngine ?? null,
-                                    igdbId: game.igdbId ?? null,
-                                    igdbSlug: game.igdbSlug ?? null,
+                                    heroUrl: displayGame.heroUrl ?? null,
+                                    installType: displayGame.installType,
+                                    installerExe: displayGame.installerExe ?? null,
+                                    gameExe: displayGame.gameExe ?? null,
+                                    developer: displayGame.developer ?? null,
+                                    publisher: displayGame.publisher ?? null,
+                                    gameMode: displayGame.gameMode ?? null,
+                                    series: displayGame.series ?? null,
+                                    franchise: displayGame.franchise ?? null,
+                                    gameEngine: displayGame.gameEngine ?? null,
+                                    igdbId: displayGame.igdbId ?? null,
+                                    igdbSlug: displayGame.igdbSlug ?? null,
                                   });
                                 }
                                 setSgdbDialog({ ...sgdbDialog, open: false });
@@ -1992,7 +2067,7 @@ export default function GameDetail() {
                               className={`aspect-2/3 rounded-lg ring-2 transition hover:ring-accent ${
                                 (editing
                                   ? editForm.coverUrl
-                                  : game.coverUrl) === url
+                                  : displayGame.coverUrl) === url
                                   ? "ring-accent"
                                   : "ring-transparent"
                               }`}
@@ -2016,29 +2091,29 @@ export default function GameDetail() {
                                   setEditForm({ ...editForm, heroUrl: url });
                                 } else {
                                   updateMutation.mutate({
-                                    title: game.title,
-                                    summary: game.summary ?? null,
-                                    genre: game.genre ?? null,
-                                    releaseYear: game.releaseYear ?? null,
-                                    coverUrl: game.coverUrl ?? null,
+                                    title: displayGame.title,
+                                    summary: displayGame.summary ?? null,
+                                    genre: displayGame.genre ?? null,
+                                    releaseYear: displayGame.releaseYear ?? null,
+                                    coverUrl: displayGame.coverUrl ?? null,
                                     heroUrl: url,
-                                    installType: game.installType,
-                                    installerExe: game.installerExe ?? null,
-                                    gameExe: game.gameExe ?? null,
-                                    developer: game.developer ?? null,
-                                    publisher: game.publisher ?? null,
-                                    gameMode: game.gameMode ?? null,
-                                    series: game.series ?? null,
-                                    franchise: game.franchise ?? null,
-                                    gameEngine: game.gameEngine ?? null,
-                                    igdbId: game.igdbId ?? null,
-                                    igdbSlug: game.igdbSlug ?? null,
+                                    installType: displayGame.installType,
+                                    installerExe: displayGame.installerExe ?? null,
+                                    gameExe: displayGame.gameExe ?? null,
+                                    developer: displayGame.developer ?? null,
+                                    publisher: displayGame.publisher ?? null,
+                                    gameMode: displayGame.gameMode ?? null,
+                                    series: displayGame.series ?? null,
+                                    franchise: displayGame.franchise ?? null,
+                                    gameEngine: displayGame.gameEngine ?? null,
+                                    igdbId: displayGame.igdbId ?? null,
+                                    igdbSlug: displayGame.igdbSlug ?? null,
                                   });
                                 }
                                 setSgdbDialog({ ...sgdbDialog, open: false });
                               }}
                               className={`rounded-lg ring-2 transition hover:ring-accent ${
-                                (editing ? editForm.heroUrl : game.heroUrl) ===
+                                (editing ? editForm.heroUrl : displayGame.heroUrl) ===
                                 url
                                   ? "ring-accent"
                                   : "ring-transparent"

@@ -364,6 +364,17 @@ async fn install_portable(
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
         installed_at: current_timestamp(),
+        summary: game.summary.clone(),
+        genre: game.genre.clone(),
+        release_year: game.release_year,
+        cover_url: game.cover_url.clone(),
+        hero_url: game.hero_url.clone(),
+        developer: game.developer.clone(),
+        publisher: game.publisher.clone(),
+        game_mode: game.game_mode.clone(),
+        series: game.series.clone(),
+        franchise: game.franchise.clone(),
+        game_engine: game.game_engine.clone(),
     })
 }
 
@@ -427,6 +438,17 @@ async fn install_installer(
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
         installed_at: current_timestamp(),
+        summary: game.summary.clone(),
+        genre: game.genre.clone(),
+        release_year: game.release_year,
+        cover_url: game.cover_url.clone(),
+        hero_url: game.hero_url.clone(),
+        developer: game.developer.clone(),
+        publisher: game.publisher.clone(),
+        game_mode: game.game_mode.clone(),
+        series: game.series.clone(),
+        franchise: game.franchise.clone(),
+        game_engine: game.game_engine.clone(),
     })
 }
 
