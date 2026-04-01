@@ -43,7 +43,7 @@ Monorepo with three .NET projects and a React frontend:
 
 - **`src/Claudio.Api`** — ASP.NET minimal API. Serves the SPA as static files and provides REST endpoints. Uses **minimal APIs with route groups**, not controllers.
 - **`src/Claudio.Shared`** — Shared DTOs (`GameDto`, `UserDto`, `ClaudioConfig`) and enums (`UserRole`, `InstallType`). Referenced by both API and Desktop.
-- **`src/Claudio.Desktop`** — Future Avalonia UI client (stub).
+- **`src/claudio-desktop`** — Tauri desktop client.
 - **`frontend/`** — React 19 SPA built with Vite. Output goes to `src/Claudio.Api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
 - **`tests/Claudio.Api.Tests/`** — TUnit + AwesomeAssertions test project.
 
