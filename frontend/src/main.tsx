@@ -2,17 +2,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
-import App from "./App";
-import AccountDialogProvider from "./features/auth/components/AccountDialogProvider";
-import AuthProvider from "./features/auth/components/AuthProvider";
-import GuideProvider from "./features/core/components/GuideProvider";
-import NavigationProvider from "./features/core/components/NavigationProvider";
-import DesktopSettingsProvider from "./features/desktop/components/DesktopSettingsProvider";
-import { isDesktop } from "./features/desktop/hooks/useDesktop";
+import App from "./app";
+import AccountDialogProvider from "./features/auth/components/account-dialog-provider";
+import AuthProvider from "./features/auth/components/auth-provider";
+import GuideProvider from "./features/core/components/guide-provider";
+import NavigationProvider from "./features/core/components/navigation-provider";
+import DesktopSettingsProvider from "./features/desktop/components/desktop-settings-provider";
+import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import "./index.css";
 
 if (isDesktop) {
-  document.documentElement.setAttribute("data-desktop", "");
+  document.documentElement.dataset.desktop = "";
 }
 
 const queryClient = new QueryClient({
@@ -24,7 +24,7 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.querySelector("#root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

@@ -91,7 +91,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       }
       localStorage.removeItem("token");
       localStorage.removeItem("refresh_token");
-      window.location.href = "/login";
+      globalThis.location.href = "/login";
     }
     const body = await res.text();
     throw new Error(body || "Unauthorized");
@@ -128,7 +128,7 @@ async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuf
     }
     localStorage.removeItem("token");
     localStorage.removeItem("refresh_token");
-    window.location.href = "/login";
+    globalThis.location.href = "/login";
     throw new Error("Unauthorized");
   }
 

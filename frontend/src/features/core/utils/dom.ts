@@ -1,9 +1,9 @@
 export function setIndexedRef<T>(
-  refs: { current: (T | null)[] },
+  references: { current: (T | null)[] },
   index: number,
-  el: T | null,
+  element: T | null,
 ) {
-  const next = refs.current.slice();
-  next[index] = el;
-  refs.current = next;
+  const next = [...references.current];
+  next[index] = element;
+  references.current = next;
 }

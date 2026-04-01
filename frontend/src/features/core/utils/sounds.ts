@@ -1,9 +1,9 @@
 const cache = new Map<string, AudioBuffer>();
-let audioCtx: AudioContext | null = null;
+let audioContext: AudioContext | null = null;
 
 function getContext() {
-  if (!audioCtx) audioCtx = new AudioContext();
-  return audioCtx;
+  if (!audioContext) audioContext = new AudioContext();
+  return audioContext;
 }
 
 async function loadBuffer(url: string): Promise<AudioBuffer> {
@@ -28,17 +28,17 @@ export function setSoundsEnabled(enabled: boolean) {
 export async function playSound(url: string, volume: number, lpFreq = 1000) {
   if (!isSoundsEnabled()) return;
   try {
-    const ctx = getContext();
-    if (ctx.state === "suspended") await ctx.resume();
+    const context = getContext();
+    if (context.state === "suspended") await context.resume();
     const buffer = await loadBuffer(url);
-    const source = ctx.createBufferSource();
+    const source = context.createBufferSource();
     source.buffer = buffer;
-    const gain = ctx.createGain();
+    const gain = context.createGain();
     gain.gain.value = volume;
-    const lpf = ctx.createBiquadFilter();
+    const lpf = context.createBiquadFilter();
     lpf.type = "lowpass";
     lpf.frequency.value = lpFreq;
-    source.connect(lpf).connect(gain).connect(ctx.destination);
+    source.connect(lpf).connect(gain).connect(context.destination);
     // source.connect(gain).connect(ctx.destination);
     source.start();
   } catch {

@@ -5,8 +5,8 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
-export function formatRelativeTime(dateStr: string): string {
-  const date = new Date(dateStr);
+export function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);

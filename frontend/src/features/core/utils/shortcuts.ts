@@ -25,7 +25,7 @@ export function setShortcut<K extends keyof ShortcutMap>(
   const current = getShortcuts();
   current[key] = value;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-  window.dispatchEvent(new CustomEvent("claudio:shortcuts-changed"));
+  globalThis.dispatchEvent(new CustomEvent("claudio:shortcuts-changed"));
 }
 
 export function getShortcutDefaults(): ShortcutMap {
