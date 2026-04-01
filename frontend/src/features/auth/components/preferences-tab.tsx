@@ -124,9 +124,7 @@ export default function PreferencesTab({
       </label>
 
       <label className="flex items-center justify-between cursor-pointer">
-        <span className="text-sm text-white/80">
-          Start emulator in fullscreen
-        </span>
+        <span className="text-sm text-white/80">Start emulator in fullscreen</span>
         <button
           ref={(element) => setIndexedReference(contentRefs, 4, element)}
           type="button"

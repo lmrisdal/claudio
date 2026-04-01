@@ -300,11 +300,11 @@ export default function DesktopSidebar() {
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           onViewDetails={() => {
-            navigate(`/games/${contextMenu.gameId}`);
+            void navigate(`/games/${contextMenu.gameId}`);
             setContextMenu(null);
           }}
           onOpenFolder={() => {
-            openInstallFolder(contextMenu.gameId);
+            void openInstallFolder(contextMenu.gameId);
             setContextMenu(null);
           }}
           onUninstall={() => {
@@ -328,8 +328,8 @@ export default function DesktopSidebar() {
           if (!uninstallTarget) return;
           await uninstallGame(uninstallTarget.id, deleteFiles);
           setUninstallTarget(null);
-          queryClient.invalidateQueries({ queryKey: ["installedGames"] });
-          queryClient.invalidateQueries({
+          void queryClient.invalidateQueries({ queryKey: ["installedGames"] });
+          void queryClient.invalidateQueries({
             queryKey: ["installedGame", String(uninstallTarget.id)],
           });
         }}

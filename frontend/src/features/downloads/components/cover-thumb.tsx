@@ -9,11 +9,7 @@ export default function CoverThumb({
 }) {
   const sizeClass = size === "lg" ? "w-14 h-18" : "w-10 h-13";
   return coverUrl ? (
-    <img
-      src={coverUrl}
-      alt={title}
-      className={`${sizeClass} rounded object-cover shrink-0`}
-    />
+    <img src={coverUrl} alt={title} className={`${sizeClass} rounded object-cover shrink-0`} />
   ) : (
     <div
       className={`${sizeClass} rounded bg-surface-raised flex items-center justify-center shrink-0`}

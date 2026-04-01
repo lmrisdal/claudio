@@ -27,8 +27,9 @@ export default function DesktopSettingsDialog({
   // Load settings when opened
   useEffect(() => {
     if (!open) return;
-    previousFocusReference.current = document.activeElement as HTMLElement | null;
-    getSettings().then((s) => {
+    previousFocusReference.current =
+      document.activeElement as HTMLElement | null;
+    void getSettings().then((s) => {
       setSettings(s);
       setServerUrl(s.serverUrl ?? "");
       setInstallPath(s.defaultInstallPath ?? "");
@@ -285,7 +286,9 @@ export default function DesktopSettingsDialog({
                     <button
                       type="button"
                       onClick={() =>
-                        setHeaders(headers.filter((_, index_) => index_ !== index))
+                        setHeaders(
+                          headers.filter((_, index_) => index_ !== index),
+                        )
                       }
                       className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
                       aria-label="Remove header"

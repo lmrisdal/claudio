@@ -15,8 +15,7 @@ function getColorSchemeSnapshot() {
 export function useTheme() {
   const [pref, setPref] = useState<ThemePreference>(() => {
     const stored = localStorage.getItem("theme") as ThemePreference | null;
-    if (stored === "dark" || stored === "light" || stored === "system")
-      return stored;
+    if (stored === "dark" || stored === "light" || stored === "system") return stored;
     return "system";
   });
 
@@ -26,8 +25,7 @@ export function useTheme() {
     () => false,
   );
 
-  const resolved: "dark" | "light" =
-    pref === "system" ? (systemIsLight ? "light" : "dark") : pref;
+  const resolved: "dark" | "light" = pref === "system" ? (systemIsLight ? "light" : "dark") : pref;
 
   useEffect(() => {
     const root = document.documentElement;

@@ -9,13 +9,10 @@ export interface NavigationContextValue {
   canGoForward: boolean;
 }
 
-export const NavigationContext = createContext<NavigationContextValue | null>(
-  null,
-);
+export const NavigationContext = createContext<NavigationContextValue | null>(null);
 
 export function useNavigation() {
   const context = useContext(NavigationContext);
-  if (!context)
-    throw new Error("useNavigation must be used within NavigationProvider");
+  if (!context) throw new Error("useNavigation must be used within NavigationProvider");
   return context;
 }

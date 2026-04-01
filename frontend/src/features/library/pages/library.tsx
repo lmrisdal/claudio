@@ -93,20 +93,22 @@ export default function Library() {
   const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
     const grid = gridReference.current;
     if (!grid) return;
-    const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
+    const firstElement = grid.querySelector<HTMLElement>(
+      "[data-group-toggle], a",
+    );
     switch (e.key) {
       case "ArrowDown":
       case "ArrowRight": {
         e.preventDefault();
         if (firstElement) {
           focusVisible(firstElement);
-          sounds.navigate();
+          void sounds.navigate();
         }
         break;
       }
       case "ArrowUp": {
         e.preventDefault();
-        sounds.navigate();
+        void sounds.navigate();
         break;
       }
     }
@@ -116,11 +118,13 @@ export default function Library() {
     if (e.key !== "ArrowDown") return;
     const grid = gridReference.current;
     if (!grid) return;
-    const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
+    const firstElement = grid.querySelector<HTMLElement>(
+      "[data-group-toggle], a",
+    );
     if (firstElement) {
       e.preventDefault();
       focusVisible(firstElement);
-      sounds.navigate();
+      void sounds.navigate();
     }
   }, []);
 
@@ -141,7 +145,7 @@ export default function Library() {
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
         saveGridFocus();
-        sounds.select();
+        void sounds.select();
         return;
       }
       if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key))
@@ -178,7 +182,9 @@ export default function Library() {
 
       // Handle navigation from a group toggle button
       if (Object.hasOwn(activeElement.dataset, "groupToggle")) {
-        const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
+        const toggles = [
+          ...grid.querySelectorAll<HTMLElement>("[data-group-toggle]"),
+        ];
         const toggleIndex = toggles.indexOf(activeElement);
         const section = activeElement.closest("section");
 
@@ -190,11 +196,11 @@ export default function Library() {
             const firstLink = groupGrid?.querySelector<HTMLElement>("a");
             if (firstLink) {
               focusVisible(firstLink);
-              sounds.navigate();
+              void sounds.navigate();
             } else if (toggleIndex + 1 < toggles.length) {
               focusVisible(toggles[toggleIndex + 1]);
               toggles[toggleIndex + 1].scrollIntoView({ block: "nearest" });
-              sounds.navigate();
+              void sounds.navigate();
             }
             return;
           }
@@ -202,28 +208,32 @@ export default function Library() {
             e.preventDefault();
             if (toggleIndex > 0) {
               // Go to previous group's last row first column, or previous toggle if collapsed
-              const previousSection = toggles[toggleIndex - 1].closest("section");
-              const previousGrid = previousSection?.querySelector<HTMLElement>(".grid");
+              const previousSection =
+                toggles[toggleIndex - 1].closest("section");
+              const previousGrid =
+                previousSection?.querySelector<HTMLElement>(".grid");
               const previousLinks = previousGrid
                 ? [...previousGrid.querySelectorAll<HTMLElement>("a")]
                 : [];
               if (previousLinks.length > 0) {
                 const previousCols = previousGrid
-                  ? getComputedStyle(previousGrid).gridTemplateColumns?.split(" ")
-                      .length || 1
+                  ? getComputedStyle(previousGrid).gridTemplateColumns?.split(
+                      " ",
+                    ).length || 1
                   : 1;
                 const lastRowStart =
-                  Math.floor((previousLinks.length - 1) / previousCols) * previousCols;
+                  Math.floor((previousLinks.length - 1) / previousCols) *
+                  previousCols;
                 focusVisible(previousLinks[lastRowStart]);
               } else {
                 focusVisible(toggles[toggleIndex - 1]);
                 toggles[toggleIndex - 1].scrollIntoView({ block: "nearest" });
               }
-              sounds.navigate();
+              void sounds.navigate();
             } else {
               focusAnchorReference.current?.focus();
               window.scrollTo({ top: 0, behavior: "smooth" });
-              sounds.navigate();
+              void sounds.navigate();
             }
             return;
           }
@@ -240,7 +250,7 @@ export default function Library() {
                 );
                 return next;
               });
-              sounds.select();
+              void sounds.select();
             }
             return;
           }
@@ -249,15 +259,14 @@ export default function Library() {
             const platform = activeElement.dataset.groupToggle!;
             if (!collapsedGroups.has(platform)) {
               setCollapsedGroups((previous) => {
-                const next = new Set(previous);
-                next.add(platform);
+                const next = new Set([...previous, platform]);
                 localStorage.setItem(
                   "library-collapsed",
                   JSON.stringify([...next]),
                 );
                 return next;
               });
-              sounds.select();
+              void sounds.select();
             }
             return;
           }
@@ -285,7 +294,7 @@ export default function Library() {
           if (nextIndex < allLinks.length) {
             e.preventDefault();
             focusVisible(allLinks[nextIndex]);
-            sounds.navigate();
+            void sounds.navigate();
           }
           return;
         }
@@ -294,7 +303,7 @@ export default function Library() {
           if (nextIndex >= 0) {
             e.preventDefault();
             focusVisible(allLinks[nextIndex]);
-            sounds.navigate();
+            void sounds.navigate();
           }
           return;
         }
@@ -303,7 +312,7 @@ export default function Library() {
           if (nextIndex < scopedLinks.length) {
             e.preventDefault();
             focusVisible(scopedLinks[nextIndex]);
-            sounds.navigate();
+            void sounds.navigate();
           } else {
             const currentCol = scopedIndex % cols;
             const lastRowStart =
@@ -317,7 +326,7 @@ export default function Library() {
               );
               e.preventDefault();
               focusVisible(scopedLinks[target]);
-              sounds.navigate();
+              void sounds.navigate();
             } else {
               // On the last row — jump to next group's toggle button
               const section = activeElement.closest("section");
@@ -330,7 +339,7 @@ export default function Library() {
                 e.preventDefault();
                 focusVisible(nextToggle);
                 nextToggle.scrollIntoView({ block: "nearest" });
-                sounds.navigate();
+                void sounds.navigate();
               }
             }
           }
@@ -341,7 +350,7 @@ export default function Library() {
           if (nextIndex >= 0) {
             e.preventDefault();
             focusVisible(scopedLinks[nextIndex]);
-            sounds.navigate();
+            void sounds.navigate();
           } else {
             // On first row — go to this group's toggle button
             const section = activeElement.closest("section");
@@ -352,12 +361,12 @@ export default function Library() {
               e.preventDefault();
               focusVisible(toggle);
               toggle.scrollIntoView({ block: "nearest" });
-              sounds.navigate();
+              void sounds.navigate();
             } else {
               e.preventDefault();
               focusAnchorReference.current?.focus();
               window.scrollTo({ top: 0, behavior: "smooth" });
-              sounds.navigate();
+              void sounds.navigate();
             }
           }
           return;
@@ -371,7 +380,9 @@ export default function Library() {
   const jumpGroup = useCallback((direction: 1 | -1) => {
     const grid = gridReference.current;
     if (!grid) return;
-    const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
+    const toggles = [
+      ...grid.querySelectorAll<HTMLElement>("[data-group-toggle]"),
+    ];
     if (toggles.length === 0) return;
     const activeElement = document.activeElement as HTMLElement;
     // Find which group the active element belongs to
@@ -392,7 +403,7 @@ export default function Library() {
     const target = firstLink ?? toggles[targetIndex];
     focusVisible(target);
     target.scrollIntoView({ block: "center", behavior: "smooth" });
-    sounds.navigate();
+    void sounds.navigate();
   }, []);
 
   useGamepadEvent("gamepad-rt", () => jumpGroup(1), view === "grouped");
@@ -404,7 +415,8 @@ export default function Library() {
         !(e.target as HTMLElement).closest('a, button, input, [role="listbox"]')
       ) {
         e.preventDefault();
-        if (focusAnchorReference.current) focusVisible(focusAnchorReference.current, true);
+        if (focusAnchorReference.current)
+          focusVisible(focusAnchorReference.current, true);
       }
     }
     document.addEventListener("mousedown", handleMouseDown);
@@ -499,8 +511,9 @@ export default function Library() {
       });
       return;
     }
-    if (focusAnchorReference.current) focusVisible(focusAnchorReference.current, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (focusAnchorReference.current)
+      focusVisible(focusAnchorReference.current, true);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
   return (
@@ -518,9 +531,9 @@ export default function Library() {
             <span className="truncate">
               {selectedPlatforms.size === 0
                 ? "All platforms"
-                : (selectedPlatforms.size === 1
+                : selectedPlatforms.size === 1
                   ? formatPlatform([...selectedPlatforms][0])
-                  : `${selectedPlatforms.size} platforms`)}
+                  : `${selectedPlatforms.size} platforms`}
             </span>
             <svg
               className="w-4 h-4 text-text-muted shrink-0"

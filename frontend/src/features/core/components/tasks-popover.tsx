@@ -12,7 +12,10 @@ export default function TasksPopover() {
     refetchInterval: (query) => {
       const d = query.state.data;
       if (!d) return 30_000;
-      return d.compression.current || d.compression.queued.length > 0 || d.igdb.isRunning || d.steamGridDb.isRunning
+      return d.compression.current ||
+        d.compression.queued.length > 0 ||
+        d.igdb.isRunning ||
+        d.steamGridDb.isRunning
         ? 2000
         : 30_000;
     },
@@ -23,16 +26,18 @@ export default function TasksPopover() {
   const sgdbStatus = tasks?.steamGridDb;
 
   const cancelMutation = useMutation({
-    mutationFn: (gameId: number) =>
-      api.post(`/admin/games/${gameId}/compress/cancel`),
+    mutationFn: (gameId: number) => api.post(`/admin/games/${gameId}/compress/cancel`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
     },
   });
 
   const taskCount =
-    (status?.current ? 1 : 0) + (status?.queued.length ?? 0) + (igdbStatus?.isRunning ? 1 : 0) + (sgdbStatus?.isRunning ? 1 : 0);
+    (status?.current ? 1 : 0) +
+    (status?.queued.length ?? 0) +
+    (igdbStatus?.isRunning ? 1 : 0) +
+    (sgdbStatus?.isRunning ? 1 : 0);
 
   return (
     <Popover className="relative">
@@ -61,26 +66,22 @@ export default function TasksPopover() {
         anchor="bottom end"
         className="z-50 mt-2 w-80 rounded-xl bg-surface-raised ring-1 ring-border shadow-xl p-4"
       >
-        <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">
-          Tasks
-        </h3>
+        <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Tasks</h3>
 
-        {!status?.current && !status?.queued.length && !igdbStatus?.isRunning && !sgdbStatus?.isRunning ? (
+        {!status?.current &&
+        !status?.queued.length &&
+        !igdbStatus?.isRunning &&
+        !sgdbStatus?.isRunning ? (
           <p className="text-sm text-text-muted py-2">No active tasks</p>
         ) : (
           <div className="space-y-3">
             {igdbStatus?.isRunning && (
               <div className="space-y-2">
                 <div className="min-w-0">
-                  <p className="text-sm text-text-primary truncate">
-                    IGDB Scan
-                  </p>
+                  <p className="text-sm text-text-primary truncate">IGDB Scan</p>
                   <p className="text-xs text-text-muted">
-                    {igdbStatus.currentGame
-                      ? `Matching: ${igdbStatus.currentGame}`
-                      : "Starting..."}
-                    {igdbStatus.total > 0 &&
-                      ` (${igdbStatus.processed}/${igdbStatus.total})`}
+                    {igdbStatus.currentGame ? `Matching: ${igdbStatus.currentGame}` : "Starting..."}
+                    {igdbStatus.total > 0 && ` (${igdbStatus.processed}/${igdbStatus.total})`}
                   </p>
                 </div>
                 {igdbStatus.total > 0 && (
@@ -99,13 +100,9 @@ export default function TasksPopover() {
             {sgdbStatus?.isRunning && (
               <div>
                 <div className="min-w-0">
-                  <p className="text-sm text-text-primary truncate">
-                    SteamGridDB Heroes
-                  </p>
+                  <p className="text-sm text-text-primary truncate">SteamGridDB Heroes</p>
                   <p className="text-xs text-text-muted truncate">
-                    {sgdbStatus.currentGame
-                      ? `Fetching: ${sgdbStatus.currentGame}`
-                      : "Starting..."}
+                    {sgdbStatus.currentGame ? `Fetching: ${sgdbStatus.currentGame}` : "Starting..."}
                   </p>
                 </div>
               </div>
@@ -125,9 +122,7 @@ export default function TasksPopover() {
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      cancelMutation.mutate(status.current!.gameId)
-                    }
+                    onClick={() => cancelMutation.mutate(status.current!.gameId)}
                     disabled={cancelMutation.isPending}
                     className="shrink-0 text-xs text-red-400 hover:text-red-300 transition disabled:opacity-50"
                   >
@@ -148,10 +143,7 @@ export default function TasksPopover() {
             )}
 
             {status?.queued.map((job) => (
-              <div
-                key={job.gameId}
-                className="flex items-center justify-between gap-2"
-              >
+              <div key={job.gameId} className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm text-text-secondary truncate">
                     {job.gameTitle || `Game #${job.gameId}`}

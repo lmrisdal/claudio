@@ -22,9 +22,7 @@ export default function AccountTab() {
         </span>
         <span className="text-white/50">Member since</span>
         <span className="text-white">
-          {user?.createdAt
-            ? new Date(user.createdAt).toLocaleDateString()
-            : "—"}
+          {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
         </span>
       </div>
     </div>

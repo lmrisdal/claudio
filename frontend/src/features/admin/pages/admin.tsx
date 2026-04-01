@@ -10,8 +10,7 @@ export default function Admin() {
   type Tab = (typeof validTabs)[number];
   const tabParameter = searchParameters.get("tab") as Tab;
   const activeTab: Tab = validTabs.includes(tabParameter) ? tabParameter : "users";
-  const setActiveTab = (tab: Tab) =>
-    setSearchParameters({ tab }, { replace: false });
+  const setActiveTab = (tab: Tab) => setSearchParameters({ tab }, { replace: false });
 
   const tabs = [
     { id: "users" as const, label: "Users" },

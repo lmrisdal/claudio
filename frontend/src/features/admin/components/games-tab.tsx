@@ -21,7 +21,7 @@ export default function GamesTab() {
     mutationFn: ({ id, deleteFiles }: { id: number; deleteFiles: boolean }) =>
       api.delete(`/admin/games/${id}?deleteFiles=${deleteFiles}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
       setDeleteTarget(null);
       setDeleteFiles(false);
     },
@@ -30,7 +30,7 @@ export default function GamesTab() {
   const removeMissingMutation = useMutation({
     mutationFn: () => api.delete<{ removed: number }>("/admin/games/missing"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
       setShowMissingOnly(false);
     },
   });
@@ -39,10 +39,7 @@ export default function GamesTab() {
     if (showMissingOnly && !g.isMissing) return false;
     if (search) {
       const q = search.toLowerCase();
-      return (
-        g.title.toLowerCase().includes(q) ||
-        g.platform.toLowerCase().includes(q)
-      );
+      return g.title.toLowerCase().includes(q) || g.platform.toLowerCase().includes(q);
     }
     return true;
   });
@@ -75,9 +72,7 @@ export default function GamesTab() {
         </div>
         <p className="text-sm text-text-secondary whitespace-nowrap">
           {filtered.length}/{games.length}
-          {missingCount > 0 && (
-            <span className="text-red-400 ml-1">({missingCount} missing)</span>
-          )}
+          {missingCount > 0 && <span className="text-red-400 ml-1">({missingCount} missing)</span>}
         </p>
         {missingCount > 0 && (
           <>
@@ -113,15 +108,9 @@ export default function GamesTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted border-b border-border bg-surface-raised">
-              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">
-                Title
-              </th>
-              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">
-                Platform
-              </th>
-              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">
-                Status
-              </th>
+              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Title</th>
+              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Platform</th>
+              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Status</th>
               <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider text-right">
                 Actions
               </th>
@@ -130,19 +119,13 @@ export default function GamesTab() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-5 py-8 text-center text-text-muted"
-                >
+                <td colSpan={4} className="px-5 py-8 text-center text-text-muted">
                   Loading...
                 </td>
               </tr>
-            ) : (filtered.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-5 py-8 text-center text-text-muted"
-                >
+                <td colSpan={4} className="px-5 py-8 text-center text-text-muted">
                   {showMissingOnly ? "No missing games" : "No games"}
                 </td>
               </tr>
@@ -153,10 +136,7 @@ export default function GamesTab() {
                   className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors"
                 >
                   <td className="px-5 py-3.5 font-medium">
-                    <Link
-                      to={`/games/${game.id}`}
-                      className="text-accent hover:underline"
-                    >
+                    <Link to={`/games/${game.id}`} className="text-accent hover:underline">
                       {game.title}
                     </Link>
                   </td>
@@ -185,7 +165,7 @@ export default function GamesTab() {
                   </td>
                 </tr>
               ))
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -219,9 +199,7 @@ export default function GamesTab() {
                   onChange={(e) => setDeleteFiles(e.target.checked)}
                   className="w-4 h-4 rounded border-border accent-red-500"
                 />
-                <span className="text-red-400">
-                  Also delete files from disk
-                </span>
+                <span className="text-red-400">Also delete files from disk</span>
               </label>
             )}
             <div className="flex justify-end gap-2">
@@ -235,9 +213,7 @@ export default function GamesTab() {
                 Cancel
               </button>
               <button
-                onClick={() =>
-                  deleteMutation.mutate({ id: deleteTarget.id, deleteFiles })
-                }
+                onClick={() => deleteMutation.mutate({ id: deleteTarget.id, deleteFiles })}
                 disabled={deleteMutation.isPending}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 ring-1 ring-red-500/30 transition disabled:opacity-50"
               >

@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { useGamepad } from "../hooks/use-gamepad";
@@ -14,11 +7,7 @@ import { NavigationContext } from "../hooks/use-navigation";
 import { useGamepadEvent, useShortcut } from "../hooks/use-shortcut";
 import { getShortcuts } from "../utils/shortcuts";
 
-export default function NavigationProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function NavigationProvider({ children }: { children: ReactNode }) {
   // Gamepad polling (converts gamepad input to keyboard/custom events)
   useGamepad();
 
@@ -81,8 +70,7 @@ export default function NavigationProvider({
       setGuideKey(getShortcuts().guide);
     }
     globalThis.addEventListener("claudio:shortcuts-changed", onChanged);
-    return () =>
-      globalThis.removeEventListener("claudio:shortcuts-changed", onChanged);
+    return () => globalThis.removeEventListener("claudio:shortcuts-changed", onChanged);
   }, []);
 
   useShortcut(guideKey, (e) => {
@@ -106,19 +94,8 @@ export default function NavigationProvider({
       canGoBack,
       canGoForward,
     }),
-    [
-      searchOpen,
-      openSearch,
-      closeSearch,
-      toggleSearch,
-      canGoBack,
-      canGoForward,
-    ],
+    [searchOpen, openSearch, closeSearch, toggleSearch, canGoBack, canGoForward],
   );
 
-  return (
-    <NavigationContext.Provider value={value}>
-      {children}
-    </NavigationContext.Provider>
-  );
+  return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }

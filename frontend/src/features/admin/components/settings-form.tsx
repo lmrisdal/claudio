@@ -7,20 +7,12 @@ export interface AdminConfig {
   steamgriddb: { apiKey: string };
 }
 
-export default function SettingsForm({
-  initialConfig,
-}: {
-  initialConfig: AdminConfig;
-}) {
+export default function SettingsForm({ initialConfig }: { initialConfig: AdminConfig }) {
   const queryClient = useQueryClient();
 
   const [igdbClientId, setIgdbClientId] = useState(initialConfig.igdb.clientId);
-  const [igdbClientSecret, setIgdbClientSecret] = useState(
-    initialConfig.igdb.clientSecret,
-  );
-  const [sgdbApiKey, setSgdbApiKey] = useState(
-    initialConfig.steamgriddb.apiKey,
-  );
+  const [igdbClientSecret, setIgdbClientSecret] = useState(initialConfig.igdb.clientSecret);
+  const [sgdbApiKey, setSgdbApiKey] = useState(initialConfig.steamgriddb.apiKey);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
@@ -80,12 +72,10 @@ export default function SettingsForm({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-text-primary mb-1">
-                IGDB / Twitch
-              </h3>
+              <h3 className="font-medium text-text-primary mb-1">IGDB / Twitch</h3>
               <p className="text-text-secondary text-sm mb-4">
-                Used for game metadata — covers, summaries, genres, and release
-                dates. Get credentials from the{" "}
+                Used for game metadata — covers, summaries, genres, and release dates. Get
+                credentials from the{" "}
                 <a
                   href="https://dev.twitch.tv/console"
                   target="_blank"
@@ -155,9 +145,7 @@ export default function SettingsForm({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-text-primary mb-1">
-                SteamGridDB
-              </h3>
+              <h3 className="font-medium text-text-primary mb-1">SteamGridDB</h3>
               <p className="text-text-secondary text-sm mb-4">
                 Used for cover art and hero image search. Get an API key from{" "}
                 <a
@@ -200,9 +188,7 @@ export default function SettingsForm({
           >
             {saveMutation.isPending ? "Saving…" : "Save"}
           </button>
-          {success && (
-            <span className="text-sm text-accent">Settings saved.</span>
-          )}
+          {success && <span className="text-sm text-accent">Settings saved.</span>}
           {error && <span className="text-sm text-red-400">{error}</span>}
         </div>
       </form>

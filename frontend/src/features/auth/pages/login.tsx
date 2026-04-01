@@ -30,7 +30,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(username, password);
-      navigate("/");
+      void navigate("/");
     } catch (error_) {
       setError(error_ instanceof Error ? error_.message : "Login failed");
     } finally {

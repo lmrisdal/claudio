@@ -2,24 +2,20 @@ const CACHE_NAME = "claudio-v1";
 const PRECACHE_URLS = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     Promise.all([
-      caches.keys().then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== CACHE_NAME)
-            .map((key) => caches.delete(key))
-        )
-      ),
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+        ),
       self.clients.claim(),
-    ])
+    ]),
   );
 });
 
@@ -47,12 +43,12 @@ self.addEventListener("fetch", (event) => {
               caches
                 .open(CACHE_NAME)
                 .then((cache) => cache.put(request, clone))
-                .catch(() => {})
+                .catch(() => {}),
             );
           }
           return response;
         })
-        .catch(() => caches.match("/"))
+        .catch(() => caches.match("/")),
     );
     return;
   }
@@ -67,7 +63,7 @@ self.addEventListener("fetch", (event) => {
               caches
                 .open(CACHE_NAME)
                 .then((cache) => cache.put(request, clone))
-                .catch(() => {})
+                .catch(() => {}),
             );
           }
           return response;
@@ -78,6 +74,6 @@ self.addEventListener("fetch", (event) => {
         return cached;
       }
       return fetched;
-    })
+    }),
   );
 });

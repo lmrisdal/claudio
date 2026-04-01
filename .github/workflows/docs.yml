@@ -1,6 +1,5 @@
 name: Deploy Docs to GitHub Pages
 
-# TODO: Enable when repo is public and GitHub Pages is configured
 on:
   push:
     branches: [main]
@@ -23,17 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: voidzero-dev/setup-vp@v1
         with:
-          node-version: 22
-
-      - name: Install dependencies
-        working-directory: docs
-        run: npm ci
+          node-version: "22"
+          working-directory: docs
+          cache: true
+          run-install: true
 
       - name: Build docs
         working-directory: docs
-        run: npm run build
+        run: vp run build
 
       - uses: actions/upload-pages-artifact@v3
         with:

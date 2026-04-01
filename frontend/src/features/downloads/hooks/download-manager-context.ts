@@ -17,5 +17,4 @@ export interface DownloadManagerContextValue {
   getProgress: (gameId: number) => InstallProgress | null;
 }
 
-export const DownloadManagerContext =
-  createContext<DownloadManagerContextValue | null>(null);
+export const DownloadManagerContext = createContext<DownloadManagerContextValue | null>(null);

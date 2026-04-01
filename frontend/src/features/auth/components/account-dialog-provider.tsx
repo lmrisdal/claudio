@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { AccountDialogContext } from "../hooks/use-account-dialog";
 import AccountDialog from "./account-dialog";
 
-export default function AccountDialogProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function AccountDialogProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const open = useCallback(() => setIsOpen(true), []);

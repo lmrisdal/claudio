@@ -36,11 +36,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: voidzero-dev/setup-vp@v1
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          node-version: "22"
+          working-directory: frontend
+          cache: true
+          run-install: true
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -66,10 +67,6 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf
-
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
 
       - uses: tauri-apps/tauri-action@v0
         env:

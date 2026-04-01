@@ -18,10 +18,7 @@ export function getShortcuts(): ShortcutMap {
   return { ...defaults };
 }
 
-export function setShortcut<K extends keyof ShortcutMap>(
-  key: K,
-  value: string,
-) {
+export function setShortcut<K extends keyof ShortcutMap>(key: K, value: string) {
   const current = getShortcuts();
   current[key] = value;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
@@ -34,8 +31,7 @@ export function getShortcutDefaults(): ShortcutMap {
 
 /** Format a shortcut pattern for display (e.g. "mod+g" → "Ctrl+G" or "⌘G") */
 export function formatShortcut(pattern: string): string {
-  const isMac =
-    typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
   const parts = pattern.toLowerCase().split("+");
   const key = parts.pop()!.toUpperCase();
 

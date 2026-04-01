@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../hooks/use-auth";
 
 export default function ExternalAuthCallback() {
@@ -14,26 +14,28 @@ export default function ExternalAuthCallback() {
     const authError = parameters.get("error");
 
     if (authError) {
-      navigate(`/login?${new URLSearchParams({ error: authError })}`, {
+      void navigate(`/login?${new URLSearchParams({ error: authError })}`, {
         replace: true,
       });
       return;
     }
 
     if (!externalNonce || !providerName) {
-      navigate("/login", { replace: true });
+      void navigate("/login", { replace: true });
       return;
     }
 
     completeExternalLogin(externalNonce)
       .then(() => {
-        navigate("/", { replace: true });
+        void navigate("/", { replace: true });
       })
       .catch((error) => {
-        navigate(
+        void navigate(
           `/login?${new URLSearchParams({
             error:
-              error instanceof Error ? error.message : `${providerName} login failed`,
+              error instanceof Error
+                ? error.message
+                : `${providerName} login failed`,
           })}`,
           { replace: true },
         );

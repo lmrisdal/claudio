@@ -41,9 +41,7 @@ function parseToken(token: string): User | null {
   }
 }
 
-async function exchangeTokens(
-  parameters: Record<string, string>,
-): Promise<TokenResponse> {
+async function exchangeTokens(parameters: Record<string, string>): Promise<TokenResponse> {
   const body = new URLSearchParams({ ...parameters, client_id: "claudio-spa" });
   const serverUrl = localStorage.getItem("claudio_server_url") ?? "";
   const res = await fetch(`${serverUrl}/connect/token`, {
@@ -55,12 +53,11 @@ async function exchangeTokens(
     const text = await res.text();
     try {
       const json = JSON.parse(text);
-      const description: string =
-        json.error_description || json.error || "Authentication failed";
+      const description: string = json.error_description || json.error || "Authentication failed";
       throw new Error(description);
     } catch (error) {
       if (error instanceof SyntaxError) {
-        throw new Error(text || "Authentication failed");
+        throw new TypeError(text || "Authentication failed");
       }
       throw error;
     }
@@ -69,9 +66,7 @@ async function exchangeTokens(
 }
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(() =>
-    localStorage.getItem("token"),
-  );
+  const [token, setTokenState] = useState<string | null>(() => localStorage.getItem("token"));
   const [authDisabled, setAuthDisabled] = useState(false);
   const [providers, setProviders] = useState<AuthProviders>({
     providers: [],
@@ -130,7 +125,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         applyTokenResponse(res);
       })
       .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // oxlint-disable-line react-hooks/exhaustive-deps
 
   const login = useCallback(
     async (username: string, password: string) => {

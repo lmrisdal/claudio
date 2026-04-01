@@ -35,11 +35,7 @@ export function useShortcut(
 /**
  * Register a custom gamepad event listener on the window.
  */
-export function useGamepadEvent(
-  event: string,
-  handler: () => void,
-  enabled = true,
-) {
+export function useGamepadEvent(event: string, handler: () => void, enabled = true) {
   const handlerReference = useRef(handler);
   useEffect(() => {
     handlerReference.current = handler;

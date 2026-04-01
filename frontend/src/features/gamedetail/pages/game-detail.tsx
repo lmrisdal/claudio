@@ -110,10 +110,10 @@ export default function GameDetail() {
     if (document.querySelector("[data-search-dialog]")) return;
     if (browsePath !== null) {
       setBrowsePath(null);
-      sounds.back();
+      void sounds.back();
     } else if (!editing && !sgdbDialog.open && !candidates) {
-      sounds.back();
-      navigate("/");
+      void sounds.back();
+      void navigate("/");
     }
   });
 
@@ -261,7 +261,7 @@ export default function GameDetail() {
     onSuccess: async (installed) => {
       setInstallError(null);
       queryClient.setQueryData(["installedGame", id], installed);
-      queryClient.invalidateQueries({ queryKey: ["installedGames"] });
+      void queryClient.invalidateQueries({ queryKey: ["installedGames"] });
       await refetchInstalledGame();
     },
     onError: (error) => {
@@ -327,7 +327,7 @@ export default function GameDetail() {
       >(`/admin/steamgriddb/search?query=${encodeURIComponent(q)}`);
       if (sgdbRequestReference.current !== requestId) return;
       setSgdbGames(games);
-      if (games.length === 1) selectSgdbGame(games[0].id, mode);
+      if (games.length === 1) void selectSgdbGame(games[0].id, mode);
     } catch {
       if (sgdbRequestReference.current !== requestId) return;
       setSgdbGames([]);
@@ -358,12 +358,12 @@ export default function GameDetail() {
   function openIgdbSearch() {
     setIgdbQuery(game?.title ?? "");
     setCandidates([]);
-    searchIgdb();
+    void searchIgdb();
   }
 
   function handleIgdbCustomSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (igdbQuery.trim()) searchIgdb(igdbQuery.trim());
+    if (igdbQuery.trim()) void searchIgdb(igdbQuery.trim());
   }
 
   const applyMutation = useMutation({
@@ -371,7 +371,7 @@ export default function GameDetail() {
       api.post<Game>(`/admin/games/${id}/igdb/apply`, { igdbId }),
     onSuccess: (data) => {
       queryClient.setQueryData(["game", id], data);
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
       setCandidates(null);
     },
   });
@@ -398,7 +398,7 @@ export default function GameDetail() {
     }) => api.put<Game>(`/admin/games/${id}`, data),
     onSuccess: (data) => {
       queryClient.setQueryData(["game", id], data);
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
       setEditing(false);
     },
   });
@@ -407,8 +407,8 @@ export default function GameDetail() {
     mutationFn: (format: string) =>
       api.post(`/admin/games/${id}/compress?format=${format}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["game", id] });
-      queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
+      void queryClient.invalidateQueries({ queryKey: ["game", id] });
+      void queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
     },
   });
 
@@ -416,7 +416,7 @@ export default function GameDetail() {
     mutationFn: () => api.post<Game>(`/admin/games/${id}/tag-folder`),
     onSuccess: (data) => {
       queryClient.setQueryData(["game", id], data);
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
     },
   });
 
@@ -470,7 +470,9 @@ export default function GameDetail() {
       title: editForm.title,
       summary: editForm.summary || null,
       genre: editForm.genre || null,
-      releaseYear: editForm.releaseYear ? Number.parseInt(editForm.releaseYear) : null,
+      releaseYear: editForm.releaseYear
+        ? Number.parseInt(editForm.releaseYear)
+        : null,
       coverUrl,
       heroUrl,
       installType: editForm.installType,
@@ -531,12 +533,12 @@ export default function GameDetail() {
     installProgress.status !== "failed";
 
   const desktopInstallLabel = hasActiveInstallProgress
-    ? (typeof installProgress?.percent === "number"
+    ? typeof installProgress?.percent === "number"
       ? `Installing ${Math.round(installProgress.percent)}%`
-      : "Installing...")
-    : (installMutation.isPending
+      : "Installing..."
+    : installMutation.isPending
       ? "Starting install…"
-      : "Install");
+      : "Install";
 
   async function handleInstallClick() {
     if (!displayGame) return;
@@ -612,7 +614,7 @@ export default function GameDetail() {
                 mainReference.current?.querySelector<HTMLElement>("[data-nav]");
               if (first) {
                 first.focus();
-                sounds.navigate();
+                void sounds.navigate();
               }
             }
           }}
@@ -623,7 +625,7 @@ export default function GameDetail() {
           to="/"
           data-nav
           onKeyDown={(e) => {
-            if (e.key === "Enter") sounds.back();
+            if (e.key === "Enter") void sounds.back();
           }}
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8] ${
             displayGame.heroUrl
@@ -1321,7 +1323,7 @@ export default function GameDetail() {
                       to={`/games/${displayGame.id}/play`}
                       data-nav
                       onClick={(e) => {
-                        if (e.detail === 0) sounds.download();
+                        if (e.detail === 0) void sounds.download();
                       }}
                       className="inline-flex items-center gap-2 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                     >
@@ -1424,7 +1426,7 @@ export default function GameDetail() {
                               ["installedGame", id],
                               null,
                             );
-                            queryClient.invalidateQueries({
+                            void queryClient.invalidateQueries({
                               queryKey: ["installedGames"],
                             });
                             void refetchInstalledGame();
@@ -1547,7 +1549,9 @@ export default function GameDetail() {
                               .split("/")
                               .filter(Boolean)
                               .map((segment, index, array) => {
-                                const segPath = array.slice(0, index + 1).join("/");
+                                const segPath = array
+                                  .slice(0, index + 1)
+                                  .join("/");
                                 const isLast = index === array.length - 1;
                                 return (
                                   <span
@@ -1582,7 +1586,7 @@ export default function GameDetail() {
                           <div className="flex items-center justify-center py-12 text-text-muted text-sm">
                             Loading...
                           </div>
-                        ) : (browseData?.entries.length ? (
+                        ) : browseData?.entries.length ? (
                           <div className="divide-y divide-border/50">
                             {resolvedPath && (
                               <button
@@ -1666,11 +1670,12 @@ export default function GameDetail() {
                                 >
                                   {entry.name}
                                 </span>
-                                {entry.size != undefined && !entry.isDirectory && (
-                                  <span className="ml-auto text-xs text-text-muted font-mono shrink-0">
-                                    {formatSize(entry.size)}
-                                  </span>
-                                )}
+                                {entry.size != undefined &&
+                                  !entry.isDirectory && (
+                                    <span className="ml-auto text-xs text-text-muted font-mono shrink-0">
+                                      {formatSize(entry.size)}
+                                    </span>
+                                  )}
                               </button>
                             ))}
                           </div>
@@ -1678,7 +1683,7 @@ export default function GameDetail() {
                           <div className="flex items-center justify-center py-12 text-text-muted text-sm">
                             Empty directory
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1739,7 +1744,8 @@ export default function GameDetail() {
                         );
                         if (sgdbRequestReference.current !== requestId) return;
                         setSgdbGames(games);
-                        if (games.length === 1) selectSgdbGame(games[0].id);
+                        if (games.length === 1)
+                          void selectSgdbGame(games[0].id);
                       } catch {
                         if (sgdbRequestReference.current !== requestId) return;
                         setSgdbGames([]);
@@ -1781,7 +1787,9 @@ export default function GameDetail() {
                             <button
                               key={g.id}
                               type="button"
-                              onClick={() => selectSgdbGame(g.id)}
+                              onClick={() => {
+                                void selectSgdbGame(g.id);
+                              }}
                               className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-surface-raised transition text-text-secondary hover:text-text-primary"
                             >
                               {g.name}

@@ -6,18 +6,18 @@ import { api } from "../api/client";
 import type { LastPlayedGame } from "../hooks/guide-types";
 import { useGamepadEvent, useShortcut } from "../hooks/use-shortcut";
 import { sounds } from "../utils/sounds";
-import SaveSlotCard from "./save-slot-card";
+import AccountIcon from "./icons/account-icon";
 import ClaudioIcon from "./icons/claudio-icon";
+import CloseIcon from "./icons/close-icon";
+import FullscreenIcon from "./icons/fullscreen-icon";
 import GamepadIcon from "./icons/gamepad-icon";
 import LibraryIcon from "./icons/library-icon";
-import AccountIcon from "./icons/account-icon";
-import SettingsIcon from "./icons/settings-icon";
-import PlayIcon from "./icons/play-icon";
-import QuitIcon from "./icons/quit-icon";
-import FullscreenIcon from "./icons/fullscreen-icon";
-import CloseIcon from "./icons/close-icon";
-import PlusIcon from "./icons/plus-icon";
 import LoadingSpinner from "./icons/loading-spinner";
+import PlayIcon from "./icons/play-icon";
+import PlusIcon from "./icons/plus-icon";
+import QuitIcon from "./icons/quit-icon";
+import SettingsIcon from "./icons/settings-icon";
+import SaveSlotCard from "./save-slot-card";
 
 interface SaveStateDto {
   id: number;
@@ -112,14 +112,14 @@ export default function GuideOverlay({
     setActiveTab(tabId);
     setFocusZone("menu");
     setFocusIndex(0);
-    sounds.navigate();
+    void sounds.navigate();
   }
 
   function navigateTo(path: string) {
-    sounds.navigate();
+    void sounds.navigate();
     onClose();
     if (location.pathname !== path) {
-      navigate(path);
+      void navigate(path);
     }
   }
 
@@ -135,7 +135,7 @@ export default function GuideOverlay({
       label: "Account",
       icon: AccountIcon,
       action: () => {
-        sounds.navigate();
+        void sounds.navigate();
         onClose();
         openAccountDialog();
       },
@@ -149,7 +149,7 @@ export default function GuideOverlay({
           label: "Resume Game",
           icon: PlayIcon,
           action: () => {
-            sounds.back();
+            void sounds.back();
             onResumeGame();
           },
         },
@@ -158,12 +158,12 @@ export default function GuideOverlay({
           label: "Close Game",
           icon: QuitIcon,
           action: () => {
-            sounds.back();
+            void sounds.back();
             onQuitGame();
           },
         },
       ]
-    : (lastPlayed
+    : lastPlayed
       ? [
           {
             id: "play",
@@ -172,7 +172,7 @@ export default function GuideOverlay({
             action: () => navigateTo(`/games/${lastPlayed.gameId}/play`),
           },
         ]
-      : []);
+      : [];
 
   const items = activeTab === "nowplaying" ? nowPlayingItems : homeItems;
 
@@ -204,7 +204,7 @@ export default function GuideOverlay({
     mutationFn: (saveId: number) =>
       api.delete(`/games/${gameId}/save-states/${saveId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
+      void queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
     },
   });
 
@@ -227,13 +227,19 @@ export default function GuideOverlay({
         ? `/games/${gameId}/save-states/${overwriteSlotId}`
         : `/games/${gameId}/save-states`;
 
-      api
-        .uploadBinary<SaveStateDto>(path, {
-          state: stateBlob,
-          screenshot: screenshotBlob,
-        }, isOverwrite ? "PUT" : "POST")
+      void api
+        .uploadBinary<SaveStateDto>(
+          path,
+          {
+            state: stateBlob,
+            screenshot: screenshotBlob,
+          },
+          isOverwrite ? "PUT" : "POST",
+        )
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
+          void queryClient.invalidateQueries({
+            queryKey: ["saveStates", gameId],
+          });
         })
         .finally(() => {
           setSavingState(false);
@@ -331,8 +337,10 @@ export default function GuideOverlay({
     (index: number) => {
       const clamped = Math.max(0, Math.min(items.length - 1, index));
       setFocusIndex(clamped);
-      itemReferences.current[clamped]?.focus({ focusVisible: true } as FocusOptions);
-      sounds.navigate();
+      itemReferences.current[clamped]?.focus({
+        focusVisible: true,
+      } as FocusOptions);
+      void sounds.navigate();
     },
     [items.length],
   );
@@ -344,8 +352,10 @@ export default function GuideOverlay({
     (index: number) => {
       const clamped = Math.max(0, Math.min(tabBarLength - 1, index));
       setTabFocusIndex(clamped);
-      tabReferences.current[clamped]?.focus({ focusVisible: true } as FocusOptions);
-      sounds.navigate();
+      tabReferences.current[clamped]?.focus({
+        focusVisible: true,
+      } as FocusOptions);
+      void sounds.navigate();
     },
     [tabBarLength],
   );
@@ -354,8 +364,10 @@ export default function GuideOverlay({
     const count = toolbarReferences.current.filter(Boolean).length;
     const clamped = Math.max(0, Math.min(count - 1, index));
     setToolbarFocusIndex(clamped);
-    toolbarReferences.current[clamped]?.focus({ focusVisible: true } as FocusOptions);
-    sounds.navigate();
+    toolbarReferences.current[clamped]?.focus({
+      focusVisible: true,
+    } as FocusOptions);
+    void sounds.navigate();
   }, []);
 
   const focusSaveSlot = useCallback(
@@ -366,7 +378,7 @@ export default function GuideOverlay({
       saveSlotReferences.current[clamped]?.focus({
         focusVisible: true,
       } as FocusOptions);
-      sounds.navigate();
+      void sounds.navigate();
     },
     [saveSlotCount],
   );
@@ -391,64 +403,64 @@ export default function GuideOverlay({
     (e) => {
       e.preventDefault();
       switch (focusZone) {
-      case "menu": {
-        if (focusIndex === 0) {
-          setFocusZone("tabs");
-          const tabIndex = tabs.findIndex((t) => t.id === activeTab);
-          setTabFocusIndex(Math.max(tabIndex, 0));
-          tabReferences.current[Math.max(tabIndex, 0)]?.focus({
-            focusVisible: true,
-          } as FocusOptions);
-          sounds.navigate();
-        } else {
-          focusItem(focusIndex - 1);
+        case "menu": {
+          if (focusIndex === 0) {
+            setFocusZone("tabs");
+            const tabIndex = tabs.findIndex((t) => t.id === activeTab);
+            setTabFocusIndex(Math.max(tabIndex, 0));
+            tabReferences.current[Math.max(tabIndex, 0)]?.focus({
+              focusVisible: true,
+            } as FocusOptions);
+            void sounds.navigate();
+          } else {
+            focusItem(focusIndex - 1);
+          }
+
+          break;
         }
-      
-      break;
-      }
-      case "savestates": {
-        if (expandedSlotIndex !== null) {
-          setExpandedSlotIndex(null);
-          return;
+        case "savestates": {
+          if (expandedSlotIndex !== null) {
+            setExpandedSlotIndex(null);
+            return;
+          }
+          // Move up a row (subtract 2 for 2-col grid), or exit to menu
+          const newIndex = saveSlotFocusIndex - 2;
+          if (newIndex >= 0) {
+            focusSaveSlot(newIndex);
+          } else {
+            setFocusZone("menu");
+            const lastIndex = items.length - 1;
+            setFocusIndex(lastIndex);
+            itemReferences.current[lastIndex]?.focus({
+              focusVisible: true,
+            } as FocusOptions);
+            void sounds.navigate();
+          }
+
+          break;
         }
-        // Move up a row (subtract 2 for 2-col grid), or exit to menu
-        const newIndex = saveSlotFocusIndex - 2;
-        if (newIndex >= 0) {
-          focusSaveSlot(newIndex);
-        } else {
-          setFocusZone("menu");
-          const lastIndex = items.length - 1;
-          setFocusIndex(lastIndex);
-          itemReferences.current[lastIndex]?.focus({
-            focusVisible: true,
-          } as FocusOptions);
-          sounds.navigate();
+        case "toolbar": {
+          if (saveSlotCount > 0) {
+            setFocusZone("savestates");
+            const lastSlot = saveSlotCount - 1;
+            setSaveSlotFocusIndex(lastSlot);
+            saveSlotReferences.current[lastSlot]?.focus({
+              focusVisible: true,
+            } as FocusOptions);
+            void sounds.navigate();
+          } else {
+            setFocusZone("menu");
+            const lastIndex = items.length - 1;
+            setFocusIndex(lastIndex);
+            itemReferences.current[lastIndex]?.focus({
+              focusVisible: true,
+            } as FocusOptions);
+            void sounds.navigate();
+          }
+
+          break;
         }
-      
-      break;
-      }
-      case "toolbar": {
-        if (saveSlotCount > 0) {
-          setFocusZone("savestates");
-          const lastSlot = saveSlotCount - 1;
-          setSaveSlotFocusIndex(lastSlot);
-          saveSlotReferences.current[lastSlot]?.focus({
-            focusVisible: true,
-          } as FocusOptions);
-          sounds.navigate();
-        } else {
-          setFocusZone("menu");
-          const lastIndex = items.length - 1;
-          setFocusIndex(lastIndex);
-          itemReferences.current[lastIndex]?.focus({
-            focusVisible: true,
-          } as FocusOptions);
-          sounds.navigate();
-        }
-      
-      break;
-      }
-      // No default
+        // No default
       }
     },
     { enabled: open, capture: true },
@@ -459,60 +471,60 @@ export default function GuideOverlay({
     (e) => {
       e.preventDefault();
       switch (focusZone) {
-      case "tabs": {
-        setFocusZone("menu");
-        setFocusIndex(0);
-        itemReferences.current[0]?.focus({
-          focusVisible: true,
-        } as FocusOptions);
-        sounds.navigate();
-      
-      break;
-      }
-      case "menu": {
-        if (focusIndex === items.length - 1) {
-          if (saveSlotCount > 0) {
-            setFocusZone("savestates");
-            setSaveSlotFocusIndex(0);
-            saveSlotReferences.current[0]?.focus({
-              focusVisible: true,
-            } as FocusOptions);
-            sounds.navigate();
+        case "tabs": {
+          setFocusZone("menu");
+          setFocusIndex(0);
+          itemReferences.current[0]?.focus({
+            focusVisible: true,
+          } as FocusOptions);
+          void sounds.navigate();
+
+          break;
+        }
+        case "menu": {
+          if (focusIndex === items.length - 1) {
+            if (saveSlotCount > 0) {
+              setFocusZone("savestates");
+              setSaveSlotFocusIndex(0);
+              saveSlotReferences.current[0]?.focus({
+                focusVisible: true,
+              } as FocusOptions);
+              void sounds.navigate();
+            } else {
+              setFocusZone("toolbar");
+              setToolbarFocusIndex(0);
+              toolbarReferences.current[0]?.focus({
+                focusVisible: true,
+              } as FocusOptions);
+              void sounds.navigate();
+            }
+          } else {
+            focusItem(focusIndex + 1);
+          }
+
+          break;
+        }
+        case "savestates": {
+          if (expandedSlotIndex !== null) {
+            setExpandedSlotIndex(null);
+            return;
+          }
+          // Move down a row (add 2 for 2-col grid), or exit to toolbar
+          const newIndex = saveSlotFocusIndex + 2;
+          if (newIndex < saveSlotCount) {
+            focusSaveSlot(newIndex);
           } else {
             setFocusZone("toolbar");
             setToolbarFocusIndex(0);
             toolbarReferences.current[0]?.focus({
               focusVisible: true,
             } as FocusOptions);
-            sounds.navigate();
+            void sounds.navigate();
           }
-        } else {
-          focusItem(focusIndex + 1);
+
+          break;
         }
-      
-      break;
-      }
-      case "savestates": {
-        if (expandedSlotIndex !== null) {
-          setExpandedSlotIndex(null);
-          return;
-        }
-        // Move down a row (add 2 for 2-col grid), or exit to toolbar
-        const newIndex = saveSlotFocusIndex + 2;
-        if (newIndex < saveSlotCount) {
-          focusSaveSlot(newIndex);
-        } else {
-          setFocusZone("toolbar");
-          setToolbarFocusIndex(0);
-          toolbarReferences.current[0]?.focus({
-            focusVisible: true,
-          } as FocusOptions);
-          sounds.navigate();
-        }
-      
-      break;
-      }
-      // No default
+        // No default
       }
     },
     { enabled: open, capture: true },
@@ -523,27 +535,27 @@ export default function GuideOverlay({
     (e) => {
       e.preventDefault();
       switch (focusZone) {
-      case "tabs": {
-        focusTabItem(tabFocusIndex - 1);
-      
-      break;
-      }
-      case "savestates": {
-        if (expandedSlotIndex !== null) {
-          setActionFocusIndex((previous) => Math.max(0, previous - 1));
-          sounds.navigate();
-        } else if (saveSlotFocusIndex % 2 === 1) {
-          focusSaveSlot(saveSlotFocusIndex - 1);
+        case "tabs": {
+          focusTabItem(tabFocusIndex - 1);
+
+          break;
         }
-      
-      break;
-      }
-      case "toolbar": {
-        focusToolbarItem(toolbarFocusIndex - 1);
-      
-      break;
-      }
-      // No default
+        case "savestates": {
+          if (expandedSlotIndex !== null) {
+            setActionFocusIndex((previous) => Math.max(0, previous - 1));
+            void sounds.navigate();
+          } else if (saveSlotFocusIndex % 2 === 1) {
+            focusSaveSlot(saveSlotFocusIndex - 1);
+          }
+
+          break;
+        }
+        case "toolbar": {
+          focusToolbarItem(toolbarFocusIndex - 1);
+
+          break;
+        }
+        // No default
       }
     },
     { enabled: open, capture: true },
@@ -554,30 +566,30 @@ export default function GuideOverlay({
     (e) => {
       e.preventDefault();
       switch (focusZone) {
-      case "tabs": {
-        focusTabItem(tabFocusIndex + 1);
-      
-      break;
-      }
-      case "savestates": {
-        if (expandedSlotIndex !== null) {
-          setActionFocusIndex((previous) => Math.min(2, previous + 1));
-          sounds.navigate();
-        } else if (
-          saveSlotFocusIndex % 2 === 0 &&
-          saveSlotFocusIndex + 1 < saveSlotCount
-        ) {
-          focusSaveSlot(saveSlotFocusIndex + 1);
+        case "tabs": {
+          focusTabItem(tabFocusIndex + 1);
+
+          break;
         }
-      
-      break;
-      }
-      case "toolbar": {
-        focusToolbarItem(toolbarFocusIndex + 1);
-      
-      break;
-      }
-      // No default
+        case "savestates": {
+          if (expandedSlotIndex !== null) {
+            setActionFocusIndex((previous) => Math.min(2, previous + 1));
+            void sounds.navigate();
+          } else if (
+            saveSlotFocusIndex % 2 === 0 &&
+            saveSlotFocusIndex + 1 < saveSlotCount
+          ) {
+            focusSaveSlot(saveSlotFocusIndex + 1);
+          }
+
+          break;
+        }
+        case "toolbar": {
+          focusToolbarItem(toolbarFocusIndex + 1);
+
+          break;
+        }
+        // No default
       }
     },
     { enabled: open, capture: true },
@@ -588,61 +600,62 @@ export default function GuideOverlay({
     (e) => {
       e.preventDefault();
       switch (focusZone) {
-      case "tabs": {
-        if (tabFocusIndex >= tabs.length) {
-          onClose();
-        } else {
-          const tab = tabs[tabFocusIndex];
-          if (tab && tab.id !== activeTab) {
-            switchTab(tab.id);
-          }
-        }
-      
-      break;
-      }
-      case "savestates": {
-        if (expandedSlotIndex !== null) {
-          // Execute the focused action
-          const save = saveStates?.[expandedSlotIndex];
-          if (save) {
-            switch (actionFocusIndex) {
-            case 0: {
-            handleLoadState(save.id);
-            break;
-            }
-            case 1: {
-            handleOverwriteState(save.id);
-            break;
-            }
-            case 2: { {
-            handleDeleteState(save.id);
-            // No default
-            }
-            break;
-            }
+        case "tabs": {
+          if (tabFocusIndex >= tabs.length) {
+            onClose();
+          } else {
+            const tab = tabs[tabFocusIndex];
+            if (tab && tab.id !== activeTab) {
+              switchTab(tab.id);
             }
           }
-          setExpandedSlotIndex(null);
-        } else if (saveSlotFocusIndex === 0) {
-          // "New Save" slot (first slot) — trigger save directly
-          saveSlotReferences.current[0]?.click();
-        } else {
-          // Expand the action overlay for this existing save slot
-          setExpandedSlotIndex(saveSlotFocusIndex - 1);
-          setActionFocusIndex(0);
-          sounds.navigate();
+
+          break;
         }
-      
-      break;
-      }
-      case "toolbar": {
-        toolbarReferences.current[toolbarFocusIndex]?.click();
-      
-      break;
-      }
-      default: {
-        items[focusIndex]?.action();
-      }
+        case "savestates": {
+          if (expandedSlotIndex !== null) {
+            // Execute the focused action
+            const save = saveStates?.[expandedSlotIndex];
+            if (save) {
+              switch (actionFocusIndex) {
+                case 0: {
+                  void handleLoadState(save.id);
+                  break;
+                }
+                case 1: {
+                  handleOverwriteState(save.id);
+                  break;
+                }
+                case 2: {
+                  {
+                    handleDeleteState(save.id);
+                    // No default
+                  }
+                  break;
+                }
+              }
+            }
+            setExpandedSlotIndex(null);
+          } else if (saveSlotFocusIndex === 0) {
+            // "New Save" slot (first slot) — trigger save directly
+            saveSlotReferences.current[0]?.click();
+          } else {
+            // Expand the action overlay for this existing save slot
+            setExpandedSlotIndex(saveSlotFocusIndex - 1);
+            setActionFocusIndex(0);
+            void sounds.navigate();
+          }
+
+          break;
+        }
+        case "toolbar": {
+          toolbarReferences.current[toolbarFocusIndex]?.click();
+
+          break;
+        }
+        default: {
+          items[focusIndex]?.action();
+        }
       }
     },
     { enabled: open, capture: true },
@@ -656,7 +669,7 @@ export default function GuideOverlay({
       setActiveTab(tabs[nextIndex].id);
       setFocusZone("menu");
       setFocusIndex(0);
-      sounds.navigate();
+      void sounds.navigate();
     },
     [tabs, activeTab],
   );
@@ -862,9 +875,9 @@ export default function GuideOverlay({
               type="button"
               onClick={() => {
                 if (document.fullscreenElement) {
-                  document.exitFullscreen();
+                  void document.exitFullscreen();
                 } else {
-                  document.documentElement.requestFullscreen();
+                  void document.documentElement.requestFullscreen();
                 }
               }}
               className="rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
@@ -879,7 +892,7 @@ export default function GuideOverlay({
               }}
               type="button"
               onClick={() => {
-                sounds.navigate();
+                void sounds.navigate();
                 onClose();
                 openAccountDialog();
               }}

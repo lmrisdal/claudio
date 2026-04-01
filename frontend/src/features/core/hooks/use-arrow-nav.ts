@@ -14,8 +14,7 @@ export function useArrowNav(
   return useCallback(
     (e: React.KeyboardEvent) => {
       if (!enabled) return;
-      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key))
-        return;
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
 
       const container = containerReference.current;
       if (!container) return;
@@ -32,18 +31,15 @@ export function useArrowNav(
       const isForward = e.key === "ArrowDown" || e.key === "ArrowRight";
       const nextIndex =
         currentIndex === -1
-          ? (isForward
+          ? isForward
             ? 0
-            : items.length - 1)
-          : Math.max(
-              0,
-              Math.min(items.length - 1, currentIndex + (isForward ? 1 : -1)),
-            );
+            : items.length - 1
+          : Math.max(0, Math.min(items.length - 1, currentIndex + (isForward ? 1 : -1)));
 
       if (nextIndex !== currentIndex) {
         e.preventDefault();
         items[nextIndex].focus({ focusVisible: true } as FocusOptions);
-        sounds.navigate();
+        void sounds.navigate();
       }
     },
     [containerReference, enabled],

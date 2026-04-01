@@ -101,16 +101,7 @@ html[data-desktop] [role="button"] {
   cursor: pointer;
 }
 
-:where(
-  a,
-  button,
-  input,
-  select,
-  textarea,
-  summary,
-  [role="button"],
-  [tabindex]
-):focus-visible {
+:where(a, button, input, select, textarea, summary, [role="button"], [tabindex]):focus-visible {
   outline-color: #00d9b8;
 }
 

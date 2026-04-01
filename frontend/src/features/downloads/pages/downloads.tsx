@@ -49,17 +49,12 @@ export default function Downloads() {
                 key={game.id}
                 className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-border"
               >
-                <CoverThumb
-                  coverUrl={getCover(game.id)}
-                  title={game.title}
-                  size="lg"
-                />
+                <CoverThumb coverUrl={getCover(game.id)} title={game.title} size="lg" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{game.title}</div>
                   <div className="text-sm text-text-muted mt-0.5">
                     {progress.detail ??
-                      progress.status.charAt(0).toUpperCase() +
-                        progress.status.slice(1)}
+                      progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
                   </div>
                   {typeof progress.percent === "number" && (
                     <div className="mt-2.5 h-2 rounded-full bg-surface-raised overflow-hidden">
@@ -87,11 +82,7 @@ export default function Downloads() {
                     stroke="currentColor"
                     strokeWidth={2}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>

@@ -8,11 +8,7 @@ import DesktopSidebar, {
   WIDTH_KEY,
 } from "./desktop-sidebar";
 
-export default function DesktopLayoutInner({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DesktopLayoutInner({ children }: { children: React.ReactNode }) {
   const [marginLeft, setMarginLeft] = useState(() => {
     const collapsed = localStorage.getItem(COLLAPSED_KEY) === "true";
     if (collapsed) return COLLAPSED_WIDTH;
@@ -34,8 +30,7 @@ export default function DesktopLayoutInner({
       }
     }
     globalThis.addEventListener("sidebar-collapse-changed", onSidebarChanged);
-    return () =>
-      globalThis.removeEventListener("sidebar-collapse-changed", onSidebarChanged);
+    return () => globalThis.removeEventListener("sidebar-collapse-changed", onSidebarChanged);
   }, []);
 
   return (

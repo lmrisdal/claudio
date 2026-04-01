@@ -27,11 +27,10 @@ export default function SecurityTab({
 
     setLoading(true);
     try {
-      const res = await api.put<void>("/auth/change-password", {
+      await api.put<void>("/auth/change-password", {
         currentPassword,
         newPassword,
       });
-      void res;
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

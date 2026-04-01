@@ -30,6 +30,15 @@ function getCustomHeaders(): Record<string, string> {
   }
 }
 
+function toHeaderRecord(headers?: HeadersInit): Record<string, string> {
+  const normalized: Record<string, string> = {};
+  if (!headers) return normalized;
+  for (const [key, value] of new Headers(headers).entries()) {
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
 async function tryRefreshToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) return null;
@@ -41,7 +50,10 @@ async function tryRefreshToken(): Promise<string | null> {
     });
     const res = await fetch(`${getServerOrigin()}/connect/token`, {
       method: "POST",
-      headers: { ...getCustomHeaders(), "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        ...getCustomHeaders(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
       body: body.toString(),
     });
     if (!res.ok) return null;
@@ -63,7 +75,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...getCustomHeaders(),
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...init?.headers,
+    ...toHeaderRecord(init?.headers),
   };
 
   const res = await fetch(`${getServerBase()}${path}`, { ...init, headers });
@@ -77,7 +89,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         const retryHeaders: HeadersInit = {
           ...(isFormData ? {} : { "Content-Type": "application/json" }),
           Authorization: `Bearer ${newToken}`,
-          ...init?.headers,
+          ...toHeaderRecord(init?.headers),
         };
         const retryRes = await fetch(`${getServerBase()}${path}`, {
           ...init,
@@ -106,12 +118,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
+async function requestBinary(
+  path: string,
+  init?: RequestInit,
+): Promise<ArrayBuffer> {
   const token = localStorage.getItem("token");
   const headers: HeadersInit = {
     ...getCustomHeaders(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...init?.headers,
+    ...toHeaderRecord(init?.headers),
   };
 
   const res = await fetch(`${getServerBase()}${path}`, { ...init, headers });
@@ -121,9 +136,12 @@ async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuf
     if (newToken) {
       const retryHeaders: HeadersInit = {
         Authorization: `Bearer ${newToken}`,
-        ...init?.headers,
+        ...toHeaderRecord(init?.headers),
       };
-      const retryRes = await fetch(`${getServerBase()}${path}`, { ...init, headers: retryHeaders });
+      const retryRes = await fetch(`${getServerBase()}${path}`, {
+        ...init,
+        headers: retryHeaders,
+      });
       if (retryRes.ok) return retryRes.arrayBuffer();
     }
     localStorage.removeItem("token");
@@ -152,7 +170,11 @@ export const api = {
     form.append("file", file);
     return request<T>(path, { method: "POST", body: form });
   },
-  uploadBinary: <T>(path: string, files: Record<string, Blob>, method: "POST" | "PUT" = "POST") => {
+  uploadBinary: <T>(
+    path: string,
+    files: Record<string, Blob>,
+    method: "POST" | "PUT" = "POST",
+  ) => {
     const form = new FormData();
     for (const [name, blob] of Object.entries(files)) {
       form.append(name, blob);

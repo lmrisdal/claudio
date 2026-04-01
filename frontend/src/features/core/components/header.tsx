@@ -13,8 +13,7 @@ import TasksPopover from "./tasks-popover";
 export default function Header() {
   const navigate = useNavigate();
   const { isLoggedIn, isAdmin, user, logout, authDisabled } = useAuth();
-  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } =
-    useNavigation();
+  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
   const accountDialog = useAccountDialog();
   const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
 
@@ -117,10 +116,7 @@ export default function Header() {
                 )}
                 {!authDisabled && (
                   <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
-                    <Menu
-                      as="div"
-                      className="relative h-full flex items-center"
-                    >
+                    <Menu as="div" className="relative h-full flex items-center">
                       <MenuButton
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-accent"
                         title="User menu"

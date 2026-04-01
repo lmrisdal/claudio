@@ -1,17 +1,11 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import {
-  loadLastPlayed,
-  saveLastPlayed,
-  type LastPlayedGame,
-} from "../hooks/guide-types";
+import { loadLastPlayed, saveLastPlayed, type LastPlayedGame } from "../hooks/guide-types";
 import { GuideContext, type GuideActions } from "../hooks/use-guide";
 import GuideOverlay from "./guide-overlay";
 
 export default function GuideProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [lastPlayed, setLastPlayed] = useState<LastPlayedGame | null>(
-    loadLastPlayed,
-  );
+  const [lastPlayed, setLastPlayed] = useState<LastPlayedGame | null>(loadLastPlayed);
   const [activeActions, setActiveActions] = useState<GuideActions | null>(null);
 
   const open = useCallback(() => {
@@ -19,10 +13,14 @@ export default function GuideProvider({ children }: { children: ReactNode }) {
     setIsOpen(true);
   }, []);
   const close = useCallback(() => setIsOpen(false), []);
-  const toggle = useCallback(() => setIsOpen((previous) => {
-    if (!previous) globalThis.dispatchEvent(new CustomEvent("claudio:close-dialogs"));
-    return !previous;
-  }), []);
+  const toggle = useCallback(
+    () =>
+      setIsOpen((previous) => {
+        if (!previous) globalThis.dispatchEvent(new CustomEvent("claudio:close-dialogs"));
+        return !previous;
+      }),
+    [],
+  );
 
   const register = useCallback((actions: GuideActions) => {
     setActiveActions(actions);

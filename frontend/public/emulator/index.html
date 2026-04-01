@@ -9,11 +9,7 @@
         color-scheme: dark;
         font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
         background:
-          radial-gradient(
-            circle at top,
-            rgba(255, 200, 87, 0.18),
-            transparent 38%
-          ),
+          radial-gradient(circle at top, rgba(255, 200, 87, 0.18), transparent 38%),
           linear-gradient(180deg, #0a0e14 0%, #020305 100%);
       }
 
@@ -43,8 +39,7 @@
           const script = document.createElement("script");
           script.src = url;
           script.onload = resolve;
-          script.onerror = () =>
-            reject(new Error(`Failed to load emulator script: ${url}`));
+          script.onerror = () => reject(new Error(`Failed to load emulator script: ${url}`));
           document.head.appendChild(script);
         });
       }
@@ -55,8 +50,7 @@
           link.rel = "stylesheet";
           link.href = url;
           link.onload = resolve;
-          link.onerror = () =>
-            reject(new Error(`Failed to load emulator stylesheet: ${url}`));
+          link.onerror = () => reject(new Error(`Failed to load emulator stylesheet: ${url}`));
           document.head.appendChild(link);
         });
       }
@@ -106,23 +100,30 @@
                 // Use createImageBitmap + OffscreenCanvas to encode
                 // the PNG off the main thread when possible.
                 if (typeof OffscreenCanvas !== "undefined") {
-                  createImageBitmap(canvas).then(function (bmp) {
-                    var oc = new OffscreenCanvas(bmp.width, bmp.height);
-                    var ctx = oc.getContext("2d");
-                    ctx.drawImage(bmp, 0, 0);
-                    bmp.close();
-                    return oc.convertToBlob({ type: "image/png" });
-                  }).then(function (blob) {
-                    return blob.arrayBuffer();
-                  }).then(function (buf) {
-                    var stateArr = new Uint8Array(state.buffer || state);
-                    var ssArr = new Uint8Array(buf);
-                    window.parent.postMessage({
-                      type: "claudio:stateData",
-                      state: stateArr,
-                      screenshot: ssArr,
-                    }, "*", [stateArr.buffer, ssArr.buffer]);
-                  });
+                  createImageBitmap(canvas)
+                    .then(function (bmp) {
+                      var oc = new OffscreenCanvas(bmp.width, bmp.height);
+                      var ctx = oc.getContext("2d");
+                      ctx.drawImage(bmp, 0, 0);
+                      bmp.close();
+                      return oc.convertToBlob({ type: "image/png" });
+                    })
+                    .then(function (blob) {
+                      return blob.arrayBuffer();
+                    })
+                    .then(function (buf) {
+                      var stateArr = new Uint8Array(state.buffer || state);
+                      var ssArr = new Uint8Array(buf);
+                      window.parent.postMessage(
+                        {
+                          type: "claudio:stateData",
+                          state: stateArr,
+                          screenshot: ssArr,
+                        },
+                        "*",
+                        [stateArr.buffer, ssArr.buffer],
+                      );
+                    });
                 } else {
                   // Fallback for browsers without OffscreenCanvas
                   canvas.toBlob(function (blob) {
@@ -130,22 +131,30 @@
                     reader.onload = function () {
                       var stateArr = new Uint8Array(state.buffer || state);
                       var ssArr = new Uint8Array(reader.result);
-                      window.parent.postMessage({
-                        type: "claudio:stateData",
-                        state: stateArr,
-                        screenshot: ssArr,
-                      }, "*", [stateArr.buffer, ssArr.buffer]);
+                      window.parent.postMessage(
+                        {
+                          type: "claudio:stateData",
+                          state: stateArr,
+                          screenshot: ssArr,
+                        },
+                        "*",
+                        [stateArr.buffer, ssArr.buffer],
+                      );
                     };
                     reader.readAsArrayBuffer(blob);
                   }, "image/png");
                 }
               } else {
                 var stateArr = new Uint8Array(state.buffer || state);
-                window.parent.postMessage({
-                  type: "claudio:stateData",
-                  state: stateArr,
-                  screenshot: new Uint8Array(0),
-                }, "*", [stateArr.buffer]);
+                window.parent.postMessage(
+                  {
+                    type: "claudio:stateData",
+                    state: stateArr,
+                    screenshot: new Uint8Array(0),
+                  },
+                  "*",
+                  [stateArr.buffer],
+                );
               }
             });
           }

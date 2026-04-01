@@ -14,14 +14,10 @@ import DesktopLayout from "./features/desktop/components/desktop-layout";
 const Admin = lazy(() => import("./features/admin/pages/admin"));
 const Downloads = lazy(() => import("./features/downloads/pages/downloads"));
 const GameDetail = lazy(() => import("./features/gamedetail/pages/game-detail"));
-const GameEmulator = lazy(
-  () => import("./features/gamedetail/pages/game-emulator"),
-);
+const GameEmulator = lazy(() => import("./features/gamedetail/pages/game-emulator"));
 const Library = lazy(() => import("./features/library/pages/library"));
 const Login = lazy(() => import("./features/auth/pages/login"));
-const ExternalAuthCallback = lazy(
-  () => import("./features/auth/pages/external-auth-callback"),
-);
+const ExternalAuthCallback = lazy(() => import("./features/auth/pages/external-auth-callback"));
 const Register = lazy(() => import("./features/auth/pages/register"));
 
 export default function App() {
@@ -49,10 +45,7 @@ export default function App() {
                     </GuestRoute>
                   }
                 />
-                <Route
-                  path="/auth/callback"
-                  element={<ExternalAuthCallback />}
-                />
+                <Route path="/auth/callback" element={<ExternalAuthCallback />} />
                 <Route
                   path="/"
                   element={

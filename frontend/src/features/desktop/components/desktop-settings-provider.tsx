@@ -31,7 +31,7 @@ export default function DesktopSettingsProvider({
     return () => {
       globalThis.removeEventListener("claudio:open-desktop-settings", open);
       globalThis.removeEventListener("claudio:close-dialogs", close);
-      unlisten.then((function_) => function_());
+      void unlisten.then((function_) => function_());
     };
   }, [open, close]);
 

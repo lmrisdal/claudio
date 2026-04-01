@@ -49,9 +49,7 @@ export default function DesktopSetup({
       }
     } catch {
       setTestResult("error");
-      setError(
-        "Could not connect. Check the URL and make sure the server is running.",
-      );
+      setError("Could not connect. Check the URL and make sure the server is running.");
     } finally {
       setTesting(false);
     }
@@ -73,10 +71,7 @@ export default function DesktopSetup({
     try {
       const settings = await getSettings();
       await updateSettings({ ...settings, serverUrl: trimmed, customHeaders });
-      localStorage.setItem(
-        "claudio_custom_headers",
-        JSON.stringify(customHeaders),
-      );
+      localStorage.setItem("claudio_custom_headers", JSON.stringify(customHeaders));
       onConnected(trimmed);
     } catch {
       setError("Failed to save settings.");
@@ -132,11 +127,7 @@ export default function DesktopSetup({
                 stroke="currentColor"
                 strokeWidth={2}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
               Custom headers
             </button>
@@ -170,9 +161,7 @@ export default function DesktopSetup({
                     />
                     <button
                       type="button"
-                      onClick={() =>
-                        setHeaders(headers.filter((_, index_) => index_ !== index))
-                      }
+                      onClick={() => setHeaders(headers.filter((_, index_) => index_ !== index))}
                       className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
                       aria-label="Remove header"
                     >
@@ -194,9 +183,7 @@ export default function DesktopSetup({
                 ))}
                 <button
                   type="button"
-                  onClick={() =>
-                    setHeaders([...headers, { name: "", value: "" }])
-                  }
+                  onClick={() => setHeaders([...headers, { name: "", value: "" }])}
                   className="text-xs text-accent hover:text-accent-hover transition"
                 >
                   + Add header

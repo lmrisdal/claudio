@@ -28,7 +28,7 @@ export function DownloadManagerProvider({
     let cancelled = false;
     let unlisten: (() => void) | undefined;
 
-    listenToInstallProgress((progress) => {
+    void listenToInstallProgress((progress) => {
       if (cancelled) return;
       setActiveDownloads((previous) => {
         const existing = previous.get(progress.gameId);
@@ -64,11 +64,16 @@ export function DownloadManagerProvider({
       }
 
       setActiveDownloads((previous) => {
-        const next = new Map(previous);
-        next.set(game.id, {
-          game,
-          progress: { gameId: game.id, status: "starting", percent: 0 },
-        });
+        const next = new Map([
+          ...previous,
+          [
+            game.id,
+            {
+              game,
+              progress: { gameId: game.id, status: "starting", percent: 0 },
+            },
+          ],
+        ]);
         return next;
       });
 

@@ -19,7 +19,7 @@ export default function UsersTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/admin/users/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
   const toggleRoleMutation = useMutation({
@@ -27,7 +27,7 @@ export default function UsersTab() {
       api.put(`/admin/users/${user.id}/role`, {
         role: user.role === "admin" ? "user" : "admin",
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
   const addUserMutation = useMutation({
@@ -37,7 +37,7 @@ export default function UsersTab() {
         password: newPassword,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
       setShowAddUser(false);
       setNewUsername("");
       setNewPassword("");
@@ -62,11 +62,7 @@ export default function UsersTab() {
               stroke="currentColor"
               strokeWidth={2}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Add user
           </button>
@@ -79,75 +75,65 @@ export default function UsersTab() {
         </p>
       )}
 
-      {providers.localLoginEnabled &&
-        providers.userCreationEnabled &&
-        showAddUser && (
-          <div className="card bg-surface rounded-xl p-5 ring-1 ring-border">
-            <h3 className="text-sm font-medium mb-4">New user</h3>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                addUserMutation.mutate();
-              }}
-              className="flex flex-col sm:flex-row gap-3"
+      {providers.localLoginEnabled && providers.userCreationEnabled && showAddUser && (
+        <div className="card bg-surface rounded-xl p-5 ring-1 ring-border">
+          <h3 className="text-sm font-medium mb-4">New user</h3>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              addUserMutation.mutate();
+            }}
+            className="flex flex-col sm:flex-row gap-3"
+          >
+            <input
+              type="text"
+              placeholder="Username"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              required
+              className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={8}
+              className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+            />
+            <button
+              type="submit"
+              disabled={addUserMutation.isPending}
+              className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-medium px-4 py-2 rounded-lg transition text-sm whitespace-nowrap"
             >
-              <input
-                type="text"
-                placeholder="Username"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                required
-                className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={8}
-                className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
-              />
-              <button
-                type="submit"
-                disabled={addUserMutation.isPending}
-                className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-medium px-4 py-2 rounded-lg transition text-sm whitespace-nowrap"
-              >
-                {addUserMutation.isPending ? "Adding..." : "Add"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddUser(false);
-                  setNewUsername("");
-                  setNewPassword("");
-                  setAddError("");
-                }}
-                className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition whitespace-nowrap"
-              >
-                Cancel
-              </button>
-            </form>
-            {addError && (
-              <p className="text-red-400 text-sm mt-2">{addError}</p>
-            )}
-          </div>
-        )}
+              {addUserMutation.isPending ? "Adding..." : "Add"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddUser(false);
+                setNewUsername("");
+                setNewPassword("");
+                setAddError("");
+              }}
+              className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition whitespace-nowrap"
+            >
+              Cancel
+            </button>
+          </form>
+          {addError && <p className="text-red-400 text-sm mt-2">{addError}</p>}
+        </div>
+      )}
 
       {/* Users table */}
       <div className="card bg-surface rounded-xl ring-1 ring-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted border-b border-border bg-surface-raised">
-              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">
-                Username
-              </th>
-              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">
-                Created
-              </th>
+              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Username</th>
+              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Role</th>
+              <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Created</th>
               <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider text-right">
                 Actions
               </th>
@@ -156,19 +142,13 @@ export default function UsersTab() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-5 py-8 text-center text-text-muted"
-                >
+                <td colSpan={4} className="px-5 py-8 text-center text-text-muted">
                   Loading...
                 </td>
               </tr>
-            ) : (users.length === 0 ? (
+            ) : users.length === 0 ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-5 py-8 text-center text-text-muted"
-                >
+                <td colSpan={4} className="px-5 py-8 text-center text-text-muted">
                   No users
                 </td>
               </tr>
@@ -178,9 +158,7 @@ export default function UsersTab() {
                   key={user.id}
                   className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors"
                 >
-                  <td className="px-5 py-3.5 font-mono text-sm">
-                    {user.username}
-                  </td>
+                  <td className="px-5 py-3.5 font-mono text-sm">{user.username}</td>
                   <td className="px-5 py-3.5">
                     <span
                       className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -230,15 +208,13 @@ export default function UsersTab() {
                         </>
                       )}
                       {user.username === currentUser?.username && (
-                        <span className="px-2.5 py-1 text-xs text-text-muted">
-                          You
-                        </span>
+                        <span className="px-2.5 py-1 text-xs text-text-muted">You</span>
                       )}
                     </div>
                   </td>
                 </tr>
               ))
-            ))}
+            )}
           </tbody>
         </table>
       </div>

@@ -6,14 +6,12 @@ export interface DesktopSettingsDialogContextValue {
   close: () => void;
 }
 
-export const DesktopSettingsDialogContext =
-  createContext<DesktopSettingsDialogContextValue | null>(null);
+export const DesktopSettingsDialogContext = createContext<DesktopSettingsDialogContextValue | null>(
+  null,
+);
 
 export function useDesktopSettings() {
   const context = useContext(DesktopSettingsDialogContext);
-  if (!context)
-    throw new Error(
-      "useDesktopSettings must be used within DesktopSettingsProvider",
-    );
+  if (!context) throw new Error("useDesktopSettings must be used within DesktopSettingsProvider");
   return context;
 }

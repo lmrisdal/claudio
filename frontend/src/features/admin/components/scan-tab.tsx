@@ -28,7 +28,7 @@ export default function ScanTab() {
       wasRunning.current = true;
     } else if (wasRunning.current) {
       wasRunning.current = false;
-      queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
     }
   }, [igdbStatus?.isRunning, queryClient]);
 
@@ -43,8 +43,8 @@ export default function ScanTab() {
         gamesMissing: number;
       }>("/admin/scan");
       setResult(res);
-      queryClient.invalidateQueries({ queryKey: ["games"] });
-      queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
     } catch (error_) {
       setError(error_ instanceof Error ? error_.message : "Scan failed");
     } finally {
@@ -56,7 +56,7 @@ export default function ScanTab() {
     setIgdbError(null);
     try {
       await api.post("/admin/scan/igdb");
-      queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
     } catch (error_) {
       setIgdbError(error_ instanceof Error ? error_.message : "IGDB scan failed");
     }
@@ -85,8 +85,8 @@ export default function ScanTab() {
           <div className="flex-1">
             <h3 className="font-medium text-text-primary mb-1">Library Scan</h3>
             <p className="text-text-secondary text-sm mb-4">
-              Walk the game library directories for new or changed games.
-              Existing games will have their file sizes updated.
+              Walk the game library directories for new or changed games. Existing games will have
+              their file sizes updated.
             </p>
             <button
               onClick={triggerScan}
@@ -95,11 +95,7 @@ export default function ScanTab() {
             >
               {scanning ? (
                 <>
-                  <svg
-                    className="w-4 h-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -126,8 +122,8 @@ export default function ScanTab() {
         {result && (
           <div className="mt-4 ml-14 bg-accent-dim rounded-lg px-4 py-3">
             <p className="text-sm text-accent font-medium">
-              Scan complete — {result.gamesFound} found, {result.gamesAdded}{" "}
-              added, {result.gamesMissing} missing
+              Scan complete — {result.gamesFound} found, {result.gamesAdded} added,{" "}
+              {result.gamesMissing} missing
             </p>
           </div>
         )}
@@ -158,12 +154,10 @@ export default function ScanTab() {
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-text-primary mb-1">
-              IGDB Metadata
-            </h3>
+            <h3 className="font-medium text-text-primary mb-1">IGDB Metadata</h3>
             <p className="text-text-secondary text-sm mb-4">
-              Fetch metadata from IGDB for games that haven&apos;t been matched
-              yet — covers, summaries, genres, and release years.
+              Fetch metadata from IGDB for games that haven&apos;t been matched yet — covers,
+              summaries, genres, and release years.
             </p>
             <button
               onClick={triggerIgdbScan}
@@ -172,11 +166,7 @@ export default function ScanTab() {
             >
               {igdbStatus?.isRunning ? (
                 <>
-                  <svg
-                    className="w-4 h-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -213,9 +203,7 @@ export default function ScanTab() {
               />
             </div>
             {igdbStatus.currentGame && (
-              <p className="text-xs text-text-muted mt-1.5">
-                Matching: {igdbStatus.currentGame}
-              </p>
+              <p className="text-xs text-text-muted mt-1.5">Matching: {igdbStatus.currentGame}</p>
             )}
           </div>
         )}

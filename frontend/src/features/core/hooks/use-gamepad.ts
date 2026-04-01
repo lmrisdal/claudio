@@ -18,9 +18,7 @@ const lastGamepadDispatchTimes: Record<string, number> = {};
 
 export function wasRecentlyDispatchedFromGamepad(key: string, withinMs = 250) {
   const lastTime = lastGamepadDispatchTimes[key];
-  return (
-    typeof lastTime === "number" && performance.now() - lastTime <= withinMs
-  );
+  return typeof lastTime === "number" && performance.now() - lastTime <= withinMs;
 }
 
 export function useGamepad() {
@@ -75,12 +73,7 @@ export function useGamepad() {
       isGamepadEvent = false;
     }
 
-    function handleInput(
-      id: string,
-      key: string,
-      pressed: boolean,
-      repeatable = true,
-    ) {
+    function handleInput(id: string, key: string, pressed: boolean, repeatable = true) {
       const now = performance.now();
       const previous = stateReference.current[id];
 
@@ -121,11 +114,7 @@ export function useGamepad() {
         handleInput("dpad-up", "ArrowUp", gp.buttons[12]?.pressed ?? false);
         handleInput("dpad-down", "ArrowDown", gp.buttons[13]?.pressed ?? false);
         handleInput("dpad-left", "ArrowLeft", gp.buttons[14]?.pressed ?? false);
-        handleInput(
-          "dpad-right",
-          "ArrowRight",
-          gp.buttons[15]?.pressed ?? false,
-        );
+        handleInput("dpad-right", "ArrowRight", gp.buttons[15]?.pressed ?? false);
 
         // Left stick
         const lx = gp.axes[0] ?? 0;
@@ -139,46 +128,21 @@ export function useGamepad() {
         // A → Enter/click, B → Escape, Y → toggle search (no repeat)
         handleInput("btn-a", "Enter", gp.buttons[0]?.pressed ?? false, false);
         handleInput("btn-b", "Escape", gp.buttons[1]?.pressed ?? false, false);
-        handleInput(
-          "btn-y",
-          "gamepad-search",
-          gp.buttons[3]?.pressed ?? false,
-          false,
-        );
+        handleInput("btn-y", "gamepad-search", gp.buttons[3]?.pressed ?? false, false);
 
         // LB/RB → bumpers
-        handleInput(
-          "btn-lb",
-          "gamepad-lb",
-          gp.buttons[4]?.pressed ?? false,
-          false,
-        );
-        handleInput(
-          "btn-rb",
-          "gamepad-rb",
-          gp.buttons[5]?.pressed ?? false,
-          false,
-        );
+        handleInput("btn-lb", "gamepad-lb", gp.buttons[4]?.pressed ?? false, false);
+        handleInput("btn-rb", "gamepad-rb", gp.buttons[5]?.pressed ?? false, false);
 
         // LT/RT → previous/next group
         handleInput("btn-lt", "gamepad-lt", (gp.buttons[6]?.value ?? 0) > 0.5);
         handleInput("btn-rt", "gamepad-rt", (gp.buttons[7]?.value ?? 0) > 0.5);
 
         // Start / Options / Menu button (button 9)
-        handleInput(
-          "btn-start",
-          "gamepad-start",
-          gp.buttons[9]?.pressed ?? false,
-          false,
-        );
+        handleInput("btn-start", "gamepad-start", gp.buttons[9]?.pressed ?? false, false);
 
         // Guide / Xbox / PS button (button 16)
-        handleInput(
-          "btn-guide",
-          "gamepad-guide",
-          gp.buttons[16]?.pressed ?? false,
-          false,
-        );
+        handleInput("btn-guide", "gamepad-guide", gp.buttons[16]?.pressed ?? false, false);
 
         // Only handle first connected gamepad
         break;

@@ -117,13 +117,15 @@ export default function GameEmulator() {
         type: "image/png",
       });
 
-      api
+      void api
         .uploadBinary<SaveStateDto>(`/games/${gameId}/save-states`, {
           state: stateBlob,
           screenshot: screenshotBlob,
         })
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
+          void queryClient.invalidateQueries({
+            queryKey: ["saveStates", gameId],
+          });
         })
         .finally(() => {
           setSavingState(false);
@@ -176,8 +178,8 @@ export default function GameEmulator() {
     "escape",
     () => {
       if (frameUrl) return;
-      sounds.back();
-      navigate(`/games/${gameId}`);
+      void sounds.back();
+      void navigate(`/games/${gameId}`);
     },
     { enabled: Boolean(gameId) },
   );
@@ -258,7 +260,10 @@ export default function GameEmulator() {
   }, [game, frameUrl, guide]);
 
   const focusNav = useCallback((index: number) => {
-    const items = [...pageReference.current?.querySelectorAll<HTMLElement>("[data-nav]") ?? []].filter(
+    const items = [
+      ...(pageReference.current?.querySelectorAll<HTMLElement>("[data-nav]") ??
+        []),
+    ].filter(
       (element) =>
         !element.hasAttribute("disabled") &&
         element.getAttribute("aria-hidden") !== "true" &&
@@ -268,7 +273,7 @@ export default function GameEmulator() {
     const target = items[index];
     if (!target) return;
     target.focus({ focusVisible: true } as FocusOptions);
-    sounds.navigate();
+    void sounds.navigate();
   }, []);
 
   const handleNavKeyDown = useArrowNav(pageReference);
@@ -294,7 +299,7 @@ export default function GameEmulator() {
     "gamepad-start",
     () => {
       if (!frameUrl && canStart && !sessionMutation.isPending) {
-        startEmulation();
+        void startEmulation();
       }
     },
     !frameUrl,
@@ -347,7 +352,7 @@ export default function GameEmulator() {
               to={`/games/${game.id}`}
               data-nav
               onKeyDown={(e) => {
-                if (e.key === "Enter") sounds.back();
+                if (e.key === "Enter") void sounds.back();
               }}
               className="rounded text-sm text-text-muted transition hover:text-accent outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8]"
             >

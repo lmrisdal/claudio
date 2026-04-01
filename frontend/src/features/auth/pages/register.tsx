@@ -24,9 +24,11 @@ export default function Register() {
     setLoading(true);
     try {
       await register(username, password);
-      navigate("/");
+      void navigate("/");
     } catch (error_) {
-      setError(error_ instanceof Error ? error_.message : "Registration failed");
+      setError(
+        error_ instanceof Error ? error_.message : "Registration failed",
+      );
     } finally {
       setLoading(false);
     }

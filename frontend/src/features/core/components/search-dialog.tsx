@@ -52,10 +52,13 @@ export default function SearchDialog({
 
   useEffect(() => {
     if (open) {
-      previousFocusReference.current = document.activeElement as HTMLElement | null;
+      previousFocusReference.current =
+        document.activeElement as HTMLElement | null;
       setTimeout(() => inputReference.current?.focus(), 0);
     } else if (previousFocusReference.current) {
-      previousFocusReference.current.focus({ focusVisible: true } as FocusOptions);
+      previousFocusReference.current.focus({
+        focusVisible: true,
+      } as FocusOptions);
       previousFocusReference.current = null;
     }
   }, [open]);
@@ -83,30 +86,31 @@ export default function SearchDialog({
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
       switch (e.key) {
-      case "Escape": {
-        e.stopImmediatePropagation();
-        onClose();
-      
-      break;
-      }
-      case "ArrowDown": {
-        e.preventDefault();
-        setSelectedIndex((index) => Math.min(index + 1, filtered.length - 1));
-      
-      break;
-      }
-      case "ArrowUp": {
-        e.preventDefault();
-        setSelectedIndex((index) => Math.max(index - 1, 0));
-      
-      break;
-      }
-      default: { if (e.key === "Enter" && filtered[selectedIndex]) {
-        e.preventDefault();
-        navigate(`/games/${filtered[selectedIndex].id}`);
-        onClose();
-      }
-      }
+        case "Escape": {
+          e.stopImmediatePropagation();
+          onClose();
+
+          break;
+        }
+        case "ArrowDown": {
+          e.preventDefault();
+          setSelectedIndex((index) => Math.min(index + 1, filtered.length - 1));
+
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          setSelectedIndex((index) => Math.max(index - 1, 0));
+
+          break;
+        }
+        default: {
+          if (e.key === "Enter" && filtered[selectedIndex]) {
+            e.preventDefault();
+            void navigate(`/games/${filtered[selectedIndex].id}`);
+            onClose();
+          }
+        }
       }
     }
     globalThis.addEventListener("keydown", handleKeyDown);
@@ -164,7 +168,7 @@ export default function SearchDialog({
                 <button
                   key={game.id}
                   onClick={() => {
-                    navigate(`/games/${game.id}`);
+                    void navigate(`/games/${game.id}`);
                     onClose();
                   }}
                   onMouseEnter={() => setSelectedIndex(index)}

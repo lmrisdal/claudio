@@ -15,13 +15,7 @@ const allTabs: { id: Tab; label: string }[] = [
   { id: "security", label: "Security" },
 ];
 
-export default function AccountDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export default function AccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, providers, logout, authDisabled } = useAuth();
   const { isOpen: guideOpen } = useGuide();
   const previousFocusReference = useRef<HTMLElement | null>(null);
@@ -31,14 +25,10 @@ export default function AccountDialog({
   const [contentIndex, setContentIndex] = useState(0);
 
   const sidebarReferences = useRef<(HTMLButtonElement | null)[]>([]);
-  const contentReferences = useRef<(HTMLButtonElement | HTMLInputElement | null)[]>(
-    [],
-  );
+  const contentReferences = useRef<(HTMLButtonElement | HTMLInputElement | null)[]>([]);
   const panelReference = useRef<HTMLDivElement>(null);
 
-  const visibleTabs = allTabs.filter(
-    (t) => t.id !== "security" || providers.localLoginEnabled,
-  );
+  const visibleTabs = allTabs.filter((t) => t.id !== "security" || providers.localLoginEnabled);
 
   // Sidebar items: tabs + sign out (if auth enabled)
   const sidebarCount = visibleTabs.length + (authDisabled ? 0 : 1);
@@ -129,14 +119,14 @@ export default function AccountDialog({
       e.preventDefault();
       if (focusZone === "sidebar") {
         focusSidebar(sidebarIndex - 1);
-        sounds.navigate();
+        void sounds.navigate();
       } else {
         if (contentIndex === 0) {
           setFocusZone("sidebar");
-          sounds.navigate();
+          void sounds.navigate();
         } else {
           focusContent(contentIndex - 1);
-          sounds.navigate();
+          void sounds.navigate();
         }
       }
     },
@@ -149,10 +139,10 @@ export default function AccountDialog({
       e.preventDefault();
       if (focusZone === "sidebar") {
         focusSidebar(sidebarIndex + 1);
-        sounds.navigate();
+        void sounds.navigate();
       } else {
         focusContent(contentIndex + 1);
-        sounds.navigate();
+        void sounds.navigate();
       }
     },
     { enabled: open && !guideOpen, capture: true },
@@ -166,7 +156,7 @@ export default function AccountDialog({
         // Move into content
         setFocusZone("content");
         setContentIndex(0);
-        sounds.navigate();
+        void sounds.navigate();
       }
     },
     { enabled: open && !guideOpen, capture: true },
@@ -179,7 +169,7 @@ export default function AccountDialog({
       if (focusZone === "content") {
         // Move back to sidebar
         setFocusZone("sidebar");
-        sounds.navigate();
+        void sounds.navigate();
       }
     },
     { enabled: open && !guideOpen, capture: true },
@@ -194,9 +184,9 @@ export default function AccountDialog({
 
       e.preventDefault();
       if (focusZone === "sidebar" && sidebarIndex < visibleTabs.length) {
-        sounds.select();
+        void sounds.select();
       } else {
-        sounds.navigate();
+        void sounds.navigate();
       }
       if (focusZone === "sidebar") {
         sidebarReferences.current[sidebarIndex]?.click();
@@ -211,12 +201,11 @@ export default function AccountDialog({
   const handleBumper = useCallback(
     (direction: 1 | -1) => {
       const currentIndex = visibleTabs.findIndex((t) => t.id === activeTab);
-      const nextIndex =
-        (currentIndex + direction + visibleTabs.length) % visibleTabs.length;
+      const nextIndex = (currentIndex + direction + visibleTabs.length) % visibleTabs.length;
       setActiveTab(visibleTabs[nextIndex].id);
       setSidebarIndex(nextIndex);
       setContentIndex(0);
-      sounds.select();
+      void sounds.select();
     },
     [visibleTabs, activeTab],
   );
@@ -230,18 +219,8 @@ export default function AccountDialog({
   let sidebarReferenceIndex = 0;
 
   const closeIcon = (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6 18 18 6M6 6l12 12"
-      />
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
     </svg>
   );
 
@@ -261,13 +240,9 @@ export default function AccountDialog({
           {/* Header */}
           <div className="flex items-start justify-between p-4 sm:p-5 sm:pb-0">
             <div>
-              <h1 className="font-display text-lg font-bold text-white">
-                Settings
-              </h1>
+              <h1 className="font-display text-lg font-bold text-white">Settings</h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-sm text-white/50 font-mono">
-                  {user?.username}
-                </span>
+                <span className="text-sm text-white/50 font-mono">{user?.username}</span>
                 {user?.role === "admin" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-accent-dim text-accent">
                     {user.role}
@@ -353,12 +328,8 @@ export default function AccountDialog({
 
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-1 pb-4 sm:pb-6">
             {activeTab === "account" && <AccountTab />}
-            {activeTab === "preferences" && (
-              <PreferencesTab contentRefs={contentReferences} />
-            )}
-            {activeTab === "security" && (
-              <SecurityTab contentRefs={contentReferences} />
-            )}
+            {activeTab === "preferences" && <PreferencesTab contentRefs={contentReferences} />}
+            {activeTab === "security" && <SecurityTab contentRefs={contentReferences} />}
 
             {/* Sign out — mobile only, at bottom of content */}
             {!authDisabled && (

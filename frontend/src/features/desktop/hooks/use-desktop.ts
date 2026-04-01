@@ -1,8 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export const isDesktop =
-  globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis;
+export const isDesktop = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis;
 
 interface DesktopSettings {
   serverUrl: string | null;
@@ -92,9 +91,7 @@ export async function installGame(
   return invoke<InstalledGame>("install_game", { game, token });
 }
 
-export async function getInstalledGame(
-  remoteGameId: number,
-): Promise<InstalledGame | null> {
+export async function getInstalledGame(remoteGameId: number): Promise<InstalledGame | null> {
   return invoke<InstalledGame | null>("get_installed_game", { remoteGameId });
 }
 
@@ -110,10 +107,7 @@ export async function cancelInstall(gameId: number): Promise<void> {
   return invoke<void>("cancel_install", { gameId });
 }
 
-export async function uninstallGame(
-  remoteGameId: number,
-  deleteFiles: boolean,
-): Promise<void> {
+export async function uninstallGame(remoteGameId: number, deleteFiles: boolean): Promise<void> {
   return invoke<void>("uninstall_game", { remoteGameId, deleteFiles });
 }
 

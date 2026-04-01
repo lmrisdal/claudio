@@ -84,7 +84,8 @@ export default function InstallDialog({
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
-                  The game will be installed in a folder named after the title inside this directory.
+                  The game will be installed in a folder named after the title inside this
+                  directory.
                 </p>
               </div>
             </div>

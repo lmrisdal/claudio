@@ -2,11 +2,7 @@ import Header from "../../core/components/header";
 import { isDesktop } from "../hooks/use-desktop";
 import DesktopLayoutInner from "./desktop-layout-inner";
 
-export default function DesktopLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DesktopLayout({ children }: { children: React.ReactNode }) {
   if (!isDesktop) {
     return (
       <>
