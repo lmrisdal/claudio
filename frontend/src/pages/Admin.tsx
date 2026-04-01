@@ -23,7 +23,7 @@ export default function Admin() {
   ];
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8">
+    <main className="max-w-4xl mx-auto px-6 py-8 flex-1 w-full">
       <h1 className="font-display text-3xl font-bold text-heading text-text-primary mb-8">
         Admin Panel
       </h1>

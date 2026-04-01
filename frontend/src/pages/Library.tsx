@@ -500,7 +500,7 @@ export default function Library() {
   }, [isLoading]);
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-8">
+    <main className="max-w-7xl mx-auto px-6 py-8 flex-1 flex flex-col w-full">
       {/* Toolbar */}
       <div
         className="flex gap-3 mb-8 items-center"
@@ -742,7 +742,7 @@ export default function Library() {
           </div>
         )
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-text-muted">
+        <div className="flex-1 flex flex-col items-center justify-center py-24 text-text-muted">
           <svg
             className="w-12 h-12 mb-4 text-text-muted"
             fill="none"

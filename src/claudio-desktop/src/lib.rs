@@ -4,7 +4,7 @@ mod registry;
 mod services;
 mod settings;
 
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri::webview::PageLoadEvent;
@@ -53,7 +53,6 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 
                 let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
                     .accelerator("CmdOrCtrl+,")
@@ -100,9 +99,17 @@ pub fn run() {
                 app.set_menu(menu)?;
             }
 
-            let show_item = MenuItem::with_id(app, "tray-show", "Show Claudio", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "tray-quit", "Quit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let show_item = MenuItemBuilder::with_id("tray-show", "Show Claudio")
+                .accelerator("CmdOrCtrl+O")
+                .build(app)?;
+            let quit_item = MenuItemBuilder::with_id("tray-quit", "Quit")
+                .accelerator("CmdOrCtrl+Q")
+                .build(app)?;
+            let tray_menu = MenuBuilder::new(app)
+                .item(&show_item)
+                .separator()
+                .item(&quit_item)
+                .build()?;
             let tray_icon = tauri::image::Image::from_bytes(TRAY_ICON_PNG)?.to_owned();
 
             TrayIconBuilder::new()

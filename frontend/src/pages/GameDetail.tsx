@@ -713,7 +713,7 @@ export default function GameDetail() {
 
   if (isLoading) {
     return (
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-5xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="flex flex-col md:flex-row gap-10 animate-pulse">
           <div className="w-72 shrink-0 aspect-2/3 bg-surface-raised rounded-xl" />
           <div className="flex-1 space-y-4 pt-2">
@@ -728,7 +728,7 @@ export default function GameDetail() {
 
   if (!displayGame) {
     return (
-      <main className="max-w-5xl mx-auto px-6 py-24 text-center">
+      <main className="max-w-5xl mx-auto px-6 py-24 text-center flex-1 w-full">
         <p className="text-text-muted">Game not found</p>
         <Link
           to="/"
@@ -784,7 +784,7 @@ export default function GameDetail() {
       <main
         ref={mainRef}
         onKeyDown={handleMainKeyDown}
-        className="max-w-5xl mx-auto px-6 py-12 relative"
+        className="max-w-5xl mx-auto px-6 py-12 relative flex-1 w-full"
       >
         {user?.role === "admin" && (
           <button

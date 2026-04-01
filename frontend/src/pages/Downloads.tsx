@@ -33,7 +33,7 @@ export default function Downloads() {
   const activeList = Array.from(activeDownloads.values());
 
   return (
-    <main className="px-6 py-8 flex-1">
+    <main className="max-w-7xl mx-auto px-6 py-8 flex-1 flex flex-col w-full">
       <h1 className="text-2xl font-semibold mb-6">Downloads</h1>
 
       {/* Active downloads */}
@@ -100,12 +100,12 @@ export default function Downloads() {
       )}
 
       {/* Installed games */}
-      <section>
+      <section className="flex-1 flex flex-col">
         <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3">
           Installed
         </h2>
         {installedGames.length === 0 && activeList.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="flex-1 flex flex-col items-center justify-center py-16">
             <svg
               className="w-12 h-12 mx-auto text-text-muted/40 mb-3"
               fill="none"
