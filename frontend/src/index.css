@@ -88,6 +88,19 @@ body {
   }
 }
 
+/* Desktop mode: prevent text selection and set default cursor, restore pointer for interactive elements */
+html[data-desktop] body {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+html[data-desktop] button,
+html[data-desktop] a,
+html[data-desktop] [role="button"] {
+  cursor: pointer;
+}
+
 :where(
   a,
   button,

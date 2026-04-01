@@ -43,8 +43,12 @@ export default function DesktopLayoutInner({
       <DesktopSidebar />
       <Header />
       <div
-        style={{ marginLeft, paddingTop: HEADER_HEIGHT }}
-        className={`flex-1 flex flex-col min-h-0 ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
+        style={{
+          marginLeft,
+          marginTop: HEADER_HEIGHT,
+          height: `calc(100dvh - ${HEADER_HEIGHT}px)`,
+        }}
+        className={`flex flex-col min-h-0 overflow-y-auto overflow-x-hidden ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
       >
         {children}
       </div>

@@ -8,7 +8,12 @@ import AuthProvider from "./features/auth/components/AuthProvider";
 import GuideProvider from "./features/core/components/GuideProvider";
 import NavigationProvider from "./features/core/components/NavigationProvider";
 import DesktopSettingsProvider from "./features/desktop/components/DesktopSettingsProvider";
+import { isDesktop } from "./features/desktop/hooks/useDesktop";
 import "./index.css";
+
+if (isDesktop) {
+  document.documentElement.setAttribute("data-desktop", "");
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
