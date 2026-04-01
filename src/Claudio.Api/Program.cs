@@ -204,6 +204,8 @@ else
 app.UseAuthorization();
 
 // Minimal API endpoints
+app.MapHealthEndpoints();
+
 if (!config.Auth.DisableAuth)
 {
     app.MapConnectEndpoints();
