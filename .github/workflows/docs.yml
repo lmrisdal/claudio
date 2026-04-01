@@ -1,13 +1,12 @@
 name: Deploy Docs to GitHub Pages
 
 # TODO: Enable when repo is public and GitHub Pages is configured
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-#       - "docs/**"
-#   workflow_dispatch:
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+  workflow_dispatch:
 
 permissions:
   contents: read

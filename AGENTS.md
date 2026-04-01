@@ -62,6 +62,7 @@ TOML config loaded from `CLAUDIO_CONFIG_PATH` env var or `/config/config.toml`. 
 - CSS theming uses custom properties in `index.css` (`:root` for dark, `.light` for light mode) with Tailwind semantic tokens (`text-text-primary`, `bg-surface`, `bg-surface-raised`, etc.).
 - TypeScript strict mode with `verbatimModuleSyntax` — use `import type` for type-only imports.
 - Only one React component per file.
+- Avoid useEffect where possible. See: https://react.dev/learn/you-might-not-need-an-effect
 
 ### Controller and keyboard navigation
 
