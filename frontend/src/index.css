@@ -71,6 +71,11 @@ body {
   height: 100%;
 }
 
+.desktop-no-drag {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
 body {
   background-color: var(--bg);
   color: var(--text-primary);

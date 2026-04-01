@@ -5,7 +5,6 @@ import { getSettings, isDesktop } from "./hooks/useDesktop";
 import { DownloadManagerProvider } from "./hooks/useDownloadManager";
 
 import DesktopLayout from "./components/DesktopLayout";
-import DesktopTitleBar from "./components/DesktopTitleBar";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const Downloads = lazy(() => import("./pages/Downloads"));
@@ -94,7 +93,6 @@ function DesktopGate({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <div className="h-full bg-grid flex flex-col">
-      <DesktopTitleBar />
       <DesktopGate>
         <DownloadManagerProvider>
           <div className="flex-1 flex flex-col min-h-0">

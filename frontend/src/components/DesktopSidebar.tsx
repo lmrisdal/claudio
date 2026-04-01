@@ -9,7 +9,6 @@ import {
 } from "../hooks/useDesktop";
 import { useDownloadManager } from "../hooks/useDownloadManagerHook";
 import type { Game } from "../types/models";
-import { isMac } from "./DesktopTitleBar";
 import UninstallDialog from "./UninstallDialog";
 
 export const COLLAPSED_KEY = "claudio_sidebar_collapsed";
@@ -17,7 +16,6 @@ export const WIDTH_KEY = "claudio_sidebar_width";
 export const COLLAPSED_WIDTH = 56;
 export const DEFAULT_WIDTH = 220;
 export const HEADER_HEIGHT = 56;
-const TITLE_BAR_HEIGHT = 36;
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 400;
 
@@ -134,7 +132,7 @@ function Sidebar() {
   );
 
   const sidebarWidth = collapsed ? COLLAPSED_WIDTH : width;
-  const sidebarTop = isMac ? HEADER_HEIGHT : TITLE_BAR_HEIGHT + HEADER_HEIGHT;
+  const sidebarTop = HEADER_HEIGHT;
 
   return (
     <nav

@@ -1,10 +1,11 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Link, useNavigate } from "react-router";
 import { useAccountDialog } from "../hooks/useAccountDialog";
 import { useAuth } from "../hooks/useAuth";
 import { isDesktop } from "../hooks/useDesktop";
 import { useNavigation } from "../hooks/useNavigation";
 import { useTheme } from "../hooks/useTheme";
-import { isMac } from "./DesktopTitleBar";
+import { isMac } from "../utils/os";
 import Logo from "./Logo";
 import SearchDialog from "./SearchDialog";
 import TasksPopover from "./TasksPopover";
@@ -15,6 +16,7 @@ export default function Header() {
   const { theme, toggle } = useTheme();
   const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
   const accountDialog = useAccountDialog();
+  const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
 
   return (
     <>
@@ -24,10 +26,12 @@ export default function Header() {
       >
         <div
           data-tauri-drag-region={isDesktop || undefined}
-          className={`${isDesktop ? "w-full px-6" : "max-w-7xl mx-auto px-6"} h-14 flex items-center justify-between`}
+          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-6") : "max-w-7xl mx-auto px-6"} h-14 flex items-center justify-between gap-4`}
         >
           {isDesktop ? (
-            <div className={`flex items-center gap-0.5 ${isMac ? "ml-20" : "ml-2"}`}>
+            <div
+              className={`desktop-no-drag flex items-center gap-0.5 min-w-0 ${isMac ? "ml-20" : "ml-2"}`}
+            >
               <button
                 onClick={() => navigate(-1)}
                 disabled={!canGoBack}
@@ -50,12 +54,12 @@ export default function Header() {
               </button>
             </div>
           ) : (
-            <Link to="/" className="flex items-center gap-3">
+            <Link to="/" className="desktop-no-drag flex items-center gap-3">
               <Logo className="text-xl" />
             </Link>
           )}
 
-          <div className="flex items-center gap-1">
+          <div className="desktop-no-drag flex items-center gap-1 ml-auto min-w-0">
             {isLoggedIn && (
               <button
                 onClick={toggleSearch}
@@ -150,6 +154,60 @@ export default function Header() {
               >
                 Sign in
               </Link>
+            )}
+            {appWindow && (
+              <div className="flex h-14 ml-2 border-l border-border">
+                <button
+                  onClick={() => appWindow.minimize()}
+                  className="w-12 h-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
+                  aria-label="Minimize"
+                >
+                  <svg
+                    width="10"
+                    height="1"
+                    viewBox="0 0 10 1"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <rect width="10" height="1" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => appWindow.toggleMaximize()}
+                  className="w-12 h-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
+                  aria-label="Maximize"
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 10 10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    aria-hidden="true"
+                  >
+                    <rect x="0.5" y="0.5" width="9" height="9" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => appWindow.close()}
+                  className="w-12 h-full flex items-center justify-center text-text-muted hover:text-white hover:bg-red-600 transition"
+                  aria-label="Close"
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 10 10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    aria-hidden="true"
+                  >
+                    <line x1="1" y1="1" x2="9" y2="9" />
+                    <line x1="9" y1="1" x2="1" y2="9" />
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
         </div>
