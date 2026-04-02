@@ -115,6 +115,18 @@ export async function uninstallGame(remoteGameId: number, deleteFiles: boolean):
   return invoke<void>("uninstall_game", { remoteGameId, deleteFiles });
 }
 
+export async function launchGame(remoteGameId: number): Promise<void> {
+  return invoke<void>("launch_game", { remoteGameId });
+}
+
+export async function setGameExe(remoteGameId: number, gameExe: string): Promise<InstalledGame> {
+  return invoke<InstalledGame>("set_game_exe", { remoteGameId, gameExe });
+}
+
+export async function listGameExecutables(remoteGameId: number): Promise<string[]> {
+  return invoke<string[]>("list_game_executables", { remoteGameId });
+}
+
 export async function listenToInstallProgress(
   handler: (progress: InstallProgress) => void,
 ): Promise<UnlistenFn> {

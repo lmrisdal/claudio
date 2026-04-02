@@ -12,12 +12,21 @@ import { formatSize } from "../../core/utils/format";
 import { isMac } from "../../core/utils/os";
 import { formatPlatform } from "../../core/utils/platforms";
 import { sounds } from "../../core/utils/sounds";
-import { cancelInstall, uninstallGame, useDesktop } from "../../desktop/hooks/use-desktop";
+import {
+  cancelInstall,
+  launchGame,
+  listGameExecutables,
+  openInstallFolder,
+  setGameExe,
+  uninstallGame,
+  useDesktop,
+} from "../../desktop/hooks/use-desktop";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import CompressionProgress from "../components/compression-progress";
 import DownloadButton from "../components/download-button";
 import ExeListbox from "../components/exe-listbox";
 import InstallDialog from "../components/install-dialog";
+import PickExeDialog from "../components/pick-exe-dialog";
 
 const pcPlatforms = new Set(["win", "mac", "linux"]);
 function isPcPlatform(platform: string) {
@@ -58,12 +67,10 @@ export default function GameDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const {
-    isDesktop,
-    getInstalledGame: getDesktopInstalledGame,
-    openInstallFolder: openDesktopInstallFolder,
-  } = useDesktop();
+  const { isDesktop, getInstalledGame: getDesktopInstalledGame } = useDesktop();
   const { startDownload, getProgress } = useDownloadManager();
+  const [pickExeOpen, setPickExeOpen] = useState(false);
+  const [pickExeOptions, setPickExeOptions] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<IgdbCandidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -1294,34 +1301,40 @@ export default function GameDetail() {
                   ) : isDesktopPcGame ? (
                     installedGame ? (
                       <div className="flex items-center gap-2">
+                        {/* Play button */}
                         <button
                           type="button"
-                          onClick={() => {
-                            openDesktopInstallFolder(displayGame.id).catch((error) => {
-                              setInstallError(
-                                error instanceof Error
-                                  ? error.message
-                                  : "Could not open the install folder.",
-                              );
-                            });
+                          onClick={async () => {
+                            if (installedGame.gameExe) {
+                              launchGame(displayGame.id).catch((error) => {
+                                setInstallError(
+                                  error instanceof Error ? error.message : "Could not launch game.",
+                                );
+                              });
+                            } else {
+                              // Installer game with no exe recorded — prompt user to pick
+                              try {
+                                const exes = await listGameExecutables(displayGame.id);
+                                setPickExeOptions(exes);
+                                setPickExeOpen(true);
+                              } catch (error) {
+                                setInstallError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Could not list game executables.",
+                                );
+                              }
+                            }
                           }}
                           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                         >
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2.25}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                            />
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z" />
                           </svg>
-                          Open Install Folder
+                          Play
                         </button>
+
+                        {/* Uninstall button */}
                         <button
                           type="button"
                           onClick={() => setShowUninstallConfirm(true)}
@@ -1342,6 +1355,37 @@ export default function GameDetail() {
                           </svg>
                           Uninstall
                         </button>
+
+                        {/* Open install folder — icon only */}
+                        <button
+                          type="button"
+                          aria-label="Open install folder"
+                          onClick={() => {
+                            openInstallFolder(displayGame.id).catch((error) => {
+                              setInstallError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Could not open the install folder.",
+                              );
+                            });
+                          }}
+                          className="inline-flex items-center justify-center rounded-lg px-3 py-3 text-text-secondary ring-1 ring-border hover:text-text-primary hover:ring-border/80 transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                            />
+                          </svg>
+                        </button>
+
                         <UninstallDialog
                           open={showUninstallConfirm}
                           title={displayGame.title}
@@ -1354,6 +1398,26 @@ export default function GameDetail() {
                               queryKey: ["installedGames"],
                             });
                             void refetchInstalledGame();
+                          }}
+                        />
+
+                        <PickExeDialog
+                          open={pickExeOpen}
+                          title={displayGame.title}
+                          exeOptions={pickExeOptions}
+                          onClose={() => setPickExeOpen(false)}
+                          onConfirm={async (exe) => {
+                            setPickExeOpen(false);
+                            try {
+                              // Build full path from relative exe + install path
+                              const fullExe = `${installedGame.installPath}\\${exe}`;
+                              await setGameExe(displayGame.id, fullExe);
+                              await launchGame(displayGame.id);
+                            } catch (error) {
+                              setInstallError(
+                                error instanceof Error ? error.message : "Could not launch game.",
+                              );
+                            }
                           }}
                         />
                       </div>

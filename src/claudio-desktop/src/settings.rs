@@ -49,6 +49,14 @@ pub fn load() -> DesktopSettings {
     }
 }
 
+pub async fn load_async() -> DesktopSettings {
+    let path = settings_path();
+    match tokio::fs::read_to_string(&path).await {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => DesktopSettings::default(),
+    }
+}
+
 pub fn save(settings: &DesktopSettings) -> Result<(), String> {
     let path = settings_path();
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;

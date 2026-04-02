@@ -95,7 +95,8 @@ fn deploy_uninstaller(
         "gameTitle": game.title,
         "installPath": game.install_path,
         "registryKeyName": key_name,
-        "shortcutPath": shortcut_path.to_string_lossy()
+        "shortcutPath": shortcut_path.to_string_lossy(),
+        "desktopShortcutPath": desktop_shortcut_path(&game.title).to_string_lossy()
     });
     let config_path = PathBuf::from(&game.install_path).join("uninstall-config.json");
     fs::write(

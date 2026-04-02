@@ -134,6 +134,51 @@ pub fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
     open_path(&path)
 }
 
+pub fn launch_game(remote_game_id: i32) -> Result<(), String> {
+    let game = registry::get(remote_game_id)?
+        .ok_or_else(|| "Game is not installed.".to_string())?;
+    let exe = game
+        .game_exe
+        .ok_or_else(|| "No executable is set for this game.".to_string())?;
+
+    std::process::Command::new(&exe)
+        .spawn()
+        .map_err(|e| format!("Failed to launch game: {e}"))?;
+    Ok(())
+}
+
+pub fn set_game_exe(remote_game_id: i32, game_exe: String) -> Result<InstalledGame, String> {
+    let mut game = registry::get(remote_game_id)?
+        .ok_or_else(|| "Game is not installed.".to_string())?;
+    game.game_exe = Some(game_exe);
+    registry::upsert(game)
+}
+
+pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String> {
+    let game = registry::get(remote_game_id)?
+        .ok_or_else(|| "Game is not installed.".to_string())?;
+    let root = PathBuf::from(&game.install_path);
+
+    let mut exes = Vec::new();
+    collect_matching_files(&root, &mut exes, |path| {
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("exe"))
+            .unwrap_or(false)
+    });
+    exes.sort();
+
+    Ok(exes
+        .into_iter()
+        .filter_map(|path| {
+            // Return paths relative to the install root so they're shorter in the UI
+            path.strip_prefix(&root)
+                .ok()
+                .map(|rel| rel.to_string_lossy().into_owned())
+        })
+        .collect())
+}
+
 async fn install_game_inner(
     app: &AppHandle,
     game: RemoteGame,
@@ -188,6 +233,7 @@ async fn install_game_inner(
         game.id,
         &temp_root,
         cancel_token,
+        settings.download_speed_limit_kbs,
     )
     .await?;
     log::info!("Download complete: {}", download_info.file_path.display());
@@ -236,6 +282,7 @@ async fn download_package(
     game_id: i32,
     temp_root: &Path,
     cancel_token: &Arc<AtomicBool>,
+    speed_limit_kbs: Option<f64>,
 ) -> Result<DownloadInfo, String> {
     let client = reqwest::Client::new();
     emit_progress(
@@ -299,14 +346,9 @@ async fn download_package(
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap_or_else(std::time::Instant::now);
 
-    fn read_speed_limit() -> Option<u64> {
-        settings::load()
-            .download_speed_limit_kbs
-            .filter(|v| *v > 0.0)
-            .map(|kbs| (kbs * 1024.0) as u64)
-    }
-
-    let mut bytes_per_second_limit = read_speed_limit();
+    let mut bytes_per_second_limit: Option<u64> = speed_limit_kbs
+        .filter(|v| *v > 0.0)
+        .map(|kbs| (kbs * 1024.0) as u64);
     let mut window_start = std::time::Instant::now();
     let mut window_bytes = 0_u64;
 
@@ -322,24 +364,20 @@ async fn download_package(
         downloaded += chunk.len() as u64;
         window_bytes += chunk.len() as u64;
 
-        // Throttle download speed if limit is set
+        // Throttle download speed if limit is set, and reload the limit every second
+        // so that changes in settings take effect without restarting the download.
+        if window_start.elapsed().as_secs() >= 1 {
+            let new_limit = settings::load_async().await.download_speed_limit_kbs;
+            bytes_per_second_limit = new_limit.filter(|v| *v > 0.0).map(|kbs| (kbs * 1024.0) as u64);
+            window_start = std::time::Instant::now();
+            window_bytes = 0;
+        }
         if let Some(limit) = bytes_per_second_limit {
             let elapsed = window_start.elapsed();
             let expected = std::time::Duration::from_secs_f64(window_bytes as f64 / limit as f64);
             if expected > elapsed {
                 tokio::time::sleep(expected - elapsed).await;
             }
-            // Reset window every second and re-read the limit from settings
-            if window_start.elapsed().as_secs() >= 1 {
-                window_start = std::time::Instant::now();
-                window_bytes = 0;
-                bytes_per_second_limit = read_speed_limit();
-            }
-        } else if window_start.elapsed().as_secs() >= 1 {
-            // Even when unlimited, periodically check if a limit was added
-            window_start = std::time::Instant::now();
-            window_bytes = 0;
-            bytes_per_second_limit = read_speed_limit();
         }
 
         let now = std::time::Instant::now();

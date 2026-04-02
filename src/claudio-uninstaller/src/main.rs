@@ -27,6 +27,7 @@ struct UninstallConfig {
     install_path: String,
     registry_key_name: String,
     shortcut_path: Option<String>,
+    desktop_shortcut_path: Option<String>,
 }
 
 fn main() {
@@ -80,6 +81,9 @@ fn run_phase1() {
     delete_registry_key(&config.registry_key_name);
 
     if let Some(shortcut) = &config.shortcut_path {
+        let _ = fs::remove_file(shortcut);
+    }
+    if let Some(shortcut) = &config.desktop_shortcut_path {
         let _ = fs::remove_file(shortcut);
     }
 
