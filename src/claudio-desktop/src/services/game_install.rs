@@ -561,7 +561,6 @@ async fn install_installer(
             .as_ref()
             .map(|entry| target_dir_owned.join(entry))
             .filter(|path| path.exists())
-            .or_else(|| detect_windows_executable(&target_dir_owned))
             .map(|path| path.to_string_lossy().into_owned());
         Ok(exe)
     })
