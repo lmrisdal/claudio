@@ -133,16 +133,27 @@ export default function GameDetail() {
     enabled: !editing && !sgdbDialog.open && !candidates && browsePath === null,
   });
 
-  const { data: exeList } = useQuery({
-    queryKey: ["executables", id],
-    queryFn: () => api.get<string[]>(`/admin/games/${id}/executables`),
-    enabled: editing && user?.role === "admin",
-  });
-
   const { data: game, isLoading } = useQuery({
     queryKey: ["game", id],
     queryFn: () => api.get<Game>(`/games/${id}`),
     refetchInterval: (query) => (query.state.data?.isProcessing ? 3000 : false),
+  });
+
+  const needsInstallerExe =
+    game?.installType === "installer" && !game.installerExe;
+  const needsGameExe = game?.installType === "portable" && !game.gameExe;
+  const installExeLabel = needsInstallerExe
+    ? "Setup Executable"
+    : needsGameExe
+      ? "Game Executable"
+      : undefined;
+
+  const { data: exeList } = useQuery({
+    queryKey: ["executables", id],
+    queryFn: () => api.get<string[]>(`/admin/games/${id}/executables`),
+    enabled:
+      (editing && user?.role === "admin") ||
+      (showInstallConfirm && (needsInstallerExe || needsGameExe)),
   });
 
   const {
@@ -547,7 +558,6 @@ export default function GameDetail() {
 
   async function handleInstallClick() {
     if (!displayGame) return;
-    if (isMac) return;
     try {
       setInstallError(null);
 
@@ -1444,7 +1454,7 @@ export default function GameDetail() {
                         type="button"
                         data-nav
                         disabled={
-                          (isMac && displayGame.installType === "installer") ||
+                          (!isMac && displayGame.installType === "installer") ||
                           installMutation.isPending ||
                           hasActiveInstallProgress ||
                           isInstalledGameLoading
@@ -1500,11 +1510,20 @@ export default function GameDetail() {
                   open={showInstallConfirm}
                   title={displayGame.title}
                   defaultPath={defaultInstallPath}
+                  exeLabel={installExeLabel}
+                  exeOptions={exeList ?? []}
                   onClose={() => setShowInstallConfirm(false)}
-                  onConfirm={(path) => {
+                  onConfirm={(path, exe) => {
                     setShowInstallConfirm(false);
                     // game and displayGame are guaranteed non-null here due to the guard clause
-                    installMutation.mutate({ ...game!, installPath: path });
+                    installMutation.mutate({
+                      ...game!,
+                      installPath: path,
+                      installerExe: needsInstallerExe
+                        ? exe
+                        : game!.installerExe,
+                      gameExe: needsGameExe ? exe : game!.gameExe,
+                    });
                   }}
                 />
               </>

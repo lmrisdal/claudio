@@ -134,6 +134,10 @@ async fn install_game_inner(
     token: String,
     cancel_token: &Arc<AtomicBool>,
 ) -> Result<InstalledGame, String> {
+    log::info!(
+        "Starting install for '{}' (id={}, install_type={:?})",
+        game.title, game.id, game.install_type
+    );
     emit_progress(
         app,
         game.id,
@@ -153,6 +157,7 @@ async fn install_game_inner(
         None => settings::resolve_install_root(&settings)?,
     };
     let target_dir = build_install_dir(&install_root, &game);
+    log::info!("Install target: {}", target_dir.display());
 
     if target_dir.exists() {
         return Err(format!(
@@ -179,6 +184,7 @@ async fn install_game_inner(
         cancel_token,
     )
     .await?;
+    log::info!("Download complete: {}", download_info.file_path.display());
 
     let install_result = match game.install_type {
         InstallType::Portable => {
@@ -189,7 +195,8 @@ async fn install_game_inner(
         }
     };
 
-    if install_result.is_err() {
+    if let Err(ref err) = install_result {
+        log::error!("Install failed for '{}': {}", game.title, err);
         let _ = fs::remove_dir_all(&temp_root);
     }
 
@@ -197,6 +204,7 @@ async fn install_game_inner(
     let installed = registry::upsert(installed)?;
 
     let _ = fs::remove_dir_all(&temp_root);
+    log::info!("Install complete for '{}': {}", game.title, installed.install_path);
     emit_progress(
         app,
         game.id,
@@ -450,6 +458,7 @@ async fn install_installer(
 
     let app_handle = app.clone();
     let gid = game.id;
+    let staging_dir = target_dir.with_extension("installing");
     let target_dir_owned = target_dir.to_path_buf();
     let package_path_owned = package_path.to_path_buf();
     let installer_exe_hint = game.installer_exe.clone();
@@ -466,15 +475,20 @@ async fn install_installer(
             );
         };
 
-        fs::create_dir_all(&target_dir_owned).map_err(|err| err.to_string())?;
-        extract_archive_or_copy(&package_path_owned, &target_dir_owned, &mut progress_cb)?;
+        if staging_dir.exists() {
+            fs::remove_dir_all(&staging_dir).map_err(|err| err.to_string())?;
+        }
+        fs::create_dir_all(&staging_dir).map_err(|err| err.to_string())?;
+        extract_archive_or_copy(&package_path_owned, &staging_dir, &mut progress_cb)?;
         emit_progress(&app_handle, gid, "extracting", Some(86.0), Some("Extracting game…"));
 
         let installer =
-            resolve_installer_path(&target_dir_owned, installer_exe_hint.as_deref())?;
+            resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
 
-        emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer"));
-        run_installer(&installer)?;
+        emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer…"));
+        run_installer(&installer, &target_dir_owned)?;
+
+        let _ = fs::remove_dir_all(&staging_dir);
 
         let exe = game_exe_hint
             .as_ref()
@@ -801,40 +815,248 @@ where
 }
 
 #[cfg(target_os = "windows")]
-fn run_installer(path: &Path) -> Result<(), String> {
-    let extension = path
+enum InstallerType {
+    Msi,
+    GogInnoSetup,
+    InnoSetup,
+    Nsis,
+    Unknown,
+}
+
+#[cfg(target_os = "windows")]
+fn detect_installer_type(path: &Path) -> InstallerType {
+    let ext = path
         .extension()
-        .and_then(|ext| ext.to_str())
+        .and_then(|e| e.to_str())
         .unwrap_or_default();
+    if ext.eq_ignore_ascii_case("msi") {
+        return InstallerType::Msi;
+    }
+    // Scan the first 2 MB for known installer signatures
+    if let Ok(mut file) = fs::File::open(path) {
+        use std::io::Read;
+        let mut buf = vec![0u8; 2 * 1024 * 1024];
+        let n = file.read(&mut buf).unwrap_or(0);
+        let slice = &buf[..n];
+        let is_inno = slice.windows(10).any(|w| w == b"Inno Setup");
+        let is_gog = slice.windows(7).any(|w| w == b"GOG.com");
+        if is_inno && is_gog {
+            return InstallerType::GogInnoSetup;
+        }
+        if is_inno {
+            return InstallerType::InnoSetup;
+        }
+        if slice.windows(8).any(|w| w == b"Nullsoft") {
+            return InstallerType::Nsis;
+        }
+    }
+    InstallerType::Unknown
+}
 
-    let status = if extension.eq_ignore_ascii_case("msi") {
-        std::process::Command::new("msiexec")
-            .arg("/i")
-            .arg(path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()
-            .map_err(|err| err.to_string())?
-    } else {
-        std::process::Command::new(path)
-            .current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
-            .stdin(Stdio::null())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .status()
-            .map_err(|err| err.to_string())?
-    };
+#[cfg(target_os = "windows")]
+fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
+    let target = target_dir.to_string_lossy();
+    let installer_type = detect_installer_type(path);
+    log::info!(
+        "Detected installer type: {} for {}",
+        match &installer_type {
+            InstallerType::GogInnoSetup => "GOG InnoSetup",
+            InstallerType::InnoSetup => "InnoSetup",
+            InstallerType::Nsis => "NSIS",
+            InstallerType::Msi => "MSI",
+            InstallerType::Unknown => "Unknown",
+        },
+        path.display()
+    );
 
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("Installer exited with status {status}."))
+    match installer_type {
+        InstallerType::GogInnoSetup => {
+            run_innoextract(path, target_dir).or_else(|err| {
+                log::warn!("innoextract failed ({err}), falling back to silent InnoSetup install");
+                // Clean up any partial output before falling back to the silent installer
+                let _ = fs::remove_dir_all(target_dir);
+                run_innosetup_silent(path, &target)
+            })
+        }
+        InstallerType::Msi => {
+            let status = std::process::Command::new("msiexec")
+                .arg("/i")
+                .arg(path)
+                .arg("/qn")
+                .arg(format!("TARGETDIR={target}"))
+                .stdin(Stdio::null())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()
+                .map_err(|err| err.to_string())?;
+            if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+        }
+        InstallerType::InnoSetup => run_innosetup_silent(path, &target),
+        InstallerType::Nsis => {
+            // /D= must be the last argument and cannot be quoted
+            let status = std::process::Command::new(path)
+                .arg("/S")
+                .arg(format!("/D={target}"))
+                .stdin(Stdio::null())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()
+                .map_err(|err| err.to_string())?;
+            if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+        }
+        InstallerType::Unknown => {
+            // Fall back to interactive; user chooses install location
+            let status = std::process::Command::new(path)
+                .current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
+                .stdin(Stdio::null())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()
+                .map_err(|err| err.to_string())?;
+            if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+        }
     }
 }
 
+#[cfg(target_os = "windows")]
+fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
+    let status = std::process::Command::new(path)
+        .arg("/VERYSILENT")
+        .arg("/SUPPRESSMSGBOXES")
+        .arg(format!("/DIR={target}"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|err| err.to_string())?;
+    if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+}
+
+#[cfg(target_os = "windows")]
+fn run_innoextract(installer: &Path, target_dir: &Path) -> Result<(), String> {
+    log::info!("Running innoextract for {}", installer.display());
+    let bin = ensure_innoextract()?;
+    log::info!("Using innoextract binary: {}", bin.display());
+
+    let status = std::process::Command::new(&bin)
+        .arg("-d")
+        .arg(target_dir)
+        .arg("--gog")
+        .arg(installer)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|err| format!("Failed to run innoextract: {err}"))?;
+
+    if !status.success() {
+        return Err(format!("innoextract exited with status {status}."));
+    }
+    log::info!("innoextract succeeded");
+
+    // innoextract places game files under <target_dir>/app/ — flatten into target_dir
+    let app_dir = target_dir.join("app");
+    if app_dir.is_dir() {
+        for entry in fs::read_dir(&app_dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let dest = target_dir.join(entry.file_name());
+            fs::rename(entry.path(), dest).map_err(|e| e.to_string())?;
+        }
+        let _ = fs::remove_dir_all(&app_dir);
+    }
+
+    // Remove leftover innoextract temp directory
+    let tmp_dir = target_dir.join("tmp");
+    if tmp_dir.is_dir() {
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_innoextract() -> Result<PathBuf, String> {
+    // Check PATH first
+    if std::process::Command::new("innoextract")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        return Ok(PathBuf::from("innoextract"));
+    }
+
+    // Check cached copy in the app's data dir
+    let cached = settings::data_dir().join("tools").join("innoextract.exe");
+    if cached.exists() {
+        log::info!("Using cached innoextract: {}", cached.display());
+        return Ok(cached);
+    }
+
+    // Download from GitHub releases on first use
+    log::info!("innoextract not found, downloading from GitHub releases");
+    download_innoextract(&cached)?;
+    log::info!("innoextract downloaded to {}", cached.display());
+    Ok(cached)
+}
+
+#[cfg(target_os = "windows")]
+fn download_innoextract(target: &Path) -> Result<(), String> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Claudio/1.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let release: serde_json::Value = client
+        .get("https://api.github.com/repos/dscharrer/innoextract/releases/latest")
+        .send()
+        .map_err(|e| format!("Failed to fetch innoextract release info: {e}"))?
+        .json()
+        .map_err(|e| e.to_string())?;
+
+    let download_url = release["assets"]
+        .as_array()
+        .ok_or("No assets found in innoextract release")?
+        .iter()
+        .find(|asset| {
+            asset["name"]
+                .as_str()
+                .map(|name| name.contains("windows") && name.ends_with(".zip"))
+                .unwrap_or(false)
+        })
+        .and_then(|asset| asset["browser_download_url"].as_str())
+        .ok_or("Could not find Windows innoextract release asset")?
+        .to_string();
+
+    let bytes = client
+        .get(&download_url)
+        .send()
+        .map_err(|e| format!("Failed to download innoextract: {e}"))?
+        .bytes()
+        .map_err(|e| e.to_string())?;
+
+    let cursor = std::io::Cursor::new(bytes.as_ref());
+    let mut archive = ZipArchive::new(cursor).map_err(|e| e.to_string())?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+        if entry.name().ends_with("innoextract.exe") {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            let mut out = fs::File::create(target).map_err(|e| e.to_string())?;
+            io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+    }
+
+    Err("innoextract.exe not found in downloaded release zip".to_string())
+}
+
 #[cfg(not(target_os = "windows"))]
-fn run_installer(_path: &Path) -> Result<(), String> {
+fn run_installer(_path: &Path, _target_dir: &Path) -> Result<(), String> {
     Err("Installer-based PC installs are only supported on Windows.".to_string())
 }
 

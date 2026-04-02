@@ -111,7 +111,7 @@ export default function DesktopSettingsDialog({
     setMessage("");
 
     try {
-      const parsedLimit = parseFloat(speedLimit);
+      const parsedLimit = Number.parseFloat(speedLimit);
       const updated: DesktopSettings = {
         ...settings,
         serverUrl: trimmedUrl,

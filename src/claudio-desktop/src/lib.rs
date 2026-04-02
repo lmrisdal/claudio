@@ -22,6 +22,13 @@ fn restore_main_window(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(services::game_install::InstallState::default())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .max_file_size(10 * 1024 * 1024) // 10 MB
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![

@@ -13,6 +13,8 @@ import "./index.css";
 
 if (isDesktop) {
   document.documentElement.dataset.desktop = "";
+  const { attachConsole } = await import("@tauri-apps/plugin-log");
+  await attachConsole();
 }
 
 const queryClient = new QueryClient({

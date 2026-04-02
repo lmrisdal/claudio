@@ -50,15 +50,7 @@ export function DownloadManagerProvider({
         const now = performance.now();
         const prev = speedState.current.get(progress.gameId);
 
-        if (!prev) {
-          // Store first baseline sample, don't compute speed yet
-          speedState.current.set(progress.gameId, {
-            lastBytes: progress.bytesDownloaded,
-            lastTime: now,
-            speed: null,
-            sampleCount: 0,
-          });
-        } else {
+        if (prev) {
           const elapsed = (now - prev.lastTime) / 1000;
           if (elapsed >= 0.5 && progress.bytesDownloaded > prev.lastBytes) {
             const instantSpeed =
@@ -67,10 +59,10 @@ export function DownloadManagerProvider({
             // Skip the first sample (often a burst), use second as baseline
             if (count <= 1) {
               speedBps = null;
-            } else if (prev.speed != null) {
-              speedBps = 0.3 * instantSpeed + 0.7 * prev.speed;
-            } else {
+            } else if (prev.speed === null) {
               speedBps = instantSpeed;
+            } else {
+              speedBps = 0.3 * instantSpeed + 0.7 * prev.speed;
             }
             speedState.current.set(progress.gameId, {
               lastBytes: progress.bytesDownloaded,
@@ -81,6 +73,14 @@ export function DownloadManagerProvider({
           } else {
             speedBps = prev.speed;
           }
+        } else {
+          // Store first baseline sample, don't compute speed yet
+          speedState.current.set(progress.gameId, {
+            lastBytes: progress.bytesDownloaded,
+            lastTime: now,
+            speed: null,
+            sampleCount: 0,
+          });
         }
       }
 

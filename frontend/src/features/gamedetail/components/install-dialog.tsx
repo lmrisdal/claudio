@@ -1,23 +1,31 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import ExeListbox from "./exe-listbox";
 
 interface InstallDialogProperties {
   open: boolean;
   title: string;
   defaultPath: string;
+  exeLabel?: string;
+  exeOptions?: string[];
   onClose: () => void;
-  onConfirm: (path: string | undefined) => void;
+  onConfirm: (path: string | undefined, exe?: string) => void;
 }
 
 export default function InstallDialog({
   open,
   title,
   defaultPath,
+  exeLabel,
+  exeOptions = [],
   onClose,
   onConfirm,
 }: InstallDialogProperties) {
   const [installPath, setInstallPath] = useState(defaultPath);
+  const [exe, setExe] = useState("");
+
+  const showExePicker = exeLabel !== undefined && exeOptions.length > 0;
 
   async function handleBrowse() {
     try {
@@ -80,7 +88,7 @@ export default function InstallDialog({
                     onClick={handleBrowse}
                     className="px-4 py-2 rounded-lg text-sm font-medium bg-surface-raised border border-border hover:bg-surface-overlay transition text-text-primary"
                   >
-                    Browse...
+                    Browse…
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
@@ -88,6 +96,17 @@ export default function InstallDialog({
                   directory.
                 </p>
               </div>
+
+              {showExePicker && (
+                <div className="mt-4">
+                  <ExeListbox
+                    label={exeLabel}
+                    value={exe}
+                    onChange={setExe}
+                    options={exeOptions}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -99,7 +118,7 @@ export default function InstallDialog({
               Cancel
             </button>
             <button
-              onClick={() => onConfirm(installPath || undefined)}
+              onClick={() => onConfirm(installPath || undefined, exe || undefined)}
               className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-neutral-950 hover:bg-accent-hover transition shadow-sm"
             >
               Install
