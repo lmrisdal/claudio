@@ -35,7 +35,7 @@ pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
             pid,
             exe_name
         );
-        for _ in 0..40 {
+        for _ in 0..400 {
             match try_mute_sessions(pid, exe_name.as_deref()) {
                 Ok(n) if n > 0 => {
                     log::info!("Muted {n} audio session(s) for pid={pid} exe={exe_name:?}");
@@ -45,7 +45,7 @@ pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
                 }
                 _ => {}
             }
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
     });
 }

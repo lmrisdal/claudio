@@ -410,7 +410,7 @@ async fn download_package(
                 game_id,
                 "downloading",
                 percent,
-                Some("Downloading package"),
+                Some("Downloading game"),
                 Some(downloaded),
                 total_bytes,
             );
