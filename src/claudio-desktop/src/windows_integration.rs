@@ -114,7 +114,7 @@ fn find_pids_by_name(name: &str) -> Vec<u32> {
                     &entry
                         .szExeFile
                         .iter()
-                        .map(|c| c.0)
+                        .map(|c| *c as u8)
                         .take_while(|&c| c != 0)
                         .collect::<Vec<u8>>(),
                 );
