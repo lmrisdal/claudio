@@ -1454,7 +1454,7 @@ export default function GameDetail() {
                         type="button"
                         data-nav
                         disabled={
-                          (!isMac && displayGame.installType === "installer") ||
+                          (isMac && displayGame.installType === "installer") ||
                           installMutation.isPending ||
                           hasActiveInstallProgress ||
                           isInstalledGameLoading
