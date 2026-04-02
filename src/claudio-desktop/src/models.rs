@@ -17,6 +17,7 @@ pub struct RemoteGame {
     pub installer_exe: Option<String>,
     pub game_exe: Option<String>,
     pub install_path: Option<String>,
+    pub desktop_shortcut: Option<bool>,
     pub summary: Option<String>,
     pub genre: Option<String>,
     pub release_year: Option<i32>,

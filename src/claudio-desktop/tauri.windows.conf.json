@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "../claudio-uninstaller/target/release/uninstall.exe": "uninstall.exe"
+    }
+  }
+}

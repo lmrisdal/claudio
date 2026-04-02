@@ -245,7 +245,7 @@ export default function GameDetail() {
     isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
 
   const installMutation = useMutation({
-    mutationFn: async (input: Game & { installPath?: string }) => {
+    mutationFn: async (input: Game & { installPath?: string; desktopShortcut?: boolean }) => {
       return startDownload({
         id: input.id,
         title: input.title,
@@ -254,6 +254,7 @@ export default function GameDetail() {
         installerExe: input.installerExe ?? null,
         gameExe: input.gameExe ?? null,
         installPath: input.installPath ?? null,
+        desktopShortcut: input.desktopShortcut,
         summary: input.summary ?? null,
         genre: input.genre ?? null,
         releaseYear: input.releaseYear ?? null,
@@ -1510,15 +1511,17 @@ export default function GameDetail() {
                   open={showInstallConfirm}
                   title={displayGame.title}
                   defaultPath={defaultInstallPath}
+                  isPortable={displayGame.installType === "portable"}
                   exeLabel={installExeLabel}
                   exeOptions={exeList ?? []}
                   onClose={() => setShowInstallConfirm(false)}
-                  onConfirm={(path, exe) => {
+                  onConfirm={(path, exe, desktopShortcut) => {
                     setShowInstallConfirm(false);
                     // game and displayGame are guaranteed non-null here due to the guard clause
                     installMutation.mutate({
                       ...game!,
                       installPath: path,
+                      desktopShortcut,
                       installerExe: needsInstallerExe
                         ? exe
                         : game!.installerExe,

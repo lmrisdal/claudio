@@ -3,6 +3,8 @@ mod models;
 mod registry;
 mod services;
 mod settings;
+#[cfg(target_os = "windows")]
+mod windows_integration;
 
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::tray::TrayIconBuilder;

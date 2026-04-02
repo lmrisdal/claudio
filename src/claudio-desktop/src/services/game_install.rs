@@ -103,6 +103,12 @@ pub fn cancel_install(state: &InstallState, game_id: i32) -> Result<(), String> 
 
 pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
     let removed = registry::remove(remote_game_id)?;
+
+    #[cfg(target_os = "windows")]
+    if let Some(game) = &removed {
+        crate::windows_integration::deregister(game);
+    }
+
     if delete_files {
         if let Some(installed) = removed {
             let path = PathBuf::from(&installed.install_path);
@@ -202,6 +208,9 @@ async fn install_game_inner(
 
     let installed = install_result?;
     let installed = registry::upsert(installed)?;
+
+    #[cfg(target_os = "windows")]
+    crate::windows_integration::register(app, &installed, game.desktop_shortcut.unwrap_or(false));
 
     let _ = fs::remove_dir_all(&temp_root);
     log::info!("Install complete for '{}': {}", game.title, installed.install_path);
@@ -879,40 +888,50 @@ fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
             })
         }
         InstallerType::Msi => {
-            let status = std::process::Command::new("msiexec")
+            let msi_args = format!("/i {} /qn TARGETDIR={target}", path.to_string_lossy());
+            let status = match std::process::Command::new("msiexec")
                 .arg("/i")
                 .arg(path)
                 .arg("/qn")
                 .arg(format!("TARGETDIR={target}"))
                 .stdin(Stdio::null())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
                 .status()
-                .map_err(|err| err.to_string())?;
+            {
+                Ok(s) => s,
+                Err(err) if err.raw_os_error() == Some(740) => {
+                    run_elevated(std::path::Path::new("msiexec"), &msi_args)?
+                }
+                Err(err) => return Err(err.to_string()),
+            };
             if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
         }
         InstallerType::InnoSetup => run_innosetup_silent(path, &target),
         InstallerType::Nsis => {
             // /D= must be the last argument and cannot be quoted
-            let status = std::process::Command::new(path)
+            let nsis_args = format!("/S /D={target}");
+            let status = match std::process::Command::new(path)
                 .arg("/S")
                 .arg(format!("/D={target}"))
                 .stdin(Stdio::null())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
                 .status()
-                .map_err(|err| err.to_string())?;
+            {
+                Ok(s) => s,
+                Err(err) if err.raw_os_error() == Some(740) => run_elevated(path, &nsis_args)?,
+                Err(err) => return Err(err.to_string()),
+            };
             if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
         }
         InstallerType::Unknown => {
             // Fall back to interactive; user chooses install location
-            let status = std::process::Command::new(path)
+            let status = match std::process::Command::new(path)
                 .current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
                 .stdin(Stdio::null())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
                 .status()
-                .map_err(|err| err.to_string())?;
+            {
+                Ok(s) => s,
+                Err(err) if err.raw_os_error() == Some(740) => run_elevated(path, "")?,
+                Err(err) => return Err(err.to_string()),
+            };
             if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
         }
     }
@@ -920,16 +939,45 @@ fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
-    let status = std::process::Command::new(path)
+    let args = format!("/VERYSILENT /SUPPRESSMSGBOXES /DIR={target}");
+    let status = match std::process::Command::new(path)
         .arg("/VERYSILENT")
         .arg("/SUPPRESSMSGBOXES")
         .arg(format!("/DIR={target}"))
         .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
         .status()
-        .map_err(|err| err.to_string())?;
+    {
+        Ok(s) => s,
+        Err(err) if err.raw_os_error() == Some(740) => run_elevated(path, &args)?,
+        Err(err) => return Err(err.to_string()),
+    };
     if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+}
+
+/// Re-launches `path` with elevated privileges via a UAC prompt.
+/// Uses PowerShell's Start-Process with -Verb RunAs so the prompt appears
+/// even when Claudio itself is not running as administrator.
+#[cfg(target_os = "windows")]
+fn run_elevated(path: &Path, args: &str) -> Result<std::process::ExitStatus, String> {
+    log::info!("Installer requires elevation, requesting UAC prompt for {}", path.display());
+    let path_esc = path.to_string_lossy().replace('\'', "''");
+    let args_esc = args.replace('\'', "''");
+
+    let ps_script = if args_esc.is_empty() {
+        format!(
+            "try {{ $p = Start-Process -FilePath '{path_esc}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1 }}"
+        )
+    } else {
+        format!(
+            "try {{ $p = Start-Process -FilePath '{path_esc}' -ArgumentList '{args_esc}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1 }}"
+        )
+    };
+
+    std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
+        .stdin(Stdio::null())
+        .status()
+        .map_err(|err| err.to_string())
 }
 
 #[cfg(target_os = "windows")]

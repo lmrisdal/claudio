@@ -28,6 +28,7 @@ interface DesktopInstallGameInput {
   installerExe?: string | null;
   gameExe?: string | null;
   installPath?: string | null;
+  desktopShortcut?: boolean;
   summary?: string | null;
   genre?: string | null;
   releaseYear?: number | null;

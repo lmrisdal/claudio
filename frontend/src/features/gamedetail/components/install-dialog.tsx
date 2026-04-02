@@ -1,22 +1,25 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { isWindows } from "../../core/utils/os";
 import ExeListbox from "./exe-listbox";
 
 interface InstallDialogProperties {
   open: boolean;
   title: string;
   defaultPath: string;
+  isPortable?: boolean;
   exeLabel?: string;
   exeOptions?: string[];
   onClose: () => void;
-  onConfirm: (path: string | undefined, exe?: string) => void;
+  onConfirm: (path: string | undefined, exe?: string, desktopShortcut?: boolean) => void;
 }
 
 export default function InstallDialog({
   open,
   title,
   defaultPath,
+  isPortable = false,
   exeLabel,
   exeOptions = [],
   onClose,
@@ -24,8 +27,10 @@ export default function InstallDialog({
 }: InstallDialogProperties) {
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
+  const [desktopShortcut, setDesktopShortcut] = useState(true);
 
   const showExePicker = exeLabel !== undefined && exeOptions.length > 0;
+  const canInstall = !showExePicker || exe !== "";
 
   async function handleBrowse() {
     try {
@@ -107,6 +112,18 @@ export default function InstallDialog({
                   />
                 </div>
               )}
+
+              {isPortable && isWindows && (
+                <label className="mt-4 flex items-center gap-2.5 cursor-pointer select-none w-fit">
+                  <input
+                    type="checkbox"
+                    checked={desktopShortcut}
+                    onChange={(e) => setDesktopShortcut(e.target.checked)}
+                    className="w-4 h-4 rounded accent-accent cursor-pointer"
+                  />
+                  <span className="text-sm text-text-primary">Add shortcut to desktop</span>
+                </label>
+              )}
             </div>
           </div>
 
@@ -118,8 +135,9 @@ export default function InstallDialog({
               Cancel
             </button>
             <button
-              onClick={() => onConfirm(installPath || undefined, exe || undefined)}
-              className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-neutral-950 hover:bg-accent-hover transition shadow-sm"
+              onClick={() => onConfirm(installPath || undefined, exe || undefined, isPortable ? desktopShortcut : undefined)}
+              disabled={!canInstall}
+              className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-neutral-950 hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
               Install
             </button>
