@@ -5,8 +5,96 @@ use tauri::{AppHandle, Manager};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 use winreg::RegKey;
 
+use windows::core::Interface;
+use windows::Win32::Media::Audio::{
+    eConsole, eRender, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2,
+    IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
+};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
+};
+
 const UNINSTALL_ROOT: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+
+/// Mutes all audio sessions associated with the given Process ID.
+/// This runs in a background thread and retries for a few seconds to account for
+/// processes that initialize their audio systems after startup.
+pub fn mute_process_audio(pid: u32) {
+    std::thread::spawn(move || {
+        log::info!("Attempting to mute audio for process {}", pid);
+        // Retry for up to 10 seconds (20 * 500ms)
+        for _ in 0..20 {
+            match try_mute_process_audio(pid) {
+                Ok(true) => {
+                    log::info!("Successfully muted audio for process {}", pid);
+                    return;
+                }
+                Err(err) => {
+                    log::debug!("Error while trying to mute process {}: {}", pid, err);
+                }
+                Ok(false) => {
+                    // Process session not found yet, continue retrying
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        log::debug!("Finished attempting to mute audio for process {}", pid);
+    });
+}
+
+fn try_mute_process_audio(pid: u32) -> Result<bool, String> {
+    unsafe {
+        // Initialize COM for this thread
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+        let device_enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                .map_err(|e| format!("Failed to create IMMDeviceEnumerator: {e}"))?;
+
+        let device = device_enumerator
+            .GetDefaultAudioEndpoint(eRender, eConsole)
+            .map_err(|e| format!("Failed to get default audio endpoint: {e}"))?;
+
+        let session_manager: IAudioSessionManager2 = device
+            .Activate(CLSCTX_ALL, None)
+            .map_err(|e| format!("Failed to activate IAudioSessionManager2: {e}"))?;
+
+        let session_enumerator: IAudioSessionEnumerator = session_manager
+            .GetSessionEnumerator()
+            .map_err(|e| format!("Failed to get session enumerator: {e}"))?;
+
+        let count = session_enumerator
+            .GetCount()
+            .map_err(|e| format!("Failed to get session count: {e}"))?;
+
+        let mut found = false;
+        for i in 0..count {
+            let session = match session_enumerator.GetSession(i) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            let session2: IAudioSessionControl2 = match session.cast() {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            if session2.GetProcessId().unwrap_or(0) == pid {
+                let volume: ISimpleAudioVolume = match session.cast() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if let Err(e) = volume.SetMute(true, None) {
+                    log::warn!("Failed to mute session for process {}: {}", pid, e);
+                } else {
+                    found = true;
+                }
+            }
+        }
+        Ok(found)
+    }
+}
 
 pub fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {
     // Installer-based games register themselves via their own installer.

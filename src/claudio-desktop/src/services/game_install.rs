@@ -926,51 +926,31 @@ fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
             })
         }
         InstallerType::Msi => {
-            let msi_args = format!("/i {} /qn TARGETDIR={target}", path.to_string_lossy());
-            let status = match std::process::Command::new("msiexec")
-                .arg("/i")
+            let msi_args = format!("/i \"{}\" /qn TARGETDIR=\"{}\"", path.to_string_lossy(), target);
+            let mut cmd = std::process::Command::new("msiexec");
+            cmd.arg("/i")
                 .arg(path)
                 .arg("/qn")
                 .arg(format!("TARGETDIR={target}"))
-                .stdin(Stdio::null())
-                .status()
-            {
-                Ok(s) => s,
-                Err(err) if err.raw_os_error() == Some(740) => {
-                    run_elevated(std::path::Path::new("msiexec"), &msi_args)?
-                }
-                Err(err) => return Err(err.to_string()),
-            };
-            if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+                .stdin(Stdio::null());
+            spawn_mute_wait(cmd, Path::new("msiexec"), &msi_args)
         }
         InstallerType::InnoSetup => run_innosetup_silent(path, &target),
         InstallerType::Nsis => {
             // /D= must be the last argument and cannot be quoted
             let nsis_args = format!("/S /D={target}");
-            let status = match std::process::Command::new(path)
-                .arg("/S")
+            let mut cmd = std::process::Command::new(path);
+            cmd.arg("/S")
                 .arg(format!("/D={target}"))
-                .stdin(Stdio::null())
-                .status()
-            {
-                Ok(s) => s,
-                Err(err) if err.raw_os_error() == Some(740) => run_elevated(path, &nsis_args)?,
-                Err(err) => return Err(err.to_string()),
-            };
-            if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+                .stdin(Stdio::null());
+            spawn_mute_wait(cmd, path, &nsis_args)
         }
         InstallerType::Unknown => {
             // Fall back to interactive; user chooses install location
-            let status = match std::process::Command::new(path)
-                .current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
-                .stdin(Stdio::null())
-                .status()
-            {
-                Ok(s) => s,
-                Err(err) if err.raw_os_error() == Some(740) => run_elevated(path, "")?,
-                Err(err) => return Err(err.to_string()),
-            };
-            if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+            let mut cmd = std::process::Command::new(path);
+            cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
+                .stdin(Stdio::null());
+            spawn_mute_wait(cmd, path, "")
         }
     }
 }
@@ -978,19 +958,47 @@ fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
     // Quote the path so spaces in the install directory are handled correctly.
-    let args = format!("/VERYSILENT /SUPPRESSMSGBOXES \"/DIR={target}\"");
-    let status = match std::process::Command::new(path)
-        .arg("/VERYSILENT")
+    // /NOSOUND is added to suppress audio if supported by the installer.
+    let args = format!("/VERYSILENT /SUPPRESSMSGBOXES /NOSOUND \"/DIR={target}\"");
+    let mut cmd = std::process::Command::new(path);
+    cmd.arg("/VERYSILENT")
         .arg("/SUPPRESSMSGBOXES")
+        .arg("/NOSOUND")
         .arg(format!("/DIR={target}"))
-        .stdin(Stdio::null())
-        .status()
-    {
-        Ok(s) => s,
-        Err(err) if err.raw_os_error() == Some(740) => run_elevated(path, &args)?,
+        .stdin(Stdio::null());
+
+    spawn_mute_wait(cmd, path, &args)
+}
+
+/// Spawns a process, attempts to mute its audio on Windows, and waits for it to exit.
+/// Handles UAC elevation (Error 740) by falling back to PowerShell's RunAs.
+#[cfg(target_os = "windows")]
+fn spawn_mute_wait(
+    mut cmd: std::process::Command,
+    path: &Path,
+    args: &str,
+) -> Result<(), String> {
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(err) if err.raw_os_error() == Some(740) => {
+            let status = run_elevated(path, args)?;
+            if status.success() {
+                return Ok(());
+            } else {
+                return Err(format!("Installer exited with status {status}."));
+            }
+        }
         Err(err) => return Err(err.to_string()),
     };
-    if status.success() { Ok(()) } else { Err(format!("Installer exited with status {status}.")) }
+
+    crate::windows_integration::mute_process_audio(child.id());
+
+    let status = child.wait().map_err(|err| err.to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("Installer exited with status {status}."))
+    }
 }
 
 /// Re-launches `path` with elevated privileges via a UAC prompt.
