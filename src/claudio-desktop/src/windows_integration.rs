@@ -85,7 +85,7 @@ fn try_mute_process_audio(pid: u32) -> Result<bool, String> {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
-                if let Err(e) = volume.SetMute(true, None) {
+                if let Err(e) = volume.SetMute(true, std::ptr::null()) {
                     log::warn!("Failed to mute session for process {}: {}", pid, e);
                 } else {
                     found = true;
