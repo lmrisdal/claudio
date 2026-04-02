@@ -110,14 +110,13 @@ fn find_pids_by_name(name: &str) -> Vec<u32> {
         };
         if Process32First(snapshot, &mut entry).is_ok() {
             loop {
-                let exe = String::from_utf8_lossy(
-                    &entry
-                        .szExeFile
-                        .iter()
-                        .map(|c| *c as u8)
-                        .take_while(|&c| c != 0)
-                        .collect::<Vec<u8>>(),
-                );
+                let exe_bytes: Vec<u8> = entry
+                    .szExeFile
+                    .iter()
+                    .map(|c| *c as u8)
+                    .take_while(|&c| c != 0)
+                    .collect();
+                let exe = String::from_utf8_lossy(&exe_bytes);
                 if exe.eq_ignore_ascii_case(name) {
                     out.push(entry.th32ProcessID);
                 }
