@@ -14,8 +14,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use tauri::{AppHandle, Emitter, State};
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 use zip::read::ZipArchive;
 
 pub struct InstallState {
@@ -336,9 +334,6 @@ async fn download_package(
     let filename =
         infer_filename(response.headers()).unwrap_or_else(|| format!("game-{game_id}.tar"));
     let download_path = temp_root.join(filename);
-    let mut file = File::create(&download_path)
-        .await
-        .map_err(|err| err.to_string())?;
     let total_bytes = response.content_length();
     let mut downloaded = 0_u64;
     let mut stream = response.bytes_stream();
@@ -352,20 +347,37 @@ async fn download_package(
     let mut window_start = std::time::Instant::now();
     let mut window_bytes = 0_u64;
 
+    // Dedicated writer thread: receives chunks via channel and writes them with
+    // a 4 MB BufWriter so we get one spawn_blocking thread for the entire download
+    // instead of one per chunk (which was saturating the tokio blocking pool).
+    let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(32);
+    let writer_path = download_path.clone();
+    let writer_handle = tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let file = std::fs::File::create(&writer_path)
+            .map_err(|e| format!("Failed to create download file: {e}"))?;
+        let mut writer = io::BufWriter::with_capacity(4 * 1024 * 1024, file);
+        while let Some(chunk) = chunk_rx.blocking_recv() {
+            io::Write::write_all(&mut writer, &chunk)
+                .map_err(|e| format!("Failed to write download chunk: {e}"))?;
+        }
+        io::Write::flush(&mut writer)
+            .map_err(|e| format!("Failed to flush download file: {e}"))?;
+        Ok(())
+    });
+
     while let Some(chunk) = stream.next().await {
         if cancel_token.load(Ordering::Relaxed) {
+            drop(chunk_tx);
+            let _ = writer_handle.await;
             let _ = fs::remove_dir_all(temp_root);
             return Err("Install cancelled.".to_string());
         }
         let chunk = chunk.map_err(|err| err.to_string())?;
-        file.write_all(&chunk)
-            .await
-            .map_err(|err| err.to_string())?;
-        downloaded += chunk.len() as u64;
-        window_bytes += chunk.len() as u64;
+        let chunk_len = chunk.len() as u64;
+        chunk_tx.send(chunk.to_vec()).await.map_err(|_| "Writer thread died unexpectedly.".to_string())?;
+        downloaded += chunk_len;
+        window_bytes += chunk_len;
 
-        // Throttle download speed if limit is set, and reload the limit every second
-        // so that changes in settings take effect without restarting the download.
         if window_start.elapsed().as_secs() >= 1 {
             let new_limit = settings::load_async().await.download_speed_limit_kbs;
             bytes_per_second_limit = new_limit.filter(|v| *v > 0.0).map(|kbs| (kbs * 1024.0) as u64);
@@ -398,7 +410,8 @@ async fn download_package(
         }
     }
 
-    file.flush().await.map_err(|err| err.to_string())?;
+    drop(chunk_tx);
+    writer_handle.await.map_err(|e| format!("Writer thread panicked: {e}"))??;
     Ok(DownloadInfo {
         file_path: download_path,
     })
