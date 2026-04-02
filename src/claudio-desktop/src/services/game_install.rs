@@ -978,9 +978,16 @@ fn spawn_mute_wait(
     path: &Path,
     args: &str,
 ) -> Result<(), String> {
+    let exe_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(String::from);
+
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(err) if err.raw_os_error() == Some(740) => {
+            // Elevated process won't be in our PID tree, but name-matching will find it.
+            crate::windows_integration::mute_process_audio(0, exe_name);
             let status = run_elevated(path, args)?;
             if status.success() {
                 return Ok(());
@@ -991,7 +998,7 @@ fn spawn_mute_wait(
         Err(err) => return Err(err.to_string()),
     };
 
-    crate::windows_integration::mute_process_audio(child.id());
+    crate::windows_integration::mute_process_audio(child.id(), exe_name);
 
     let status = child.wait().map_err(|err| err.to_string())?;
     if status.success() {

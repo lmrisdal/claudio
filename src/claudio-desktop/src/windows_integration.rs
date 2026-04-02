@@ -21,50 +21,105 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 const UNINSTALL_ROOT: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
-/// Mutes all audio sessions associated with the given Process ID and its descendants.
-/// This runs in a background thread and retries for a few seconds to account for
-/// processes that initialize their audio systems after startup.
-pub fn mute_process_audio(pid: u32) {
+/// Mutes all audio sessions associated with the given process tree and/or executable name.
+/// Runs in a background thread and retries for up to 20 seconds to catch processes
+/// that initialize their audio systems after startup (common with game installers).
+///
+/// `pid` — root process ID (0 to skip PID-tree matching, e.g. for elevated installs).
+/// `exe_name` — optional installer filename (e.g. "setup.exe") for name-based fallback
+///              matching, which catches elevated processes that aren't in the PID tree.
+pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
     std::thread::spawn(move || {
-        log::info!("Attempting to mute audio for process tree starting at {}", pid);
-        // Retry for up to 20 seconds (40 * 500ms)
-        // Some installers take a while to extract and spawn their audio sub-processes.
+        log::info!(
+            "Attempting to mute audio for pid={} exe={:?}",
+            pid,
+            exe_name
+        );
         for _ in 0..40 {
-            match try_mute_process_tree(pid) {
-                Ok(muted_count) if muted_count > 0 => {
-                    log::info!("Muted {} audio session(s) for process tree {}", muted_count, pid);
-                    // Don't return early; keep muting as new sub-processes might spawn
+            match try_mute_sessions(pid, exe_name.as_deref()) {
+                Ok(n) if n > 0 => {
+                    log::info!("Muted {n} audio session(s) for pid={pid} exe={exe_name:?}");
                 }
                 Err(err) => {
-                    log::debug!("Error while trying to mute process tree {}: {}", pid, err);
+                    log::debug!("Mute attempt failed: {err}");
                 }
                 _ => {}
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        log::debug!("Finished attempting to mute audio for process tree {}", pid);
     });
 }
 
-fn get_process_tree(pid: u32) -> Vec<u32> {
-    let mut tree = vec![pid];
+/// Collects all (pid, parent_pid) pairs from a toolhelp snapshot, then builds
+/// the full descendant tree for `root_pid` using multi-pass expansion so that
+/// grandchildren are never missed regardless of snapshot ordering.
+fn get_process_tree(root_pid: u32) -> Vec<u32> {
+    let entries = snapshot_processes();
+    let mut tree = vec![root_pid];
+    loop {
+        let prev_len = tree.len();
+        for &(pid, parent) in &entries {
+            if tree.contains(&parent) && !tree.contains(&pid) {
+                tree.push(pid);
+            }
+        }
+        if tree.len() == prev_len {
+            break;
+        }
+    }
+    tree
+}
+
+/// Returns (pid, parent_pid) for every process visible in the toolhelp snapshot.
+fn snapshot_processes() -> Vec<(u32, u32)> {
+    let mut out = Vec::new();
     unsafe {
         let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
             Ok(s) => s,
-            Err(_) => return tree,
+            Err(_) => return out,
         };
-
         let mut entry = PROCESSENTRY32 {
             dwSize: std::mem::size_of::<PROCESSENTRY32>() as u32,
             ..Default::default()
         };
-
         if Process32First(snapshot, &mut entry).is_ok() {
             loop {
-                if tree.contains(&entry.th32ParentProcessID) {
-                    if !tree.contains(&entry.th32ProcessID) {
-                        tree.push(entry.th32ProcessID);
-                    }
+                out.push((entry.th32ProcessID, entry.th32ParentProcessID));
+                if Process32Next(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = windows::Win32::Foundation::CloseHandle(snapshot);
+    }
+    out
+}
+
+/// Finds PIDs of all running processes whose executable filename (case-insensitive)
+/// matches `name` (e.g. "setup.exe").
+fn find_pids_by_name(name: &str) -> Vec<u32> {
+    let mut out = Vec::new();
+    unsafe {
+        let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
+            Ok(s) => s,
+            Err(_) => return out,
+        };
+        let mut entry = PROCESSENTRY32 {
+            dwSize: std::mem::size_of::<PROCESSENTRY32>() as u32,
+            ..Default::default()
+        };
+        if Process32First(snapshot, &mut entry).is_ok() {
+            loop {
+                let exe = String::from_utf8_lossy(
+                    &entry
+                        .szExeFile
+                        .iter()
+                        .map(|c| c.0)
+                        .take_while(|&c| c != 0)
+                        .collect::<Vec<u8>>(),
+                );
+                if exe.eq_ignore_ascii_case(name) {
+                    out.push(entry.th32ProcessID);
                 }
                 if Process32Next(snapshot, &mut entry).is_err() {
                     break;
@@ -73,15 +128,28 @@ fn get_process_tree(pid: u32) -> Vec<u32> {
         }
         let _ = windows::Win32::Foundation::CloseHandle(snapshot);
     }
-    tree
+    out
 }
 
-fn try_mute_process_tree(pid: u32) -> Result<usize, String> {
-    let pids = get_process_tree(pid);
+/// Mutes audio sessions matching either the PID tree or the executable name.
+fn try_mute_sessions(pid: u32, exe_name: Option<&str>) -> Result<usize, String> {
+    // Build the set of PIDs to mute: process tree + any process matching the exe name
+    let mut target_pids: Vec<u32> = if pid != 0 {
+        get_process_tree(pid)
+    } else {
+        Vec::new()
+    };
+    if let Some(name) = exe_name {
+        for found_pid in find_pids_by_name(name) {
+            if !target_pids.contains(&found_pid) {
+                target_pids.push(found_pid);
+            }
+        }
+    }
+
     let mut muted_count = 0;
 
     unsafe {
-        // Initialize COM for this thread
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
         let device_enumerator: IMMDeviceEnumerator =
@@ -116,21 +184,21 @@ fn try_mute_process_tree(pid: u32) -> Result<usize, String> {
             };
 
             let session_pid = session2.GetProcessId().unwrap_or(0);
-            if pids.contains(&session_pid) {
-                let volume: ISimpleAudioVolume = match session.cast() {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-                // Check if already muted to avoid spamming the system
-                if let Ok(is_muted) = volume.GetMute() {
-                    if !is_muted.as_bool() {
-                        if volume.SetMute(true, std::ptr::null()).is_ok() {
-                            muted_count += 1;
-                        }
-                    } else {
-                        // Already muted, count it anyway so the caller knows we are successful
+            if !target_pids.contains(&session_pid) {
+                continue;
+            }
+
+            let volume: ISimpleAudioVolume = match session.cast() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if let Ok(is_muted) = volume.GetMute() {
+                if !is_muted.as_bool() {
+                    if volume.SetMute(true, std::ptr::null()).is_ok() {
                         muted_count += 1;
                     }
+                } else {
+                    muted_count += 1;
                 }
             }
         }

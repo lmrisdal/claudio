@@ -55,14 +55,22 @@ Endpoints are in `src/Claudio.Api/Endpoints/` as static classes with extension m
 
 TOML config loaded from `CLAUDIO_CONFIG_PATH` env var or `/config/config.toml`. See `config/config.example.toml` for schema. Local dev config is at `config/config.toml` (gitignored, contains secrets).
 
+### Code style
+
+- C# uses `PascalCase` for types and methods, `camelCase` for parameters and local variables.
+- React components are `PascalCase`, hooks are `useCamelCase`.
+- Tailwind classes are used for styling in JSX, with semantic tokens for colors and spacing.
+- Only one React component per file.
+- Avoid useEffect where possible. See: https://react.dev/learn/you-might-not-need-an-effect
+- Limit source files to 400 lines for readability. If a file grows too large, consider splitting it into smaller components or modules.
+- Avoid comments that explain "what" the code is doing — the code should be self-explanatory. Use comments to explain "why" if the reasoning is not obvious.
+
 ### Frontend patterns
 
 - API client at `frontend/src/api/client.ts` — wraps fetch with JWT auth header injection and error handling.
 - Auth context at `frontend/src/hooks/useAuth.tsx` — JWT parsing, login/register/logout.
 - CSS theming uses custom properties in `index.css` (`:root` for dark, `.light` for light mode) with Tailwind semantic tokens (`text-text-primary`, `bg-surface`, `bg-surface-raised`, etc.).
 - TypeScript strict mode with `verbatimModuleSyntax` — use `import type` for type-only imports.
-- Only one React component per file.
-- Avoid useEffect where possible. See: https://react.dev/learn/you-might-not-need-an-effect
 
 ### Controller and keyboard navigation
 
