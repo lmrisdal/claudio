@@ -14,36 +14,72 @@ use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
 
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
+};
+
 const UNINSTALL_ROOT: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
-/// Mutes all audio sessions associated with the given Process ID.
+/// Mutes all audio sessions associated with the given Process ID and its descendants.
 /// This runs in a background thread and retries for a few seconds to account for
 /// processes that initialize their audio systems after startup.
 pub fn mute_process_audio(pid: u32) {
     std::thread::spawn(move || {
-        log::info!("Attempting to mute audio for process {}", pid);
-        // Retry for up to 10 seconds (20 * 500ms)
-        for _ in 0..20 {
-            match try_mute_process_audio(pid) {
-                Ok(true) => {
-                    log::info!("Successfully muted audio for process {}", pid);
-                    return;
+        log::info!("Attempting to mute audio for process tree starting at {}", pid);
+        // Retry for up to 20 seconds (40 * 500ms)
+        // Some installers take a while to extract and spawn their audio sub-processes.
+        for _ in 0..40 {
+            match try_mute_process_tree(pid) {
+                Ok(muted_count) if muted_count > 0 => {
+                    log::info!("Muted {} audio session(s) for process tree {}", muted_count, pid);
+                    // Don't return early; keep muting as new sub-processes might spawn
                 }
                 Err(err) => {
-                    log::debug!("Error while trying to mute process {}: {}", pid, err);
+                    log::debug!("Error while trying to mute process tree {}: {}", pid, err);
                 }
-                Ok(false) => {
-                    // Process session not found yet, continue retrying
-                }
+                _ => {}
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        log::debug!("Finished attempting to mute audio for process {}", pid);
+        log::debug!("Finished attempting to mute audio for process tree {}", pid);
     });
 }
 
-fn try_mute_process_audio(pid: u32) -> Result<bool, String> {
+fn get_process_tree(pid: u32) -> Vec<u32> {
+    let mut tree = vec![pid];
+    unsafe {
+        let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
+            Ok(s) => s,
+            Err(_) => return tree,
+        };
+
+        let mut entry = PROCESSENTRY32 {
+            dwSize: std::mem::size_of::<PROCESSENTRY32>() as u32,
+            ..Default::default()
+        };
+
+        if Process32First(snapshot, &mut entry).is_ok() {
+            loop {
+                if tree.contains(&entry.th32ParentProcessID) {
+                    if !tree.contains(&entry.th32ProcessID) {
+                        tree.push(entry.th32ProcessID);
+                    }
+                }
+                if Process32Next(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = windows::Win32::Foundation::CloseHandle(snapshot);
+    }
+    tree
+}
+
+fn try_mute_process_tree(pid: u32) -> Result<usize, String> {
+    let pids = get_process_tree(pid);
+    let mut muted_count = 0;
+
     unsafe {
         // Initialize COM for this thread
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -68,7 +104,6 @@ fn try_mute_process_audio(pid: u32) -> Result<bool, String> {
             .GetCount()
             .map_err(|e| format!("Failed to get session count: {e}"))?;
 
-        let mut found = false;
         for i in 0..count {
             let session = match session_enumerator.GetSession(i) {
                 Ok(s) => s,
@@ -80,19 +115,26 @@ fn try_mute_process_audio(pid: u32) -> Result<bool, String> {
                 Err(_) => continue,
             };
 
-            if session2.GetProcessId().unwrap_or(0) == pid {
+            let session_pid = session2.GetProcessId().unwrap_or(0);
+            if pids.contains(&session_pid) {
                 let volume: ISimpleAudioVolume = match session.cast() {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
-                if let Err(e) = volume.SetMute(true, std::ptr::null()) {
-                    log::warn!("Failed to mute session for process {}: {}", pid, e);
-                } else {
-                    found = true;
+                // Check if already muted to avoid spamming the system
+                if let Ok(is_muted) = volume.GetMute() {
+                    if !is_muted.as_bool() {
+                        if volume.SetMute(true, std::ptr::null()).is_ok() {
+                            muted_count += 1;
+                        }
+                    } else {
+                        // Already muted, count it anyway so the caller knows we are successful
+                        muted_count += 1;
+                    }
                 }
             }
         }
-        Ok(found)
+        Ok(muted_count)
     }
 }
 
