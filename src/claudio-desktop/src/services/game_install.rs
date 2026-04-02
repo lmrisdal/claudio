@@ -232,6 +232,7 @@ async fn install_game_inner(
             speed_limit_kbs: settings.download_speed_limit_kbs,
         },
         game.id,
+        game.title.as_str(),
         &temp_root,
         cancel_token,
     )
@@ -285,6 +286,7 @@ async fn download_package(
     app: &AppHandle,
     opts: &DownloadOptions<'_>,
     game_id: i32,
+    game_title: &str,
     temp_root: &Path,
     cancel_token: &Arc<AtomicBool>,
 ) -> Result<DownloadInfo, String> {
@@ -295,7 +297,7 @@ async fn download_package(
         game_id,
         "requestingTicket",
         Some(0.0),
-        Some("Requesting download ticket"),
+        Some("Requesting download"),
     );
 
     let auth_headers = build_headers(custom_headers, token)?;
@@ -410,7 +412,7 @@ async fn download_package(
                 game_id,
                 "downloading",
                 percent,
-                Some("Downloading game"),
+                Some(&format!("Downloading {}", game_title)),
                 Some(downloaded),
                 total_bytes,
             );
@@ -552,7 +554,7 @@ async fn install_installer(
         let installer =
             resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
 
-        emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer…"));
+        emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer. This may take a while…"));
         run_installer(&installer, &target_dir_owned)?;
 
         let _ = fs::remove_dir_all(&staging_dir);
