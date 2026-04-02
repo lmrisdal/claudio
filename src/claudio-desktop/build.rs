@@ -27,4 +27,5 @@ fn build_uninstaller() {
     // Tell Cargo to re-run this if the uninstaller source changes.
     println!("cargo:rerun-if-changed=../claudio-uninstaller/src/main.rs");
     println!("cargo:rerun-if-changed=../claudio-uninstaller/Cargo.toml");
+    println!("cargo:rerun-if-changed=../claudio-uninstaller/target/release/claudio-game-uninstaller.exe");
 }

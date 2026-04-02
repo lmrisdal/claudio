@@ -83,9 +83,9 @@ fn deploy_uninstaller(
     shortcut_path: &Path,
 ) -> Result<(), String> {
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
-    let source = resource_dir.join("uninstall.exe");
+    let source = resource_dir.join("claudio-game-uninstaller.exe");
     if !source.exists() {
-        return Err("Bundled uninstall.exe not found in resources".to_string());
+        return Err("Bundled claudio-game-uninstaller.exe not found in resources".to_string());
     }
 
     let dest = PathBuf::from(&game.install_path).join("uninstall.exe");
