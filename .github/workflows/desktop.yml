@@ -67,7 +67,7 @@ jobs:
           cd src/claudio-uninstaller
           cargo build --release --target ${{ matrix.uninstaller-target }}
           mkdir -p target/release
-          cp target/${{ matrix.uninstaller-target }}/release/uninstall.exe target/release/uninstall.exe
+          cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'

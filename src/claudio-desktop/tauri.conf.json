@@ -39,9 +39,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": {
-      "../claudio-uninstaller/target/release/claudio-game-uninstaller.exe": "claudio-game-uninstaller.exe"
-    },
     "windows": {
       "nsis": {
         "installMode": "both"
