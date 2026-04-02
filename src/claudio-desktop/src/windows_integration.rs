@@ -55,8 +55,8 @@ pub fn deregister(game: &InstalledGame) {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let _ = hkcu.delete_subkey_all(format!("{UNINSTALL_ROOT}\\{key_name}"));
 
-    let shortcut = start_menu_shortcut_path(&game.title);
-    let _ = fs::remove_file(shortcut);
+    let _ = fs::remove_file(start_menu_shortcut_path(&game.title));
+    let _ = fs::remove_file(desktop_shortcut_path(&game.title));
 }
 
 fn registry_key_name(remote_game_id: i32) -> String {
