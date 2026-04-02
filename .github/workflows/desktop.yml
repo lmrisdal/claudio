@@ -24,9 +24,11 @@ jobs:
           - platform: windows-latest
             args: --target x86_64-pc-windows-msvc
             rust-targets: ""
+            uninstaller-target: x86_64-pc-windows-msvc
           - platform: windows-latest
             args: --target aarch64-pc-windows-msvc
             rust-targets: aarch64-pc-windows-msvc
+            uninstaller-target: aarch64-pc-windows-msvc
           - platform: macos-latest
             args: --target universal-apple-darwin
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
@@ -57,6 +59,15 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src/claudio-desktop -> target
+
+      - name: Build uninstaller (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          cd src/claudio-uninstaller
+          cargo build --release --target ${{ matrix.uninstaller-target }}
+          mkdir -p target/release
+          cp target/${{ matrix.uninstaller-target }}/release/uninstall.exe target/release/uninstall.exe
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
