@@ -939,7 +939,8 @@ fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
-    let args = format!("/VERYSILENT /SUPPRESSMSGBOXES /DIR={target}");
+    // Quote the path so spaces in the install directory are handled correctly.
+    let args = format!("/VERYSILENT /SUPPRESSMSGBOXES \"/DIR={target}\"");
     let status = match std::process::Command::new(path)
         .arg("/VERYSILENT")
         .arg("/SUPPRESSMSGBOXES")
