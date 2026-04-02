@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   installGame,
@@ -20,14 +21,9 @@ interface SpeedState {
   sampleCount: number;
 }
 
-export function DownloadManagerProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [activeDownloads, setActiveDownloads] = useState<
-    Map<number, ActiveDownload>
-  >(new Map());
+export function DownloadManagerProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  const [activeDownloads, setActiveDownloads] = useState<Map<number, ActiveDownload>>(new Map());
   const speedState = useRef<Map<number, SpeedState>>(new Map());
 
   useEffect(() => {
@@ -43,18 +39,14 @@ export function DownloadManagerProvider({
       // React strict mode re-running updaters and corrupting the ref.
       let speedBps: number | null = null;
 
-      if (
-        progress.status === "downloading" &&
-        progress.bytesDownloaded != null
-      ) {
+      if (progress.status === "downloading" && progress.bytesDownloaded != null) {
         const now = performance.now();
         const prev = speedState.current.get(progress.gameId);
 
         if (prev) {
           const elapsed = (now - prev.lastTime) / 1000;
           if (elapsed >= 0.5 && progress.bytesDownloaded > prev.lastBytes) {
-            const instantSpeed =
-              (progress.bytesDownloaded - prev.lastBytes) / elapsed;
+            const instantSpeed = (progress.bytesDownloaded - prev.lastBytes) / elapsed;
             const count = prev.sampleCount + 1;
             // Skip the first sample (often a burst), use second as baseline
             if (count <= 1) {
@@ -97,6 +89,10 @@ export function DownloadManagerProvider({
         }
         return next;
       });
+
+      if (progress.status === "completed") {
+        void queryClient.invalidateQueries({ queryKey: ["installedGames"] });
+      }
     }).then((dispose) => {
       if (cancelled) {
         dispose();
@@ -109,7 +105,7 @@ export function DownloadManagerProvider({
       cancelled = true;
       unlisten?.();
     };
-  }, []);
+  }, [queryClient]);
 
   const startDownload = useCallback(
     async (game: DesktopInstallGameInput): Promise<InstalledGame> => {
@@ -170,8 +166,6 @@ export function DownloadManagerProvider({
   };
 
   return (
-    <DownloadManagerContext.Provider value={value}>
-      {children}
-    </DownloadManagerContext.Provider>
+    <DownloadManagerContext.Provider value={value}>{children}</DownloadManagerContext.Provider>
   );
 }

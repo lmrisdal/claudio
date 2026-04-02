@@ -70,14 +70,10 @@ export default function GuideOverlay({
     globalThis.dispatchEvent(new CustomEvent("claudio:open-account"));
   }
   const [visible, setVisible] = useState(false);
-  const [animState, setAnimState] = useState<
-    "entering" | "open" | "exiting" | "closed"
-  >("closed");
+  const [animState, setAnimState] = useState<"entering" | "open" | "exiting" | "closed">("closed");
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [tabDir, setTabDir] = useState<"left" | "right">("right");
-  const [focusZone, setFocusZone] = useState<
-    "tabs" | "menu" | "savestates" | "toolbar"
-  >("menu");
+  const [focusZone, setFocusZone] = useState<"tabs" | "menu" | "savestates" | "toolbar">("menu");
   const [focusIndex, setFocusIndex] = useState(0);
   const [tabFocusIndex, setTabFocusIndex] = useState(0);
   const [toolbarFocusIndex, setToolbarFocusIndex] = useState(0);
@@ -185,24 +181,19 @@ export default function GuideOverlay({
 
   const hasSaveStatesSection = activeTab === "nowplaying" && hasActiveGame;
   // Total navigable save slots: existing saves + 1 "New Save" button
-  const saveSlotCount = hasSaveStatesSection
-    ? (saveStates?.length ?? 0) + 1
-    : 0;
+  const saveSlotCount = hasSaveStatesSection ? (saveStates?.length ?? 0) + 1 : 0;
 
   const [savingState, setSavingState] = useState(false);
   const [loadingSlotId, setLoadingSlotId] = useState<number | null>(null);
   const [saveSlotFocusIndex, setSaveSlotFocusIndex] = useState(0);
-  const [expandedSlotIndex, setExpandedSlotIndex] = useState<number | null>(
-    null,
-  );
+  const [expandedSlotIndex, setExpandedSlotIndex] = useState<number | null>(null);
   const [actionFocusIndex, setActionFocusIndex] = useState(0);
   const saveSlotReferences = useRef<(HTMLButtonElement | null)[]>([]);
 
   const [overwriteSlotId, setOverwriteSlotId] = useState<number | null>(null);
 
   const deleteMutation = useMutation({
-    mutationFn: (saveId: number) =>
-      api.delete(`/games/${gameId}/save-states/${saveId}`),
+    mutationFn: (saveId: number) => api.delete(`/games/${gameId}/save-states/${saveId}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["saveStates", gameId] });
     },
@@ -261,9 +252,7 @@ export default function GuideOverlay({
       if (!gameId) return;
       setLoadingSlotId(saveId);
       try {
-        const stateData = await api.getBinary(
-          `/games/${gameId}/save-states/${saveId}/state`,
-        );
+        const stateData = await api.getBinary(`/games/${gameId}/save-states/${saveId}/state`);
         onLoadState(stateData);
         onClose();
       } finally {
@@ -575,10 +564,7 @@ export default function GuideOverlay({
           if (expandedSlotIndex !== null) {
             setActionFocusIndex((previous) => Math.min(2, previous + 1));
             void sounds.navigate();
-          } else if (
-            saveSlotFocusIndex % 2 === 0 &&
-            saveSlotFocusIndex + 1 < saveSlotCount
-          ) {
+          } else if (saveSlotFocusIndex % 2 === 0 && saveSlotFocusIndex + 1 < saveSlotCount) {
             focusSaveSlot(saveSlotFocusIndex + 1);
           }
 
@@ -686,9 +672,7 @@ export default function GuideOverlay({
       {/* Backdrop */}
       <div
         className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity ${exiting ? "opacity-0" : "opacity-100 animate-[fadeIn_200ms_ease-out]"}`}
-        style={
-          exiting ? { transitionDuration: `${ANIM_DURATION}ms` } : undefined
-        }
+        style={exiting ? { transitionDuration: `${ANIM_DURATION}ms` } : undefined}
         onClick={onClose}
       />
 
@@ -834,13 +818,9 @@ export default function GuideOverlay({
                         createdAt={save.createdAt}
                         isLoading={loadingSlotId === save.id}
                         isExpanded={expandedSlotIndex === index}
-                        activeActionIndex={
-                          expandedSlotIndex === index ? actionFocusIndex : 0
-                        }
+                        activeActionIndex={expandedSlotIndex === index ? actionFocusIndex : 0}
                         onToggleExpand={() => {
-                          setExpandedSlotIndex((previous) =>
-                            previous === index ? null : index,
-                          );
+                          setExpandedSlotIndex((previous) => (previous === index ? null : index));
                           setActionFocusIndex(0);
                         }}
                         onCollapse={() => setExpandedSlotIndex(null)}

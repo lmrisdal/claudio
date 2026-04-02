@@ -1,21 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import { isDesktop } from "../hooks/use-desktop";
 import { DesktopSettingsDialogContext } from "../hooks/use-desktop-settings";
 import DesktopSettingsDialog from "./desktop-settings-dialog";
 
-export default function DesktopSettingsProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function DesktopSettingsProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const open = useCallback(() => setIsOpen(true), []);

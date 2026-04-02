@@ -60,8 +60,7 @@ async function tryRefreshToken(): Promise<string | null> {
     const data = await res.json();
     const newToken: string = data.access_token;
     localStorage.setItem("token", newToken);
-    if (data.refresh_token)
-      localStorage.setItem("refresh_token", data.refresh_token);
+    if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
     return newToken;
   } catch {
     return null;
@@ -96,8 +95,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
           headers: retryHeaders,
         });
         if (retryRes.ok) {
-          if (retryRes.status === 204 || retryRes.status === 202)
-            return undefined as T;
+          if (retryRes.status === 204 || retryRes.status === 202) return undefined as T;
           return retryRes.json();
         }
       }
@@ -118,10 +116,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-async function requestBinary(
-  path: string,
-  init?: RequestInit,
-): Promise<ArrayBuffer> {
+async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
   const token = localStorage.getItem("token");
   const headers: HeadersInit = {
     ...getCustomHeaders(),
@@ -170,11 +165,7 @@ export const api = {
     form.append("file", file);
     return request<T>(path, { method: "POST", body: form });
   },
-  uploadBinary: <T>(
-    path: string,
-    files: Record<string, Blob>,
-    method: "POST" | "PUT" = "POST",
-  ) => {
+  uploadBinary: <T>(path: string, files: Record<string, Blob>, method: "POST" | "PUT" = "POST") => {
     const form = new FormData();
     for (const [name, blob] of Object.entries(files)) {
       form.append(name, blob);

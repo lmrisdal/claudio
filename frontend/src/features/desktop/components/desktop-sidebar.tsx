@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import {
+  cancelInstall,
   isDesktop,
   listInstalledGames,
   openInstallFolder,
@@ -26,14 +27,10 @@ export default function DesktopSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSED_KEY) === "true",
-  );
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "true");
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem(WIDTH_KEY);
-    return saved
-      ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Number(saved)))
-      : DEFAULT_WIDTH;
+    return saved ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Number(saved))) : DEFAULT_WIDTH;
   });
   const isResizing = useRef(false);
   const [dragging, setDragging] = useState(false);
@@ -43,6 +40,7 @@ export default function DesktopSidebar() {
     gameId: number;
     x: number;
     y: number;
+    type: "installed" | "installing";
   } | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<{
     id: number;
@@ -54,6 +52,7 @@ export default function DesktopSidebar() {
     queryFn: listInstalledGames,
     refetchInterval: 30_000,
   });
+  const { activeDownloads } = useDownloadManager();
 
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, String(collapsed));
@@ -84,9 +83,7 @@ export default function DesktopSidebar() {
   ];
 
   const isActive = (path: string) =>
-    path === "/"
-      ? location.pathname === "/"
-      : location.pathname.startsWith(path);
+    path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   const onResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -98,10 +95,7 @@ export default function DesktopSidebar() {
 
       function onMouseMove(e: MouseEvent) {
         if (!isResizing.current) return;
-        const newWidth = Math.max(
-          MIN_WIDTH,
-          Math.min(MAX_WIDTH, startWidth + e.clientX - startX),
-        );
+        const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + e.clientX - startX));
         setWidth(newWidth);
       }
 
@@ -167,11 +161,7 @@ export default function DesktopSidebar() {
 
         {/* Settings button */}
         <button
-          onClick={() =>
-            globalThis.dispatchEvent(
-              new CustomEvent("claudio:open-desktop-settings"),
-            )
-          }
+          onClick={() => globalThis.dispatchEvent(new CustomEvent("claudio:open-desktop-settings"))}
           className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised/50 ${
             collapsed ? "justify-center p-2.5" : "px-3 py-2"
           }`}
@@ -195,74 +185,146 @@ export default function DesktopSidebar() {
           </div>
         )}
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 space-y-1.5 scrollbar-thin">
-          {installedGames.length === 0
-            ? !collapsed && (
-                <p className="px-2 text-xs text-text-muted italic">
-                  No games installed
-                </p>
-              )
-            : installedGames.map((installed) => {
-                const cover = installed.coverUrl;
-                const active =
-                  location.pathname === `/games/${installed.remoteGameId}`;
+          {installedGames.length === 0 && activeDownloads.size === 0 ? (
+            !collapsed && <p className="px-2 text-xs text-text-muted italic">No games installed</p>
+          ) : (
+            <>
+              {[...activeDownloads.values()].map(({ game, progress }) => {
+                const percent = typeof progress.percent === "number" ? progress.percent : null;
+                const active = location.pathname === `/games/${game.id}`;
                 return (
                   <Link
-                    key={installed.remoteGameId}
-                    to={`/games/${installed.remoteGameId}`}
+                    key={`installing-${game.id}`}
+                    to={`/games/${game.id}`}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setContextMenu({
-                        gameId: installed.remoteGameId,
+                        gameId: game.id,
                         x: e.clientX,
                         y: e.clientY,
+                        type: "installing",
                       });
                     }}
-                    className={`flex items-center gap-2.5 rounded-lg transition ${
+                    className={`relative flex items-center gap-2.5 rounded-lg overflow-hidden transition ${
                       collapsed ? "justify-center p-1.5" : "px-2 py-1.5"
                     } ${
                       active
                         ? "bg-surface-raised text-text-primary"
                         : "text-text-secondary hover:text-text-primary hover:bg-surface-raised/50"
                     }`}
-                    title={installed.title}
+                    title={game.title}
                   >
-                    {cover ? (
-                      <img
-                        src={cover}
-                        alt=""
-                        className={`rounded object-cover shrink-0 ${
-                          collapsed ? "w-8 h-10" : "w-7 h-9"
-                        }`}
-                      />
-                    ) : (
+                    {/* Progress bar spanning the full entry width */}
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/30">
                       <div
-                        className={`rounded bg-surface-raised flex items-center justify-center shrink-0 ${
-                          collapsed ? "w-8 h-10" : "w-7 h-9"
-                        }`}
-                      >
-                        <svg
-                          className="w-3 h-3 text-text-muted"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.401.604-.401.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z"
-                          />
-                        </svg>
-                      </div>
-                    )}
+                        className="h-full bg-accent transition-all duration-300"
+                        style={{ width: `${percent ?? 0}%` }}
+                      />
+                    </div>
+                    <div
+                      className={`rounded overflow-hidden shrink-0 ${
+                        collapsed ? "w-8 h-10" : "w-7 h-9"
+                      }`}
+                    >
+                      {game.coverUrl ? (
+                        <img src={game.coverUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-surface-raised flex items-center justify-center">
+                          <svg
+                            className="w-3 h-3 text-text-muted animate-spin"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="3"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                     {!collapsed && (
-                      <span className="text-xs truncate">
-                        {installed.title}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-xs truncate block">{game.title}</span>
+                        <span className="text-[10px] text-text-muted leading-tight">
+                          {percent === null ? "Preparing\u2026" : `${Math.round(percent)}%`}
+                        </span>
+                      </div>
                     )}
                   </Link>
                 );
               })}
+              {installedGames
+                .filter((g) => !activeDownloads.has(g.remoteGameId))
+                .map((installed) => {
+                  const cover = installed.coverUrl;
+                  const active = location.pathname === `/games/${installed.remoteGameId}`;
+                  return (
+                    <Link
+                      key={installed.remoteGameId}
+                      to={`/games/${installed.remoteGameId}`}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          gameId: installed.remoteGameId,
+                          x: e.clientX,
+                          y: e.clientY,
+                          type: "installed",
+                        });
+                      }}
+                      className={`flex items-center gap-2.5 rounded-lg transition ${
+                        collapsed ? "justify-center p-1.5" : "px-2 py-1.5"
+                      } ${
+                        active
+                          ? "bg-surface-raised text-text-primary"
+                          : "text-text-secondary hover:text-text-primary hover:bg-surface-raised/50"
+                      }`}
+                      title={installed.title}
+                    >
+                      {cover ? (
+                        <img
+                          src={cover}
+                          alt=""
+                          className={`rounded object-cover shrink-0 ${
+                            collapsed ? "w-8 h-10" : "w-7 h-9"
+                          }`}
+                        />
+                      ) : (
+                        <div
+                          className={`rounded bg-surface-raised flex items-center justify-center shrink-0 ${
+                            collapsed ? "w-8 h-10" : "w-7 h-9"
+                          }`}
+                        >
+                          <svg
+                            className="w-3 h-3 text-text-muted"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.401.604-.401.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                      {!collapsed && <span className="text-xs truncate">{installed.title}</span>}
+                    </Link>
+                  );
+                })}
+            </>
+          )}
         </div>
       </div>
 
@@ -293,7 +355,7 @@ export default function DesktopSidebar() {
         </button>
       </div>
 
-      {/* Context menu for installed games */}
+      {/* Context menu for installed / installing games */}
       {contextMenu && (
         <SidebarContextMenu
           x={contextMenu.x}
@@ -303,20 +365,34 @@ export default function DesktopSidebar() {
             void navigate(`/games/${contextMenu.gameId}`);
             setContextMenu(null);
           }}
-          onOpenFolder={() => {
-            void openInstallFolder(contextMenu.gameId);
-            setContextMenu(null);
-          }}
-          onUninstall={() => {
-            const game = installedGames.find(
-              (g) => g.remoteGameId === contextMenu.gameId,
-            );
-            setUninstallTarget({
-              id: contextMenu.gameId,
-              title: game?.title ?? "this game",
-            });
-            setContextMenu(null);
-          }}
+          onOpenFolder={
+            contextMenu.type === "installed"
+              ? () => {
+                  void openInstallFolder(contextMenu.gameId);
+                  setContextMenu(null);
+                }
+              : undefined
+          }
+          onUninstall={
+            contextMenu.type === "installed"
+              ? () => {
+                  const game = installedGames.find((g) => g.remoteGameId === contextMenu.gameId);
+                  setUninstallTarget({
+                    id: contextMenu.gameId,
+                    title: game?.title ?? "this game",
+                  });
+                  setContextMenu(null);
+                }
+              : undefined
+          }
+          onCancelInstall={
+            contextMenu.type === "installing"
+              ? () => {
+                  void cancelInstall(contextMenu.gameId);
+                  setContextMenu(null);
+                }
+              : undefined
+          }
         />
       )}
 

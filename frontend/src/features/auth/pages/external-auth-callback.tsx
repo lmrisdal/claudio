@@ -32,10 +32,7 @@ export default function ExternalAuthCallback() {
       .catch((error) => {
         void navigate(
           `/login?${new URLSearchParams({
-            error:
-              error instanceof Error
-                ? error.message
-                : `${providerName} login failed`,
+            error: error instanceof Error ? error.message : `${providerName} login failed`,
           })}`,
           { replace: true },
         );

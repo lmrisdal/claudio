@@ -27,16 +27,14 @@ function formatSize(bytes: number): string {
 
 export default function Library() {
   const navigate = useNavigate();
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(
-    () => {
-      try {
-        const saved = localStorage.getItem("library-platforms");
-        return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
-      } catch {
-        return new Set();
-      }
-    },
-  );
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("library-platforms");
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [platformOrder, setPlatformOrder] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem("library-platform-order");
@@ -50,9 +48,7 @@ export default function Library() {
   const [view, setView] = useState<ViewMode>(
     () => (localStorage.getItem("library-view") as ViewMode) || "grouped",
   );
-  const [sortBy, setSortBy] = useState<"platform" | "title" | "year" | "size">(
-    "title",
-  );
+  const [sortBy, setSortBy] = useState<"platform" | "title" | "year" | "size">("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   function toggleSort(col: typeof sortBy) {
@@ -78,8 +74,7 @@ export default function Library() {
     queryFn: () => api.get<TasksStatus>("/admin/tasks/status"),
     enabled: false,
   });
-  const hasActiveTasks =
-    tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning;
+  const hasActiveTasks = tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning;
 
   const { data: games = [], isLoading } = useQuery({
     queryKey: ["games"],
@@ -93,9 +88,7 @@ export default function Library() {
   const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
     const grid = gridReference.current;
     if (!grid) return;
-    const firstElement = grid.querySelector<HTMLElement>(
-      "[data-group-toggle], a",
-    );
+    const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
     switch (e.key) {
       case "ArrowDown":
       case "ArrowRight": {
@@ -118,9 +111,7 @@ export default function Library() {
     if (e.key !== "ArrowDown") return;
     const grid = gridReference.current;
     if (!grid) return;
-    const firstElement = grid.querySelector<HTMLElement>(
-      "[data-group-toggle], a",
-    );
+    const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
     if (firstElement) {
       e.preventDefault();
       focusVisible(firstElement);
@@ -136,8 +127,7 @@ export default function Library() {
 
   const saveGridFocus = useCallback(() => {
     const active = document.activeElement as HTMLElement;
-    const gameId =
-      active?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
+    const gameId = active?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
     if (gameId) lastFocusedGameId = gameId;
   }, []);
 
@@ -148,8 +138,7 @@ export default function Library() {
         void sounds.select();
         return;
       }
-      if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key))
-        return;
+      if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) return;
 
       // Throttle held keys with acceleration (gamepad handles its own throttle)
       if (e.repeat && !isGamepadEvent) {
@@ -182,9 +171,7 @@ export default function Library() {
 
       // Handle navigation from a group toggle button
       if (Object.hasOwn(activeElement.dataset, "groupToggle")) {
-        const toggles = [
-          ...grid.querySelectorAll<HTMLElement>("[data-group-toggle]"),
-        ];
+        const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
         const toggleIndex = toggles.indexOf(activeElement);
         const section = activeElement.closest("section");
 
@@ -208,22 +195,17 @@ export default function Library() {
             e.preventDefault();
             if (toggleIndex > 0) {
               // Go to previous group's last row first column, or previous toggle if collapsed
-              const previousSection =
-                toggles[toggleIndex - 1].closest("section");
-              const previousGrid =
-                previousSection?.querySelector<HTMLElement>(".grid");
+              const previousSection = toggles[toggleIndex - 1].closest("section");
+              const previousGrid = previousSection?.querySelector<HTMLElement>(".grid");
               const previousLinks = previousGrid
                 ? [...previousGrid.querySelectorAll<HTMLElement>("a")]
                 : [];
               if (previousLinks.length > 0) {
                 const previousCols = previousGrid
-                  ? getComputedStyle(previousGrid).gridTemplateColumns?.split(
-                      " ",
-                    ).length || 1
+                  ? getComputedStyle(previousGrid).gridTemplateColumns?.split(" ").length || 1
                   : 1;
                 const lastRowStart =
-                  Math.floor((previousLinks.length - 1) / previousCols) *
-                  previousCols;
+                  Math.floor((previousLinks.length - 1) / previousCols) * previousCols;
                 focusVisible(previousLinks[lastRowStart]);
               } else {
                 focusVisible(toggles[toggleIndex - 1]);
@@ -244,10 +226,7 @@ export default function Library() {
               setCollapsedGroups((previous) => {
                 const next = new Set(previous);
                 next.delete(platform);
-                localStorage.setItem(
-                  "library-collapsed",
-                  JSON.stringify([...next]),
-                );
+                localStorage.setItem("library-collapsed", JSON.stringify([...next]));
                 return next;
               });
               void sounds.select();
@@ -260,10 +239,7 @@ export default function Library() {
             if (!collapsedGroups.has(platform)) {
               setCollapsedGroups((previous) => {
                 const next = new Set([...previous, platform]);
-                localStorage.setItem(
-                  "library-collapsed",
-                  JSON.stringify([...next]),
-                );
+                localStorage.setItem("library-collapsed", JSON.stringify([...next]));
                 return next;
               });
               void sounds.select();
@@ -280,9 +256,7 @@ export default function Library() {
 
       // Find the nearest CSS grid container for accurate column count and scoped navigation
       const gridContainer = activeElement.closest<HTMLElement>(".grid") ?? grid;
-      const cols =
-        getComputedStyle(gridContainer).gridTemplateColumns?.split(" ")
-          .length || 1;
+      const cols = getComputedStyle(gridContainer).gridTemplateColumns?.split(" ").length || 1;
       const scopedLinks = [...gridContainer.querySelectorAll<HTMLElement>("a")];
       const scopedIndex = scopedLinks.indexOf(activeElement);
       let nextIndex = -1;
@@ -315,26 +289,19 @@ export default function Library() {
             void sounds.navigate();
           } else {
             const currentCol = scopedIndex % cols;
-            const lastRowStart =
-              Math.floor((scopedLinks.length - 1) / cols) * cols;
+            const lastRowStart = Math.floor((scopedLinks.length - 1) / cols) * cols;
             const currentRowStart = Math.floor(scopedIndex / cols) * cols;
             if (currentRowStart < lastRowStart) {
               // Not on the last row yet — go to same column on last row
-              const target = Math.min(
-                lastRowStart + currentCol,
-                scopedLinks.length - 1,
-              );
+              const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1);
               e.preventDefault();
               focusVisible(scopedLinks[target]);
               void sounds.navigate();
             } else {
               // On the last row — jump to next group's toggle button
               const section = activeElement.closest("section");
-              const nextSection =
-                section?.nextElementSibling as HTMLElement | null;
-              const nextToggle = nextSection?.querySelector<HTMLElement>(
-                "[data-group-toggle]",
-              );
+              const nextSection = section?.nextElementSibling as HTMLElement | null;
+              const nextToggle = nextSection?.querySelector<HTMLElement>("[data-group-toggle]");
               if (nextToggle) {
                 e.preventDefault();
                 focusVisible(nextToggle);
@@ -354,9 +321,7 @@ export default function Library() {
           } else {
             // On first row — go to this group's toggle button
             const section = activeElement.closest("section");
-            const toggle = section?.querySelector<HTMLElement>(
-              "[data-group-toggle]",
-            );
+            const toggle = section?.querySelector<HTMLElement>("[data-group-toggle]");
             if (toggle) {
               e.preventDefault();
               focusVisible(toggle);
@@ -380,16 +345,12 @@ export default function Library() {
   const jumpGroup = useCallback((direction: 1 | -1) => {
     const grid = gridReference.current;
     if (!grid) return;
-    const toggles = [
-      ...grid.querySelectorAll<HTMLElement>("[data-group-toggle]"),
-    ];
+    const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
     if (toggles.length === 0) return;
     const activeElement = document.activeElement as HTMLElement;
     // Find which group the active element belongs to
     const currentSection = activeElement?.closest("section");
-    const currentToggle = currentSection?.querySelector<HTMLElement>(
-      "[data-group-toggle]",
-    );
+    const currentToggle = currentSection?.querySelector<HTMLElement>("[data-group-toggle]");
     const currentIndex = currentToggle ? toggles.indexOf(currentToggle) : -1;
     let targetIndex: number;
     if (currentIndex === -1) {
@@ -411,12 +372,9 @@ export default function Library() {
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
-      if (
-        !(e.target as HTMLElement).closest('a, button, input, [role="listbox"]')
-      ) {
+      if (!(e.target as HTMLElement).closest('a, button, input, [role="listbox"]')) {
         e.preventDefault();
-        if (focusAnchorReference.current)
-          focusVisible(focusAnchorReference.current, true);
+        if (focusAnchorReference.current) focusVisible(focusAnchorReference.current, true);
       }
     }
     document.addEventListener("mousedown", handleMouseDown);
@@ -432,8 +390,7 @@ export default function Library() {
   ];
 
   const filtered = games.filter((g) => {
-    if (selectedPlatforms.size > 0 && !selectedPlatforms.has(g.platform))
-      return false;
+    if (selectedPlatforms.size > 0 && !selectedPlatforms.has(g.platform)) return false;
     return true;
   });
 
@@ -505,24 +462,19 @@ export default function Library() {
           focusVisible(link);
           link.scrollIntoView({ block: "center" });
         } else {
-          if (focusAnchorReference.current)
-            focusVisible(focusAnchorReference.current, true);
+          if (focusAnchorReference.current) focusVisible(focusAnchorReference.current, true);
         }
       });
       return;
     }
-    if (focusAnchorReference.current)
-      focusVisible(focusAnchorReference.current, true);
+    if (focusAnchorReference.current) focusVisible(focusAnchorReference.current, true);
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
   return (
     <main className="max-w-7xl mx-auto px-6 py-8 flex-1 flex flex-col w-full">
       {/* Toolbar */}
-      <div
-        className="flex gap-3 mb-8 items-center"
-        onKeyDown={handleToolbarKeyDown}
-      >
+      <div className="flex gap-3 mb-8 items-center" onKeyDown={handleToolbarKeyDown}>
         <div className="relative min-w-40" ref={platformDropdownReference}>
           <button
             onClick={() => setPlatformDropdownOpen((v) => !v)}
@@ -569,10 +521,7 @@ export default function Library() {
                       const next = new Set(previous);
                       if (next.has(p)) next.delete(p);
                       else next.add(p);
-                      localStorage.setItem(
-                        "library-platforms",
-                        JSON.stringify([...next]),
-                      );
+                      localStorage.setItem("library-platforms", JSON.stringify([...next]));
                       return next;
                     });
                   }}
@@ -724,10 +673,8 @@ export default function Library() {
       {!isLoading && (
         <p className="text-xs text-text-muted mb-4 font-mono">
           {filtered.length} {filtered.length === 1 ? "game" : "games"}
-          {selectedPlatforms.size === 1 &&
-            ` in ${formatPlatform([...selectedPlatforms][0])}`}
-          {selectedPlatforms.size > 1 &&
-            ` across ${selectedPlatforms.size} platforms`}
+          {selectedPlatforms.size === 1 && ` in ${formatPlatform([...selectedPlatforms][0])}`}
+          {selectedPlatforms.size > 1 && ` across ${selectedPlatforms.size} platforms`}
         </p>
       )}
 
@@ -788,11 +735,7 @@ export default function Library() {
           ))}
         </div>
       ) : view === "grouped" ? (
-        <div
-          ref={gridReference}
-          onKeyDown={handleGridKeyDown}
-          onClick={saveGridFocus}
-        >
+        <div ref={gridReference} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
           {Object.entries(grouped).map(([p, games]) => (
             <section key={p} className="mb-10">
               <button
@@ -802,10 +745,7 @@ export default function Library() {
                     const next = new Set(previous);
                     if (next.has(p)) next.delete(p);
                     else next.add(p);
-                    localStorage.setItem(
-                      "library-collapsed",
-                      JSON.stringify([...next]),
-                    );
+                    localStorage.setItem("library-collapsed", JSON.stringify([...next]));
                     return next;
                   })
                 }
@@ -825,9 +765,7 @@ export default function Library() {
                   />
                 </svg>
                 {formatPlatform(p)}
-                <span className="text-text-muted font-normal text-sm">
-                  ({games.length})
-                </span>
+                <span className="text-text-muted font-normal text-sm">({games.length})</span>
               </button>
               {!collapsedGroups.has(p) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -840,11 +778,7 @@ export default function Library() {
           ))}
         </div>
       ) : (
-        <div
-          ref={gridReference}
-          onKeyDown={handleGridKeyDown}
-          onClick={saveGridFocus}
-        >
+        <div ref={gridReference} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
           <table className="w-full text-sm table-fixed">
             <colgroup>
               <col className="w-25" />
@@ -872,24 +806,18 @@ export default function Library() {
                       className="hover:text-text-primary transition-colors inline-flex items-center gap-1"
                     >
                       {col.charAt(0).toUpperCase() + col.slice(1)}
-                      {sortBy === col && (
-                        <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
-                      )}
+                      {sortBy === col && <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span>}
                     </button>
                   </th>
                 ))}
-                <th className="pb-2 pr-4 font-medium hidden lg:table-cell">
-                  Genre
-                </th>
+                <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Genre</th>
                 <th className="pb-2 pr-3 text-right font-medium hidden sm:table-cell">
                   <button
                     onClick={() => toggleSort("size")}
                     className="hover:text-text-primary transition-colors inline-flex items-center gap-1 ml-auto"
                   >
                     Size
-                    {sortBy === "size" && (
-                      <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
-                    )}
+                    {sortBy === "size" && <span>{sortDir === "asc" ? "\u2191" : "\u2193"}</span>}
                   </button>
                 </th>
                 <th className="pb-2 pr-3"></th>

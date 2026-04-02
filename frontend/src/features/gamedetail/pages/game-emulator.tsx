@@ -5,11 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api, resolveServerUrl } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { useGuide } from "../../core/hooks/use-guide";
-import {
-  matchKey,
-  useGamepadEvent,
-  useShortcut,
-} from "../../core/hooks/use-shortcut";
+import { matchKey, useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 import { isEmulatorFullscreenEnabled } from "../../core/utils/preferences";
@@ -62,9 +58,7 @@ export default function GameEmulator() {
     enabled: Boolean(id),
   });
 
-  const [previousPreferredPath, setPreviousPreferredPath] = useState<
-    string | undefined
-  >();
+  const [previousPreferredPath, setPreviousPreferredPath] = useState<string | undefined>();
   if (emulation?.preferredPath !== previousPreferredPath) {
     setPreviousPreferredPath(emulation?.preferredPath);
     if (emulation?.preferredPath && !selectedPath) {
@@ -138,18 +132,13 @@ export default function GameEmulator() {
 
   const handleSaveState = useCallback(() => {
     setSavingState(true);
-    iframeReference.current?.contentWindow?.postMessage(
-      { type: "claudio:requestSaveState" },
-      "*",
-    );
+    iframeReference.current?.contentWindow?.postMessage({ type: "claudio:requestSaveState" }, "*");
   }, []);
 
   const handleLoadState = useCallback(
     async (saveId: number) => {
       if (!gameId) return;
-      const stateData = await api.getBinary(
-        `/games/${gameId}/save-states/${saveId}/state`,
-      );
+      const stateData = await api.getBinary(`/games/${gameId}/save-states/${saveId}/state`);
       iframeReference.current?.contentWindow?.postMessage(
         {
           type: "claudio:loadState",
@@ -261,8 +250,7 @@ export default function GameEmulator() {
 
   const focusNav = useCallback((index: number) => {
     const items = [
-      ...(pageReference.current?.querySelectorAll<HTMLElement>("[data-nav]") ??
-        []),
+      ...(pageReference.current?.querySelectorAll<HTMLElement>("[data-nav]") ?? []),
     ].filter(
       (element) =>
         !element.hasAttribute("disabled") &&
@@ -328,11 +316,7 @@ export default function GameEmulator() {
   const hasQueuedSelection = Boolean(frameUrl) && activePath !== selectedPath;
 
   return (
-    <div
-      ref={pageReference}
-      className="min-h-screen bg-grid"
-      onKeyDown={handleNavKeyDown}
-    >
+    <div ref={pageReference} className="min-h-screen bg-grid" onKeyDown={handleNavKeyDown}>
       <div className="mx-auto max-w-7xl px-6 pb-8 space-y-6">
         <div
           ref={focusAnchorReference}
@@ -470,21 +454,17 @@ export default function GameEmulator() {
               hasQueuedSelection) && (
               <div className="space-y-2">
                 {sessionMutation.isPending && (
-                  <p className="text-sm text-text-secondary">
-                    Preparing emulator...
-                  </p>
+                  <p className="text-sm text-text-secondary">Preparing emulator...</p>
                 )}
                 {hasQueuedSelection && (
                   <p className="text-sm text-accent">
-                    The selected ROM changed. Restart the emulator to switch to
-                    it.
+                    The selected ROM changed. Restart the emulator to switch to it.
                   </p>
                 )}
                 {emulation.requiresThreads && (
                   <p className="text-xs leading-relaxed text-amber-300">
-                    This core benefits from `SharedArrayBuffer` support. If it
-                    fails to boot in your browser, start with a simpler core or
-                    add cross-origin isolation headers later.
+                    This core benefits from `SharedArrayBuffer` support. If it fails to boot in your
+                    browser, start with a simpler core or add cross-origin isolation headers later.
                   </p>
                 )}
                 {sessionMutation.isError && (
@@ -538,16 +518,10 @@ export default function GameEmulator() {
                           onClick={startEmulation}
                           className="inline-flex items-center gap-3 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg) disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <svg
-                            className="h-5 w-5"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                          >
+                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5.14v13.72c0 .79.87 1.27 1.54.84l10.28-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z" />
                           </svg>
-                          {sessionMutation.isPending
-                            ? "Starting..."
-                            : "Press Start to Play"}
+                          {sessionMutation.isPending ? "Starting..." : "Press Start to Play"}
                         </button>
                       </div>
                     </div>
@@ -558,8 +532,7 @@ export default function GameEmulator() {
           </>
         ) : (
           <div className="rounded-2xl bg-red-500/10 p-5 text-sm text-red-300 ring-1 ring-red-500/30">
-            {emulation.reason ??
-              "This game is not ready for in-browser emulation."}
+            {emulation.reason ?? "This game is not ready for in-browser emulation."}
           </div>
         )}
       </div>

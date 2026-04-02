@@ -104,12 +104,7 @@ export default function InstallDialog({
 
               {showExePicker && (
                 <div className="mt-4">
-                  <ExeListbox
-                    label={exeLabel}
-                    value={exe}
-                    onChange={setExe}
-                    options={exeOptions}
-                  />
+                  <ExeListbox label={exeLabel} value={exe} onChange={setExe} options={exeOptions} />
                 </div>
               )}
 
@@ -135,7 +130,13 @@ export default function InstallDialog({
               Cancel
             </button>
             <button
-              onClick={() => onConfirm(installPath || undefined, exe || undefined, isPortable ? desktopShortcut : undefined)}
+              onClick={() =>
+                onConfirm(
+                  installPath || undefined,
+                  exe || undefined,
+                  isPortable ? desktopShortcut : undefined,
+                )
+              }
               disabled={!canInstall}
               className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-neutral-950 hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >

@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useShortcut } from "../../core/hooks/use-shortcut";
-import {
-  getSettings,
-  updateSettings,
-  type DesktopSettings,
-} from "../hooks/use-desktop";
+import { getSettings, updateSettings, type DesktopSettings } from "../hooks/use-desktop";
 
 export default function DesktopSettingsDialog({
   open,
@@ -28,8 +24,7 @@ export default function DesktopSettingsDialog({
   // Load settings when opened
   useEffect(() => {
     if (!open) return;
-    previousFocusReference.current =
-      document.activeElement as HTMLElement | null;
+    previousFocusReference.current = document.activeElement as HTMLElement | null;
     void getSettings().then((s) => {
       setSettings(s);
       setServerUrl(s.serverUrl ?? "");
@@ -122,15 +117,11 @@ export default function DesktopSettingsDialog({
       };
       await updateSettings(updated);
       localStorage.setItem("claudio_server_url", trimmedUrl);
-      localStorage.setItem(
-        "claudio_custom_headers",
-        JSON.stringify(customHeaders),
-      );
+      localStorage.setItem("claudio_custom_headers", JSON.stringify(customHeaders));
 
       const serverChanged = trimmedUrl !== (settings.serverUrl ?? "");
       const headersChanged =
-        JSON.stringify(customHeaders) !==
-        JSON.stringify(settings.customHeaders ?? {});
+        JSON.stringify(customHeaders) !== JSON.stringify(settings.customHeaders ?? {});
       if (serverChanged || headersChanged) {
         globalThis.location.reload();
         return;
@@ -146,10 +137,7 @@ export default function DesktopSettingsDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-lg mx-4 bg-surface border border-border rounded-xl shadow-2xl"
@@ -158,9 +146,7 @@ export default function DesktopSettingsDialog({
         aria-label="Desktop Settings"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-text-primary">
-            Desktop Settings
-          </h2>
+          <h2 className="text-base font-semibold text-text-primary">Desktop Settings</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
@@ -173,11 +159,7 @@ export default function DesktopSettingsDialog({
               stroke="currentColor"
               strokeWidth={2}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -228,12 +210,9 @@ export default function DesktopSettingsDialog({
               className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-accent focus:ring-2 focus:ring-accent"
             />
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-text-primary">
-                Close to tray
-              </span>
+              <span className="block text-sm font-medium text-text-primary">Close to tray</span>
               <span className="block text-xs text-text-muted mt-1">
-                Keep Claudio running in the system tray when the window is
-                closed.
+                Keep Claudio running in the system tray when the window is closed.
               </span>
             </span>
           </label>
@@ -273,11 +252,7 @@ export default function DesktopSettingsDialog({
                 stroke="currentColor"
                 strokeWidth={2}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
               Custom headers
             </button>
@@ -311,11 +286,7 @@ export default function DesktopSettingsDialog({
                     />
                     <button
                       type="button"
-                      onClick={() =>
-                        setHeaders(
-                          headers.filter((_, index_) => index_ !== index),
-                        )
-                      }
+                      onClick={() => setHeaders(headers.filter((_, index_) => index_ !== index))}
                       className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
                       aria-label="Remove header"
                     >
@@ -337,9 +308,7 @@ export default function DesktopSettingsDialog({
                 ))}
                 <button
                   type="button"
-                  onClick={() =>
-                    setHeaders([...headers, { name: "", value: "" }])
-                  }
+                  onClick={() => setHeaders([...headers, { name: "", value: "" }])}
                   className="text-xs text-accent hover:text-accent-hover transition"
                 >
                   + Add header

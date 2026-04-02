@@ -26,9 +26,7 @@ export default function Register() {
       await register(username, password);
       void navigate("/");
     } catch (error_) {
-      setError(
-        error_ instanceof Error ? error_.message : "Registration failed",
-      );
+      setError(error_ instanceof Error ? error_.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -121,9 +119,7 @@ export default function Register() {
               {providers.localLoginEnabled && providers.userCreationEnabled && (
                 <div className="my-4 flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs uppercase tracking-[0.2em] text-text-muted">
-                    or
-                  </span>
+                  <span className="text-xs uppercase tracking-[0.2em] text-text-muted">or</span>
                   <div className="h-px flex-1 bg-border" />
                 </div>
               )}
@@ -157,25 +153,21 @@ export default function Register() {
 
           {!providers.userCreationEnabled && providers.providers.length > 0 && (
             <p className="text-sm text-text-muted">
-              New accounts are disabled. Sign in with an existing external
-              account.
+              New accounts are disabled. Sign in with an existing external account.
             </p>
           )}
 
-          {!providers.userCreationEnabled &&
-            providers.providers.length === 0 && (
-              <p className="text-sm text-text-muted">
-                User creation is disabled and no external providers are
-                configured for existing users.
-              </p>
-            )}
+          {!providers.userCreationEnabled && providers.providers.length === 0 && (
+            <p className="text-sm text-text-muted">
+              User creation is disabled and no external providers are configured for existing users.
+            </p>
+          )}
 
           {providers.userCreationEnabled &&
             !providers.localLoginEnabled &&
             providers.providers.length === 0 && (
               <p className="text-sm text-text-muted">
-                Local registration is disabled and no external providers are
-                configured.
+                Local registration is disabled and no external providers are configured.
               </p>
             )}
         </div>

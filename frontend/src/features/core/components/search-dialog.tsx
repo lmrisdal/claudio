@@ -5,13 +5,7 @@ import { api } from "../api/client";
 import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 
-export default function SearchDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export default function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const inputReference = useRef<HTMLInputElement>(null);
   const listReference = useRef<HTMLDivElement>(null);
@@ -32,9 +26,7 @@ export default function SearchDialog({
   const filtered = useMemo(
     () =>
       query.length > 0
-        ? games
-            .filter((g) => normalize(g.title).includes(normalize(query)))
-            .slice(0, 20)
+        ? games.filter((g) => normalize(g.title).includes(normalize(query))).slice(0, 20)
         : [],
     [games, query],
   );
@@ -52,8 +44,7 @@ export default function SearchDialog({
 
   useEffect(() => {
     if (open) {
-      previousFocusReference.current =
-        document.activeElement as HTMLElement | null;
+      previousFocusReference.current = document.activeElement as HTMLElement | null;
       setTimeout(() => inputReference.current?.focus(), 0);
     } else if (previousFocusReference.current) {
       previousFocusReference.current.focus({
@@ -160,9 +151,7 @@ export default function SearchDialog({
         {query.length > 0 && (
           <div ref={listReference} className="max-h-72 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-text-muted text-center">
-                No games found
-              </p>
+              <p className="px-4 py-6 text-sm text-text-muted text-center">No games found</p>
             ) : (
               filtered.map((game, index) => (
                 <button
@@ -200,12 +189,8 @@ export default function SearchDialog({
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-text-primary truncate">
-                      {game.title}
-                    </p>
-                    <p className="text-xs text-text-muted">
-                      {formatPlatform(game.platform)}
-                    </p>
+                    <p className="text-sm text-text-primary truncate">{game.title}</p>
+                    <p className="text-xs text-text-muted">{formatPlatform(game.platform)}</p>
                   </div>
                 </button>
               ))

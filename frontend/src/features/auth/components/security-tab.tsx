@@ -36,9 +36,7 @@ export default function SecurityTab({
       setConfirmPassword("");
       setSuccess(true);
     } catch (error_) {
-      setError(
-        error_ instanceof Error ? error_.message : "Failed to change password",
-      );
+      setError(error_ instanceof Error ? error_.message : "Failed to change password");
     } finally {
       setLoading(false);
     }

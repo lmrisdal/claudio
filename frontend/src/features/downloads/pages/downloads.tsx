@@ -65,9 +65,7 @@ export default function Downloads() {
                         progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
                     </span>
                     {speedBps != null && (
-                      <span className="ml-2 font-mono tabular-nums">
-                        {formatSpeed(speedBps)}
-                      </span>
+                      <span className="ml-2 font-mono tabular-nums">{formatSpeed(speedBps)}</span>
                     )}
                   </div>
                   {typeof progress.percent === "number" && (
