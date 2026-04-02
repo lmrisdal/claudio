@@ -95,9 +95,9 @@ fn snapshot_processes() -> Vec<(u32, u32)> {
     out
 }
 
-/// Finds PIDs of all running processes whose executable filename (case-insensitive)
-/// matches `name` (e.g. "setup.exe").
-fn find_pids_by_name(name: &str) -> Vec<u32> {
+/// Returns the PIDs of all running processes for which `predicate` returns true,
+/// based on each process's executable filename from the toolhelp snapshot.
+fn find_pids_matching(predicate: impl Fn(&str) -> bool) -> Vec<u32> {
     let mut out = Vec::new();
     unsafe {
         let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
@@ -117,7 +117,7 @@ fn find_pids_by_name(name: &str) -> Vec<u32> {
                     .take_while(|&c| c != 0)
                     .collect();
                 let exe = String::from_utf8_lossy(&exe_bytes);
-                if exe.eq_ignore_ascii_case(name) {
+                if predicate(&exe) {
                     out.push(entry.th32ProcessID);
                 }
                 if Process32Next(snapshot, &mut entry).is_err() {
@@ -131,18 +131,34 @@ fn find_pids_by_name(name: &str) -> Vec<u32> {
 }
 
 /// Mutes audio sessions matching either the PID tree or the executable name.
+/// Also catches InnoSetup's self-extractor, which runs as `*.tmp` rather than
+/// the original `setup.exe` and is reparented away from the installer process.
 fn try_mute_sessions(pid: u32, exe_name: Option<&str>) -> Result<usize, String> {
-    // Build the set of PIDs to mute: process tree + any process matching the exe name
     let mut target_pids: Vec<u32> = if pid != 0 {
         get_process_tree(pid)
     } else {
         Vec::new()
     };
+
+    // Match by installer exe name (handles non-elevated installs where setup.exe
+    // may have been reparented before we walked the tree).
     if let Some(name) = exe_name {
-        for found_pid in find_pids_by_name(name) {
+        for found_pid in find_pids_matching(|exe| exe.eq_ignore_ascii_case(name)) {
             if !target_pids.contains(&found_pid) {
                 target_pids.push(found_pid);
             }
+        }
+    }
+
+    // InnoSetup extracts to %TEMP%\is-XXXXX.tmp\ and runs as setup.tmp (or similar).
+    // It launches via ShellExecute so setup.tmp is not a child of setup.exe — it
+    // escapes the PID tree. Catch it by extension: any *.tmp process during an
+    // install is virtually guaranteed to be an InnoSetup self-extractor.
+    for found_pid in find_pids_matching(|exe| {
+        exe.to_ascii_lowercase().ends_with(".tmp")
+    }) {
+        if !target_pids.contains(&found_pid) {
+            target_pids.push(found_pid);
         }
     }
 

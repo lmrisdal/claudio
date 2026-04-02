@@ -225,13 +225,15 @@ async fn install_game_inner(
 
     let download_info = download_package(
         app,
-        &server_url,
-        &settings.custom_headers,
-        &token,
+        &DownloadOptions {
+            server_url: &server_url,
+            custom_headers: &settings.custom_headers,
+            token: &token,
+            speed_limit_kbs: settings.download_speed_limit_kbs,
+        },
         game.id,
         &temp_root,
         cancel_token,
-        settings.download_speed_limit_kbs,
     )
     .await?;
     log::info!("Download complete: {}", download_info.file_path.display());
@@ -272,16 +274,21 @@ struct DownloadInfo {
     file_path: PathBuf,
 }
 
+struct DownloadOptions<'a> {
+    server_url: &'a str,
+    custom_headers: &'a HashMap<String, String>,
+    token: &'a str,
+    speed_limit_kbs: Option<f64>,
+}
+
 async fn download_package(
     app: &AppHandle,
-    server_url: &str,
-    custom_headers: &HashMap<String, String>,
-    token: &str,
+    opts: &DownloadOptions<'_>,
     game_id: i32,
     temp_root: &Path,
     cancel_token: &Arc<AtomicBool>,
-    speed_limit_kbs: Option<f64>,
 ) -> Result<DownloadInfo, String> {
+    let DownloadOptions { server_url, custom_headers, token, speed_limit_kbs } = opts;
     let client = reqwest::Client::new();
     emit_progress(
         app,
