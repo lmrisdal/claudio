@@ -1,22 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGuide } from "../../core/hooks/use-guide";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import { sounds } from "../../core/utils/sounds";
+import { isDesktop } from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
 import AccountTab from "./account-tab";
+import DesktopSettingsTab from "./desktop-settings-tab";
 import PreferencesTab from "./preferences-tab";
-import SecurityTab from "./security-tab";
 
-type Tab = "account" | "preferences" | "security";
+type Tab = "account" | "preferences" | "desktop";
 
 const allTabs: { id: Tab; label: string }[] = [
   { id: "account", label: "Account" },
   { id: "preferences", label: "Preferences" },
-  { id: "security", label: "Security" },
+  { id: "desktop", label: "App" },
 ];
 
-export default function AccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, providers, logout, authDisabled } = useAuth();
+export default function AccountDialog({
+  open,
+  initialTab,
+  onClose,
+}: {
+  open: boolean;
+  initialTab: Tab;
+  onClose: () => void;
+}) {
+  const { user, logout, authDisabled } = useAuth();
   const { isOpen: guideOpen } = useGuide();
   const previousFocusReference = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("account");
@@ -28,22 +37,27 @@ export default function AccountDialog({ open, onClose }: { open: boolean; onClos
   const contentReferences = useRef<(HTMLButtonElement | HTMLInputElement | null)[]>([]);
   const panelReference = useRef<HTMLDivElement>(null);
 
-  const visibleTabs = allTabs.filter((t) => t.id !== "security" || providers.localLoginEnabled);
+  const visibleTabs = useMemo(
+    () =>
+      allTabs.filter((tab) => {
+        if (tab.id === "desktop" && !isDesktop) return false;
+        return true;
+      }),
+    [],
+  );
 
   // Sidebar items: tabs + sign out (if auth enabled)
   const sidebarCount = visibleTabs.length + (authDisabled ? 0 : 1);
 
-  // Reset state when reopening
-  const [previousOpen, setPreviousOpen] = useState(false);
-  if (open !== previousOpen) {
-    setPreviousOpen(open);
-    if (open) {
-      setActiveTab("account");
-      setFocusZone("sidebar");
-      setSidebarIndex(0);
-      setContentIndex(0);
-    }
-  }
+  useEffect(() => {
+    if (!open) return;
+    const nextTab = visibleTabs.some((tab) => tab.id === initialTab) ? initialTab : "account";
+    const tabIndex = visibleTabs.findIndex((tab) => tab.id === nextTab);
+    setActiveTab(nextTab);
+    setFocusZone("sidebar");
+    setSidebarIndex(Math.max(0, tabIndex));
+    setContentIndex(0);
+  }, [open, initialTab, visibleTabs]);
 
   // Save/restore focus to element behind dialog
   useEffect(() => {
@@ -226,42 +240,40 @@ export default function AccountDialog({ open, onClose }: { open: boolean; onClos
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
       onClick={onClose}
     >
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-[fadeIn_150ms_ease-out]" />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         ref={panelReference}
-        className="relative flex flex-col sm:flex-row w-full sm:max-w-2xl sm:mx-4 h-[85dvh] sm:h-[min(520px,80vh)] rounded-t-2xl sm:rounded-2xl bg-white/6 shadow-[0_8px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/8 backdrop-blur-2xl overflow-hidden animate-[slideUpIn_200ms_cubic-bezier(0.16,1,0.3,1)]"
+        className="relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Settings"
       >
-        {/* Sidebar */}
-        <nav className="flex flex-col bg-white/8 sm:w-52 sm:shrink-0 sm:border-r border-white/6">
-          {/* Header */}
-          <div className="flex items-start justify-between p-4 sm:p-5 sm:pb-0">
+        <nav className="flex flex-col border-border bg-surface-raised sm:w-56 sm:shrink-0 sm:border-r">
+          <div className="flex items-start justify-between border-b border-border p-4 sm:border-b-0 sm:p-5 sm:pb-0">
             <div>
-              <h1 className="font-display text-lg font-bold text-white">Settings</h1>
+              <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-sm text-white/50 font-mono">{user?.username}</span>
+                <span className="font-mono text-sm text-text-muted">{user?.username}</span>
                 {user?.role === "admin" && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-accent-dim text-accent">
+                  <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">
                     {user.role}
                   </span>
                 )}
               </div>
             </div>
-            {/* Close button — mobile only */}
             <button
               onClick={onClose}
-              className="sm:hidden p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/6 transition outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded-lg p-1.5 text-text-muted transition hover:bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
               aria-label="Close"
             >
               {closeIcon}
             </button>
           </div>
 
-          {/* Tabs — horizontal scroll on mobile, vertical on desktop */}
-          <div className="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-3 sm:px-5 py-3 sm:py-0 sm:mt-6 sm:flex-1 border-b sm:border-b-0 border-white/6">
+          <div className="flex gap-1 overflow-x-auto border-b border-border px-3 py-3 [scrollbar-width:none] sm:mt-4 sm:flex-1 sm:flex-col sm:overflow-visible sm:border-b-0 sm:px-5 sm:py-0 [&::-webkit-scrollbar]:hidden">
             {visibleTabs.map((tab) => {
               const index = sidebarReferenceIndex++;
               return (
@@ -276,10 +288,10 @@ export default function AccountDialog({ open, onClose }: { open: boolean; onClos
                     setSidebarIndex(index);
                     sidebarReferences.current[index]?.focus();
                   }}
-                  className={`shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm transition-colors outline-none ${
+                  className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors sm:w-full ${
                     activeTab === tab.id
-                      ? "bg-white/10 text-white font-medium"
-                      : "text-white/60 hover:text-white hover:bg-white/6"
+                      ? "bg-surface text-text-primary font-medium"
+                      : "text-text-secondary hover:bg-surface hover:text-text-primary"
                   } focus-visible:ring-2 focus-visible:ring-accent`}
                 >
                   {tab.label}
@@ -288,7 +300,6 @@ export default function AccountDialog({ open, onClose }: { open: boolean; onClos
             })}
           </div>
 
-          {/* Sign out — desktop sidebar only */}
           {!authDisabled && (
             <button
               ref={(element) => {
@@ -303,42 +314,39 @@ export default function AccountDialog({ open, onClose }: { open: boolean; onClos
                 setSidebarIndex(visibleTabs.length);
                 sidebarReferences.current[visibleTabs.length]?.focus();
               }}
-              className="hidden sm:block text-left px-3 py-2 m-5 mt-0 rounded-lg text-sm text-white/40 hover:text-red-400 hover:bg-white/6 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-red-400 focus-visible:ring-2 focus-visible:ring-accent sm:block"
             >
               Sign out
             </button>
           )}
         </nav>
 
-        {/* Content */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* Content header with close button — desktop only */}
-          <div className="hidden sm:flex items-center justify-between px-6 pt-5 pb-4">
-            <h2 className="font-display text-lg font-semibold text-white">
+          <div className="hidden items-center justify-between border-b border-border px-6 py-4 sm:flex">
+            <h2 className="text-base font-semibold text-text-primary">
               {visibleTabs.find((t) => t.id === activeTab)?.label}
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/6 transition outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded-lg p-1.5 text-text-muted transition hover:bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
               aria-label="Close"
             >
               {closeIcon}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 sm:pt-1 pb-4 sm:pb-6">
-            {activeTab === "account" && <AccountTab />}
+          <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+            {activeTab === "account" && <AccountTab contentRefs={contentReferences} />}
             {activeTab === "preferences" && <PreferencesTab contentRefs={contentReferences} />}
-            {activeTab === "security" && <SecurityTab contentRefs={contentReferences} />}
+            {activeTab === "desktop" && <DesktopSettingsTab active={open && activeTab === "desktop"} />}
 
-            {/* Sign out — mobile only, at bottom of content */}
             {!authDisabled && (
               <button
                 onClick={() => {
                   onClose();
                   logout();
                 }}
-                className="sm:hidden mt-6 w-full text-left px-3 py-2 rounded-lg text-sm text-white/40 hover:text-red-400 hover:bg-white/6 transition-colors"
+                className="mt-6 w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted transition-colors hover:bg-surface-raised hover:text-red-400 sm:hidden"
               >
                 Sign out
               </button>

@@ -143,7 +143,7 @@ export default function Header() {
                       >
                         <MenuItem>
                           <button
-                            onClick={accountDialog.open}
+                            onClick={() => accountDialog.openTab("account")}
                             className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-text-secondary data-focus:bg-surface-overlay data-focus:text-text-primary transition"
                           >
                             <svg

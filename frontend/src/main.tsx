@@ -7,7 +7,6 @@ import AccountDialogProvider from "./features/auth/components/account-dialog-pro
 import AuthProvider from "./features/auth/components/auth-provider";
 import GuideProvider from "./features/core/components/guide-provider";
 import NavigationProvider from "./features/core/components/navigation-provider";
-import DesktopSettingsProvider from "./features/desktop/components/desktop-settings-provider";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import "./index.css";
 
@@ -33,13 +32,11 @@ createRoot(document.querySelector("#root")!).render(
         <AuthProvider>
           <GuideProvider>
             <AccountDialogProvider>
-              <DesktopSettingsProvider>
-                <NavigationProvider>
-                  <main data-ui-scroll-container>
-                    <App />
-                  </main>
-                </NavigationProvider>
-              </DesktopSettingsProvider>
+              <NavigationProvider>
+                <main data-ui-scroll-container>
+                  <App />
+                </main>
+              </NavigationProvider>
             </AccountDialogProvider>
           </GuideProvider>
         </AuthProvider>

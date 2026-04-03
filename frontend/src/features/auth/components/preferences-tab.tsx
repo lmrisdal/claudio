@@ -82,9 +82,9 @@ export default function PreferencesTab({
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-white/80">Theme</span>
+          <span className="text-sm text-text-secondary">Theme</span>
         </div>
-        <div className="flex rounded-lg overflow-hidden ring-1 ring-white/12">
+        <div className="flex overflow-hidden rounded-lg ring-1 ring-border">
           {themeOptions.map((opt, index) => (
             <button
               key={opt.value}
@@ -93,8 +93,8 @@ export default function PreferencesTab({
               onClick={() => setTheme(opt.value)}
               className={`flex-1 py-1.5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
                 theme === opt.value
-                  ? "bg-white/14 text-white"
-                  : "text-white/50 hover:text-white/80 hover:bg-white/6"
+                  ? "bg-surface-raised text-text-primary"
+                  : "text-text-muted hover:bg-surface hover:text-text-secondary"
               }`}
             >
               {opt.label}
@@ -104,7 +104,7 @@ export default function PreferencesTab({
       </div>
 
       <label className="flex items-center justify-between cursor-pointer">
-        <span className="text-sm text-white/80">Navigation sounds</span>
+        <span className="text-sm text-text-secondary">Navigation sounds</span>
         <button
           ref={(element) => setIndexedReference(contentRefs, 3, element)}
           type="button"
@@ -115,7 +115,7 @@ export default function PreferencesTab({
             setSoundsOn(next);
             setSoundsEnabled(next);
           }}
-          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent ring-1 ${soundsOn ? "bg-white/14 ring-white/20" : "bg-white/8 ring-white/12"}`}
+          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent ${soundsOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
         >
           <span
             className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${soundsOn ? "translate-x-5" : "translate-x-0"}`}
@@ -124,7 +124,7 @@ export default function PreferencesTab({
       </label>
 
       <label className="flex items-center justify-between cursor-pointer">
-        <span className="text-sm text-white/80">Start emulator in fullscreen</span>
+        <span className="text-sm text-text-secondary">Start emulator in fullscreen</span>
         <button
           ref={(element) => setIndexedReference(contentRefs, 4, element)}
           type="button"
@@ -135,7 +135,7 @@ export default function PreferencesTab({
             setFullscreenOn(next);
             setEmulatorFullscreenEnabled(next);
           }}
-          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent ring-1 ${fullscreenOn ? "bg-white/14 ring-white/20" : "bg-white/8 ring-white/12"}`}
+          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent ${fullscreenOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
         >
           <span
             className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${fullscreenOn ? "translate-x-5" : "translate-x-0"}`}
@@ -144,7 +144,7 @@ export default function PreferencesTab({
       </label>
 
       <div>
-        <h3 className="text-xs font-medium text-white/50 uppercase tracking-wider mb-3">
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">
           Keyboard shortcuts
         </h3>
         <div className="space-y-2">
