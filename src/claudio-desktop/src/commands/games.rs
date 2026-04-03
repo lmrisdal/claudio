@@ -65,3 +65,8 @@ pub async fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, S
         .await
         .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub fn resolve_install_path(game_title: String) -> String {
+    game_install::resolve_install_path(&game_title)
+}

@@ -29,6 +29,7 @@ interface DesktopInstallGameInput {
   gameExe?: string | null;
   installPath?: string | null;
   desktopShortcut?: boolean;
+  forceInteractive?: boolean;
   summary?: string | null;
   genre?: string | null;
   releaseYear?: number | null;
@@ -93,6 +94,10 @@ export async function installGame(
   token: string,
 ): Promise<InstalledGame> {
   return invoke<InstalledGame>("install_game", { game, token });
+}
+
+export async function resolveInstallPath(gameTitle: string): Promise<string> {
+  return invoke<string>("resolve_install_path", { gameTitle });
 }
 
 export async function getInstalledGame(remoteGameId: number): Promise<InstalledGame | null> {

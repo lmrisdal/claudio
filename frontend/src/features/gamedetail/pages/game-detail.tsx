@@ -248,7 +248,13 @@ export default function GameDetail() {
   const isDesktopPcGame = isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
 
   const installMutation = useMutation({
-    mutationFn: async (input: Game & { installPath?: string; desktopShortcut?: boolean }) => {
+    mutationFn: async (
+      input: Game & {
+        installPath?: string;
+        desktopShortcut?: boolean;
+        forceInteractive?: boolean;
+      },
+    ) => {
       return startDownload({
         id: input.id,
         title: input.title,
@@ -258,6 +264,7 @@ export default function GameDetail() {
         gameExe: input.gameExe ?? null,
         installPath: input.installPath ?? null,
         desktopShortcut: input.desktopShortcut,
+        forceInteractive: input.forceInteractive,
         summary: input.summary ?? null,
         genre: input.genre ?? null,
         releaseYear: input.releaseYear ?? null,
@@ -554,9 +561,9 @@ export default function GameDetail() {
     try {
       setInstallError(null);
 
-      const { getSettings } = await import("../../desktop/hooks/use-desktop");
-      const settings = await getSettings();
-      setDefaultInstallPath(settings.defaultInstallPath || "");
+      const { resolveInstallPath } = await import("../../desktop/hooks/use-desktop");
+      const fullPath = await resolveInstallPath(displayGame.title);
+      setDefaultInstallPath(fullPath);
       setShowInstallConfirm(true);
     } catch (error) {
       setInstallError(
@@ -1427,7 +1434,7 @@ export default function GameDetail() {
                           type="button"
                           data-nav
                           disabled={
-                            (isMac && displayGame.installType === "installer") ||
+                            (!isMac && displayGame.installType === "installer") ||
                             installMutation.isPending ||
                             hasActiveInstallProgress ||
                             isInstalledGameLoading
@@ -1507,13 +1514,14 @@ export default function GameDetail() {
                   exeLabel={installExeLabel}
                   exeOptions={exeList ?? []}
                   onClose={() => setShowInstallConfirm(false)}
-                  onConfirm={(path, exe, desktopShortcut) => {
+                  onConfirm={(path, exe, desktopShortcut, forceInteractive) => {
                     setShowInstallConfirm(false);
                     // game and displayGame are guaranteed non-null here due to the guard clause
                     installMutation.mutate({
                       ...game!,
                       installPath: path,
                       desktopShortcut,
+                      forceInteractive,
                       installerExe: needsInstallerExe ? exe : game!.installerExe,
                       gameExe: needsGameExe ? exe : game!.gameExe,
                     });

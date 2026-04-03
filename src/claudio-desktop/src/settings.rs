@@ -71,13 +71,28 @@ pub fn data_dir() -> PathBuf {
     dir
 }
 
-pub fn resolve_install_root(settings: &DesktopSettings) -> Result<PathBuf, String> {
-    let path = settings
+fn os_default_games_dir() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    return PathBuf::from("C:\\Games");
+
+    #[cfg(not(target_os = "windows"))]
+    return dirs::home_dir()
+        .expect("could not determine home directory")
+        .join("Games");
+}
+
+/// Returns the install root without creating any directories. Used to suggest a
+/// default path in the UI.
+pub fn default_install_root(settings: &DesktopSettings) -> PathBuf {
+    settings
         .default_install_path
         .as_deref()
         .map(PathBuf::from)
-        .unwrap_or_else(|| data_dir().join("games"));
+        .unwrap_or_else(os_default_games_dir)
+}
 
+pub fn resolve_install_root(settings: &DesktopSettings) -> Result<PathBuf, String> {
+    let path = default_install_root(settings);
     fs::create_dir_all(&path).map_err(|err| err.to_string())?;
     Ok(path)
 }

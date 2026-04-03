@@ -87,6 +87,16 @@ pub async fn install_game(
     result
 }
 
+/// Returns the full suggested install path for a game title without creating any
+/// directories. Used by the frontend to pre-populate the install dialog.
+pub fn resolve_install_path(game_title: &str) -> String {
+    let settings = settings::load();
+    let root = settings::default_install_root(&settings);
+    root.join(sanitize_segment(game_title))
+        .to_string_lossy()
+        .into_owned()
+}
+
 pub fn list_installed_games() -> Result<Vec<InstalledGame>, String> {
     registry::list()
 }
@@ -201,11 +211,13 @@ async fn install_game_inner(
         .clone()
         .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
 
-    let install_root = match game.install_path.as_deref() {
+    let target_dir = match game.install_path.as_deref() {
         Some(path) => PathBuf::from(path),
-        None => settings::resolve_install_root(&settings)?,
+        None => {
+            let install_root = settings::resolve_install_root(&settings)?;
+            build_install_dir(&install_root, &game)
+        }
     };
-    let target_dir = build_install_dir(&install_root, &game);
     log::info!("Install target: {}", target_dir.display());
 
     if target_dir.exists() {
@@ -532,6 +544,7 @@ async fn install_installer(
     let package_path_owned = package_path.to_path_buf();
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
+    let force_interactive = game.force_interactive.unwrap_or(false);
 
     let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
         let mut progress_cb = |p: f64| {
@@ -555,7 +568,7 @@ async fn install_installer(
             resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
 
         emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer. This may take a while…"));
-        run_installer(&installer, &target_dir_owned)?;
+        run_installer(&installer, &target_dir_owned, force_interactive)?;
 
         let _ = fs::remove_dir_all(&staging_dir);
 
@@ -802,7 +815,7 @@ fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(entries)
 }
 
-fn sanitize_segment(value: &str) -> String {
+pub(crate) fn sanitize_segment(value: &str) -> String {
     let sanitized: String = value
         .chars()
         .map(|ch| match ch {
@@ -922,7 +935,7 @@ fn detect_installer_type(path: &Path) -> InstallerType {
 }
 
 #[cfg(target_os = "windows")]
-fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
+fn run_installer(path: &Path, target_dir: &Path, force_interactive: bool) -> Result<(), String> {
     let target = target_dir.to_string_lossy();
     let installer_type = detect_installer_type(path);
     log::info!(
@@ -936,6 +949,13 @@ fn run_installer(path: &Path, target_dir: &Path) -> Result<(), String> {
         },
         path.display()
     );
+
+    if force_interactive {
+        let mut cmd = std::process::Command::new(path);
+        cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
+            .stdin(Stdio::null());
+        return spawn_mute_wait(cmd, path, "");
+    }
 
     match installer_type {
         InstallerType::GogInnoSetup => {
@@ -1183,7 +1203,7 @@ fn download_innoextract(target: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn run_installer(_path: &Path, _target_dir: &Path) -> Result<(), String> {
+fn run_installer(_path: &Path, _target_dir: &Path, _force_interactive: bool) -> Result<(), String> {
     Err("Installer-based PC installs are only supported on Windows.".to_string())
 }
 

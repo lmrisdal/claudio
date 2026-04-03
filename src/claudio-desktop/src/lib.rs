@@ -42,6 +42,7 @@ pub fn run() {
             commands::games::launch_game,
             commands::games::list_game_executables,
             commands::games::list_installed_games,
+            commands::games::resolve_install_path,
             commands::games::open_install_folder,
             commands::games::set_game_exe,
             commands::games::uninstall_game,

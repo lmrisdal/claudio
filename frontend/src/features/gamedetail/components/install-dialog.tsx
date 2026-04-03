@@ -12,7 +12,12 @@ interface InstallDialogProperties {
   exeLabel?: string;
   exeOptions?: string[];
   onClose: () => void;
-  onConfirm: (path: string | undefined, exe?: string, desktopShortcut?: boolean) => void;
+  onConfirm: (
+    path: string | undefined,
+    exe?: string,
+    desktopShortcut?: boolean,
+    forceInteractive?: boolean,
+  ) => void;
 }
 
 export default function InstallDialog({
@@ -28,17 +33,23 @@ export default function InstallDialog({
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
   const [desktopShortcut, setDesktopShortcut] = useState(true);
+  const [forceInteractive, setForceInteractive] = useState(false);
 
   const showExePicker = exeLabel !== undefined && exeOptions.length > 0;
   const canInstall = !showExePicker || exe !== "";
 
   async function handleBrowse() {
     try {
+      const currentPath = installPath || defaultPath || undefined;
+      // Open the parent directory so the user picks/confirms the game folder name
+      const browseRoot = currentPath
+        ? currentPath.replace(/[\\/][^\\/]+$/, "") || currentPath
+        : undefined;
       const selected = await openDialog({
         directory: true,
         multiple: false,
         title: "Select Install Location",
-        defaultPath: installPath || defaultPath || undefined,
+        defaultPath: browseRoot,
       });
 
       if (selected !== null) {
@@ -85,7 +96,7 @@ export default function InstallDialog({
                     type="text"
                     value={installPath}
                     onChange={(e) => setInstallPath(e.target.value)}
-                    placeholder="Default Library Location"
+                    placeholder="e.g. C:\Games\My Game"
                     className="flex-1 rounded-lg bg-surface-raised border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent transition"
                   />
                   <button
@@ -96,10 +107,6 @@ export default function InstallDialog({
                     Browse…
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-text-muted">
-                  The game will be installed in a folder named after the title inside this
-                  directory.
-                </p>
               </div>
 
               {showExePicker && (
@@ -119,6 +126,23 @@ export default function InstallDialog({
                   <span className="text-sm text-text-primary">Add shortcut to desktop</span>
                 </label>
               )}
+
+              {isPortable ? null : (
+                <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
+                  <input
+                    type="checkbox"
+                    checked={forceInteractive}
+                    onChange={(e) => setForceInteractive(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
+                  />
+                  <div>
+                    <span className="text-sm text-text-primary">Run installer interactively</span>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Show the installer&apos;s setup wizard instead of installing silently.
+                    </p>
+                  </div>
+                </label>
+              )}
             </div>
           </div>
 
@@ -135,6 +159,7 @@ export default function InstallDialog({
                   installPath || undefined,
                   exe || undefined,
                   isPortable ? desktopShortcut : undefined,
+                  isPortable ? undefined : forceInteractive,
                 )
               }
               disabled={!canInstall}
