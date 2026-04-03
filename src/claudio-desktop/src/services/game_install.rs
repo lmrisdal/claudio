@@ -569,6 +569,8 @@ async fn install_installer(
 
         emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer. This may take a while…"));
         run_installer(&installer, &target_dir_owned, force_interactive)?;
+        emit_progress(&app_handle, gid, "installing", Some(97.0), Some("Applying patches…"));
+        apply_scene_overrides(&staging_dir, &target_dir_owned)?;
 
         let _ = fs::remove_dir_all(&staging_dir);
 
@@ -813,6 +815,59 @@ fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
         }
     }
     Ok(entries)
+}
+
+const SCENE_GROUP_FOLDERS: &[&str] = &[
+    "SKIDROW", "CODEX", "CPY", "PLAZA", "RELOADED", "RUNE", "EMPRESS", "VOKSI",
+    "FLT", "BAT", "PROPHET", "DARKSIDERS", "DODI", "HOODLUM", "RAZOR1911", "FAIRLIGHT",
+    "voices38",
+];
+
+/// Scans `source_dir` for known scene group subdirectories (SKIDROW, CODEX, etc.).
+/// For each found, copies its contents into `target_dir` (overwriting existing files),
+/// then removes the scene group subdirectory from `source_dir`.
+fn apply_scene_overrides(source_dir: &Path, target_dir: &Path) -> Result<(), String> {
+    let entries = match fs::read_dir(source_dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(()),
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        if SCENE_GROUP_FOLDERS
+            .iter()
+            .any(|g| g.eq_ignore_ascii_case(name))
+        {
+            log::info!(
+                "Applying scene group overrides from '{}' to {}",
+                name,
+                target_dir.display()
+            );
+            copy_dir_contents(&path, target_dir)?;
+        }
+    }
+    Ok(())
+}
+
+fn copy_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
+    for entry in fs::read_dir(src).map_err(|e| e.to_string())?.flatten() {
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            fs::create_dir_all(&dst_path).map_err(|e| e.to_string())?;
+            copy_dir_contents(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn sanitize_segment(value: &str) -> String {
