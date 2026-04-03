@@ -1,6 +1,6 @@
 {
   "productName": "Claudio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.claudio.desktop",
   "build": {
     "devUrl": "http://localhost:5173",
@@ -19,7 +19,10 @@
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 24, "y": 30 },
+        "trafficLightPosition": {
+          "x": 24,
+          "y": 30
+        },
         "center": true,
         "minWidth": 800,
         "minHeight": 600
@@ -31,7 +34,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "appimage", "app", "dmg"],
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis",
+      "appimage",
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -50,5 +59,15 @@
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZCOEJGQ0RERDgyMkQ5ODkKUldTSjJTTFkzZnlMYXpQUEF0bGRrQTExbVEzb28xeWlMbWt2QXFZWGhpbmdWWnlBbXV0eG5VTm4K",
+      "endpoints": [
+        "https://github.com/lmrisdal/claudio/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }
