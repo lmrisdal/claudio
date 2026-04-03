@@ -63,6 +63,7 @@ interface IgdbCandidate {
 }
 
 export default function GameDetail() {
+  const aboutPreviewLines = 5;
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -80,6 +81,8 @@ export default function GameDetail() {
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
   const [defaultInstallPath, setDefaultInstallPath] = useState("");
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
+  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+  const [aboutNeedsExpand, setAboutNeedsExpand] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [sgdbDialog, setSgdbDialog] = useState<{
@@ -128,6 +131,7 @@ export default function GameDetail() {
   const mainReference = useRef<HTMLElement>(null);
   const backLinkReference = useRef<HTMLAnchorElement>(null);
   const focusAnchorReference = useRef<HTMLDivElement>(null);
+  const aboutSummaryReference = useRef<HTMLParagraphElement>(null);
   const coverFileReference = useRef<HTMLInputElement>(null);
   const heroFileReference = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<{
@@ -308,6 +312,26 @@ export default function GameDetail() {
       requestAnimationFrame(() => focusAnchorReference.current?.focus());
     }
   }, [isLoading, game]);
+
+  useEffect(() => {
+    setIsAboutExpanded(false);
+  }, [displayGame?.id, displayGame?.summary]);
+
+  useEffect(() => {
+    const evaluateSummaryOverflow = () => {
+      const element = aboutSummaryReference.current;
+      if (!element || isAboutExpanded) return;
+      setAboutNeedsExpand(element.scrollHeight > element.clientHeight + 1);
+    };
+
+    const frame = requestAnimationFrame(evaluateSummaryOverflow);
+    window.addEventListener("resize", evaluateSummaryOverflow);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", evaluateSummaryOverflow);
+    };
+  }, [displayGame?.summary, isAboutExpanded]);
 
   async function searchIgdb(customQuery?: string) {
     setSearching(true);
@@ -1272,9 +1296,37 @@ export default function GameDetail() {
                     <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
                       About
                     </h2>
-                    <p className="text-text-secondary leading-relaxed">
-                      {displayGame.summary}
-                    </p>
+                    <div className="relative">
+                      <p
+                        ref={aboutSummaryReference}
+                        className="text-text-secondary leading-relaxed"
+                        style={
+                          isAboutExpanded
+                            ? undefined
+                            : {
+                                display: "-webkit-box",
+                                WebkitLineClamp: aboutPreviewLines,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }
+                        }
+                      >
+                        {displayGame.summary}
+                      </p>
+                      {!isAboutExpanded && aboutNeedsExpand && (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-linear-to-t from-(--bg) to-transparent" />
+                      )}
+                    </div>
+                    {aboutNeedsExpand && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAboutExpanded((expanded) => !expanded)}
+                        aria-expanded={isAboutExpanded}
+                        className="mt-2 text-xs text-accent hover:underline"
+                      >
+                        {isAboutExpanded ? "Show less" : "Show more"}
+                      </button>
+                    )}
                   </div>
                 )}
 
