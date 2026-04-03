@@ -171,8 +171,15 @@ jobs:
           tauriScript: ../../frontend/node_modules/.bin/tauri
           args: ${{ matrix.args }}
           tagName: v__VERSION__
-          updaterJsonKeepUniversal: true
           releaseName: Claudio v__VERSION__
           releaseBody: See the assets below to download and install Claudio for your platform.
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
+
+      - name: Re-sign updater artifacts (macOS)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          TAR_FILE=$(find src/claudio-desktop/target -name "*.app.tar.gz" -type f | head -1)
+          npm run tauri signer sign -- "$TAR_FILE"

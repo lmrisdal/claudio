@@ -221,8 +221,7 @@ jobs:
           tauriScript: ../../frontend/node_modules/.bin/tauri
           args: ${{ matrix.args }}
           tagName: v__VERSION__
-          updaterJsonKeepUniversal: true
           releaseName: Claudio v__VERSION__
           releaseBody: See the assets below to download and install Claudio for your platform.
-          releaseDraft: false
+          releaseDraft: true
           prerelease: true
