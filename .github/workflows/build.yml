@@ -45,8 +45,8 @@ jobs:
               - "src/claudio-uninstaller/**"
               - "frontend/**"
 
-  web:
-    needs: detect-changes
+  web-image:
+    needs: [detect-changes, web-tests]
     if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -58,17 +58,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - run: dotnet restore
-
-      - run: dotnet build --no-restore
-
-      - name: Run tests
-        run: dotnet run --project tests/Claudio.Api.Tests --no-build
 
       - uses: docker/setup-qemu-action@v3
 
@@ -130,6 +119,27 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  web-tests:
+    needs: detect-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - run: dotnet restore
+
+      - run: dotnet build --no-restore
+
+      - name: Run tests
+        run: dotnet run --project tests/Claudio.Api.Tests --no-build
 
   desktop:
     needs: detect-changes

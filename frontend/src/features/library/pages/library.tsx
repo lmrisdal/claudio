@@ -124,6 +124,18 @@ export default function Library() {
     count: 0,
     time: 0,
   });
+  const preloadedHeaderUrls = useRef(new Set<string>());
+
+  const preloadHeaderImage = useCallback((headerUrl?: string) => {
+    if (!headerUrl || preloadedHeaderUrls.current.has(headerUrl)) return;
+    preloadedHeaderUrls.current.add(headerUrl);
+    const image = new Image();
+    image.decoding = "async";
+    image.src = headerUrl;
+    image.addEventListener("error", () => {
+      preloadedHeaderUrls.current.delete(headerUrl);
+    });
+  }, []);
 
   const saveGridFocus = useCallback(() => {
     const active = document.activeElement as HTMLElement;
@@ -731,7 +743,7 @@ export default function Library() {
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
         >
           {filtered.map((game) => (
-            <GameCard key={game.id} game={game} />
+            <GameCard key={game.id} game={game} onPreviewStart={(g) => preloadHeaderImage(g.heroUrl)} />
           ))}
         </div>
       ) : view === "grouped" ? (
@@ -770,7 +782,11 @@ export default function Library() {
               {!collapsedGroups.has(p) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
                   {games.map((game) => (
-                    <GameCard key={game.id} game={game} />
+                    <GameCard
+                      key={game.id}
+                      game={game}
+                      onPreviewStart={(g) => preloadHeaderImage(g.heroUrl)}
+                    />
                   ))}
                 </div>
               )}
@@ -828,6 +844,7 @@ export default function Library() {
                 <tr
                   key={game.id}
                   onClick={() => navigate(`/games/${game.id}`)}
+                  onMouseEnter={() => preloadHeaderImage(game.heroUrl)}
                   className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors cursor-pointer"
                 >
                   <td className="py-2.5 pl-3 pr-4 text-text-secondary truncate">
@@ -837,6 +854,7 @@ export default function Library() {
                     <Link
                       to={`/games/${game.id}`}
                       data-game-id={game.id}
+                      onFocus={() => preloadHeaderImage(game.heroUrl)}
                       className={`font-medium hover:text-accent transition-colors outline-none focus-visible:text-accent ${game.isMissing ? "opacity-50" : ""}`}
                     >
                       {game.title}

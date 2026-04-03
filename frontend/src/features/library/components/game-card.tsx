@@ -2,11 +2,19 @@ import { Link } from "react-router";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 
-export default function GameCard({ game }: { game: Game }) {
+export default function GameCard({
+  game,
+  onPreviewStart,
+}: {
+  game: Game;
+  onPreviewStart?: (game: Game) => void;
+}) {
   return (
     <Link
       to={`/games/${game.id}`}
       data-game-id={game.id}
+      onMouseEnter={() => onPreviewStart?.(game)}
+      onFocus={() => onPreviewStart?.(game)}
       className={`group outline-none ${game.isMissing ? "opacity-50" : ""}`}
     >
       <div className="aspect-2/3 bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:outline-2 group-focus-visible:outline-accent group-focus-visible:outline-offset-4 transition-all duration-200 relative">
