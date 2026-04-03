@@ -1,0 +1,217 @@
+name: Build Artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/Claudio.Api/**"
+      - "src/Claudio.Shared/**"
+      - "src/claudio-desktop/**"
+      - "src/claudio-uninstaller/**"
+      - "tests/**"
+      - "frontend/**"
+      - "docker/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "Claudio.slnx"
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - "src/Claudio.Api/**"
+              - "src/Claudio.Shared/**"
+              - "tests/**"
+              - "frontend/**"
+              - "docker/**"
+              - "Directory.Build.props"
+              - "Directory.Packages.props"
+              - "Claudio.slnx"
+            desktop:
+              - "src/claudio-desktop/**"
+              - "src/claudio-uninstaller/**"
+              - "frontend/**"
+
+  web:
+    needs: detect-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - run: dotnet restore
+
+      - run: dotnet build --no-restore
+
+      - name: Run tests
+        run: dotnet run --project tests/Claudio.Api.Tests --no-build
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build smoke test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: claudio:smoke
+
+      - name: Smoke test container startup
+        run: |
+          docker run -d --rm --name claudio-smoke -p 18080:8080 \
+            -e CLAUDIO_DISABLE_AUTH=true \
+            claudio:smoke
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/health >/dev/null; then
+              exit 0
+            fi
+
+            if ! docker ps --format '{{.Names}}' | grep -qx 'claudio-smoke'; then
+              docker logs claudio-smoke
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          docker logs claudio-smoke
+          exit 1
+
+      - name: Stop smoke test container
+        if: always()
+        run: docker rm -f claudio-smoke || true
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=dev
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  desktop:
+    needs: detect-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop == 'true'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ""
+            rust-targets: ""
+          - platform: windows-latest
+            args: --target x86_64-pc-windows-msvc
+            rust-targets: ""
+            uninstaller-target: x86_64-pc-windows-msvc
+          - platform: windows-latest
+            args: --target aarch64-pc-windows-msvc
+            rust-targets: aarch64-pc-windows-msvc
+            uninstaller-target: aarch64-pc-windows-msvc
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "22"
+          working-directory: frontend
+          cache: true
+          run-install: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust cross-compilation targets
+        if: matrix.rust-targets != ''
+        shell: bash
+        run: |
+          IFS=',' read -ra TARGETS <<< "${{ matrix.rust-targets }}"
+          for target in "${TARGETS[@]}"; do
+            rustup target add "$target"
+          done
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src/claudio-desktop -> target
+
+      - name: Build uninstaller (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          cd src/claudio-uninstaller
+          cargo build --release --target ${{ matrix.uninstaller-target }}
+          mkdir -p target/release
+          cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: src/claudio-desktop
+          tauriScript: ../../frontend/node_modules/.bin/tauri
+          args: ${{ matrix.args }}
+          tagName: v__VERSION__
+          releaseName: Claudio v__VERSION__
+          releaseBody: See the assets below to download and install Claudio for your platform.
+          releaseDraft: false
+          prerelease: true
