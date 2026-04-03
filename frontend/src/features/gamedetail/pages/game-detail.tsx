@@ -27,6 +27,7 @@ import DownloadButton from "../components/download-button";
 import ExeListbox from "../components/exe-listbox";
 import InstallDialog from "../components/install-dialog";
 import PickExeDialog from "../components/pick-exe-dialog";
+import PlayContextMenu from "../components/play-context-menu";
 
 const pcPlatforms = new Set(["win", "mac", "linux"]);
 function isPcPlatform(platform: string) {
@@ -72,6 +73,7 @@ export default function GameDetail() {
   const { startDownload, getProgress } = useDownloadManager();
   const [pickExeOpen, setPickExeOpen] = useState(false);
   const [pickExeOptions, setPickExeOptions] = useState<string[]>([]);
+  const [playContextMenu, setPlayContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [candidates, setCandidates] = useState<IgdbCandidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -1479,6 +1481,10 @@ export default function GameDetail() {
                               }
                             }
                           }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setPlayContextMenu({ x: e.clientX, y: e.clientY });
+                          }}
                           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                         >
                           <svg
@@ -1490,6 +1496,29 @@ export default function GameDetail() {
                           </svg>
                           Play
                         </button>
+
+                        {/* Play button context menu */}
+                        {playContextMenu && (
+                          <PlayContextMenu
+                            x={playContextMenu.x}
+                            y={playContextMenu.y}
+                            onClose={() => setPlayContextMenu(null)}
+                            onChangeExecutable={async () => {
+                              setPlayContextMenu(null);
+                              try {
+                                const exes = await listGameExecutables(displayGame.id);
+                                setPickExeOptions(exes);
+                                setPickExeOpen(true);
+                              } catch (error) {
+                                setInstallError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Could not list game executables.",
+                                );
+                              }
+                            }}
+                          />
+                        )}
 
                         {/* Uninstall button */}
                         <button

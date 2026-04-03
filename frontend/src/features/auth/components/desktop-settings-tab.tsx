@@ -13,6 +13,7 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
   const [testing, setTesting] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [updateMessage, setUpdateMessage] = useState("");
 
   useEffect(() => {
     if (!active) return;
@@ -31,6 +32,22 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
       setConnectionMessage("");
       setSaveMessage("");
     });
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const onResult = (event: Event) => {
+      const custom = event as CustomEvent<{ message?: string }>;
+      if (custom.detail?.message) {
+        setUpdateMessage(custom.detail.message);
+      }
+    };
+
+    globalThis.addEventListener("claudio:update-check-result", onResult);
+    return () => {
+      globalThis.removeEventListener("claudio:update-check-result", onResult);
+    };
   }, [active]);
 
   function buildCustomHeaders() {
@@ -111,6 +128,11 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleCheckForUpdates() {
+    setUpdateMessage("Checking for updates...");
+    globalThis.dispatchEvent(new CustomEvent("claudio:check-for-updates"));
   }
 
   return (
@@ -282,6 +304,29 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
           {saveMessage}
         </p>
       )}
+
+      <div className="rounded-xl border border-border bg-bg px-3 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Desktop updates</p>
+            <p className="mt-1 text-xs text-text-muted">
+              Claudio checks for updates on startup and prepares downloads in the background.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCheckForUpdates}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary transition hover:bg-surface-raised hover:text-text-primary"
+          >
+            Check for updates
+          </button>
+        </div>
+        {updateMessage && (
+          <p className="mt-2 text-xs text-text-muted" role="status">
+            {updateMessage}
+          </p>
+        )}
+      </div>
 
       <div className="flex justify-end border-t border-border pt-4">
         <button

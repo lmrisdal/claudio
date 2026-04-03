@@ -12,3 +12,8 @@ pub fn get_settings() -> Result<settings::DesktopSettings, String> {
 pub fn update_settings(settings: settings::DesktopSettings) -> Result<(), String> {
     settings::save(&settings)
 }
+
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}

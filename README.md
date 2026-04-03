@@ -233,6 +233,16 @@ npm run dev
 
 The Vite dev server runs on port 5173 and proxies API requests to the backend on port 5118.
 
+### Desktop release versioning
+
+Use a single Makefile helper to bump desktop version, commit, and tag in one step:
+
+```bash
+make bump 0.1.1
+```
+
+This updates `src/claudio-desktop/tauri.conf.json`, `src/claudio-desktop/Cargo.toml`, and `frontend/package.json` to the same version before committing and tagging.
+
 ## Tech Stack
 
 - **Backend:** ASP.NET minimal APIs, Entity Framework Core, SQLite/PostgreSQL

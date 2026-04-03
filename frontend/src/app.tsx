@@ -10,6 +10,7 @@ import { GuestRoute } from "./features/auth/components/guest-route";
 import { ProtectedRoute } from "./features/auth/components/protected-route";
 import { DesktopGate } from "./features/desktop/components/desktop-gate";
 import DesktopLayout from "./features/desktop/components/desktop-layout";
+import UpdateToast from "./features/desktop/components/update-toast";
 
 const Admin = lazy(() => import("./features/admin/pages/admin"));
 const Downloads = lazy(() => import("./features/downloads/pages/downloads"));
@@ -102,6 +103,7 @@ export default function App() {
               </Routes>
             </Suspense>
           </div>
+          <UpdateToast />
         </DownloadManagerProvider>
       </DesktopGate>
     </div>

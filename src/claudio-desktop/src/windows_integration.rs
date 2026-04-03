@@ -30,21 +30,8 @@ const UNINSTALL_ROOT: &str =
 ///              matching, which catches elevated processes that aren't in the PID tree.
 pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
     std::thread::spawn(move || {
-        log::info!(
-            "Attempting to mute audio for pid={} exe={:?}",
-            pid,
-            exe_name
-        );
         for _ in 0..400 {
-            match try_mute_sessions(pid, exe_name.as_deref()) {
-                Ok(n) if n > 0 => {
-                    log::info!("Muted {n} audio session(s) for pid={pid} exe={exe_name:?}");
-                }
-                Err(err) => {
-                    log::debug!("Mute attempt failed: {err}");
-                }
-                _ => {}
-            }
+            let _ = try_mute_sessions(pid, exe_name.as_deref());
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     });
