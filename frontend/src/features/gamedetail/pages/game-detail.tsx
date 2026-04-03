@@ -88,9 +88,9 @@ export default function GameDetail() {
   }>({ open: false, mode: "covers" });
   const [sgdbQuery, setSgdbQuery] = useState("");
   const [sgdbSearching, setSgdbSearching] = useState(false);
-  const [sgdbGames, setSgdbGames] = useState<{ id: number; name: string; year?: number }[] | null>(
-    null,
-  );
+  const [sgdbGames, setSgdbGames] = useState<
+    { id: number; name: string; year?: number }[] | null
+  >(null);
   const [sgdbImages, setSgdbImages] = useState<string[] | null>(null);
   const [sgdbLoadingImages, setSgdbLoadingImages] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -146,7 +146,8 @@ export default function GameDetail() {
     refetchInterval: (query) => (query.state.data?.isProcessing ? 3000 : false),
   });
 
-  const needsInstallerExe = game?.installType === "installer" && !game.installerExe;
+  const needsInstallerExe =
+    game?.installType === "installer" && !game.installerExe;
   const needsGameExe = game?.installType === "portable" && !game.gameExe;
   const installExeLabel = needsInstallerExe
     ? "Setup Executable"
@@ -175,7 +176,9 @@ export default function GameDetail() {
   const { data: browseData, isLoading: browseLoading } = useQuery({
     queryKey: ["browse", id, browsePath],
     queryFn: () =>
-      api.get<BrowseResponse>(`/games/${id}/browse?path=${encodeURIComponent(browsePath ?? "")}`),
+      api.get<BrowseResponse>(
+        `/games/${id}/browse?path=${encodeURIComponent(browsePath ?? "")}`,
+      ),
     enabled: browsePath !== null,
   });
 
@@ -245,7 +248,8 @@ export default function GameDetail() {
     };
   }, [game, installedGame]);
 
-  const isDesktopPcGame = isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
+  const isDesktopPcGame =
+    isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
 
   const installMutation = useMutation({
     mutationFn: async (
@@ -350,9 +354,9 @@ export default function GameDetail() {
     setSgdbDialog({ open: true, mode });
     setSgdbSearching(true);
     try {
-      const games = await api.get<{ id: number; name: string; year?: number }[]>(
-        `/admin/steamgriddb/search?query=${encodeURIComponent(q)}`,
-      );
+      const games = await api.get<
+        { id: number; name: string; year?: number }[]
+      >(`/admin/steamgriddb/search?query=${encodeURIComponent(q)}`);
       if (sgdbRequestReference.current !== requestId) return;
       setSgdbGames(games);
       if (games.length === 1) void selectSgdbGame(games[0].id, mode);
@@ -364,12 +368,17 @@ export default function GameDetail() {
     }
   }
 
-  async function selectSgdbGame(sgdbGameId: number, mode?: "covers" | "heroes") {
+  async function selectSgdbGame(
+    sgdbGameId: number,
+    mode?: "covers" | "heroes",
+  ) {
     setSgdbImages(null);
     setSgdbLoadingImages(true);
     const endpoint = mode ?? sgdbDialog.mode;
     try {
-      const urls = await api.get<string[]>(`/admin/steamgriddb/${sgdbGameId}/${endpoint}`);
+      const urls = await api.get<string[]>(
+        `/admin/steamgriddb/${sgdbGameId}/${endpoint}`,
+      );
       setSgdbImages(urls);
     } catch {
       setSgdbImages([]);
@@ -390,7 +399,8 @@ export default function GameDetail() {
   }
 
   const applyMutation = useMutation({
-    mutationFn: (igdbId: number) => api.post<Game>(`/admin/games/${id}/igdb/apply`, { igdbId }),
+    mutationFn: (igdbId: number) =>
+      api.post<Game>(`/admin/games/${id}/igdb/apply`, { igdbId }),
     onSuccess: (data) => {
       queryClient.setQueryData(["game", id], data);
       void queryClient.invalidateQueries({ queryKey: ["games"] });
@@ -426,7 +436,8 @@ export default function GameDetail() {
   });
 
   const compressMutation = useMutation({
-    mutationFn: (format: string) => api.post(`/admin/games/${id}/compress?format=${format}`),
+    mutationFn: (format: string) =>
+      api.post(`/admin/games/${id}/compress?format=${format}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["game", id] });
       void queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
@@ -491,7 +502,9 @@ export default function GameDetail() {
       title: editForm.title,
       summary: editForm.summary || null,
       genre: editForm.genre || null,
-      releaseYear: editForm.releaseYear ? Number.parseInt(editForm.releaseYear) : null,
+      releaseYear: editForm.releaseYear
+        ? Number.parseInt(editForm.releaseYear)
+        : null,
       coverUrl,
       heroUrl,
       installType: editForm.installType,
@@ -535,7 +548,10 @@ export default function GameDetail() {
     return (
       <main className="max-w-5xl mx-auto px-6 py-24 text-center flex-1 w-full">
         <p className="text-text-muted">Game not found</p>
-        <Link to="/" className="text-accent hover:underline text-sm mt-2 inline-block">
+        <Link
+          to="/"
+          className="text-accent hover:underline text-sm mt-2 inline-block"
+        >
           Back to library
         </Link>
       </main>
@@ -561,13 +577,16 @@ export default function GameDetail() {
     try {
       setInstallError(null);
 
-      const { resolveInstallPath } = await import("../../desktop/hooks/use-desktop");
+      const { resolveInstallPath } =
+        await import("../../desktop/hooks/use-desktop");
       const fullPath = await resolveInstallPath(displayGame.title);
       setDefaultInstallPath(fullPath);
       setShowInstallConfirm(true);
     } catch (error) {
       setInstallError(
-        error instanceof Error ? error.message : "Failed to load settings. " + String(error),
+        error instanceof Error
+          ? error.message
+          : "Failed to load settings. " + String(error),
       );
     }
   }
@@ -624,7 +643,8 @@ export default function GameDetail() {
           onKeyDown={(e) => {
             if (e.key === "ArrowDown" || e.key === "ArrowRight") {
               e.preventDefault();
-              const first = mainReference.current?.querySelector<HTMLElement>("[data-nav]");
+              const first =
+                mainReference.current?.querySelector<HTMLElement>("[data-nav]");
               if (first) {
                 first.focus();
                 void sounds.navigate();
@@ -653,7 +673,11 @@ export default function GameDetail() {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
+            />
           </svg>
           Library
         </Link>
@@ -663,7 +687,11 @@ export default function GameDetail() {
           <div className="w-72 shrink-0 mx-auto md:mx-0">
             <div
               className={`aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border${user?.role === "admin" ? " cursor-pointer hover:ring-accent transition" : ""}`}
-              onClick={user?.role === "admin" ? () => openSgdbDialog("covers") : undefined}
+              onClick={
+                user?.role === "admin"
+                  ? () => openSgdbDialog("covers")
+                  : undefined
+              }
             >
               {(editing ? editForm.coverUrl : displayGame.coverUrl) ? (
                 <img
@@ -704,7 +732,9 @@ export default function GameDetail() {
                   <input
                     type="text"
                     value={editForm.title}
-                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, title: e.target.value })
+                    }
                     required
                     className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                   />
@@ -715,7 +745,9 @@ export default function GameDetail() {
                   </label>
                   <textarea
                     value={editForm.summary}
-                    onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, summary: e.target.value })
+                    }
                     rows={4}
                     className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition resize-y"
                   />
@@ -728,7 +760,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.genre}
-                      onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, genre: e.target.value })
+                      }
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
                   </div>
@@ -758,7 +792,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.developer}
-                      onChange={(e) => setEditForm({ ...editForm, developer: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, developer: e.target.value })
+                      }
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
                   </div>
@@ -769,7 +805,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.publisher}
-                      onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, publisher: e.target.value })
+                      }
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
                   </div>
@@ -782,7 +820,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.gameMode}
-                      onChange={(e) => setEditForm({ ...editForm, gameMode: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, gameMode: e.target.value })
+                      }
                       placeholder="e.g. Single player, Multiplayer"
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
@@ -794,7 +834,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.gameEngine}
-                      onChange={(e) => setEditForm({ ...editForm, gameEngine: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, gameEngine: e.target.value })
+                      }
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
                   </div>
@@ -807,7 +849,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.series}
-                      onChange={(e) => setEditForm({ ...editForm, series: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, series: e.target.value })
+                      }
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
                   </div>
@@ -818,7 +862,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.franchise}
-                      onChange={(e) => setEditForm({ ...editForm, franchise: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, franchise: e.target.value })
+                      }
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
                   </div>
@@ -832,12 +878,16 @@ export default function GameDetail() {
                       <input
                         type="number"
                         value={editForm.igdbId}
-                        onChange={(e) => setEditForm({ ...editForm, igdbId: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, igdbId: e.target.value })
+                        }
                         placeholder="e.g. 12345"
                         className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                       />
                       {displayGame.igdbId &&
-                        !displayGame.folderName.includes(`igdb-${displayGame.igdbId}`) && (
+                        !displayGame.folderName.includes(
+                          `igdb-${displayGame.igdbId}`,
+                        ) && (
                           <button
                             type="button"
                             onClick={() => tagFolderMutation.mutate()}
@@ -845,7 +895,9 @@ export default function GameDetail() {
                             className="shrink-0 px-3 py-2 rounded-lg text-xs text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
                             title={`Rename folder to add (igdb-${displayGame.igdbId})`}
                           >
-                            {tagFolderMutation.isPending ? "Tagging..." : "Tag folder"}
+                            {tagFolderMutation.isPending
+                              ? "Tagging..."
+                              : "Tag folder"}
                           </button>
                         )}
                     </div>
@@ -857,7 +909,9 @@ export default function GameDetail() {
                     <input
                       type="text"
                       value={editForm.igdbSlug}
-                      onChange={(e) => setEditForm({ ...editForm, igdbSlug: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, igdbSlug: e.target.value })
+                      }
                       placeholder="e.g. the-witcher-3"
                       className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                     />
@@ -900,7 +954,9 @@ export default function GameDetail() {
                   <input
                     type="text"
                     value={editForm.coverUrl}
-                    onChange={(e) => setEditForm({ ...editForm, coverUrl: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, coverUrl: e.target.value })
+                    }
                     placeholder="https://..."
                     className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                   />
@@ -942,7 +998,9 @@ export default function GameDetail() {
                   <input
                     type="text"
                     value={editForm.heroUrl}
-                    onChange={(e) => setEditForm({ ...editForm, heroUrl: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, heroUrl: e.target.value })
+                    }
                     placeholder="https://..."
                     className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
                   />
@@ -959,7 +1017,9 @@ export default function GameDetail() {
                           <button
                             key={type}
                             type="button"
-                            onClick={() => setEditForm({ ...editForm, installType: type })}
+                            onClick={() =>
+                              setEditForm({ ...editForm, installType: type })
+                            }
                             className={`px-4 py-2 rounded-lg text-sm font-medium ring-1 transition ${
                               editForm.installType === type
                                 ? "bg-accent/15 text-accent ring-accent/30"
@@ -975,7 +1035,9 @@ export default function GameDetail() {
                       <ExeListbox
                         label="Installer Executable"
                         value={editForm.installerExe}
-                        onChange={(v) => setEditForm({ ...editForm, installerExe: v })}
+                        onChange={(v) =>
+                          setEditForm({ ...editForm, installerExe: v })
+                        }
                         options={exeList ?? []}
                       />
                     )}
@@ -983,7 +1045,9 @@ export default function GameDetail() {
                       <ExeListbox
                         label="Game Executable"
                         value={editForm.gameExe}
-                        onChange={(v) => setEditForm({ ...editForm, gameExe: v })}
+                        onChange={(v) =>
+                          setEditForm({ ...editForm, gameExe: v })
+                        }
                         options={exeList ?? []}
                       />
                     )}
@@ -1022,7 +1086,9 @@ export default function GameDetail() {
                         disabled={compressMutation.isPending}
                         className="px-4 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
                       >
-                        {compressMutation.isPending ? "Queuing..." : "Package as ZIP"}
+                        {compressMutation.isPending
+                          ? "Queuing..."
+                          : "Package as ZIP"}
                       </button>
                       <button
                         type="button"
@@ -1030,7 +1096,9 @@ export default function GameDetail() {
                         disabled={compressMutation.isPending}
                         className="px-4 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay ring-1 ring-border transition disabled:opacity-50"
                       >
-                        {compressMutation.isPending ? "Queuing..." : "Package as TAR"}
+                        {compressMutation.isPending
+                          ? "Queuing..."
+                          : "Package as TAR"}
                       </button>
                     </div>
                   )}
@@ -1057,7 +1125,9 @@ export default function GameDetail() {
                         disabled={displayGame.isProcessing}
                         className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50 disabled:cursor-not-allowed!"
                         title={
-                          displayGame.isProcessing ? "Cannot edit while processing" : "Edit game"
+                          displayGame.isProcessing
+                            ? "Cannot edit while processing"
+                            : "Edit game"
                         }
                       >
                         <svg
@@ -1078,7 +1148,11 @@ export default function GameDetail() {
                         onClick={openIgdbSearch}
                         disabled={searching}
                         className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition disabled:opacity-50"
-                        title={displayGame.igdbId ? "Re-match on IGDB" : "Match on IGDB"}
+                        title={
+                          displayGame.igdbId
+                            ? "Re-match on IGDB"
+                            : "Match on IGDB"
+                        }
                       >
                         <svg
                           className="w-4 h-4"
@@ -1137,7 +1211,9 @@ export default function GameDetail() {
                           : "bg-accent-dim ring-accent/20 text-accent"
                       }`}
                     >
-                      {displayGame.installType === "installer" ? "Installer" : "Portable"}
+                      {displayGame.installType === "installer"
+                        ? "Installer"
+                        : "Portable"}
                     </span>
                   )}
                   {displayGame.igdbSlug && (
@@ -1196,7 +1272,9 @@ export default function GameDetail() {
                     <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
                       About
                     </h2>
-                    <p className="text-text-secondary leading-relaxed">{displayGame.summary}</p>
+                    <p className="text-text-secondary leading-relaxed">
+                      {displayGame.summary}
+                    </p>
                   </div>
                 )}
 
@@ -1213,7 +1291,9 @@ export default function GameDetail() {
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Developer
                         </span>
-                        <p className="text-text-secondary mt-0.5">{displayGame.developer}</p>
+                        <p className="text-text-secondary mt-0.5">
+                          {displayGame.developer}
+                        </p>
                       </div>
                     )}
                     {displayGame.publisher && (
@@ -1221,7 +1301,9 @@ export default function GameDetail() {
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Publisher
                         </span>
-                        <p className="text-text-secondary mt-0.5">{displayGame.publisher}</p>
+                        <p className="text-text-secondary mt-0.5">
+                          {displayGame.publisher}
+                        </p>
                       </div>
                     )}
                     {displayGame.gameMode && (
@@ -1229,7 +1311,9 @@ export default function GameDetail() {
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Game Mode
                         </span>
-                        <p className="text-text-secondary mt-0.5">{displayGame.gameMode}</p>
+                        <p className="text-text-secondary mt-0.5">
+                          {displayGame.gameMode}
+                        </p>
                       </div>
                     )}
                     {displayGame.gameEngine && (
@@ -1237,7 +1321,9 @@ export default function GameDetail() {
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Engine
                         </span>
-                        <p className="text-text-secondary mt-0.5">{displayGame.gameEngine}</p>
+                        <p className="text-text-secondary mt-0.5">
+                          {displayGame.gameEngine}
+                        </p>
                       </div>
                     )}
                     {displayGame.series && (
@@ -1245,7 +1331,9 @@ export default function GameDetail() {
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Series
                         </span>
-                        <p className="text-text-secondary mt-0.5">{displayGame.series}</p>
+                        <p className="text-text-secondary mt-0.5">
+                          {displayGame.series}
+                        </p>
                       </div>
                     )}
                     {displayGame.franchise && (
@@ -1253,7 +1341,9 @@ export default function GameDetail() {
                         <span className="text-text-muted text-xs uppercase tracking-wider font-medium">
                           Franchise
                         </span>
-                        <p className="text-text-secondary mt-0.5">{displayGame.franchise}</p>
+                        <p className="text-text-secondary mt-0.5">
+                          {displayGame.franchise}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1315,13 +1405,17 @@ export default function GameDetail() {
                             if (installedGame.gameExe) {
                               launchGame(displayGame.id).catch((error) => {
                                 setInstallError(
-                                  error instanceof Error ? error.message : "Could not launch game.",
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Could not launch game.",
                                 );
                               });
                             } else {
                               // Installer game with no exe recorded — prompt user to pick
                               try {
-                                const exes = await listGameExecutables(displayGame.id);
+                                const exes = await listGameExecutables(
+                                  displayGame.id,
+                                );
                                 setPickExeOptions(exes);
                                 setPickExeOpen(true);
                               } catch (error) {
@@ -1335,7 +1429,11 @@ export default function GameDetail() {
                           }}
                           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                         >
-                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
                             <path d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z" />
                           </svg>
                           Play
@@ -1400,7 +1498,10 @@ export default function GameDetail() {
                           onConfirm={async (deleteFiles) => {
                             await uninstallGame(displayGame.id, deleteFiles);
                             setShowUninstallConfirm(false);
-                            queryClient.setQueryData(["installedGame", id], null);
+                            queryClient.setQueryData(
+                              ["installedGame", id],
+                              null,
+                            );
                             void queryClient.invalidateQueries({
                               queryKey: ["installedGames"],
                             });
@@ -1422,7 +1523,9 @@ export default function GameDetail() {
                               await launchGame(displayGame.id);
                             } catch (error) {
                               setInstallError(
-                                error instanceof Error ? error.message : "Could not launch game.",
+                                error instanceof Error
+                                  ? error.message
+                                  : "Could not launch game.",
                               );
                             }
                           }}
@@ -1434,7 +1537,8 @@ export default function GameDetail() {
                           type="button"
                           data-nav
                           disabled={
-                            (!isMac && displayGame.installType === "installer") ||
+                            (isMac &&
+                              displayGame.installType === "installer") ||
                             installMutation.isPending ||
                             hasActiveInstallProgress ||
                             isInstalledGameLoading
@@ -1454,7 +1558,8 @@ export default function GameDetail() {
                             stroke="currentColor"
                             strokeWidth={2.25}
                           >
-                            {installMutation.isPending || hasActiveInstallProgress ? (
+                            {installMutation.isPending ||
+                            hasActiveInstallProgress ? (
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -1470,7 +1575,8 @@ export default function GameDetail() {
                           </svg>
                           {desktopInstallLabel}
                         </button>
-                        {(installMutation.isPending || hasActiveInstallProgress) && (
+                        {(installMutation.isPending ||
+                          hasActiveInstallProgress) && (
                           <button
                             type="button"
                             data-nav
@@ -1496,7 +1602,10 @@ export default function GameDetail() {
                       </div>
                     )
                   ) : (
-                    <DownloadButton gameId={displayGame.id} size={displayGame.sizeBytes} />
+                    <DownloadButton
+                      gameId={displayGame.id}
+                      size={displayGame.sizeBytes}
+                    />
                   )}
                 </div>
                 {installError && (
@@ -1522,7 +1631,9 @@ export default function GameDetail() {
                       installPath: path,
                       desktopShortcut,
                       forceInteractive,
-                      installerExe: needsInstallerExe ? exe : game!.installerExe,
+                      installerExe: needsInstallerExe
+                        ? exe
+                        : game!.installerExe,
                       gameExe: needsGameExe ? exe : game!.gameExe,
                     });
                   }}
@@ -1544,7 +1655,9 @@ export default function GameDetail() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-text-primary font-medium shrink-0">Browse Files</h3>
+                        <h3 className="text-text-primary font-medium shrink-0">
+                          Browse Files
+                        </h3>
                         <button
                           onClick={() => setBrowsePath(null)}
                           className="text-text-muted hover:text-text-primary transition p-1 shrink-0"
@@ -1579,11 +1692,20 @@ export default function GameDetail() {
                               .split("/")
                               .filter(Boolean)
                               .map((segment, index, array) => {
-                                const segPath = array.slice(0, index + 1).join("/");
+                                const segPath = array
+                                  .slice(0, index + 1)
+                                  .join("/");
                                 const isLast = index === array.length - 1;
                                 return (
-                                  <span key={segPath} className="flex items-center gap-1">
-                                    {index > 0 && <span className="text-text-muted/50">/</span>}
+                                  <span
+                                    key={segPath}
+                                    className="flex items-center gap-1"
+                                  >
+                                    {index > 0 && (
+                                      <span className="text-text-muted/50">
+                                        /
+                                      </span>
+                                    )}
                                     <button
                                       onClick={() => setBrowsePath(segPath)}
                                       className={`hover:text-text-primary transition ${isLast ? "text-text-primary font-medium" : ""}`}
@@ -1595,7 +1717,9 @@ export default function GameDetail() {
                               })}
                           </>
                         ) : (
-                          <span className="text-text-primary font-medium">/</span>
+                          <span className="text-text-primary font-medium">
+                            /
+                          </span>
                         )}
                       </div>
 
@@ -1610,7 +1734,9 @@ export default function GameDetail() {
                             {resolvedPath && (
                               <button
                                 onClick={() => {
-                                  const parts = resolvedPath.split("/").filter(Boolean);
+                                  const parts = resolvedPath
+                                    .split("/")
+                                    .filter(Boolean);
                                   parts.pop();
                                   setBrowsePath(parts.join("/"));
                                 }}
@@ -1641,11 +1767,14 @@ export default function GameDetail() {
                                     entry.name.toLowerCase().endsWith(".zip")
                                   )
                                     setBrowsePath(
-                                      resolvedPath ? `${resolvedPath}/${entry.name}` : entry.name,
+                                      resolvedPath
+                                        ? `${resolvedPath}/${entry.name}`
+                                        : entry.name,
                                     );
                                 }}
                                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition text-left ${
-                                  entry.isDirectory || entry.name.toLowerCase().endsWith(".zip")
+                                  entry.isDirectory ||
+                                  entry.name.toLowerCase().endsWith(".zip")
                                     ? "hover:bg-surface-raised/50 cursor-pointer"
                                     : "cursor-default"
                                 }`}
@@ -1684,11 +1813,12 @@ export default function GameDetail() {
                                 >
                                   {entry.name}
                                 </span>
-                                {entry.size != undefined && !entry.isDirectory && (
-                                  <span className="ml-auto text-xs text-text-muted font-mono shrink-0">
-                                    {formatSize(entry.size)}
-                                  </span>
-                                )}
+                                {entry.size != undefined &&
+                                  !entry.isDirectory && (
+                                    <span className="ml-auto text-xs text-text-muted font-mono shrink-0">
+                                      {formatSize(entry.size)}
+                                    </span>
+                                  )}
                               </button>
                             ))}
                           </div>
@@ -1714,11 +1844,14 @@ export default function GameDetail() {
                 <DialogPanel className="bg-surface rounded-xl ring-1 ring-border p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[80vh] flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-text-primary font-medium">
-                      SteamGridDB {sgdbDialog.mode === "covers" ? "Covers" : "Heroes"}
+                      SteamGridDB{" "}
+                      {sgdbDialog.mode === "covers" ? "Covers" : "Heroes"}
                     </h3>
                     <button
                       type="button"
-                      onClick={() => setSgdbDialog({ ...sgdbDialog, open: false })}
+                      onClick={() =>
+                        setSgdbDialog({ ...sgdbDialog, open: false })
+                      }
                       className="text-text-muted hover:text-text-primary transition p-1"
                     >
                       <svg
@@ -1747,17 +1880,21 @@ export default function GameDetail() {
                       setSgdbLoadingImages(false);
                       setSgdbSearching(true);
                       try {
-                        const games = await api.get<{ id: number; name: string; year?: number }[]>(
+                        const games = await api.get<
+                          { id: number; name: string; year?: number }[]
+                        >(
                           `/admin/steamgriddb/search?query=${encodeURIComponent(sgdbQuery.trim())}`,
                         );
                         if (sgdbRequestReference.current !== requestId) return;
                         setSgdbGames(games);
-                        if (games.length === 1) void selectSgdbGame(games[0].id);
+                        if (games.length === 1)
+                          void selectSgdbGame(games[0].id);
                       } catch {
                         if (sgdbRequestReference.current !== requestId) return;
                         setSgdbGames([]);
                       } finally {
-                        if (sgdbRequestReference.current === requestId) setSgdbSearching(false);
+                        if (sgdbRequestReference.current === requestId)
+                          setSgdbSearching(false);
                       }
                     }}
                   >
@@ -1784,7 +1921,9 @@ export default function GameDetail() {
                       {sgdbSearching ? (
                         <p className="text-sm text-text-muted">Searching...</p>
                       ) : sgdbGames !== null && sgdbGames.length === 0 ? (
-                        <p className="text-sm text-text-muted">No games found.</p>
+                        <p className="text-sm text-text-muted">
+                          No games found.
+                        </p>
                       ) : sgdbGames === null ? null : (
                         <div className="overflow-y-auto flex-1 min-h-0 space-y-1">
                           {sgdbGames.map((g) => (
@@ -1829,9 +1968,13 @@ export default function GameDetail() {
                         Back to results
                       </button>
                       {sgdbLoadingImages ? (
-                        <p className="text-sm text-text-muted">Loading images...</p>
+                        <p className="text-sm text-text-muted">
+                          Loading images...
+                        </p>
                       ) : sgdbImages.length === 0 ? (
-                        <p className="text-sm text-text-muted">No {sgdbDialog.mode} found.</p>
+                        <p className="text-sm text-text-muted">
+                          No {sgdbDialog.mode} found.
+                        </p>
                       ) : sgdbDialog.mode === "covers" ? (
                         <div className="grid grid-cols-3 gap-3 overflow-y-auto p-1 flex-1 min-h-0">
                           {sgdbImages.map((url) => (
@@ -1846,11 +1989,13 @@ export default function GameDetail() {
                                     title: displayGame.title,
                                     summary: displayGame.summary ?? null,
                                     genre: displayGame.genre ?? null,
-                                    releaseYear: displayGame.releaseYear ?? null,
+                                    releaseYear:
+                                      displayGame.releaseYear ?? null,
                                     coverUrl: url,
                                     heroUrl: displayGame.heroUrl ?? null,
                                     installType: displayGame.installType,
-                                    installerExe: displayGame.installerExe ?? null,
+                                    installerExe:
+                                      displayGame.installerExe ?? null,
                                     gameExe: displayGame.gameExe ?? null,
                                     developer: displayGame.developer ?? null,
                                     publisher: displayGame.publisher ?? null,
@@ -1865,7 +2010,9 @@ export default function GameDetail() {
                                 setSgdbDialog({ ...sgdbDialog, open: false });
                               }}
                               className={`aspect-2/3 rounded-lg ring-2 transition hover:ring-accent ${
-                                (editing ? editForm.coverUrl : displayGame.coverUrl) === url
+                                (editing
+                                  ? editForm.coverUrl
+                                  : displayGame.coverUrl) === url
                                   ? "ring-accent"
                                   : "ring-transparent"
                               }`}
@@ -1892,11 +2039,13 @@ export default function GameDetail() {
                                     title: displayGame.title,
                                     summary: displayGame.summary ?? null,
                                     genre: displayGame.genre ?? null,
-                                    releaseYear: displayGame.releaseYear ?? null,
+                                    releaseYear:
+                                      displayGame.releaseYear ?? null,
                                     coverUrl: displayGame.coverUrl ?? null,
                                     heroUrl: url,
                                     installType: displayGame.installType,
-                                    installerExe: displayGame.installerExe ?? null,
+                                    installerExe:
+                                      displayGame.installerExe ?? null,
                                     gameExe: displayGame.gameExe ?? null,
                                     developer: displayGame.developer ?? null,
                                     publisher: displayGame.publisher ?? null,
@@ -1911,12 +2060,18 @@ export default function GameDetail() {
                                 setSgdbDialog({ ...sgdbDialog, open: false });
                               }}
                               className={`rounded-lg ring-2 transition hover:ring-accent ${
-                                (editing ? editForm.heroUrl : displayGame.heroUrl) === url
+                                (editing
+                                  ? editForm.heroUrl
+                                  : displayGame.heroUrl) === url
                                   ? "ring-accent"
                                   : "ring-transparent"
                               }`}
                             >
-                              <img src={url} alt="" className="w-full rounded-lg object-cover" />
+                              <img
+                                src={url}
+                                alt=""
+                                className="w-full rounded-lg object-cover"
+                              />
                             </button>
                           ))}
                         </div>
@@ -1938,7 +2093,9 @@ export default function GameDetail() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-text-primary font-medium">Match on IGDB</h3>
+                    <h3 className="text-text-primary font-medium">
+                      Match on IGDB
+                    </h3>
                     <button
                       onClick={() => {
                         setCandidates(null);
@@ -1961,7 +2118,10 @@ export default function GameDetail() {
                       </svg>
                     </button>
                   </div>
-                  <form onSubmit={handleIgdbCustomSearch} className="flex gap-2 mb-4">
+                  <form
+                    onSubmit={handleIgdbCustomSearch}
+                    className="flex gap-2 mb-4"
+                  >
                     <input
                       type="text"
                       value={igdbQuery}
@@ -1977,12 +2137,17 @@ export default function GameDetail() {
                       {searching ? "Searching..." : "Search"}
                     </button>
                   </form>
-                  {searchError && <p className="text-sm text-red-400 mb-3">{searchError}</p>}
+                  {searchError && (
+                    <p className="text-sm text-red-400 mb-3">{searchError}</p>
+                  )}
                   <div className="overflow-y-auto space-y-2 flex-1">
                     {searching &&
                       candidates.length === 0 &&
                       Array.from({ length: 3 }).map((_, index) => (
-                        <div key={index} className="flex gap-4 p-3 rounded-lg animate-pulse">
+                        <div
+                          key={index}
+                          className="flex gap-4 p-3 rounded-lg animate-pulse"
+                        >
                           <div className="w-16 h-20 shrink-0 rounded-md bg-surface-raised" />
                           <div className="flex-1 space-y-2 py-1">
                             <div className="h-4 bg-surface-raised rounded w-3/4" />
@@ -2024,13 +2189,19 @@ export default function GameDetail() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-text-primary truncate">{c.name}</p>
+                          <p className="font-medium text-sm text-text-primary truncate">
+                            {c.name}
+                          </p>
                           <div className="flex gap-2 mt-0.5 text-xs text-text-muted">
                             {c.releaseYear && <span>{c.releaseYear}</span>}
-                            {c.genre && <span className="truncate">{c.genre}</span>}
+                            {c.genre && (
+                              <span className="truncate">{c.genre}</span>
+                            )}
                           </div>
                           {c.platform && (
-                            <p className="text-xs text-text-muted mt-0.5 truncate">{c.platform}</p>
+                            <p className="text-xs text-text-muted mt-0.5 truncate">
+                              {c.platform}
+                            </p>
                           )}
                           {c.summary && (
                             <p className="text-xs text-text-secondary mt-1 line-clamp-2">
