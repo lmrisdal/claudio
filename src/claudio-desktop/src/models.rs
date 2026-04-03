@@ -61,6 +61,7 @@ pub struct InstallProgress {
     pub game_id: i32,
     pub status: String,
     pub percent: Option<f64>,
+    pub indeterminate: Option<bool>,
     pub detail: Option<String>,
     pub bytes_downloaded: Option<u64>,
     pub total_bytes: Option<u64>,

@@ -190,6 +190,7 @@ export default function DesktopSidebar() {
           ) : (
             <>
               {[...activeDownloads.values()].map(({ game, progress }) => {
+                const isIndeterminate = progress.indeterminate === true;
                 const percent = typeof progress.percent === "number" ? progress.percent : null;
                 const active = location.pathname === `/games/${game.id}`;
                 return (
@@ -216,10 +217,14 @@ export default function DesktopSidebar() {
                   >
                     {/* Progress bar spanning the full entry width */}
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/30">
-                      <div
-                        className="h-full bg-accent transition-all duration-300"
-                        style={{ width: `${percent ?? 0}%` }}
-                      />
+                      {isIndeterminate ? (
+                        <div className="h-full bg-accent progress-indeterminate-bar" />
+                      ) : (
+                        <div
+                          className="h-full bg-accent transition-all duration-300"
+                          style={{ width: `${percent ?? 0}%` }}
+                        />
+                      )}
                     </div>
                     <div
                       className={`rounded overflow-hidden shrink-0 ${
@@ -256,7 +261,11 @@ export default function DesktopSidebar() {
                       <div className="min-w-0">
                         <span className="text-xs truncate block">{game.title}</span>
                         <span className="text-[10px] text-text-muted leading-tight">
-                          {percent === null ? "Preparing\u2026" : `${Math.round(percent)}%`}
+                          {isIndeterminate
+                            ? "Installing\u2026"
+                            : percent === null
+                              ? "Preparing\u2026"
+                              : `${Math.round(percent)}%`}
                         </span>
                       </div>
                     )}

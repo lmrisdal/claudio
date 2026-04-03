@@ -72,6 +72,7 @@ interface InstallProgress {
   gameId: number;
   status: string;
   percent?: number | null;
+  indeterminate?: boolean | null;
   detail?: string | null;
   bytesDownloaded?: number | null;
   totalBytes?: number | null;

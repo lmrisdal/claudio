@@ -51,54 +51,63 @@ export default function Downloads() {
             Active
           </h2>
           <div className="space-y-2">
-            {activeList.map(({ game, progress, speedBps }) => (
-              <div
-                key={game.id}
-                className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-border"
-              >
-                <CoverThumb coverUrl={getCover(game.id)} title={game.title} size="lg" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{game.title}</div>
-                  <div className="text-sm text-text-muted mt-0.5">
-                    <span>
-                      {progress.detail ??
-                        progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
-                    </span>
-                    {speedBps != null && (
-                      <span className="ml-2 font-mono tabular-nums">{formatSpeed(speedBps)}</span>
+            {activeList.map(({ game, progress, speedBps }) => {
+              const isIndeterminate = progress.indeterminate === true;
+              const hasPercent = typeof progress.percent === "number";
+
+              return (
+                <div
+                  key={game.id}
+                  className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-border"
+                >
+                  <CoverThumb coverUrl={getCover(game.id)} title={game.title} size="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{game.title}</div>
+                    <div className="text-sm text-text-muted mt-0.5">
+                      <span>
+                        {progress.detail ??
+                          progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
+                      </span>
+                      {speedBps != null && (
+                        <span className="ml-2 font-mono tabular-nums">{formatSpeed(speedBps)}</span>
+                      )}
+                    </div>
+                    {(isIndeterminate || hasPercent) && (
+                      <div className="mt-2.5 h-2 rounded-full bg-surface-raised overflow-hidden">
+                        {isIndeterminate ? (
+                          <div className="h-full bg-accent rounded-full progress-indeterminate-bar" />
+                        ) : (
+                          <div
+                            className="h-full bg-accent rounded-full transition-[width] duration-300"
+                            style={{ width: `${Math.min(100, progress.percent ?? 0)}%` }}
+                          />
+                        )}
+                      </div>
                     )}
                   </div>
-                  {typeof progress.percent === "number" && (
-                    <div className="mt-2.5 h-2 rounded-full bg-surface-raised overflow-hidden">
-                      <div
-                        className="h-full bg-accent rounded-full transition-[width] duration-300"
-                        style={{ width: `${Math.min(100, progress.percent)}%` }}
-                      />
-                    </div>
+                  {!isIndeterminate && hasPercent && (
+                    <span className="text-sm text-text-muted font-mono tabular-nums shrink-0">
+                      {Math.round(progress.percent ?? 0)}%
+                    </span>
                   )}
-                </div>
-                {typeof progress.percent === "number" && (
-                  <span className="text-sm text-text-muted font-mono tabular-nums shrink-0">
-                    {Math.round(progress.percent)}%
-                  </span>
-                )}
-                <button
-                  onClick={() => cancelInstall(game.id)}
-                  className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
-                  title="Cancel download"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                  <button
+                    onClick={() => cancelInstall(game.id)}
+                    className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                    title="Cancel download"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

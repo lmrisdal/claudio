@@ -427,6 +427,7 @@ async fn download_package(
                 Some(&format!("Downloading {}", game_title)),
                 Some(downloaded),
                 total_bytes,
+                None,
             );
         }
     }
@@ -567,9 +568,23 @@ async fn install_installer(
         let installer =
             resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
 
-        emit_progress(&app_handle, gid, "installing", Some(87.0), Some("Running installer. This may take a while…"));
+        emit_progress_indeterminate(
+            &app_handle,
+            gid,
+            "installing",
+            Some(87.0),
+            Some("Running installer. This may take a while…"),
+            true,
+        );
         run_installer(&installer, &target_dir_owned, force_interactive)?;
-        emit_progress(&app_handle, gid, "installing", Some(97.0), Some("Applying patches…"));
+        emit_progress_indeterminate(
+            &app_handle,
+            gid,
+            "installing",
+            Some(97.0),
+            Some("Applying patches…"),
+            false,
+        );
         apply_scene_overrides(&staging_dir, &target_dir_owned)?;
 
         let _ = fs::remove_dir_all(&staging_dir);
@@ -1269,7 +1284,27 @@ fn emit_progress(
     percent: Option<f64>,
     detail: Option<&str>,
 ) {
-    emit_progress_with_bytes(app, game_id, status, percent, detail, None, None);
+    emit_progress_with_bytes(app, game_id, status, percent, detail, None, None, None);
+}
+
+fn emit_progress_indeterminate(
+    app: &AppHandle,
+    game_id: i32,
+    status: &str,
+    percent: Option<f64>,
+    detail: Option<&str>,
+    indeterminate: bool,
+) {
+    emit_progress_with_bytes(
+        app,
+        game_id,
+        status,
+        percent,
+        detail,
+        None,
+        None,
+        Some(indeterminate),
+    );
 }
 
 fn emit_progress_with_bytes(
@@ -1280,6 +1315,7 @@ fn emit_progress_with_bytes(
     detail: Option<&str>,
     bytes_downloaded: Option<u64>,
     total_bytes: Option<u64>,
+    indeterminate: Option<bool>,
 ) {
     let _ = app.emit(
         "install-progress",
@@ -1287,6 +1323,7 @@ fn emit_progress_with_bytes(
             game_id,
             status: status.to_string(),
             percent,
+            indeterminate,
             detail: detail.map(ToString::to_string),
             bytes_downloaded,
             total_bytes,
