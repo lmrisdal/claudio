@@ -12,13 +12,13 @@ bump:
 	git commit -m "chore(release): bump version to $$version"; \
 	git tag "v$$version"; \
 	case "$$push_flag" in \
-		push=true|push=yes|push=1) git push origin "v$$version" ;; \
+		push=true|push=yes|push=1) git push origin HEAD --tags ;; \
 		*) \
-			printf "Push tag now (y/N)? "; \
+			printf "Push commit and tag now (y/N)? "; \
 			read -r confirm; \
 			case "$$confirm" in \
-				[yY]|[yY][eE][sS]) git push origin "v$$version" ;; \
-				*) echo "Created commit + tag v$$version. Push tag later with: git push origin v$$version" ;; \
+				[yY]|[yY][eE][sS]) git push origin HEAD --tags ;; \
+				*) echo "Created commit + tag v$$version. Push later with: git push origin HEAD --tags" ;; \
 			esac ;; \
 	esac
 
