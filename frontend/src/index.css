@@ -229,7 +229,42 @@ html[data-desktop] [role="button"] {
   }
 }
 
+@keyframes checkingTextWave {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -180% 0;
+  }
+}
+
 .progress-indeterminate-bar {
   width: 36%;
   animation: progressIndeterminateSwing 1.1s ease-in-out infinite alternate;
+}
+
+.checking-wave-text {
+  color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    var(--text-muted-color) 0%,
+    var(--text-secondary) 18%,
+    var(--text-muted-color) 36%,
+    var(--text-secondary) 54%,
+    var(--text-muted-color) 72%,
+    var(--text-secondary) 90%,
+    var(--text-muted-color) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: checkingTextWave 3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checking-wave-text {
+    animation: none;
+    color: var(--text-secondary);
+    background-image: none;
+  }
 }

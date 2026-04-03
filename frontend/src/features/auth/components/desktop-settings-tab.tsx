@@ -13,7 +13,6 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
   const [testing, setTesting] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
-  const [updateMessage, setUpdateMessage] = useState("");
 
   useEffect(() => {
     if (!active) return;
@@ -26,28 +25,15 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
         loadedSettings.downloadSpeedLimitKbs ? String(loadedSettings.downloadSpeedLimitKbs) : "",
       );
       const customHeaders = loadedSettings.customHeaders ?? {};
-      const entries = Object.entries(customHeaders).map(([name, value]) => ({ name, value }));
+      const entries = Object.entries(customHeaders).map(([name, value]) => ({
+        name,
+        value,
+      }));
       setHeaders(entries);
       setShowHeaders(entries.length > 0);
       setConnectionMessage("");
       setSaveMessage("");
     });
-  }, [active]);
-
-  useEffect(() => {
-    if (!active) return;
-
-    const onResult = (event: Event) => {
-      const custom = event as CustomEvent<{ message?: string }>;
-      if (custom.detail?.message) {
-        setUpdateMessage(custom.detail.message);
-      }
-    };
-
-    globalThis.addEventListener("claudio:update-check-result", onResult);
-    return () => {
-      globalThis.removeEventListener("claudio:update-check-result", onResult);
-    };
   }, [active]);
 
   function buildCustomHeaders() {
@@ -130,15 +116,13 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
     }
   }
 
-  function handleCheckForUpdates() {
-    setUpdateMessage("Checking for updates...");
-    globalThis.dispatchEvent(new CustomEvent("claudio:check-for-updates"));
-  }
-
   return (
     <div className="space-y-5">
-      <div>
-        <label htmlFor="settings-server-url" className="mb-1.5 block text-sm font-medium text-text-secondary">
+      <div className="mb-2">
+        <label
+          htmlFor="settings-server-url"
+          className="mb-1.5 block text-sm font-medium text-text-secondary"
+        >
           Server URL
         </label>
         <input
@@ -225,7 +209,7 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
             </button>
           </div>
         )}
-        <div className="border-t border-border pt-3">
+        <div className="border-b border-border pb-3">
           <button
             onClick={handleTest}
             disabled={testing || !serverUrl.trim()}
@@ -300,33 +284,13 @@ export default function DesktopSettingsTab({ active }: { active: boolean }) {
       </div>
 
       {saveMessage && (
-        <p className={`text-sm ${saveMessage.includes("saved") ? "text-accent" : "text-red-400"}`} role="alert">
+        <p
+          className={`text-sm ${saveMessage.includes("saved") ? "text-accent" : "text-red-400"}`}
+          role="alert"
+        >
           {saveMessage}
         </p>
       )}
-
-      <div className="rounded-xl border border-border bg-bg px-3 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-text-primary">Desktop updates</p>
-            <p className="mt-1 text-xs text-text-muted">
-              Claudio checks for updates on startup and prepares downloads in the background.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleCheckForUpdates}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary transition hover:bg-surface-raised hover:text-text-primary"
-          >
-            Check for updates
-          </button>
-        </div>
-        {updateMessage && (
-          <p className="mt-2 text-xs text-text-muted" role="status">
-            {updateMessage}
-          </p>
-        )}
-      </div>
 
       <div className="flex justify-end border-t border-border pt-4">
         <button

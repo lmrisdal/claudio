@@ -74,11 +74,15 @@ pub fn run() {
                 let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
                     .accelerator("CmdOrCtrl+,")
                     .build(app)?;
+                let check_updates_item =
+                    MenuItemBuilder::with_id("check-updates", "Check for Updates...")
+                        .build(app)?;
 
                 let app_submenu = SubmenuBuilder::new(app, "Claudio")
                     .about(None)
                     .separator()
                     .item(&settings_item)
+                    .item(&check_updates_item)
                     .separator()
                     .services()
                     .separator()
@@ -119,11 +123,14 @@ pub fn run() {
             let show_item = MenuItemBuilder::with_id("tray-show", "Show Claudio")
                 .accelerator("CmdOrCtrl+O")
                 .build(app)?;
+            let check_updates_item =
+                MenuItemBuilder::with_id("tray-check-updates", "Check for Updates").build(app)?;
             let quit_item = MenuItemBuilder::with_id("tray-quit", "Quit")
                 .accelerator("CmdOrCtrl+Q")
                 .build(app)?;
             let tray_menu = MenuBuilder::new(app)
                 .item(&show_item)
+                .item(&check_updates_item)
                 .separator()
                 .item(&quit_item)
                 .build()?;
@@ -144,6 +151,9 @@ pub fn run() {
             match event.id().as_ref() {
                 "settings" => {
                     let _ = app.emit("open-settings", ());
+                }
+                "check-updates" | "tray-check-updates" => {
+                    let _ = app.emit("check-for-updates", ());
                 }
                 "tray-show" => {
                     restore_main_window(app);

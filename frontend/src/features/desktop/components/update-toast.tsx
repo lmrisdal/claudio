@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isDesktop } from "../hooks/use-desktop";
@@ -8,6 +9,7 @@ const CHECK_EVENT = "claudio:check-for-updates";
 const CHECK_RESULT_EVENT = "claudio:update-check-result";
 
 type ToastMode = "update-available" | "up-to-date" | "installing" | "error";
+type CheckSource = "startup" | "settings" | "native";
 
 type DownloadEvent =
   | { event: "Started"; data: { contentLength?: number | null } }
@@ -31,6 +33,8 @@ export default function UpdateToast() {
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const updateRef = useRef<Update | null>(null);
   const downloadedRef = useRef(false);
@@ -113,13 +117,25 @@ export default function UpdateToast() {
   );
 
   const checkForUpdates = useCallback(
-    async (manual: boolean) => {
+    async (source: CheckSource) => {
       if (!isDesktop) {
         return;
       }
 
+      const manual = source !== "startup";
+      const showToastForCheck = source === "native";
+
       if (manual) {
-        dismissedForSessionRef.current = false;
+        emitResult("Checking for updates...");
+      }
+
+      setIsChecking(true);
+
+      if (showToastForCheck) {
+        setMode("up-to-date");
+        setToastTitle("Checking for updates");
+        setToastBody("Looking for a newer version of Claudio.");
+        setVisible(true);
       }
 
       try {
@@ -127,15 +143,19 @@ export default function UpdateToast() {
 
         if (!update) {
           localStorage.removeItem(PENDING_UPDATE_VERSION_KEY);
+          updateRef.current = null;
           setMode("up-to-date");
           setToastTitle("No updates available");
           setToastBody("You are already running the latest version of Claudio.");
           setDownloadProgress(null);
           setUpdateVersion(null);
 
-          if (manual) {
-            setVisible(true);
+          if (manual || showToastForCheck) {
             emitResult("No updates available.");
+          }
+
+          if (showToastForCheck) {
+            setVisible(true);
           }
 
           return;
@@ -146,7 +166,7 @@ export default function UpdateToast() {
         setUpdateVersion(update.version);
 
         const pendingVersion = localStorage.getItem(PENDING_UPDATE_VERSION_KEY);
-        if (!manual && pendingVersion === update.version) {
+        if (source === "startup" && pendingVersion === update.version) {
           await installPreparedUpdate(update);
           return;
         }
@@ -156,12 +176,14 @@ export default function UpdateToast() {
         setToastBody(update.body?.trim() || "A new Claudio version is ready to install.");
         setDownloadProgress(null);
 
-        if (manual || !dismissedForSessionRef.current) {
-          setVisible(true);
+        if (source === "settings" || source === "native") {
+          emitResult(`Update v${update.version} is available.`);
         }
 
-        if (manual) {
-          emitResult(`Update v${update.version} is available.`);
+        if (source === "native" || (source === "startup" && !dismissedForSessionRef.current)) {
+          setVisible(true);
+        } else {
+          setVisible(false);
         }
 
         void startDownload(update);
@@ -169,11 +191,18 @@ export default function UpdateToast() {
         setMode("error");
         setToastTitle("Update check failed");
         setToastBody(toErrorMessage(error));
+        updateRef.current = null;
+        setUpdateVersion(null);
 
-        if (manual) {
-          setVisible(true);
+        if (manual || showToastForCheck) {
           emitResult("Could not check for updates.");
         }
+
+        if (showToastForCheck) {
+          setVisible(true);
+        }
+      } finally {
+        setIsChecking(false);
       }
     },
     [emitResult, installPreparedUpdate, startDownload],
@@ -184,17 +213,44 @@ export default function UpdateToast() {
       return;
     }
 
-    void checkForUpdates(false);
+    void checkForUpdates("startup");
 
-    const onCheck = () => {
-      void checkForUpdates(true);
+    const onSettingsCheck = () => {
+      void checkForUpdates("settings");
     };
 
-    globalThis.addEventListener(CHECK_EVENT, onCheck);
+    const onNativeCheck = () => {
+      void checkForUpdates("native");
+    };
+
+    const unlisten = listen("check-for-updates", onNativeCheck);
+
+    globalThis.addEventListener(CHECK_EVENT, onSettingsCheck);
     return () => {
-      globalThis.removeEventListener(CHECK_EVENT, onCheck);
+      globalThis.removeEventListener(CHECK_EVENT, onSettingsCheck);
+      void unlisten.then((function_) => function_());
     };
   }, [checkForUpdates]);
+
+  useEffect(() => {
+    if (!visible && isHovered) {
+      setIsHovered(false);
+    }
+  }, [isHovered, visible]);
+
+  useEffect(() => {
+    if (isHovered || !visible || mode !== "up-to-date" || toastTitle !== "No updates available") {
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(() => {
+      setVisible(false);
+    }, 2000);
+
+    return () => {
+      globalThis.clearTimeout(timeout);
+    };
+  }, [isHovered, mode, toastTitle, visible]);
 
   if (!isDesktop || !visible) {
     return null;
@@ -202,20 +258,28 @@ export default function UpdateToast() {
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[140] w-[min(24rem,calc(100vw-2rem))]">
-      <div className="pointer-events-auto rounded-xl border border-border bg-surface-raised/95 p-4 shadow-2xl backdrop-blur-sm">
+      <div
+        className="pointer-events-auto rounded-xl border border-border bg-surface-raised/95 p-4 shadow-2xl backdrop-blur-sm"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <h3 className="text-sm font-semibold text-text-primary">{toastTitle}</h3>
         <p className="mt-1 text-sm text-text-secondary">{toastBody}</p>
 
-        {(isDownloading || isInstalling) && (
+        {(isChecking || isDownloading || isInstalling) && (
           <div className="mt-3">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg">
               <div
                 className="h-full rounded-full bg-accent transition-all"
-                style={{ width: `${downloadProgress ?? 30}%` }}
+                style={{ width: `${isChecking ? 45 : (downloadProgress ?? 30)}%` }}
               />
             </div>
             <p className="mt-1 text-xs text-text-muted">
-              {isInstalling ? "Installing..." : "Preparing update in the background..."}
+              {isChecking
+                ? "Checking for updates..."
+                : isInstalling
+                  ? "Installing..."
+                  : "Preparing update in the background..."}
             </p>
           </div>
         )}

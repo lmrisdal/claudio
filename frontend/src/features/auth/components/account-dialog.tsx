@@ -10,6 +10,10 @@ import PreferencesTab from "./preferences-tab";
 
 type Tab = "account" | "preferences" | "desktop";
 
+const CHECK_FOR_UPDATES_EVENT = "claudio:check-for-updates";
+const CHECKING_FOR_UPDATES_MESSAGE = "Checking for updates...";
+const MIN_CHECKING_STATUS_MS = 1000;
+
 const allTabs: { id: Tab; label: string }[] = [
   { id: "account", label: "Account" },
   { id: "preferences", label: "Preferences" },
@@ -28,10 +32,13 @@ export default function AccountDialog({
   const { user, logout, authDisabled } = useAuth();
   const { isOpen: guideOpen } = useGuide();
   const previousFocusReference = useRef<HTMLElement | null>(null);
+  const checkingStartedAtReference = useRef<number | null>(null);
+  const delayedStatusTimeoutReference = useRef<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("account");
   const [focusZone, setFocusZone] = useState<"sidebar" | "content">("sidebar");
   const [sidebarIndex, setSidebarIndex] = useState(0);
   const [contentIndex, setContentIndex] = useState(0);
+  const [updateStatusMessage, setUpdateStatusMessage] = useState("");
 
   const sidebarReferences = useRef<(HTMLButtonElement | null)[]>([]);
   const contentReferences = useRef<(HTMLButtonElement | HTMLInputElement | null)[]>([]);
@@ -46,8 +53,11 @@ export default function AccountDialog({
     [],
   );
 
-  // Sidebar items: tabs + sign out (if auth enabled)
-  const sidebarCount = visibleTabs.length + (authDisabled ? 0 : 1);
+  const hasCheckForUpdatesButton = isDesktop;
+  const checkForUpdatesIndex = visibleTabs.length;
+  const signOutIndex = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0);
+  const sidebarCount =
+    visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (authDisabled ? 0 : 1);
 
   useEffect(() => {
     if (!open) return;
@@ -58,6 +68,76 @@ export default function AccountDialog({
     setSidebarIndex(Math.max(0, tabIndex));
     setContentIndex(0);
   }, [open, initialTab, visibleTabs]);
+
+  useEffect(() => {
+    if (!open) {
+      if (delayedStatusTimeoutReference.current !== null) {
+        globalThis.clearTimeout(delayedStatusTimeoutReference.current);
+        delayedStatusTimeoutReference.current = null;
+      }
+      checkingStartedAtReference.current = null;
+      setUpdateStatusMessage("");
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !isDesktop) {
+      return;
+    }
+
+    const onResult = (event: Event) => {
+      const custom = event as CustomEvent<{ message?: string }>;
+      const message = custom.detail?.message;
+      if (!message) {
+        return;
+      }
+
+      if (message === CHECKING_FOR_UPDATES_MESSAGE) {
+        if (delayedStatusTimeoutReference.current !== null) {
+          globalThis.clearTimeout(delayedStatusTimeoutReference.current);
+          delayedStatusTimeoutReference.current = null;
+        }
+        checkingStartedAtReference.current = Date.now();
+        setUpdateStatusMessage(message);
+        return;
+      }
+
+      const startedAt = checkingStartedAtReference.current;
+      if (startedAt === null) {
+        setUpdateStatusMessage(message);
+        return;
+      }
+
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, MIN_CHECKING_STATUS_MS - elapsed);
+
+      if (delayedStatusTimeoutReference.current !== null) {
+        globalThis.clearTimeout(delayedStatusTimeoutReference.current);
+      }
+
+      if (remaining === 0) {
+        checkingStartedAtReference.current = null;
+        setUpdateStatusMessage(message);
+        return;
+      }
+
+      delayedStatusTimeoutReference.current = globalThis.setTimeout(() => {
+        checkingStartedAtReference.current = null;
+        delayedStatusTimeoutReference.current = null;
+        setUpdateStatusMessage(message);
+      }, remaining);
+    };
+
+    globalThis.addEventListener("claudio:update-check-result", onResult);
+
+    return () => {
+      globalThis.removeEventListener("claudio:update-check-result", onResult);
+      if (delayedStatusTimeoutReference.current !== null) {
+        globalThis.clearTimeout(delayedStatusTimeoutReference.current);
+        delayedStatusTimeoutReference.current = null;
+      }
+    };
+  }, [open]);
 
   // Save/restore focus to element behind dialog
   useEffect(() => {
@@ -114,6 +194,19 @@ export default function AccountDialog({
     setActiveTab(tab);
     setContentIndex(0);
   }
+
+  function checkForUpdates() {
+    if (delayedStatusTimeoutReference.current !== null) {
+      globalThis.clearTimeout(delayedStatusTimeoutReference.current);
+      delayedStatusTimeoutReference.current = null;
+    }
+    checkingStartedAtReference.current = Date.now();
+    setUpdateStatusMessage(CHECKING_FOR_UPDATES_MESSAGE);
+    globalThis.dispatchEvent(new CustomEvent(CHECK_FOR_UPDATES_EVENT));
+  }
+
+  const checkForUpdatesLabel = updateStatusMessage || "Check for updates";
+  const isCheckingForUpdates = updateStatusMessage === CHECKING_FOR_UPDATES_MESSAGE;
 
   // ── Keyboard navigation (capture phase) ──
 
@@ -229,7 +322,7 @@ export default function AccountDialog({
 
   if (!open) return null;
 
-  // Build sidebar ref index: 0..visibleTabs.length-1 are tabs, last is sign out
+  // Build sidebar ref index: tabs, check updates (desktop), sign out (if auth enabled)
   let sidebarReferenceIndex = 0;
 
   const closeIcon = (
@@ -300,10 +393,31 @@ export default function AccountDialog({
             })}
           </div>
 
+          {hasCheckForUpdatesButton && (
+            <div className="mx-5 mb-2 hidden sm:block">
+              <button
+                ref={(element) => {
+                  sidebarReferences.current[checkForUpdatesIndex] = element;
+                }}
+                onClick={checkForUpdates}
+                onMouseEnter={() => {
+                  setFocusZone("sidebar");
+                  setSidebarIndex(checkForUpdatesIndex);
+                  sidebarReferences.current[checkForUpdatesIndex]?.focus();
+                }}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
+                  {checkForUpdatesLabel}
+                </span>
+              </button>
+            </div>
+          )}
+
           {!authDisabled && (
             <button
               ref={(element) => {
-                sidebarReferences.current[visibleTabs.length] = element;
+                sidebarReferences.current[signOutIndex] = element;
               }}
               onClick={() => {
                 onClose();
@@ -311,8 +425,8 @@ export default function AccountDialog({
               }}
               onMouseEnter={() => {
                 setFocusZone("sidebar");
-                setSidebarIndex(visibleTabs.length);
-                sidebarReferences.current[visibleTabs.length]?.focus();
+                setSidebarIndex(signOutIndex);
+                sidebarReferences.current[signOutIndex]?.focus();
               }}
               className="m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-red-400 focus-visible:ring-2 focus-visible:ring-accent sm:block"
             >
@@ -338,7 +452,9 @@ export default function AccountDialog({
           <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
             {activeTab === "account" && <AccountTab contentRefs={contentReferences} />}
             {activeTab === "preferences" && <PreferencesTab contentRefs={contentReferences} />}
-            {activeTab === "desktop" && <DesktopSettingsTab active={open && activeTab === "desktop"} />}
+            {activeTab === "desktop" && (
+              <DesktopSettingsTab active={open && activeTab === "desktop"} />
+            )}
 
             {!authDisabled && (
               <button
