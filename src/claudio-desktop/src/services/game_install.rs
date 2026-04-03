@@ -585,7 +585,8 @@ async fn install_installer(
             Some("Applying patches…"),
             false,
         );
-        apply_scene_overrides(&staging_dir, &target_dir_owned)?;
+        let installer_dir = installer.parent().unwrap_or(&staging_dir);
+        apply_scene_overrides(installer_dir, &target_dir_owned)?;
 
         let _ = fs::remove_dir_all(&staging_dir);
 
