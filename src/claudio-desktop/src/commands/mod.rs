@@ -21,14 +21,17 @@ pub fn restart_app(app: tauri::AppHandle) {
 
 #[tauri::command]
 pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    log::info!("Opening settings window");
+
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
+        log::info!("Focused existing settings window");
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(
+    let result = WebviewWindowBuilder::new(
         &app,
         "settings",
         WebviewUrl::App("index.html?desktop-settings-window=1".into()),
@@ -38,7 +41,18 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     .min_inner_size(640.0, 620.0)
     .center()
     .resizable(true)
+    .visible(true)
     .build()
-    .map(|_| ())
-    .map_err(|error| error.to_string())
+    .map(|_| ());
+
+    match result {
+        Ok(()) => {
+            log::info!("Created settings window");
+            Ok(())
+        }
+        Err(error) => {
+            log::error!("Failed to create settings window: {error}");
+            Err(error.to_string())
+        }
+    }
 }

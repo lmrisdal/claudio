@@ -1410,7 +1410,9 @@ export default function GameDetail() {
                               setPickExeOpen(true);
                             } catch (error) {
                               setInstallError(
-                                error instanceof Error ? error.message : "Could not list game executables.",
+                                error instanceof Error
+                                  ? error.message
+                                  : "Could not list game executables.",
                               );
                             }
                           }}
