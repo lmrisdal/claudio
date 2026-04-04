@@ -37,7 +37,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             commands::games::cancel_install,
             commands::games::get_installed_game,
@@ -166,13 +173,16 @@ pub fn run() {
             _ => {}
         })
         .on_page_load(|webview, payload| {
-            if webview.label() == "settings" {
-                log::info!("Settings window page load event: {:?}", payload.event());
+            if matches!(payload.event(), PageLoadEvent::Finished) {
+                let window = webview.window().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                });
             }
 
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {
-                let _ = webview.window().show();
-
                 #[cfg(target_os = "macos")]
                 {
                     use objc2::msg_send;

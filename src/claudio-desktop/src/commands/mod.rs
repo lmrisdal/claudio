@@ -43,7 +43,7 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     .min_inner_size(640.0, 620.0)
     .center()
     .resizable(true)
-    .visible(true)
+    .visible(false)
     .build()
     .map(|_| ());
 
