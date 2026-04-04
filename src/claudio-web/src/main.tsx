@@ -6,6 +6,7 @@ import App from "./app";
 import AuthProvider from "./features/auth/components/auth-provider";
 import GuideProvider from "./features/core/components/guide-provider";
 import NavigationProvider from "./features/core/components/navigation-provider";
+import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import "./index.css";
@@ -43,6 +44,8 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       retry: 1,
+      refetchOnReconnect: true,
+      refetchOnWindowFocus: true,
     },
   },
 });
@@ -51,17 +54,19 @@ createRoot(document.querySelector("#root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AuthProvider>
-          <GuideProvider>
-            <SettingsDialogProvider>
-              <NavigationProvider>
-                <main data-ui-scroll-container>
-                  <App />
-                </main>
-              </NavigationProvider>
-            </SettingsDialogProvider>
-          </GuideProvider>
-        </AuthProvider>
+        <ServerStatusProvider>
+          <AuthProvider>
+            <GuideProvider>
+              <SettingsDialogProvider>
+                <NavigationProvider>
+                  <main data-ui-scroll-container>
+                    <App />
+                  </main>
+                </NavigationProvider>
+              </SettingsDialogProvider>
+            </GuideProvider>
+          </AuthProvider>
+        </ServerStatusProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

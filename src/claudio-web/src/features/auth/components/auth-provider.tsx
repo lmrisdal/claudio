@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   desktopCompleteExternalLogin,
   desktopGetSession,
@@ -10,6 +10,7 @@ import {
   type DesktopSession,
 } from "../../desktop/hooks/use-desktop";
 import { api } from "../../core/api/client";
+import { useServerStatus } from "../../core/hooks/use-server-status";
 import type { User } from "../../core/types/models";
 import type { AuthProvider, AuthProviders } from "../hooks/use-auth";
 import { AuthContext } from "../hooks/use-auth";
@@ -24,13 +25,6 @@ interface AuthProvidersResponse {
   localLoginEnabled: boolean;
   userCreationEnabled: boolean;
 }
-
-const noAuthUser: User = {
-  id: 0,
-  username: "admin",
-  role: "admin",
-  createdAt: "",
-};
 
 function parseToken(token: string): User | null {
   try {
@@ -89,6 +83,7 @@ async function exchangeTokens(parameters: Record<string, string>): Promise<Token
 }
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
+  const { isConnected } = useServerStatus();
   const [token, setTokenState] = useState<string | null>(() => {
     if (isDesktop) return null;
     return localStorage.getItem("token");
@@ -104,6 +99,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const existingToken = localStorage.getItem("token");
     return existingToken ? parseToken(existingToken) : null;
   });
+  const previousConnectedReference = useRef(isConnected);
 
   const clearWebAuthState = useCallback(() => {
     localStorage.removeItem("token");
@@ -136,16 +132,29 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    api
+    if (isDesktop && !isConnected) {
+      setAuthDisabled(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    void api
       .get<AuthProvidersResponse>("/auth/providers")
       .then((response) => {
+        if (cancelled) return;
         setProviders(response);
+        setAuthDisabled(false);
       })
       .catch(() => {
+        if (cancelled) return;
         setAuthDisabled(true);
-        setUser(noAuthUser);
       });
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected]);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -176,6 +185,44 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [applyDesktopSession, clearWebAuthState]);
+
+  useEffect(() => {
+    if (!isDesktop) {
+      previousConnectedReference.current = isConnected;
+      return;
+    }
+
+    const wasConnected = previousConnectedReference.current;
+    previousConnectedReference.current = isConnected;
+    if (wasConnected || !isConnected) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void desktopGetSession()
+      .then((session) => {
+        if (cancelled) return;
+
+        applyDesktopSession(session);
+        if (session.isLoggedIn) {
+          return;
+        }
+
+        return desktopProxyLogin()
+          .then((proxySession) => {
+            if (!cancelled) {
+              applyDesktopSession(proxySession);
+            }
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyDesktopSession, isConnected]);
 
   useEffect(() => {
     if (isDesktop || token) return;

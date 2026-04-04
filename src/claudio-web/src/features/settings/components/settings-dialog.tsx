@@ -37,7 +37,7 @@ export default function SettingsDialog({
   onClose: () => void;
   embedded?: boolean;
 }) {
-  const { user, logout, authDisabled } = useAuth();
+  const { user, logout } = useAuth();
   const { isOpen: guideOpen } = useGuide();
   const previousFocusReference = useRef<HTMLElement | null>(null);
   const checkingStartedAtReference = useRef<number | null>(null);
@@ -69,10 +69,10 @@ export default function SettingsDialog({
   const firstAppTabIndex = visibleTabs.findIndex((tab) => tab.id.startsWith("app."));
 
   const hasCheckForUpdatesButton = isDesktop;
+  const canSignOut = Boolean(user);
   const checkForUpdatesIndex = visibleTabs.length;
   const signOutIndex = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0);
-  const sidebarCount =
-    visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (authDisabled ? 0 : 1);
+  const sidebarCount = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (canSignOut ? 1 : 0);
 
   useEffect(() => {
     if (!open) return;
@@ -513,7 +513,7 @@ export default function SettingsDialog({
             </div>
           )}
 
-          {!authDisabled && (
+          {canSignOut && (
             <button
               ref={(element) => {
                 sidebarReferences.current[signOutIndex] = element;
@@ -558,7 +558,7 @@ export default function SettingsDialog({
               <AppDownloadsSettingsTab contentRefs={contentReferences} settings={appSettings} />
             )}
 
-            {!authDisabled && (
+            {canSignOut && (
               <button
                 onClick={() => {
                   onClose();

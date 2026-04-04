@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
 import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
+import { useServerStatus } from "../hooks/use-server-status";
 import { useNavigation } from "../hooks/use-navigation";
 import { isMac } from "../utils/os";
 import Logo from "./logo";
@@ -12,7 +13,8 @@ import TasksPopover from "./tasks-popover";
 
 export default function Header() {
   const navigate = useNavigate();
-  const { isLoggedIn, isAdmin, user, logout, authDisabled } = useAuth();
+  const { isLoggedIn, isAdmin, user, logout } = useAuth();
+  const { isConnected } = useServerStatus();
   const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
   const settingsDialog = useSettingsDialog();
   const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
@@ -79,6 +81,17 @@ export default function Header() {
           )}
 
           <div className="desktop-no-drag flex items-center gap-1 ml-auto min-w-0">
+            {isLoggedIn && !isConnected && isDesktop && (
+              <span
+                className="mr-2 flex items-center gap-2 text-xs text-red-400"
+                title="Server could not connect"
+                aria-label="Server could not connect"
+              >
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span>Disconnected</span>
+              </span>
+            )}
+
             {isLoggedIn && (
               <button
                 onClick={toggleSearch}
@@ -114,7 +127,7 @@ export default function Header() {
                     </Link>
                   </>
                 )}
-                {!authDisabled && (
+                {user && (
                   <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
                     <Menu as="div" className="relative h-full flex items-center">
                       <MenuButton
