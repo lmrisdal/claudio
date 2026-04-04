@@ -10,13 +10,32 @@ import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import "./index.css";
 
+const LOG_ATTACH_TIMEOUT_MS = 1500;
+
+async function attachDesktopLogBridgeWithTimeout() {
+  const { attachConsole } = await import("@tauri-apps/plugin-log");
+  await Promise.race([
+    attachConsole(),
+    new Promise<never>((_, reject) => {
+      globalThis.setTimeout(() => {
+        reject(new Error("Timed out attaching desktop log bridge"));
+      }, LOG_ATTACH_TIMEOUT_MS);
+    }),
+  ]);
+}
+
 if (isDesktop) {
   document.documentElement.dataset.desktop = "";
   document.addEventListener("contextmenu", (event) => {
     event.preventDefault();
   });
-  const { attachConsole } = await import("@tauri-apps/plugin-log");
-  await attachConsole();
+
+  try {
+    await attachDesktopLogBridgeWithTimeout();
+    console.info("Desktop log bridge attached");
+  } catch (error) {
+    console.error("Failed to attach desktop log bridge", error);
+  }
 }
 
 const queryClient = new QueryClient({

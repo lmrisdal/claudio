@@ -31,6 +31,8 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
+    log::info!("Building settings window webview");
+
     let result = WebviewWindowBuilder::new(
         &app,
         "settings",

@@ -166,6 +166,10 @@ pub fn run() {
             _ => {}
         })
         .on_page_load(|webview, payload| {
+            if webview.label() == "settings" {
+                log::info!("Settings window page load event: {:?}", payload.event());
+            }
+
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {
                 let _ = webview.window().show();
 
