@@ -141,19 +141,6 @@ pub fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
     open_path(&path)
 }
 
-pub fn launch_game(remote_game_id: i32) -> Result<(), String> {
-    let game =
-        registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
-    let exe = game
-        .game_exe
-        .ok_or_else(|| "No executable is set for this game.".to_string())?;
-
-    std::process::Command::new(&exe)
-        .spawn()
-        .map_err(|e| format!("Failed to launch game: {e}"))?;
-    Ok(())
-}
-
 pub fn set_game_exe(remote_game_id: i32, game_exe: String) -> Result<InstalledGame, String> {
     let mut game =
         registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;

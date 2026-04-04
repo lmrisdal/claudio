@@ -1,5 +1,6 @@
-use crate::models::{InstalledGame, RemoteGame};
+use crate::models::{InstalledGame, RemoteGame, RunningGameInfo};
 use crate::services::game_install::{self, InstallState};
+use crate::services::game_runtime::{self, RunningGamesState};
 use tauri::{AppHandle, State};
 
 #[tauri::command]
@@ -46,10 +47,20 @@ pub async fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(
 }
 
 #[tauri::command]
-pub async fn launch_game(remote_game_id: i32) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || game_install::launch_game(remote_game_id))
-        .await
-        .map_err(|e| e.to_string())?
+pub fn launch_game(state: State<'_, RunningGamesState>, remote_game_id: i32) -> Result<(), String> {
+    game_runtime::launch_game(&state, remote_game_id)
+}
+
+#[tauri::command]
+pub fn stop_game(state: State<'_, RunningGamesState>, remote_game_id: i32) -> Result<(), String> {
+    game_runtime::stop_game(&state, remote_game_id)
+}
+
+#[tauri::command]
+pub fn list_running_games(
+    state: State<'_, RunningGamesState>,
+) -> Result<Vec<RunningGameInfo>, String> {
+    state.list_active()
 }
 
 #[tauri::command]

@@ -15,9 +15,11 @@ import { sounds } from "../../core/utils/sounds";
 import {
   cancelInstall,
   launchGame,
+  listRunningGames,
   listGameExecutables,
   openInstallFolder,
   setGameExe,
+  stopGame,
   uninstallGame,
   useDesktop,
 } from "../../desktop/hooks/use-desktop";
@@ -178,6 +180,13 @@ export default function GameDetail() {
     enabled: isDesktop && !!id,
   });
 
+  const { data: runningGames = [] } = useQuery({
+    queryKey: ["runningGames"],
+    queryFn: listRunningGames,
+    enabled: isDesktop,
+    refetchInterval: 3000,
+  });
+
   const { data: browseData, isLoading: browseLoading } = useQuery({
     queryKey: ["browse", id, browsePath],
     queryFn: () =>
@@ -252,6 +261,8 @@ export default function GameDetail() {
   }, [game, installedGame]);
 
   const isDesktopPcGame = isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
+  const isGameRunning =
+    !!displayGame && runningGames.some((runningGame) => runningGame.gameId === displayGame.id);
 
   const installMutation = useMutation({
     mutationFn: async (
@@ -1368,37 +1379,62 @@ export default function GameDetail() {
                         <button
                           type="button"
                           onClick={async () => {
+                            if (isGameRunning) {
+                              try {
+                                await stopGame(displayGame.id);
+                                await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
+                              } catch (error) {
+                                setInstallError(
+                                  error instanceof Error ? error.message : "Could not stop game.",
+                                );
+                              }
+                              return;
+                            }
+
                             if (installedGame.gameExe) {
-                              launchGame(displayGame.id).catch((error) => {
+                              try {
+                                await launchGame(displayGame.id);
+                                await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
+                              } catch (error) {
                                 setInstallError(
                                   error instanceof Error ? error.message : "Could not launch game.",
                                 );
-                              });
-                            } else {
-                              // Installer game with no exe recorded — prompt user to pick
-                              try {
-                                const exes = await listGameExecutables(displayGame.id);
-                                setPickExeOptions(exes);
-                                setPickExeOpen(true);
-                              } catch (error) {
-                                setInstallError(
-                                  error instanceof Error
-                                    ? error.message
-                                    : "Could not list game executables.",
-                                );
                               }
+                              return;
+                            }
+
+                            // Installer game with no exe recorded — prompt user to pick
+                            try {
+                              const exes = await listGameExecutables(displayGame.id);
+                              setPickExeOptions(exes);
+                              setPickExeOpen(true);
+                            } catch (error) {
+                              setInstallError(
+                                error instanceof Error ? error.message : "Could not list game executables.",
+                              );
                             }
                           }}
                           onContextMenu={(e) => {
+                            if (isGameRunning) {
+                              return;
+                            }
                             e.preventDefault();
                             setPlayContextMenu({ x: e.clientX, y: e.clientY });
                           }}
-                          className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                          className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg) ${
+                            isGameRunning
+                              ? "bg-red-500 text-white hover:bg-red-400 focus-visible:ring-red-400"
+                              : "bg-accent text-neutral-950 hover:bg-accent-hover focus-visible:ring-accent"
+                          }`}
                         >
                           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z" />
+                            {isGameRunning ? (
+                              <path d="M7.5 6.75A2.25 2.25 0 0 1 9.75 4.5h4.5a2.25 2.25 0 0 1 2.25 2.25v4.5a2.25 2.25 0 0 1-2.25 2.25h-4.5A2.25 2.25 0 0 1 7.5 11.25v-4.5Z" />
+                            ) : (
+                              <path d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z" />
+                            )}
                           </svg>
-                          Play
+                          {isGameRunning ? "Stop" : "Play"}
                         </button>
 
                         {/* Play button context menu */}
@@ -1503,6 +1539,7 @@ export default function GameDetail() {
                               const fullExe = `${installedGame.installPath}\\${exe}`;
                               await setGameExe(displayGame.id, fullExe);
                               await launchGame(displayGame.id);
+                              await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
                             } catch (error) {
                               setInstallError(
                                 error instanceof Error ? error.message : "Could not launch game.",

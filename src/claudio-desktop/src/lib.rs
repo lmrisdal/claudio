@@ -26,6 +26,7 @@ fn restore_main_window(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(services::game_install::InstallState::default())
+        .manage(services::game_runtime::RunningGamesState::default())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -44,9 +45,11 @@ pub fn run() {
             commands::games::launch_game,
             commands::games::list_game_executables,
             commands::games::list_installed_games,
+            commands::games::list_running_games,
             commands::games::resolve_install_path,
             commands::games::open_install_folder,
             commands::games::set_game_exe,
+            commands::games::stop_game,
             commands::games::uninstall_game,
             commands::ping::ping,
             commands::get_settings,

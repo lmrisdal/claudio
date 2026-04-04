@@ -66,3 +66,12 @@ pub struct InstallProgress {
     pub bytes_downloaded: Option<u64>,
     pub total_bytes: Option<u64>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunningGameInfo {
+    pub game_id: i32,
+    pub pid: u32,
+    pub exe_path: String,
+    pub started_at: String,
+}

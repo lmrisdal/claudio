@@ -78,6 +78,13 @@ interface InstallProgress {
   totalBytes?: number | null;
 }
 
+interface RunningGame {
+  gameId: number;
+  pid: number;
+  exePath: string;
+  startedAt: string;
+}
+
 export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
 }
@@ -129,6 +136,14 @@ export async function launchGame(remoteGameId: number): Promise<void> {
   return invoke<void>("launch_game", { remoteGameId });
 }
 
+export async function stopGame(remoteGameId: number): Promise<void> {
+  return invoke<void>("stop_game", { remoteGameId });
+}
+
+export async function listRunningGames(): Promise<RunningGame[]> {
+  return invoke<RunningGame[]>("list_running_games");
+}
+
 export async function setGameExe(remoteGameId: number, gameExe: string): Promise<InstalledGame> {
   return invoke<InstalledGame>("set_game_exe", { remoteGameId, gameExe });
 }
@@ -166,4 +181,5 @@ export type {
   InstalledGame,
   InstallProgress,
   PingResponse,
+  RunningGame,
 };
