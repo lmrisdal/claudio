@@ -65,7 +65,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-grid">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-2">
+        <div className={`text-center ${isDesktop ? "mb-2" : "mb-10"}`}>
           <Logo className="text-5xl" />
           <p className="text-text-muted text-sm mt-3">
             {providers.localLoginEnabled
