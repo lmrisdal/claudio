@@ -18,6 +18,8 @@ import {
   listRunningGames,
   listGameExecutables,
   openInstallFolder,
+  restartInstallInteractive,
+  type RunningGame,
   setGameExe,
   stopGame,
   uninstallGame,
@@ -316,6 +318,34 @@ export default function GameDetail() {
     },
   });
 
+  const stopGameMutation = useMutation({
+    mutationFn: async (remoteGameId: number) => {
+      await stopGame(remoteGameId);
+    },
+    onMutate: async (remoteGameId) => {
+      await queryClient.cancelQueries({ queryKey: ["runningGames"] });
+      const previous = queryClient.getQueryData<RunningGame[]>(["runningGames"]) ?? [];
+      queryClient.setQueryData<RunningGame[]>(
+        ["runningGames"],
+        previous.filter((runningGame) => runningGame.gameId !== remoteGameId),
+      );
+      return { previous };
+    },
+    onError: (error, _remoteGameId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["runningGames"], context.previous);
+      }
+      setInstallError(error instanceof Error ? error.message : "Could not stop game.");
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
+    },
+  });
+
+  const stoppingGameId = stopGameMutation.variables;
+  const isStoppingGame =
+    typeof stoppingGameId === "number" && !!displayGame && stoppingGameId === displayGame.id;
+
   useEffect(() => {
     if (!isLoading && game) {
       requestAnimationFrame(() => focusAnchorReference.current?.focus());
@@ -592,6 +622,11 @@ export default function GameDetail() {
     : installMutation.isPending
       ? "Starting install…"
       : "Install";
+
+  const canRestartInstallerInteractively =
+    hasActiveInstallProgress &&
+    installProgress?.status === "installing" &&
+    displayGame.installType === "installer";
 
   async function handleInstallClick() {
     if (!displayGame) return;
@@ -1379,15 +1414,12 @@ export default function GameDetail() {
                         <button
                           type="button"
                           onClick={async () => {
-                            if (isGameRunning) {
-                              try {
-                                await stopGame(displayGame.id);
-                                await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
-                              } catch (error) {
-                                setInstallError(
-                                  error instanceof Error ? error.message : "Could not stop game.",
-                                );
-                              }
+                            if (isStoppingGame) {
+                              return;
+                            }
+
+                            if (isGameRunning || isStoppingGame) {
+                              stopGameMutation.mutate(displayGame.id);
                               return;
                             }
 
@@ -1417,26 +1449,33 @@ export default function GameDetail() {
                             }
                           }}
                           onContextMenu={(e) => {
-                            if (isGameRunning) {
+                            if (isGameRunning || isStoppingGame) {
                               return;
                             }
                             e.preventDefault();
                             setPlayContextMenu({ x: e.clientX, y: e.clientY });
                           }}
                           className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg) ${
-                            isGameRunning
+                            isGameRunning || isStoppingGame
                               ? "bg-red-500 text-white hover:bg-red-400 focus-visible:ring-red-400"
                               : "bg-accent text-neutral-950 hover:bg-accent-hover focus-visible:ring-accent"
                           }`}
+                          disabled={isStoppingGame}
                         >
-                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                            {isGameRunning ? (
+                          <svg
+                            className={`h-4 w-4 ${isStoppingGame ? "animate-spin" : ""}`}
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            {isStoppingGame ? (
+                              <path d="M12 2.25a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM12 18.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 .75-.75ZM4.398 4.398a.75.75 0 0 1 1.06 0l1.768 1.768a.75.75 0 1 1-1.06 1.06L4.398 5.46a.75.75 0 0 1 0-1.061ZM16.774 16.774a.75.75 0 0 1 1.06 0l1.768 1.768a.75.75 0 1 1-1.06 1.06l-1.768-1.768a.75.75 0 0 1 0-1.06ZM2.25 12a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75ZM18.5 12a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75ZM6.167 16.774a.75.75 0 0 1 1.06 1.06L5.46 19.602a.75.75 0 1 1-1.06-1.06l1.767-1.768ZM18.542 4.398a.75.75 0 0 1 1.06 1.061l-1.768 1.767a.75.75 0 0 1-1.06-1.06l1.768-1.768Z" />
+                            ) : isGameRunning ? (
                               <path d="M7.5 6.75A2.25 2.25 0 0 1 9.75 4.5h4.5a2.25 2.25 0 0 1 2.25 2.25v4.5a2.25 2.25 0 0 1-2.25 2.25h-4.5A2.25 2.25 0 0 1 7.5 11.25v-4.5Z" />
                             ) : (
                               <path d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z" />
                             )}
                           </svg>
-                          {isGameRunning ? "Stop" : "Play"}
+                          {isStoppingGame ? "Stopping..." : isGameRunning ? "Stop" : "Play"}
                         </button>
 
                         {/* Play button context menu */}
@@ -1593,27 +1632,39 @@ export default function GameDetail() {
                           {desktopInstallLabel}
                         </button>
                         {(installMutation.isPending || hasActiveInstallProgress) && (
-                          <button
-                            type="button"
-                            data-nav
-                            onClick={() => void cancelInstall(displayGame.id)}
-                            aria-label="Cancel install"
-                            className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-3 text-sm text-text-secondary transition hover:border-red-400 hover:text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-                          >
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2.25}
+                          <div className="flex items-center gap-2">
+                            {canRestartInstallerInteractively && (
+                              <button
+                                type="button"
+                                data-nav
+                                onClick={() => void restartInstallInteractive(displayGame.id)}
+                                className="inline-flex items-center rounded-lg border border-border px-3 py-3 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                              >
+                                Run interactively
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              data-nav
+                              onClick={() => void cancelInstall(displayGame.id)}
+                              aria-label="Cancel install"
+                              className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-3 text-sm text-text-secondary transition hover:border-red-400 hover:text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 18 18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.25}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M6 18 18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         )}
                       </div>
                     )

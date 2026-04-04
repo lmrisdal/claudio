@@ -25,7 +25,6 @@ function closeSettingsWindow(): void {
 }
 
 export default function SettingsWindow() {
-  console.info("Opening embedded settings dialog window");
   const initialTab = getInitialSettingsTab();
 
   return (

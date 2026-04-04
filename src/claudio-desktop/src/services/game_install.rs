@@ -11,7 +11,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Archive;
@@ -19,53 +19,117 @@ use tauri::{AppHandle, Emitter, State};
 use zip::read::ZipArchive;
 
 pub struct InstallState {
-    active_game_ids: Mutex<Vec<i32>>,
-    cancel_tokens: Mutex<HashMap<i32, Arc<AtomicBool>>>,
+    installs: Mutex<HashMap<i32, InstallControl>>,
 }
 
 impl Default for InstallState {
     fn default() -> Self {
         Self {
-            active_game_ids: Mutex::new(Vec::new()),
-            cancel_tokens: Mutex::new(HashMap::new()),
+            installs: Mutex::new(HashMap::new()),
         }
     }
 }
 
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+struct InstallControl {
+    cancel_token: Arc<AtomicBool>,
+    restart_interactive: Arc<AtomicBool>,
+    installer_pid: Arc<AtomicU32>,
+    installer_exe_name: Arc<Mutex<Option<String>>>,
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+impl InstallControl {
+    fn new() -> Self {
+        Self {
+            cancel_token: Arc::new(AtomicBool::new(false)),
+            restart_interactive: Arc::new(AtomicBool::new(false)),
+            installer_pid: Arc::new(AtomicU32::new(0)),
+            installer_exe_name: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancel_token.load(Ordering::Relaxed)
+    }
+
+    fn set_cancelled(&self, value: bool) {
+        self.cancel_token.store(value, Ordering::Relaxed);
+    }
+
+    fn request_restart_interactive(&self) {
+        self.restart_interactive.store(true, Ordering::Relaxed);
+        self.cancel_token.store(true, Ordering::Relaxed);
+    }
+
+    fn take_restart_interactive_request(&self) -> bool {
+        self.restart_interactive.swap(false, Ordering::Relaxed)
+    }
+
+    fn set_installer_process(&self, pid: u32, exe_name: Option<String>) {
+        self.installer_pid.store(pid, Ordering::Relaxed);
+        if let Ok(mut name) = self.installer_exe_name.lock() {
+            *name = exe_name;
+        }
+    }
+
+    fn clear_installer_process(&self) {
+        self.installer_pid.store(0, Ordering::Relaxed);
+        if let Ok(mut name) = self.installer_exe_name.lock() {
+            *name = None;
+        }
+    }
+
+    fn installer_snapshot(&self) -> (u32, Option<String>) {
+        let pid = self.installer_pid.load(Ordering::Relaxed);
+        let name = self.installer_exe_name.lock().ok().and_then(|n| n.clone());
+        (pid, name)
+    }
+}
+
 impl InstallState {
-    fn start(&self, game_id: i32) -> Result<Arc<AtomicBool>, String> {
-        let mut active = self
-            .active_game_ids
+    fn start(&self, game_id: i32) -> Result<InstallControl, String> {
+        let mut installs = self
+            .installs
             .lock()
             .map_err(|_| "Install state lock poisoned.".to_string())?;
-        if active.contains(&game_id) {
+        if installs.contains_key(&game_id) {
             return Err("This game is already being installed.".to_string());
         }
-        active.push(game_id);
-
-        let token = Arc::new(AtomicBool::new(false));
-        if let Ok(mut tokens) = self.cancel_tokens.lock() {
-            tokens.insert(game_id, token.clone());
-        }
-        Ok(token)
+        let control = InstallControl::new();
+        installs.insert(game_id, control.clone());
+        Ok(control)
     }
 
     fn finish(&self, game_id: i32) {
-        if let Ok(mut active) = self.active_game_ids.lock() {
-            active.retain(|id| *id != game_id);
-        }
-        if let Ok(mut tokens) = self.cancel_tokens.lock() {
-            tokens.remove(&game_id);
+        if let Ok(mut installs) = self.installs.lock() {
+            installs.remove(&game_id);
         }
     }
 
     pub fn cancel(&self, game_id: i32) -> Result<(), String> {
-        let tokens = self
-            .cancel_tokens
+        let installs = self
+            .installs
             .lock()
             .map_err(|_| "Install state lock poisoned.".to_string())?;
-        if let Some(token) = tokens.get(&game_id) {
-            token.store(true, Ordering::Relaxed);
+        if let Some(control) = installs.get(&game_id) {
+            control.set_cancelled(true);
+            terminate_external_installer(control);
+            Ok(())
+        } else {
+            Err("No active install for this game.".to_string())
+        }
+    }
+
+    pub fn restart_interactive(&self, game_id: i32) -> Result<(), String> {
+        let installs = self
+            .installs
+            .lock()
+            .map_err(|_| "Install state lock poisoned.".to_string())?;
+        if let Some(control) = installs.get(&game_id) {
+            control.request_restart_interactive();
+            terminate_external_installer(control);
             Ok(())
         } else {
             Err("No active install for this game.".to_string())
@@ -73,16 +137,25 @@ impl InstallState {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn terminate_external_installer(control: &InstallControl) {
+    let (pid, exe_name) = control.installer_snapshot();
+    let _ = crate::windows_integration::terminate_related_processes(pid, exe_name);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn terminate_external_installer(_control: &InstallControl) {}
+
 pub async fn install_game(
     app: AppHandle,
     state: State<'_, InstallState>,
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
-    let cancel_token = state.start(game.id)?;
+    let control = state.start(game.id)?;
     let game_id = game.id;
-    let result = install_game_inner(&app, game, &cancel_token).await;
+    let result = install_game_inner(&app, game, &control).await;
     state.finish(game_id);
-    if cancel_token.load(Ordering::Relaxed) {
+    if control.is_cancelled() {
         return Err("Install cancelled.".to_string());
     }
     result
@@ -108,6 +181,10 @@ pub fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledGame>, 
 
 pub fn cancel_install(state: &InstallState, game_id: i32) -> Result<(), String> {
     state.cancel(game_id)
+}
+
+pub fn restart_install_interactive(state: &InstallState, game_id: i32) -> Result<(), String> {
+    state.restart_interactive(game_id)
 }
 
 pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
@@ -177,7 +254,7 @@ pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String>
 async fn install_game_inner(
     app: &AppHandle,
     game: RemoteGame,
-    cancel_token: &Arc<AtomicBool>,
+    control: &InstallControl,
 ) -> Result<InstalledGame, String> {
     log::info!(
         "Starting install for '{}' (id={}, install_type={:?})",
@@ -234,7 +311,7 @@ async fn install_game_inner(
         game.id,
         game.title.as_str(),
         &temp_root,
-        cancel_token,
+        control,
     )
     .await?;
     log::info!("Download complete: {}", download_info.file_path.display());
@@ -244,7 +321,7 @@ async fn install_game_inner(
             install_portable(app, &game, &target_dir, &download_info.file_path).await
         }
         InstallType::Installer => {
-            install_installer(app, &game, &target_dir, &download_info.file_path).await
+            install_installer(app, &game, &target_dir, &download_info.file_path, control).await
         }
     };
 
@@ -292,7 +369,7 @@ async fn download_package(
     game_id: i32,
     game_title: &str,
     temp_root: &Path,
-    cancel_token: &Arc<AtomicBool>,
+    control: &InstallControl,
 ) -> Result<DownloadInfo, String> {
     let DownloadOptions {
         settings,
@@ -407,7 +484,7 @@ async fn download_package(
     });
 
     while let Some(chunk) = stream.next().await {
-        if cancel_token.load(Ordering::Relaxed) {
+        if control.is_cancelled() {
             drop(chunk_tx);
             let _ = writer_handle.await;
             let _ = fs::remove_dir_all(temp_root);
@@ -557,6 +634,7 @@ async fn install_installer(
     game: &RemoteGame,
     target_dir: &Path,
     package_path: &Path,
+    control: &InstallControl,
 ) -> Result<InstalledGame, String> {
     if !cfg!(target_os = "windows") {
         return Err("Installer-based PC installs are only supported on Windows.".to_string());
@@ -577,9 +655,11 @@ async fn install_installer(
     let package_path_owned = package_path.to_path_buf();
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
-    let force_interactive = game.force_interactive.unwrap_or(false);
+    let initial_force_interactive = game.force_interactive.unwrap_or(false);
+    let control = control.clone();
 
     let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+        let mut force_interactive = initial_force_interactive;
         let mut progress_cb = |p: f64| {
             emit_progress(
                 &app_handle,
@@ -605,15 +685,37 @@ async fn install_installer(
 
         let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
 
-        emit_progress_indeterminate(
-            &app_handle,
-            gid,
-            "installing",
-            Some(87.0),
-            Some("Running installer. This may take a while…"),
-            true,
-        );
-        run_installer(&installer, &target_dir_owned, force_interactive)?;
+        loop {
+            let detail = if force_interactive {
+                "Running installer interactively…"
+            } else {
+                "Running installer silently. This may take a while…"
+            };
+            emit_progress_indeterminate(
+                &app_handle,
+                gid,
+                "installing",
+                Some(87.0),
+                Some(detail),
+                true,
+            );
+            match run_installer(&installer, &target_dir_owned, force_interactive, &control) {
+                Ok(()) => break,
+                Err(RunInstallerError::RestartInteractiveRequested) => {
+                    force_interactive = true;
+                    emit_progress_indeterminate(
+                        &app_handle,
+                        gid,
+                        "installing",
+                        Some(87.0),
+                        Some("Restarting installer in interactive mode…"),
+                        true,
+                    );
+                }
+                Err(RunInstallerError::Cancelled) => return Err("Install cancelled.".to_string()),
+                Err(RunInstallerError::Failed(message)) => return Err(message),
+            }
+        }
         emit_progress_indeterminate(
             &app_handle,
             gid,
@@ -1093,7 +1195,12 @@ fn detect_installer_type(path: &Path) -> InstallerType {
 }
 
 #[cfg(target_os = "windows")]
-fn run_installer(path: &Path, target_dir: &Path, force_interactive: bool) -> Result<(), String> {
+fn run_installer(
+    path: &Path,
+    target_dir: &Path,
+    force_interactive: bool,
+    control: &InstallControl,
+) -> Result<(), RunInstallerError> {
     let target = target_dir.to_string_lossy();
     let installer_type = detect_installer_type(path);
     log::info!(
@@ -1112,7 +1219,7 @@ fn run_installer(path: &Path, target_dir: &Path, force_interactive: bool) -> Res
         let mut cmd = std::process::Command::new(path);
         cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
             .stdin(Stdio::null());
-        return spawn_mute_wait(cmd, path, "");
+        return spawn_mute_wait(cmd, path, "", control);
     }
 
     match installer_type {
@@ -1136,9 +1243,9 @@ fn run_installer(path: &Path, target_dir: &Path, force_interactive: bool) -> Res
                 .arg("/qn")
                 .arg(format!("TARGETDIR={target}"))
                 .stdin(Stdio::null());
-            spawn_mute_wait(cmd, Path::new("msiexec"), &msi_args)
+            spawn_mute_wait(cmd, Path::new("msiexec"), &msi_args, control)
         }
-        InstallerType::InnoSetup => run_innosetup_silent(path, &target),
+        InstallerType::InnoSetup => run_innosetup_silent(path, &target, control),
         InstallerType::Nsis => {
             // /D= must be the last argument and cannot be quoted
             let nsis_args = format!("/S /D={target}");
@@ -1146,20 +1253,24 @@ fn run_installer(path: &Path, target_dir: &Path, force_interactive: bool) -> Res
             cmd.arg("/S")
                 .arg(format!("/D={target}"))
                 .stdin(Stdio::null());
-            spawn_mute_wait(cmd, path, &nsis_args)
+            spawn_mute_wait(cmd, path, &nsis_args, control)
         }
         InstallerType::Unknown => {
             // Fall back to interactive; user chooses install location
             let mut cmd = std::process::Command::new(path);
             cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
                 .stdin(Stdio::null());
-            spawn_mute_wait(cmd, path, "")
+            spawn_mute_wait(cmd, path, "", control)
         }
     }
 }
 
 #[cfg(target_os = "windows")]
-fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
+fn run_innosetup_silent(
+    path: &Path,
+    target: &str,
+    control: &InstallControl,
+) -> Result<(), RunInstallerError> {
     // Quote the path so spaces in the install directory are handled correctly.
     // /NOSOUND is added to suppress audio if supported by the installer.
     let args = format!("/VERYSILENT /SUPPRESSMSGBOXES /NOSOUND \"/DIR={target}\"");
@@ -1170,37 +1281,91 @@ fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
         .arg(format!("/DIR={target}"))
         .stdin(Stdio::null());
 
-    spawn_mute_wait(cmd, path, &args)
+    spawn_mute_wait(cmd, path, &args, control)
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+enum RunInstallerError {
+    Cancelled,
+    RestartInteractiveRequested,
+    Failed(String),
 }
 
 /// Spawns a process, attempts to mute its audio on Windows, and waits for it to exit.
 /// Handles UAC elevation (Error 740) by falling back to PowerShell's RunAs.
 #[cfg(target_os = "windows")]
-fn spawn_mute_wait(mut cmd: std::process::Command, path: &Path, args: &str) -> Result<(), String> {
+fn spawn_mute_wait(
+    mut cmd: std::process::Command,
+    path: &Path,
+    args: &str,
+    control: &InstallControl,
+) -> Result<(), RunInstallerError> {
     let exe_name = path.file_name().and_then(|n| n.to_str()).map(String::from);
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(err) if err.raw_os_error() == Some(740) => {
             // Elevated process won't be in our PID tree, but name-matching will find it.
+            control.set_installer_process(0, exe_name.clone());
             crate::windows_integration::mute_process_audio(0, exe_name);
-            let status = run_elevated(path, args)?;
+            let status = run_elevated(path, args).map_err(RunInstallerError::Failed)?;
+            control.clear_installer_process();
+            if control.take_restart_interactive_request() {
+                control.set_cancelled(false);
+                return Err(RunInstallerError::RestartInteractiveRequested);
+            }
+            if control.is_cancelled() {
+                return Err(RunInstallerError::Cancelled);
+            }
             if status.success() {
                 return Ok(());
             } else {
-                return Err(format!("Installer exited with status {status}."));
+                return Err(RunInstallerError::Failed(format!(
+                    "Installer exited with status {status}."
+                )));
             }
         }
-        Err(err) => return Err(err.to_string()),
+        Err(err) => return Err(RunInstallerError::Failed(err.to_string())),
     };
 
+    control.set_installer_process(child.id(), exe_name.clone());
     crate::windows_integration::mute_process_audio(child.id(), exe_name);
+    loop {
+        if control.take_restart_interactive_request() {
+            let _ = crate::windows_integration::terminate_related_processes(
+                child.id(),
+                path.file_name().and_then(|n| n.to_str()).map(String::from),
+            );
+            control.clear_installer_process();
+            control.set_cancelled(false);
+            return Err(RunInstallerError::RestartInteractiveRequested);
+        }
 
-    let status = child.wait().map_err(|err| err.to_string())?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("Installer exited with status {status}."))
+        if control.is_cancelled() {
+            let _ = crate::windows_integration::terminate_related_processes(
+                child.id(),
+                path.file_name().and_then(|n| n.to_str()).map(String::from),
+            );
+            control.clear_installer_process();
+            return Err(RunInstallerError::Cancelled);
+        }
+
+        match child
+            .try_wait()
+            .map_err(|err| RunInstallerError::Failed(err.to_string()))?
+        {
+            Some(status) => {
+                control.clear_installer_process();
+                return if status.success() {
+                    Ok(())
+                } else {
+                    Err(RunInstallerError::Failed(format!(
+                        "Installer exited with status {status}."
+                    )))
+                };
+            }
+            None => std::thread::sleep(std::time::Duration::from_millis(120)),
+        }
     }
 }
 
@@ -1368,8 +1533,15 @@ fn download_innoextract(target: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn run_installer(_path: &Path, _target_dir: &Path, _force_interactive: bool) -> Result<(), String> {
-    Err("Installer-based PC installs are only supported on Windows.".to_string())
+fn run_installer(
+    _path: &Path,
+    _target_dir: &Path,
+    _force_interactive: bool,
+    _control: &InstallControl,
+) -> Result<(), RunInstallerError> {
+    Err(RunInstallerError::Failed(
+        "Installer-based PC installs are only supported on Windows.".to_string(),
+    ))
 }
 
 fn emit_progress(

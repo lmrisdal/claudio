@@ -1,6 +1,7 @@
 use crate::models::{InstallType, InstalledGame};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
 use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
@@ -34,6 +35,48 @@ pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     });
+}
+
+pub fn terminate_related_processes(pid: u32, exe_name: Option<String>) -> Result<(), String> {
+    let mut target_pids: Vec<u32> = if pid != 0 {
+        get_process_tree(pid)
+    } else {
+        Vec::new()
+    };
+
+    if let Some(name) = exe_name.as_deref() {
+        for found_pid in find_pids_matching(|exe| exe.eq_ignore_ascii_case(name)) {
+            if !target_pids.contains(&found_pid) {
+                target_pids.push(found_pid);
+            }
+        }
+    }
+
+    for found_pid in find_pids_matching(|exe| exe.to_ascii_lowercase().ends_with(".tmp")) {
+        if !target_pids.contains(&found_pid) {
+            target_pids.push(found_pid);
+        }
+    }
+
+    for target_pid in target_pids {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &target_pid.to_string(), "/T", "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+
+    if let Some(name) = exe_name {
+        let _ = Command::new("taskkill")
+            .args(["/IM", &name, "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+
+    Ok(())
 }
 
 /// Collects all (pid, parent_pid) pairs from a toolhelp snapshot, then builds

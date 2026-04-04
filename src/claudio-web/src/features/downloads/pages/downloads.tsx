@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Game } from "../../core/types/models";
-import { cancelInstall } from "../../desktop/hooks/use-desktop";
+import { cancelInstall, restartInstallInteractive } from "../../desktop/hooks/use-desktop";
 import CoverThumb from "../components/cover-thumb";
 import { useDownloadManager } from "../hooks/use-download-manager-hook";
 
@@ -14,6 +15,7 @@ function formatSpeed(bytesPerSecond: number): string {
 export default function Downloads() {
   const queryClient = useQueryClient();
   const { activeDownloads } = useDownloadManager();
+  const [restartRequestedByGameId, setRestartRequestedByGameId] = useState<Set<number>>(new Set());
 
   const games = queryClient.getQueryData<Game[]>(["games"]);
 
@@ -54,6 +56,11 @@ export default function Downloads() {
             {activeList.map(({ game, progress, speedBps }) => {
               const isIndeterminate = progress.indeterminate === true;
               const hasPercent = typeof progress.percent === "number";
+              const canRestartInteractive =
+                game.installType === "installer" &&
+                progress.status === "installing" &&
+                game.forceInteractive !== true;
+              const isRestartingInteractive = restartRequestedByGameId.has(game.id);
 
               return (
                 <div
@@ -90,21 +97,48 @@ export default function Downloads() {
                       {Math.round(progress.percent ?? 0)}%
                     </span>
                   )}
-                  <button
-                    onClick={() => cancelInstall(game.id)}
-                    className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
-                    title="Cancel download"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
+                  <div className="flex items-center gap-2">
+                    {canRestartInteractive && (
+                      <button
+                        onClick={async () => {
+                          setRestartRequestedByGameId((previous) => new Set(previous).add(game.id));
+                          try {
+                            await restartInstallInteractive(game.id);
+                          } finally {
+                            setRestartRequestedByGameId((previous) => {
+                              const next = new Set(previous);
+                              next.delete(game.id);
+                              return next;
+                            });
+                          }
+                        }}
+                        disabled={isRestartingInteractive}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Restart installer interactively"
+                      >
+                        {isRestartingInteractive ? "Restarting..." : "Run interactively"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => cancelInstall(game.id)}
+                      className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                      title="Cancel download"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               );
             })}

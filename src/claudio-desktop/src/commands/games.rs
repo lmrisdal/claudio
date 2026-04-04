@@ -39,6 +39,14 @@ pub fn cancel_install(state: State<'_, InstallState>, game_id: i32) -> Result<()
 }
 
 #[tauri::command]
+pub fn restart_install_interactive(
+    state: State<'_, InstallState>,
+    game_id: i32,
+) -> Result<(), String> {
+    game_install::restart_install_interactive(&state, game_id)
+}
+
+#[tauri::command]
 pub async fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
     tokio::task::spawn_blocking(move || game_install::uninstall_game(remote_game_id, delete_files))
         .await

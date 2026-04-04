@@ -158,6 +158,10 @@ export async function cancelInstall(gameId: number): Promise<void> {
   return invoke<void>("cancel_install", { gameId });
 }
 
+export async function restartInstallInteractive(gameId: number): Promise<void> {
+  return invoke<void>("restart_install_interactive", { gameId });
+}
+
 export async function uninstallGame(remoteGameId: number, deleteFiles: boolean): Promise<void> {
   return invoke<void>("uninstall_game", { remoteGameId, deleteFiles });
 }

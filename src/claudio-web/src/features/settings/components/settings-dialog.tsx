@@ -72,7 +72,8 @@ export default function SettingsDialog({
   const canSignOut = Boolean(user);
   const checkForUpdatesIndex = visibleTabs.length;
   const signOutIndex = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0);
-  const sidebarCount = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (canSignOut ? 1 : 0);
+  const sidebarCount =
+    visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (canSignOut ? 1 : 0);
 
   useEffect(() => {
     if (!open) return;

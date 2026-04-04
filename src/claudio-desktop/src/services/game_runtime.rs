@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct RunningGamesState {
@@ -140,10 +142,35 @@ fn kill_process_tree(pid: u32) -> Result<(), String> {
             .status()
             .map_err(|e| format!("Failed to stop game process: {e}"))?;
 
-        if status.success() {
-            Ok(())
-        } else {
+        if !status.success() {
+            return Err(format!("Failed to stop game process (PID {pid})."));
+        }
+
+        for _ in 0..12 {
+            if !is_process_running(pid) {
+                return Ok(());
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+
+        let _ = Command::new("pkill")
+            .args(["-KILL", "-P", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+
+        let _ = Command::new("kill")
+            .args(["-KILL", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+
+        if is_process_running(pid) {
             Err(format!("Failed to stop game process (PID {pid})."))
+        } else {
+            Ok(())
         }
     }
 }

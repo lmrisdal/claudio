@@ -103,17 +103,12 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         return Err("You must be signed in to open Settings.".to_string());
     }
 
-    log::info!("Opening settings window");
-
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
-        log::info!("Focused existing settings window");
         return Ok(());
     }
-
-    log::info!("Building settings window webview");
 
     let result = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("index.html".into()))
         .title("Desktop Settings")
@@ -126,10 +121,7 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         .map(|_| ());
 
     match result {
-        Ok(()) => {
-            log::info!("Created settings window");
-            Ok(())
-        }
+        Ok(()) => Ok(()),
         Err(error) => {
             log::error!("Failed to create settings window: {error}");
             Err(error.to_string())
