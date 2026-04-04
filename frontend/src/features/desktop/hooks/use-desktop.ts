@@ -90,6 +90,10 @@ export async function updateSettings(settings: DesktopSettings): Promise<void> {
   return invoke<void>("update_settings", { settings });
 }
 
+export async function openSettingsWindow(): Promise<void> {
+  return invoke<void>("open_settings_window");
+}
+
 export async function installGame(
   game: DesktopInstallGameInput,
   token: string,
@@ -147,6 +151,7 @@ export function useDesktop() {
     ping,
     getSettings,
     updateSettings,
+    openSettingsWindow,
     installGame,
     getInstalledGame,
     listInstalledGames,

@@ -3,7 +3,7 @@ import { createContext, useContext } from "react";
 export interface AccountDialogContextValue {
   isOpen: boolean;
   open: () => void;
-  openTab: (tab: "account" | "preferences" | "desktop") => void;
+  openTab: (tab: "account" | "interface" | "app.general" | "app.server" | "app.downloads") => void;
   close: () => void;
 }
 

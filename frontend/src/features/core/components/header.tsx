@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Link, useNavigate } from "react-router";
 import { useAccountDialog } from "../../auth/hooks/use-account-dialog";
 import { useAuth } from "../../auth/hooks/use-auth";
-import { isDesktop } from "../../desktop/hooks/use-desktop";
+import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
 import { useNavigation } from "../hooks/use-navigation";
 import { isMac } from "../utils/os";
 import Logo from "./logo";
@@ -143,7 +143,13 @@ export default function Header() {
                       >
                         <MenuItem>
                           <button
-                            onClick={() => accountDialog.openTab("account")}
+                            onClick={() => {
+                              if (isDesktop) {
+                                void openSettingsWindow();
+                                return;
+                              }
+                              accountDialog.openTab("account");
+                            }}
                             className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-text-secondary data-focus:bg-surface-overlay data-focus:text-text-primary transition"
                           >
                             <svg

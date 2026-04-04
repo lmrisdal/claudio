@@ -5,9 +5,11 @@ import { getSettings, updateSettings, type DesktopSettings } from "../hooks/use-
 export default function DesktopSettingsDialog({
   open,
   onClose,
+  embedded = false,
 }: {
   open: boolean;
   onClose: () => void;
+  embedded?: boolean;
 }) {
   const previousFocusReference = useRef<HTMLElement | null>(null);
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
@@ -55,6 +57,17 @@ export default function DesktopSettingsDialog({
   });
 
   if (!open) return null;
+
+  const containerClassName = embedded
+    ? "h-full w-full"
+    : "fixed inset-0 z-[100] flex items-center justify-center";
+  const panelClassName = embedded
+    ? "relative flex h-full w-full flex-col bg-surface"
+    : "relative w-full max-w-lg mx-4 bg-surface border border-border rounded-xl shadow-2xl";
+  const contentClassName = embedded ? "flex-1 overflow-y-auto px-6 py-5 space-y-5" : "px-6 py-5 space-y-5";
+  const footerClassName = embedded
+    ? "flex justify-between px-6 py-4 border-t border-border"
+    : "flex justify-between px-6 py-4 border-t border-border";
 
   function buildCustomHeaders() {
     const customHeaders: Record<string, string> = {};
@@ -137,10 +150,10 @@ export default function DesktopSettingsDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div className={containerClassName} onClick={embedded ? undefined : onClose}>
+      {!embedded && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />}
       <div
-        className="relative w-full max-w-lg mx-4 bg-surface border border-border rounded-xl shadow-2xl"
+        className={panelClassName}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="Desktop Settings"
@@ -164,7 +177,7 @@ export default function DesktopSettingsDialog({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className={contentClassName}>
           <div>
             <label
               htmlFor="settings-server-url"
@@ -327,7 +340,7 @@ export default function DesktopSettingsDialog({
           )}
         </div>
 
-        <div className="flex justify-between px-6 py-4 border-t border-border">
+        <div className={footerClassName}>
           <button
             onClick={handleTest}
             disabled={testing || !serverUrl.trim()}
@@ -340,7 +353,7 @@ export default function DesktopSettingsDialog({
               onClick={onClose}
               className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
             >
-              Cancel
+              {embedded ? "Close" : "Cancel"}
             </button>
             <button
               onClick={handleSave}

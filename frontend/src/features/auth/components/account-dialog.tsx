@@ -5,10 +5,10 @@ import { sounds } from "../../core/utils/sounds";
 import { isDesktop, ping } from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
 import AccountTab from "./account-tab";
-import DesktopSettingsTab from "./desktop-settings-tab";
-import PreferencesTab from "./preferences-tab";
+import AppSettingsTab, { type AppSettingsSubTab } from "./app-settings-tab";
+import InterfaceTab from "./interface-tab";
 
-type Tab = "account" | "preferences" | "desktop";
+export type Tab = "account" | "interface" | `app.${AppSettingsSubTab}`;
 
 const CHECK_FOR_UPDATES_EVENT = "claudio:check-for-updates";
 const CHECKING_FOR_UPDATES_MESSAGE = "Checking for updates...";
@@ -16,18 +16,22 @@ const MIN_CHECKING_STATUS_MS = 1000;
 
 const allTabs: { id: Tab; label: string }[] = [
   { id: "account", label: "Account" },
-  { id: "preferences", label: "Preferences" },
-  { id: "desktop", label: "App" },
+  { id: "interface", label: "Interface" },
+  { id: "app.general", label: "General" },
+  { id: "app.server", label: "Server" },
+  { id: "app.downloads", label: "Downloads" },
 ];
 
 export default function AccountDialog({
   open,
   initialTab,
   onClose,
+  embedded = false,
 }: {
   open: boolean;
   initialTab: Tab;
   onClose: () => void;
+  embedded?: boolean;
 }) {
   const { user, logout, authDisabled } = useAuth();
   const { isOpen: guideOpen } = useGuide();
@@ -49,11 +53,13 @@ export default function AccountDialog({
   const visibleTabs = useMemo(
     () =>
       allTabs.filter((tab) => {
-        if (tab.id === "desktop" && !isDesktop) return false;
+        if (tab.id.startsWith("app.") && !isDesktop) return false;
         return true;
       }),
     [],
   );
+
+  const firstAppTabIndex = visibleTabs.findIndex((tab) => tab.id.startsWith("app."));
 
   const hasCheckForUpdatesButton = isDesktop;
   const checkForUpdatesIndex = visibleTabs.length;
@@ -363,15 +369,19 @@ export default function AccountDialog({
     </svg>
   );
 
+  const containerClassName = embedded
+    ? "h-full w-full"
+    : "fixed inset-0 z-[100] flex items-end justify-center sm:items-center";
+  const panelClassName = embedded
+    ? "relative flex h-full w-full flex-col overflow-hidden bg-surface sm:flex-row"
+    : "relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl";
+
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
-      onClick={onClose}
-    >
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+    <div className={containerClassName} onClick={embedded ? undefined : onClose}>
+      {!embedded && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />}
       <div
         ref={panelReference}
-        className="relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl"
+        className={panelClassName}
         onClick={(e) => e.stopPropagation()}
         onPointerDownCapture={() => setShowSidebarFocusRing(false)}
         role="dialog"
@@ -400,27 +410,31 @@ export default function AccountDialog({
           </div>
 
           <div className="flex gap-1 overflow-x-auto border-b border-border px-3 py-3 [scrollbar-width:none] sm:mt-4 sm:flex-1 sm:flex-col sm:overflow-visible sm:border-b-0 sm:px-5 sm:py-0 [&::-webkit-scrollbar]:hidden">
-            {visibleTabs.map((tab) => {
+            {visibleTabs.map((tab, listIndex) => {
               const index = sidebarReferenceIndex++;
               return (
-                <button
-                  key={tab.id}
-                  ref={(element) => {
-                    sidebarReferences.current[index] = element;
-                  }}
-                  onClick={() => {
-                    setFocusZone("sidebar");
-                    setSidebarIndex(index);
-                    selectTab(tab.id);
-                  }}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors sm:w-full ${
-                    activeTab === tab.id
-                      ? "bg-surface text-text-primary font-medium"
-                      : "text-text-secondary hover:bg-surface hover:text-text-primary"
-                  } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
-                >
-                  {tab.label}
-                </button>
+                <div key={tab.id} className="shrink-0 sm:w-full">
+                  {listIndex === firstAppTabIndex && (
+                    <div className="my-2 border-t border-border/70 sm:my-3" aria-hidden="true" />
+                  )}
+                  <button
+                    ref={(element) => {
+                      sidebarReferences.current[index] = element;
+                    }}
+                    onClick={() => {
+                      setFocusZone("sidebar");
+                      setSidebarIndex(index);
+                      selectTab(tab.id);
+                    }}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors ${
+                      activeTab === tab.id
+                        ? "bg-surface text-text-primary font-medium"
+                        : "text-text-secondary hover:bg-surface hover:text-text-primary"
+                    } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                  >
+                    {tab.label}
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -480,9 +494,12 @@ export default function AccountDialog({
 
           <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
             {activeTab === "account" && <AccountTab contentRefs={contentReferences} />}
-            {activeTab === "preferences" && <PreferencesTab contentRefs={contentReferences} />}
-            {activeTab === "desktop" && (
-              <DesktopSettingsTab active={open && activeTab === "desktop"} />
+            {activeTab === "interface" && <InterfaceTab contentRefs={contentReferences} />}
+            {activeTab.startsWith("app.") && (
+              <AppSettingsTab
+                active={open && activeTab.startsWith("app.")}
+                subTab={activeTab.split(".")[1] as AppSettingsSubTab}
+              />
             )}
 
             {!authDisabled && (

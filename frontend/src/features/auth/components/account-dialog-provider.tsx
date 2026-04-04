@@ -1,11 +1,10 @@
-import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShortcut } from "../../core/hooks/use-shortcut";
-import { isDesktop } from "../../desktop/hooks/use-desktop";
+import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
 import { AccountDialogContext } from "../hooks/use-account-dialog";
 import AccountDialog from "./account-dialog";
 
-type SettingsTab = "account" | "preferences" | "desktop";
+type SettingsTab = "account" | "interface" | "app.general" | "app.server" | "app.downloads";
 
 export default function AccountDialogProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,7 +19,9 @@ export default function AccountDialogProvider({ children }: { children: ReactNod
 
   useEffect(() => {
     const openAccount = () => openTab("account");
-    const openDesktop = () => openTab("desktop");
+    const openDesktop = () => {
+      void openSettingsWindow();
+    };
 
     globalThis.addEventListener("claudio:open-account", openAccount);
     if (isDesktop) {
@@ -28,17 +29,12 @@ export default function AccountDialogProvider({ children }: { children: ReactNod
     }
     globalThis.addEventListener("claudio:close-dialogs", close);
 
-    const unlisten = isDesktop ? listen("open-settings", openDesktop) : null;
-
     return () => {
       globalThis.removeEventListener("claudio:open-account", openAccount);
       if (isDesktop) {
         globalThis.removeEventListener("claudio:open-desktop-settings", openDesktop);
       }
       globalThis.removeEventListener("claudio:close-dialogs", close);
-      if (unlisten) {
-        void unlisten.then((function_) => function_());
-      }
     };
   }, [openTab, close]);
 
@@ -46,7 +42,7 @@ export default function AccountDialogProvider({ children }: { children: ReactNod
     "mod+,",
     (event) => {
       event.preventDefault();
-      openTab("desktop");
+      void openSettingsWindow();
     },
     { enabled: isDesktop },
   );

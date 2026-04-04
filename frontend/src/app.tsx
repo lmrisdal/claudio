@@ -10,6 +10,7 @@ import { GuestRoute } from "./features/auth/components/guest-route";
 import { ProtectedRoute } from "./features/auth/components/protected-route";
 import { DesktopGate } from "./features/desktop/components/desktop-gate";
 import DesktopLayout from "./features/desktop/components/desktop-layout";
+import DesktopSettingsWindow from "./features/desktop/components/desktop-settings-window";
 import UpdateToast from "./features/desktop/components/update-toast";
 
 const Admin = lazy(() => import("./features/admin/pages/admin"));
@@ -23,6 +24,14 @@ const Register = lazy(() => import("./features/auth/pages/register"));
 
 export default function App() {
   useTheme(); // keeps OS colour-scheme subscription alive for the lifetime of the app
+
+  const isDesktopSettingsWindow =
+    isDesktop && new URLSearchParams(globalThis.location.search).has("desktop-settings-window");
+
+  if (isDesktopSettingsWindow) {
+    return <DesktopSettingsWindow />;
+  }
+
   return (
     <div className="h-full bg-grid flex flex-col">
       <DesktopGate>

@@ -51,6 +51,7 @@ pub fn run() {
             commands::get_settings,
             commands::update_settings,
             commands::restart_app,
+            commands::open_settings_window,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -150,7 +151,7 @@ pub fn run() {
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
                 "settings" => {
-                    let _ = app.emit("open-settings", ());
+                    let _ = commands::open_settings_window(app.clone());
                 }
                 "check-updates" | "tray-check-updates" => {
                     let _ = app.emit("check-for-updates", ());

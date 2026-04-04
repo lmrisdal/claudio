@@ -15,7 +15,7 @@ import {
 import { isSoundsEnabled, setSoundsEnabled } from "../../core/utils/sounds";
 import ShortcutRow from "./shortcut-row";
 
-export default function PreferencesTab({
+export default function InterfaceTab({
   contentRefs,
 }: {
   contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
