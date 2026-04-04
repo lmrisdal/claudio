@@ -13,6 +13,7 @@ import { type SettingsTab } from "../hooks/use-settings-dialog";
 import { useAppSettingsForm } from "../hooks/use-app-settings-form";
 
 const CHECK_FOR_UPDATES_EVENT = "claudio:check-for-updates";
+const INSTALL_PREPARED_UPDATE_EVENT = "claudio:install-prepared-update";
 const CHECKING_FOR_UPDATES_MESSAGE = "Checking for updates...";
 const MIN_CHECKING_STATUS_MS = 1000;
 
@@ -45,6 +46,8 @@ export default function SettingsDialog({
   const [sidebarIndex, setSidebarIndex] = useState(0);
   const [contentIndex, setContentIndex] = useState(0);
   const [updateStatusMessage, setUpdateStatusMessage] = useState("");
+  const [canInstallUpdate, setCanInstallUpdate] = useState(false);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   const [showSidebarFocusRing, setShowSidebarFocusRing] = useState(false);
 
@@ -88,6 +91,8 @@ export default function SettingsDialog({
       }
       checkingStartedAtReference.current = null;
       setUpdateStatusMessage("");
+      setCanInstallUpdate(false);
+      setIsInstallingUpdate(false);
       setShowSidebarFocusRing(false);
     }
   }, [open]);
@@ -121,7 +126,19 @@ export default function SettingsDialog({
     }
 
     const onResult = (event: Event) => {
-      const custom = event as CustomEvent<{ message?: string }>;
+      const custom = event as CustomEvent<{
+        message?: string;
+        canInstall?: boolean;
+        isInstalling?: boolean;
+      }>;
+      if (typeof custom.detail?.canInstall === "boolean") {
+        setCanInstallUpdate(custom.detail.canInstall);
+      }
+
+      if (typeof custom.detail?.isInstalling === "boolean") {
+        setIsInstallingUpdate(custom.detail.isInstalling);
+      }
+
       const message = custom.detail?.message;
       if (!message) {
         return;
@@ -240,7 +257,20 @@ export default function SettingsDialog({
     globalThis.dispatchEvent(new CustomEvent(CHECK_FOR_UPDATES_EVENT));
   }
 
-  const checkForUpdatesLabel = updateStatusMessage || "Check for updates";
+  function installPreparedUpdate() {
+    if (isInstallingUpdate) {
+      return;
+    }
+
+    globalThis.dispatchEvent(new CustomEvent(INSTALL_PREPARED_UPDATE_EVENT));
+  }
+
+  const checkForUpdatesLabel =
+    isInstallingUpdate
+      ? "Installing update..."
+      : canInstallUpdate
+        ? "Install update"
+        : updateStatusMessage || "Check for updates";
   const isCheckingForUpdates = updateStatusMessage === CHECKING_FOR_UPDATES_MESSAGE;
 
   // ── Keyboard navigation (capture phase) ──
@@ -452,6 +482,11 @@ export default function SettingsDialog({
                 onClick={() => {
                   setFocusZone("sidebar");
                   setSidebarIndex(checkForUpdatesIndex);
+                  if (canInstallUpdate) {
+                    installPreparedUpdate();
+                    return;
+                  }
+
                   checkForUpdates();
                 }}
                 className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}

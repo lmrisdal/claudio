@@ -7,6 +7,7 @@ import { isDesktop } from "../hooks/use-desktop";
 const PENDING_UPDATE_VERSION_KEY = "claudio_pending_update_version";
 const CHECK_EVENT = "claudio:check-for-updates";
 const CHECK_RESULT_EVENT = "claudio:update-check-result";
+const INSTALL_PREPARED_UPDATE_EVENT = "claudio:install-prepared-update";
 
 type ToastMode = "update-available" | "up-to-date" | "installing" | "error";
 type CheckSource = "startup" | "settings" | "native";
@@ -41,9 +42,20 @@ export default function UpdateToast() {
   const downloadPromiseRef = useRef<Promise<void> | null>(null);
   const dismissedForSessionRef = useRef(false);
 
-  const emitResult = useCallback((message: string) => {
-    globalThis.dispatchEvent(new CustomEvent(CHECK_RESULT_EVENT, { detail: { message } }));
-  }, []);
+  const emitResult = useCallback(
+    (message: string, options?: { canInstall?: boolean; isInstalling?: boolean }) => {
+      globalThis.dispatchEvent(
+        new CustomEvent(CHECK_RESULT_EVENT, {
+          detail: {
+            message,
+            canInstall: options?.canInstall,
+            isInstalling: options?.isInstalling,
+          },
+        }),
+      );
+    },
+    [],
+  );
 
   const startDownload = useCallback(async (update: Update) => {
     if (downloadedRef.current) {
@@ -98,6 +110,7 @@ export default function UpdateToast() {
       setToastTitle("Installing update");
       setToastBody(`Installing v${update.version}. Claudio will restart when done.`);
       setVisible(true);
+      emitResult(`Installing update v${update.version}...`, { canInstall: false, isInstalling: true });
 
       try {
         await startDownload(update);
@@ -109,11 +122,12 @@ export default function UpdateToast() {
         setToastTitle("Update failed");
         setToastBody(toErrorMessage(error));
         setVisible(true);
+        emitResult("Update installation failed.", { canInstall: true, isInstalling: false });
       } finally {
         setIsInstalling(false);
       }
     },
-    [startDownload],
+    [emitResult, startDownload],
   );
 
   const checkForUpdates = useCallback(
@@ -126,7 +140,7 @@ export default function UpdateToast() {
       const showToastForCheck = source === "native";
 
       if (manual) {
-        emitResult("Checking for updates...");
+        emitResult("Checking for updates...", { canInstall: false, isInstalling: false });
       }
 
       setIsChecking(true);
@@ -151,7 +165,7 @@ export default function UpdateToast() {
           setUpdateVersion(null);
 
           if (manual || showToastForCheck) {
-            emitResult("No updates available.");
+            emitResult("No updates available.", { canInstall: false, isInstalling: false });
           }
 
           if (showToastForCheck) {
@@ -177,7 +191,10 @@ export default function UpdateToast() {
         setDownloadProgress(null);
 
         if (source === "settings" || source === "native") {
-          emitResult(`Update v${update.version} is available.`);
+          emitResult(`Update v${update.version} is available.`, {
+            canInstall: true,
+            isInstalling: false,
+          });
         }
 
         if (source === "native" || (source === "startup" && !dismissedForSessionRef.current)) {
@@ -195,7 +212,7 @@ export default function UpdateToast() {
         setUpdateVersion(null);
 
         if (manual || showToastForCheck) {
-          emitResult("Could not check for updates.");
+          emitResult("Could not check for updates.", { canInstall: false, isInstalling: false });
         }
 
         if (showToastForCheck) {
@@ -223,14 +240,24 @@ export default function UpdateToast() {
       void checkForUpdates("native");
     };
 
+    const onInstallPreparedUpdate = () => {
+      if (!updateRef.current || isInstalling || isChecking) {
+        return;
+      }
+
+      void installPreparedUpdate(updateRef.current);
+    };
+
     const unlisten = listen("check-for-updates", onNativeCheck);
 
     globalThis.addEventListener(CHECK_EVENT, onSettingsCheck);
+    globalThis.addEventListener(INSTALL_PREPARED_UPDATE_EVENT, onInstallPreparedUpdate);
     return () => {
       globalThis.removeEventListener(CHECK_EVENT, onSettingsCheck);
+      globalThis.removeEventListener(INSTALL_PREPARED_UPDATE_EVENT, onInstallPreparedUpdate);
       void unlisten.then((function_) => function_());
     };
-  }, [checkForUpdates]);
+  }, [checkForUpdates, installPreparedUpdate, isChecking, isInstalling]);
 
   useEffect(() => {
     if (!visible && isHovered) {
