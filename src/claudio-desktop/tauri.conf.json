@@ -1,6 +1,6 @@
 {
   "productName": "Claudio",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "com.claudio.desktop",
   "build": {
     "devUrl": "http://localhost:5173",
