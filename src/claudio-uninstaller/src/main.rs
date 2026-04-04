@@ -150,12 +150,10 @@ fn schedule_self_delete(exe_path: &str) {
 
 #[cfg(target_os = "windows")]
 fn delete_registry_key(key_name: &str) {
-    use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = format!(
-        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{key_name}"
-    );
+    let path = format!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{key_name}");
     let _ = hkcu.delete_subkey_all(path);
 }
 
@@ -209,5 +207,12 @@ fn message_box(text: &str, caption: &str, flags: u32) -> i32 {
 
     let text_w = to_wide(text);
     let caption_w = to_wide(caption);
-    unsafe { MessageBoxW(std::ptr::null_mut(), text_w.as_ptr(), caption_w.as_ptr(), flags) }
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            text_w.as_ptr(),
+            caption_w.as_ptr(),
+            flags,
+        )
+    }
 }

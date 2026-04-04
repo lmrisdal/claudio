@@ -498,3 +498,7 @@ docs/.astro/
 
 # Claude Code
 .claude/
+
+# Rust
+src/claudio-desktop/target/
+src/claudio-uninstaller/target/
