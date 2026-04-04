@@ -3,20 +3,20 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
-use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+use winreg::RegKey;
 
+use windows::core::Interface;
 use windows::Win32::Media::Audio::{
-    IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDeviceEnumerator,
-    ISimpleAudioVolume, MMDeviceEnumerator, eConsole, eRender,
+    eConsole, eRender, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2,
+    IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
 };
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
-use windows::core::Interface;
 
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
 };
 
 const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
@@ -107,7 +107,7 @@ fn expand_process_tree(entries: &[(u32, u32)], root_pids: &[u32]) -> Vec<u32> {
     let mut tree: Vec<u32> = root_pids.iter().copied().filter(|pid| *pid != 0).collect();
     loop {
         let prev_len = tree.len();
-        for &(pid, parent) in &entries {
+        for &(pid, parent) in entries {
             if tree.contains(&parent) && !tree.contains(&pid) {
                 tree.push(pid);
             }
