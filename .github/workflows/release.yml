@@ -107,10 +107,6 @@ jobs:
             args: --target x86_64-pc-windows-msvc
             rust-targets: ""
             uninstaller-target: x86_64-pc-windows-msvc
-          - platform: windows-latest
-            args: --target aarch64-pc-windows-msvc
-            rust-targets: aarch64-pc-windows-msvc
-            uninstaller-target: aarch64-pc-windows-msvc
           - platform: macos-latest
             args: --target universal-apple-darwin
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
