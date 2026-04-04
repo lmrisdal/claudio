@@ -5,8 +5,8 @@
   "build": {
     "devUrl": "http://localhost:5173",
     "frontendDist": "../claudio-web/dist",
-    "beforeDevCommand": "cd ../claudio-web && npm run dev",
-    "beforeBuildCommand": "cd ../claudio-web && npm run build"
+    "beforeDevCommand": "cd src/claudio-web && npm run dev",
+    "beforeBuildCommand": "cd src/claudio-web && npm run build"
   },
   "app": {
     "withGlobalTauri": true,
