@@ -1,9 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  cancelInstall,
   installGame,
   isDesktop,
   listenToInstallProgress,
+  restartInstallInteractive,
   type DesktopInstallGameInput,
   type InstalledGame,
   type InstallProgress,
@@ -19,6 +21,20 @@ interface SpeedState {
   lastTime: number;
   speed: number | null;
   sampleCount: number;
+}
+
+function updateActionProgress(
+  previous: Map<number, ActiveDownload>,
+  gameId: number,
+  progress: InstallProgress,
+) {
+  const existing = previous.get(gameId);
+  if (!existing) return previous;
+
+  return new Map([
+    ...previous,
+    [gameId, { ...existing, progress, speedBps: null }],
+  ]);
 }
 
 export function DownloadManagerProvider({ children }: { children: React.ReactNode }) {
@@ -74,6 +90,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
             sampleCount: 0,
           });
         }
+      } else {
+        speedState.current.delete(progress.gameId);
       }
 
       setActiveDownloads((previous) => {
@@ -153,11 +171,61 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     [activeDownloads],
   );
 
+  const cancelDownload = useCallback(async (gameId: number) => {
+    let previousProgress: InstallProgress | null = null;
+    setActiveDownloads((previous) =>
+      {
+        previousProgress = previous.get(gameId)?.progress ?? null;
+        return updateActionProgress(previous, gameId, {
+          gameId,
+          status: "stopping",
+          detail: "Stopping installation...",
+          indeterminate: true,
+        });
+      },
+    );
+    try {
+      await cancelInstall(gameId);
+    } catch (error) {
+      const restoreProgress = previousProgress;
+      if (restoreProgress !== null) {
+        setActiveDownloads((previous) => updateActionProgress(previous, gameId, restoreProgress));
+      }
+      throw error;
+    }
+  }, []);
+
+  const restartDownloadInteractive = useCallback(async (gameId: number) => {
+    let previousProgress: InstallProgress | null = null;
+    setActiveDownloads((previous) =>
+      {
+        previousProgress = previous.get(gameId)?.progress ?? null;
+        return updateActionProgress(previous, gameId, {
+          gameId,
+          status: "stopping",
+          detail: "Stopping installation to restart interactively...",
+          indeterminate: true,
+        });
+      },
+    );
+    try {
+      await restartInstallInteractive(gameId);
+    } catch (error) {
+      const restoreProgress = previousProgress;
+      if (restoreProgress !== null) {
+        setActiveDownloads((previous) => updateActionProgress(previous, gameId, restoreProgress));
+      }
+      throw error;
+    }
+  }, []);
+
   const value: DownloadManagerContextValue = {
     activeDownloads,
     activeCount: activeDownloads.size,
     startDownload,
     getProgress,
+    cancelDownload,
+    restartDownloadInteractive,
   };
 
   return (

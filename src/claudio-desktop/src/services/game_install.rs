@@ -6,12 +6,12 @@ use crate::settings;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use reqwest::header::{AUTHORIZATION, CONTENT_DISPOSITION, HeaderMap, HeaderName, HeaderValue};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Archive;
@@ -35,8 +35,13 @@ impl Default for InstallState {
 struct InstallControl {
     cancel_token: Arc<AtomicBool>,
     restart_interactive: Arc<AtomicBool>,
-    installer_pid: Arc<AtomicU32>,
-    installer_exe_name: Arc<Mutex<Option<String>>>,
+    tracked_installer: Arc<Mutex<TrackedInstallerState>>,
+}
+
+#[derive(Default)]
+struct TrackedInstallerState {
+    pids: BTreeSet<u32>,
+    exe_name: Option<String>,
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
@@ -45,8 +50,7 @@ impl InstallControl {
         Self {
             cancel_token: Arc::new(AtomicBool::new(false)),
             restart_interactive: Arc::new(AtomicBool::new(false)),
-            installer_pid: Arc::new(AtomicU32::new(0)),
-            installer_exe_name: Arc::new(Mutex::new(None)),
+            tracked_installer: Arc::new(Mutex::new(TrackedInstallerState::default())),
         }
     }
 
@@ -68,23 +72,45 @@ impl InstallControl {
     }
 
     fn set_installer_process(&self, pid: u32, exe_name: Option<String>) {
-        self.installer_pid.store(pid, Ordering::Relaxed);
-        if let Ok(mut name) = self.installer_exe_name.lock() {
-            *name = exe_name;
+        if let Ok(mut tracked) = self.tracked_installer.lock() {
+            tracked.pids.clear();
+            if pid != 0 {
+                tracked.pids.insert(pid);
+            }
+            tracked.exe_name = exe_name;
         }
     }
 
-    fn clear_installer_process(&self) {
-        self.installer_pid.store(0, Ordering::Relaxed);
-        if let Ok(mut name) = self.installer_exe_name.lock() {
-            *name = None;
+    fn refresh_tracked_processes(&self) {
+        #[cfg(target_os = "windows")]
+        if let Ok(mut tracked) = self.tracked_installer.lock() {
+            let current: Vec<u32> = tracked.pids.iter().copied().collect();
+            tracked.pids = crate::windows_integration::collect_tracked_processes(
+                &current,
+                tracked.exe_name.as_deref(),
+            )
+            .into_iter()
+            .collect();
         }
     }
 
-    fn installer_snapshot(&self) -> (u32, Option<String>) {
-        let pid = self.installer_pid.load(Ordering::Relaxed);
-        let name = self.installer_exe_name.lock().ok().and_then(|n| n.clone());
-        (pid, name)
+    fn clear_installer_processes(&self) {
+        if let Ok(mut tracked) = self.tracked_installer.lock() {
+            tracked.pids.clear();
+            tracked.exe_name = None;
+        }
+    }
+
+    fn installer_snapshot(&self) -> (Vec<u32>, Option<String>) {
+        self.tracked_installer
+            .lock()
+            .map(|tracked| {
+                (
+                    tracked.pids.iter().copied().collect(),
+                    tracked.exe_name.clone(),
+                )
+            })
+            .unwrap_or_else(|_| (Vec::new(), None))
     }
 }
 
@@ -108,13 +134,21 @@ impl InstallState {
         }
     }
 
-    pub fn cancel(&self, game_id: i32) -> Result<(), String> {
+    pub fn cancel(&self, app: &AppHandle, game_id: i32) -> Result<(), String> {
         let installs = self
             .installs
             .lock()
             .map_err(|_| "Install state lock poisoned.".to_string())?;
         if let Some(control) = installs.get(&game_id) {
             control.set_cancelled(true);
+            emit_progress_indeterminate(
+                app,
+                game_id,
+                "stopping",
+                None,
+                Some("Stopping installation..."),
+                true,
+            );
             terminate_external_installer(control);
             Ok(())
         } else {
@@ -122,13 +156,21 @@ impl InstallState {
         }
     }
 
-    pub fn restart_interactive(&self, game_id: i32) -> Result<(), String> {
+    pub fn restart_interactive(&self, app: &AppHandle, game_id: i32) -> Result<(), String> {
         let installs = self
             .installs
             .lock()
             .map_err(|_| "Install state lock poisoned.".to_string())?;
         if let Some(control) = installs.get(&game_id) {
             control.request_restart_interactive();
+            emit_progress_indeterminate(
+                app,
+                game_id,
+                "stopping",
+                None,
+                Some("Stopping installation to restart interactively..."),
+                true,
+            );
             terminate_external_installer(control);
             Ok(())
         } else {
@@ -139,8 +181,9 @@ impl InstallState {
 
 #[cfg(target_os = "windows")]
 fn terminate_external_installer(control: &InstallControl) {
-    let (pid, exe_name) = control.installer_snapshot();
-    let _ = crate::windows_integration::terminate_related_processes(pid, exe_name);
+    control.refresh_tracked_processes();
+    let (pids, exe_name) = control.installer_snapshot();
+    let _ = crate::windows_integration::terminate_tracked_processes(&pids, exe_name.as_deref());
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -179,12 +222,16 @@ pub fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledGame>, 
     registry::get(remote_game_id)
 }
 
-pub fn cancel_install(state: &InstallState, game_id: i32) -> Result<(), String> {
-    state.cancel(game_id)
+pub fn cancel_install(app: &AppHandle, state: &InstallState, game_id: i32) -> Result<(), String> {
+    state.cancel(app, game_id)
 }
 
-pub fn restart_install_interactive(state: &InstallState, game_id: i32) -> Result<(), String> {
-    state.restart_interactive(game_id)
+pub fn restart_install_interactive(
+    app: &AppHandle,
+    state: &InstallState,
+    game_id: i32,
+) -> Result<(), String> {
+    state.restart_interactive(app, game_id)
 }
 
 pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
@@ -1309,7 +1356,7 @@ fn spawn_mute_wait(
             control.set_installer_process(0, exe_name.clone());
             crate::windows_integration::mute_process_audio(0, exe_name);
             let status = run_elevated(path, args).map_err(RunInstallerError::Failed)?;
-            control.clear_installer_process();
+            control.clear_installer_processes();
             if control.take_restart_interactive_request() {
                 control.set_cancelled(false);
                 return Err(RunInstallerError::RestartInteractiveRequested);
@@ -1331,22 +1378,17 @@ fn spawn_mute_wait(
     control.set_installer_process(child.id(), exe_name.clone());
     crate::windows_integration::mute_process_audio(child.id(), exe_name);
     loop {
+        control.refresh_tracked_processes();
         if control.take_restart_interactive_request() {
-            let _ = crate::windows_integration::terminate_related_processes(
-                child.id(),
-                path.file_name().and_then(|n| n.to_str()).map(String::from),
-            );
-            control.clear_installer_process();
+            terminate_external_installer(control);
+            control.clear_installer_processes();
             control.set_cancelled(false);
             return Err(RunInstallerError::RestartInteractiveRequested);
         }
 
         if control.is_cancelled() {
-            let _ = crate::windows_integration::terminate_related_processes(
-                child.id(),
-                path.file_name().and_then(|n| n.to_str()).map(String::from),
-            );
-            control.clear_installer_process();
+            terminate_external_installer(control);
+            control.clear_installer_processes();
             return Err(RunInstallerError::Cancelled);
         }
 
@@ -1355,7 +1397,7 @@ fn spawn_mute_wait(
             .map_err(|err| RunInstallerError::Failed(err.to_string()))?
         {
             Some(status) => {
-                control.clear_installer_process();
+                control.clear_installer_processes();
                 return if status.success() {
                     Ok(())
                 } else {

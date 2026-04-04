@@ -17,6 +17,8 @@ export interface DownloadManagerContextValue {
   activeCount: number;
   startDownload: (game: DesktopInstallGameInput) => Promise<InstalledGame>;
   getProgress: (gameId: number) => InstallProgress | null;
+  cancelDownload: (gameId: number) => Promise<void>;
+  restartDownloadInteractive: (gameId: number) => Promise<void>;
 }
 
 export const DownloadManagerContext = createContext<DownloadManagerContextValue | null>(null);

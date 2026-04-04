@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import {
-  cancelInstall,
   isDesktop,
   listInstalledGames,
   openInstallFolder,
@@ -52,7 +51,7 @@ export default function DesktopSidebar() {
     queryFn: listInstalledGames,
     refetchInterval: 30_000,
   });
-  const { activeDownloads } = useDownloadManager();
+  const { activeDownloads, cancelDownload } = useDownloadManager();
 
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, String(collapsed));
@@ -261,11 +260,12 @@ export default function DesktopSidebar() {
                       <div className="min-w-0">
                         <span className="text-xs truncate block">{game.title}</span>
                         <span className="text-[10px] text-text-muted leading-tight">
-                          {isIndeterminate
-                            ? "Installing\u2026"
-                            : percent === null
-                              ? "Preparing\u2026"
-                              : `${Math.round(percent)}%`}
+                          {progress.detail ??
+                            (isIndeterminate
+                              ? "Installing\u2026"
+                              : percent === null
+                                ? "Preparing\u2026"
+                                : `${Math.round(percent)}%`)}
                         </span>
                       </div>
                     )}
@@ -397,7 +397,7 @@ export default function DesktopSidebar() {
           onCancelInstall={
             contextMenu.type === "installing"
               ? () => {
-                  void cancelInstall(contextMenu.gameId);
+                  void cancelDownload(contextMenu.gameId);
                   setContextMenu(null);
                 }
               : undefined

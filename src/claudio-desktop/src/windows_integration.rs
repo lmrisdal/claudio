@@ -37,43 +37,59 @@ pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
     });
 }
 
-pub fn terminate_related_processes(pid: u32, exe_name: Option<String>) -> Result<(), String> {
-    let mut target_pids: Vec<u32> = if pid != 0 {
-        get_process_tree(pid)
-    } else {
-        Vec::new()
-    };
+pub fn collect_tracked_processes(seed_pids: &[u32], exe_name: Option<&str>) -> Vec<u32> {
+    let entries = snapshot_processes();
+    let mut tracked = expand_process_tree(&entries, seed_pids);
 
-    if let Some(name) = exe_name.as_deref() {
+    if let Some(name) = exe_name {
         for found_pid in find_pids_matching(|exe| exe.eq_ignore_ascii_case(name)) {
-            if !target_pids.contains(&found_pid) {
-                target_pids.push(found_pid);
+            if !tracked.contains(&found_pid) {
+                tracked.push(found_pid);
             }
         }
     }
 
     for found_pid in find_pids_matching(|exe| exe.to_ascii_lowercase().ends_with(".tmp")) {
-        if !target_pids.contains(&found_pid) {
-            target_pids.push(found_pid);
+        if !tracked.contains(&found_pid) {
+            tracked.push(found_pid);
         }
     }
 
-    for target_pid in target_pids {
-        let _ = Command::new("taskkill")
-            .args(["/PID", &target_pid.to_string(), "/T", "/F"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    }
+    tracked.sort_unstable();
+    tracked.dedup();
+    tracked
+}
 
-    if let Some(name) = exe_name {
-        let _ = Command::new("taskkill")
-            .args(["/IM", &name, "/F"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+pub fn terminate_tracked_processes(
+    seed_pids: &[u32],
+    exe_name: Option<&str>,
+) -> Result<(), String> {
+    let mut target_pids = collect_tracked_processes(seed_pids, exe_name);
+
+    for _ in 0..3 {
+        for target_pid in &target_pids {
+            let _ = Command::new("taskkill")
+                .args(["/PID", &target_pid.to_string(), "/T", "/F"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+
+        if let Some(name) = exe_name {
+            let _ = Command::new("taskkill")
+                .args(["/IM", name, "/F"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(120));
+        target_pids = collect_tracked_processes(&target_pids, exe_name);
+        if target_pids.is_empty() {
+            break;
+        }
     }
 
     Ok(())
@@ -84,7 +100,11 @@ pub fn terminate_related_processes(pid: u32, exe_name: Option<String>) -> Result
 /// grandchildren are never missed regardless of snapshot ordering.
 fn get_process_tree(root_pid: u32) -> Vec<u32> {
     let entries = snapshot_processes();
-    let mut tree = vec![root_pid];
+    expand_process_tree(&entries, &[root_pid])
+}
+
+fn expand_process_tree(entries: &[(u32, u32)], root_pids: &[u32]) -> Vec<u32> {
+    let mut tree: Vec<u32> = root_pids.iter().copied().filter(|pid| *pid != 0).collect();
     loop {
         let prev_len = tree.len();
         for &(pid, parent) in &entries {

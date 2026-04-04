@@ -13,12 +13,10 @@ import { isMac } from "../../core/utils/os";
 import { formatPlatform } from "../../core/utils/platforms";
 import { sounds } from "../../core/utils/sounds";
 import {
-  cancelInstall,
   launchGame,
   listRunningGames,
   listGameExecutables,
   openInstallFolder,
-  restartInstallInteractive,
   type RunningGame,
   setGameExe,
   stopGame,
@@ -74,7 +72,8 @@ export default function GameDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isDesktop, getInstalledGame: getDesktopInstalledGame } = useDesktop();
-  const { startDownload, getProgress } = useDownloadManager();
+  const { startDownload, getProgress, cancelDownload, restartDownloadInteractive } =
+    useDownloadManager();
   const [pickExeOpen, setPickExeOpen] = useState(false);
   const [pickExeOptions, setPickExeOptions] = useState<string[]>([]);
   const [playContextMenu, setPlayContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -616,7 +615,9 @@ export default function GameDetail() {
     installProgress.status !== "failed";
 
   const desktopInstallLabel = hasActiveInstallProgress
-    ? typeof installProgress?.percent === "number"
+    ? installProgress?.status === "stopping"
+      ? (installProgress.detail ?? "Stopping installation...")
+      : typeof installProgress?.percent === "number"
       ? `Installing ${Math.round(installProgress.percent)}%`
       : "Installing..."
     : installMutation.isPending
@@ -1637,7 +1638,8 @@ export default function GameDetail() {
                               <button
                                 type="button"
                                 data-nav
-                                onClick={() => void restartInstallInteractive(displayGame.id)}
+                                onClick={() => void restartDownloadInteractive(displayGame.id)}
+                                disabled={installProgress?.status === "stopping"}
                                 className="inline-flex items-center rounded-lg border border-border px-3 py-3 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                               >
                                 Run interactively
@@ -1646,8 +1648,9 @@ export default function GameDetail() {
                             <button
                               type="button"
                               data-nav
-                              onClick={() => void cancelInstall(displayGame.id)}
+                              onClick={() => void cancelDownload(displayGame.id)}
                               aria-label="Cancel install"
+                              disabled={installProgress?.status === "stopping"}
                               className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-3 text-sm text-text-secondary transition hover:border-red-400 hover:text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                             >
                               <svg

@@ -34,16 +34,21 @@ pub async fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn cancel_install(state: State<'_, InstallState>, game_id: i32) -> Result<(), String> {
-    game_install::cancel_install(&state, game_id)
+pub fn cancel_install(
+    app: AppHandle,
+    state: State<'_, InstallState>,
+    game_id: i32,
+) -> Result<(), String> {
+    game_install::cancel_install(&app, &state, game_id)
 }
 
 #[tauri::command]
 pub fn restart_install_interactive(
+    app: AppHandle,
     state: State<'_, InstallState>,
     game_id: i32,
 ) -> Result<(), String> {
-    game_install::restart_install_interactive(&state, game_id)
+    game_install::restart_install_interactive(&app, &state, game_id)
 }
 
 #[tauri::command]
