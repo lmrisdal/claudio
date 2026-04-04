@@ -31,6 +31,10 @@
   --text-primary: #e5e5e5;
   --text-secondary: #a0a0b0;
   --text-muted-color: #6b6b7b;
+
+  --settings-sidebar-bg: var(--surface-raised);
+  --settings-sidebar-active-bg: var(--surface);
+  --settings-sidebar-hover-bg: var(--surface);
 }
 
 /* Light theme tokens */
@@ -45,6 +49,10 @@
   --text-primary: #1a1a2e;
   --text-secondary: #555566;
   --text-muted-color: #888899;
+
+  --settings-sidebar-bg: var(--surface);
+  --settings-sidebar-active-bg: var(--surface-raised);
+  --settings-sidebar-hover-bg: var(--surface-raised);
 }
 
 /* Disable page-level overscroll and rubber-band scrolling so the UI feels more desktop-native. */

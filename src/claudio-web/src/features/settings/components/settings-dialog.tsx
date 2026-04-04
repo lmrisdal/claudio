@@ -390,7 +390,7 @@ export default function SettingsDialog({
         role="dialog"
         aria-label="Settings"
       >
-        <nav className="flex flex-col border-border bg-surface-raised sm:w-56 sm:shrink-0 sm:border-r">
+        <nav className="flex flex-col border-border bg-[var(--settings-sidebar-bg)] sm:w-56 sm:shrink-0 sm:border-r">
           <div className="flex items-start justify-between border-b border-border p-4 sm:border-b-0 sm:p-5 sm:pb-0">
             <div>
               <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
@@ -403,11 +403,11 @@ export default function SettingsDialog({
                 )}
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-text-muted transition hover:bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
-              aria-label="Close"
-            >
+              <button
+                onClick={onClose}
+                className="rounded-lg p-1.5 text-text-muted transition hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
+                aria-label="Close"
+              >
               {closeIcon}
             </button>
           </div>
@@ -430,10 +430,10 @@ export default function SettingsDialog({
                       selectTab(tab.id);
                     }}
                     className={`w-full rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors ${
-                      activeTab === tab.id
-                        ? "bg-surface text-text-primary font-medium"
-                        : "text-text-secondary hover:bg-surface hover:text-text-primary"
-                    } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                       activeTab === tab.id
+                        ? "bg-[var(--settings-sidebar-active-bg)] text-text-primary font-medium"
+                        : "text-text-secondary hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary"
+                     } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
                   >
                     {tab.label}
                   </button>
@@ -454,7 +454,7 @@ export default function SettingsDialog({
                   setSidebarIndex(checkForUpdatesIndex);
                   checkForUpdates();
                 }}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
               >
                 <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
                   {checkForUpdatesLabel}
@@ -474,7 +474,7 @@ export default function SettingsDialog({
                 onClose();
                 logout();
               }}
-              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
+              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
             >
               Sign out
             </button>
