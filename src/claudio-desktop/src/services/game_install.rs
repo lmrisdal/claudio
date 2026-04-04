@@ -1228,7 +1228,7 @@ fn run_installer(
                 log::warn!("innoextract failed ({err}), falling back to silent InnoSetup install");
                 // Clean up any partial output before falling back to the silent installer
                 let _ = fs::remove_dir_all(target_dir);
-                run_innosetup_silent(path, &target)
+                run_innosetup_silent(path, &target, control)
             })
         }
         InstallerType::Msi => {

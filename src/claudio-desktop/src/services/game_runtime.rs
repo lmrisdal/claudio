@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
+#[cfg(not(target_os = "windows"))]
 use std::thread;
+#[cfg(not(target_os = "windows"))]
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 

@@ -280,10 +280,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Claudio");
 
-    app.run(|app, event| {
+    app.run(|_app, _event| {
         #[cfg(target_os = "macos")]
-        if matches!(event, tauri::RunEvent::Reopen { .. }) {
-            restore_main_window(app);
+        if matches!(_event, tauri::RunEvent::Reopen { .. }) {
+            restore_main_window(_app);
         }
     });
 }
