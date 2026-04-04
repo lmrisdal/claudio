@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { useTheme } from "./features/core/hooks/use-theme";
@@ -26,7 +27,14 @@ export default function App() {
   useTheme(); // keeps OS colour-scheme subscription alive for the lifetime of the app
 
   const isDesktopSettingsWindow =
-    isDesktop && new URLSearchParams(globalThis.location.search).has("desktop-settings-window");
+    isDesktop &&
+    (() => {
+      try {
+        return getCurrentWindow().label === "settings";
+      } catch {
+        return false;
+      }
+    })();
 
   if (isDesktopSettingsWindow) {
     return <SettingsWindow />;

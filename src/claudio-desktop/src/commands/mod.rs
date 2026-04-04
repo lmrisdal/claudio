@@ -36,7 +36,7 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     let result = WebviewWindowBuilder::new(
         &app,
         "settings",
-        WebviewUrl::App("index.html?desktop-settings-window=1".into()),
+        WebviewUrl::App("index.html".into()),
     )
     .title("Desktop Settings")
     .inner_size(760.0, 780.0)
