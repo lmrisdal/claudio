@@ -6,7 +6,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const tauriConfPath = path.join(root, "src/claudio-desktop/tauri.conf.json");
 const cargoTomlPath = path.join(root, "src/claudio-desktop/Cargo.toml");
-const frontendPackageJsonPath = path.join(root, "frontend/package.json");
+const frontendPackageJsonPath = path.join(root, "src/claudio-web/package.json");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function updateTauriConfig(version) {
@@ -82,7 +82,7 @@ function main() {
   console.log(`Updated desktop version to ${version}`);
   console.log(`- tauri.conf.json: ${oldTauri} -> ${version}`);
   console.log(`- Cargo.toml: ${oldCargo} -> ${version}`);
-  console.log(`- frontend/package.json: ${oldFrontend} -> ${version}`);
+  console.log(`- src/claudio-web/package.json: ${oldFrontend} -> ${version}`);
 }
 
 main();

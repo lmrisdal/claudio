@@ -1,6 +1,6 @@
 using Claudio.Api.Data;
 using Claudio.Api.Services;
-using Claudio.Shared.Models;
+using Claudio.Api.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

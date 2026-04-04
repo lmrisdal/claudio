@@ -8,7 +8,7 @@ bump:
 		exit 1; \
 	fi; \
 	node scripts/bump_version.cjs "$$version"; \
-	git add src/claudio-desktop/tauri.conf.json src/claudio-desktop/Cargo.toml frontend/package.json; \
+	git add src/claudio-desktop/tauri.conf.json src/claudio-desktop/Cargo.toml src/claudio-web/package.json; \
 	git commit -m "chore(release): bump version to $$version"; \
 	git tag "v$$version"; \
 	case "$$push_flag" in \

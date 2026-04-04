@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Regenerate all app icons from frontend/public/favicon.svg
+# Regenerate all app icons from src/claudio-web/public/favicon.svg
 # Requires: npx (Node.js)
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SVG="$REPO_ROOT/frontend/public/favicon.svg"
+SVG="$REPO_ROOT/src/claudio-web/public/favicon.svg"
 DESKTOP_ICONS="$REPO_ROOT/src/claudio-desktop/icons"
-PUBLIC="$REPO_ROOT/frontend/public"
+PUBLIC="$REPO_ROOT/src/claudio-web/public"
 TRAY_SVG="$DESKTOP_ICONS/tray-icon.svg"
 
 if [ ! -f "$SVG" ]; then

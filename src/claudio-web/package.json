@@ -1,0 +1,50 @@
+{
+  "name": "claudio-web",
+  "version": "0.1.7",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc -b && vp build",
+    "lint": "vp lint .",
+    "preview": "vp preview",
+    "tauri:dev": "cd ../claudio-desktop && ../claudio-web/node_modules/.bin/tauri dev",
+    "tauri:build": "cd ../claudio-desktop && ../claudio-web/node_modules/.bin/tauri build",
+    "generate-icons": "../scripts/generate-icons.sh"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.9",
+    "@tanstack/react-query": "^5.91.3",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-log": "^2.8.0",
+    "@tauri-apps/plugin-updater": "^2.10.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router": "^7.13.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@tailwindcss/vite": "^4.2.2",
+    "@tauri-apps/cli": "^2.10.1",
+    "@types/node": "^24.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "globals": "^17.4.0",
+    "tailwindcss": "^4.2.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "latest"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

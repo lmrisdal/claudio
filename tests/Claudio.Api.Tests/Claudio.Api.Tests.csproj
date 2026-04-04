@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Claudio.Api\Claudio.Api.csproj" />
+    <ProjectReference Include="..\..\src\claudio-api\Claudio.Api.csproj" />
   </ItemGroup>
 
 </Project>

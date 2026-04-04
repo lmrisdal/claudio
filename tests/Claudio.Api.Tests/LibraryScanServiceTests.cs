@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
-using Claudio.Shared.Models;
+using Claudio.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

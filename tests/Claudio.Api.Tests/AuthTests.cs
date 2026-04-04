@@ -4,8 +4,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AwesomeAssertions;
-using Claudio.Shared.Enums;
-using Claudio.Shared.Models;
+using Claudio.Api.Enums;
+using Claudio.Api.Models;
 
 namespace Claudio.Api.Tests;
 

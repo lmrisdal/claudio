@@ -11,7 +11,7 @@ description: Set up a local development environment for Claudio.
 ## Backend
 
 ```bash
-dotnet run --project src/Claudio.Api
+dotnet run --project src/claudio-api
 ```
 
 The API serves on port 5118.
@@ -19,7 +19,7 @@ The API serves on port 5118.
 ## Frontend
 
 ```bash
-cd frontend
+cd src/claudio-web
 npm install
 npm run dev
 ```
@@ -36,11 +36,11 @@ dotnet test tests/Claudio.Api.Tests   # API tests only
 ## Building for Production
 
 ```bash
-# Build the frontend (outputs to src/Claudio.Api/wwwroot/)
-cd frontend && npm run build
+# Build the frontend (outputs to src/claudio-api/wwwroot/)
+cd src/claudio-web && npm run build
 
 # Build the .NET app
-dotnet build src/Claudio.Api
+dotnet build src/claudio-api
 
 # Or build the Docker image
 docker compose -f docker/docker-compose.yml up --build

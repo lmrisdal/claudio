@@ -482,12 +482,12 @@ $RECYCLE.BIN/
 *.swp
 
 # Frontend
-frontend/node_modules/
-frontend/dist/
+src/claudio-web/node_modules/
+src/claudio-web/dist/
 
-# Embedded SPA (built from frontend/)
-src/Claudio.Api/wwwroot/*
-!src/Claudio.Api/wwwroot/.gitkeep
+# Embedded SPA (built from src/claudio-web/)
+src/claudio-api/wwwroot/*
+!src/claudio-api/wwwroot/.gitkeep
 
 # Local config (contains secrets)
 config/

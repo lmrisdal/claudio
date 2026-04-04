@@ -1,0 +1,21 @@
+.git
+.github
+.vscode
+.claude
+
+# Local config, docs, and artifacts not needed for image build
+config/
+docs/
+TestResults/
+
+# Build outputs and caches
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+src/claudio-desktop/
+src/claudio-uninstaller/
+
+# Logs and OS/editor noise
+*.log
+.DS_Store

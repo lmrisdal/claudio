@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using AwesomeAssertions;
 using Claudio.Api.Data;
-using Claudio.Shared.Enums;
+using Claudio.Api.Enums;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Claudio.Api.Tests;

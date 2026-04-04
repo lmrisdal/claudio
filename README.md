@@ -220,13 +220,13 @@ Games are organized by platform in your library directories:
 ### Backend
 
 ```bash
-dotnet run --project src/Claudio.Api
+dotnet run --project src/claudio-api
 ```
 
 ### Frontend
 
 ```bash
-cd frontend
+cd src/claudio-web
 npm install
 npm run dev
 ```
@@ -241,7 +241,7 @@ Use a single Makefile helper to bump desktop version, commit, and tag in one ste
 make bump 0.1.1
 ```
 
-This updates `src/claudio-desktop/tauri.conf.json`, `src/claudio-desktop/Cargo.toml`, and `frontend/package.json` to the same version before committing and tagging.
+This updates `src/claudio-desktop/tauri.conf.json`, `src/claudio-desktop/Cargo.toml`, and `src/claudio-web/package.json` to the same version before committing and tagging.
 
 ## Tech Stack
 

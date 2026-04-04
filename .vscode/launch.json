@@ -10,7 +10,7 @@
       "request": "launch",
       "preLaunchTask": "build",
       // If you have changed target frameworks, make sure to update the program path.
-      "program": "${workspaceFolder}/src/Claudio.Api/bin/Debug/net10.0/Claudio.Api.dll",
+      "program": "${workspaceFolder}/src/claudio-api/bin/Debug/net10.0/Claudio.Api.dll",
       "args": [],
       "cwd": "${workspaceFolder}",
       "stopAtEntry": false,
@@ -34,7 +34,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/Claudio.Api/Claudio.Api.csproj"],
+      "runtimeArgs": ["run", "--project", "src/claudio-api/Claudio.Api.csproj"],
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_URLS": "http://localhost:8080",
@@ -47,7 +47,7 @@
       "name": "Tauri Dev",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}/frontend",
+      "cwd": "${workspaceFolder}/src/claudio-web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "tauri:dev"],
       "console": "integratedTerminal"

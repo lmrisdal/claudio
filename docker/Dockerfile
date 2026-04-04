@@ -1,19 +1,19 @@
-# Stage 1: Build frontend (platform-independent, always runs natively)
+# Stage 1: Build web app (platform-independent, always runs natively)
 FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
-WORKDIR /build/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+WORKDIR /build/src/claudio-web
+COPY src/claudio-web/package.json src/claudio-web/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
-COPY frontend/ ./
+COPY src/claudio-web/ ./
 RUN pnpm build
 
 # Stage 2: Build .NET API (cross-compile natively using dotnet RID)
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS backend
 ARG TARGETARCH
 WORKDIR /build
-COPY Directory.Build.props Directory.Packages.props Claudio.slnx ./
+COPY Directory.Build.props Directory.Packages.props ./
 COPY src/ src/
-COPY --from=frontend /build/src/Claudio.Api/wwwroot/ src/Claudio.Api/wwwroot/
-RUN dotnet publish src/Claudio.Api/Claudio.Api.csproj -c Release -o /app -a $TARGETARCH
+COPY --from=frontend /build/src/claudio-api/wwwroot/ src/claudio-api/wwwroot/
+RUN dotnet publish src/claudio-api/Claudio.Api.csproj -c Release -o /app -a $TARGETARCH
 
 # Stage 3: Runtime (runs on target platform)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime

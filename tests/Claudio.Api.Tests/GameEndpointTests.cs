@@ -5,8 +5,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using AwesomeAssertions;
 using Claudio.Api.Data;
-using Claudio.Shared.Enums;
-using Claudio.Shared.Models;
+using Claudio.Api.Enums;
+using Claudio.Api.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Claudio.Api.Tests;

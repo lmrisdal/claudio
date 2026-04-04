@@ -123,7 +123,7 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: "22"
-          working-directory: frontend
+          working-directory: src/claudio-web
           cache: true
           run-install: true
 
@@ -168,7 +168,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: src/claudio-desktop
-          tauriScript: ../../frontend/node_modules/.bin/tauri
+          tauriScript: ../claudio-web/node_modules/.bin/tauri
           args: ${{ matrix.args }}
           tagName: v__VERSION__
           releaseName: Claudio v__VERSION__
