@@ -77,7 +77,6 @@ fn run_phase1() {
     }
 
     // Remove registry entry and Start Menu shortcut before we vacate the directory.
-    #[cfg(target_os = "windows")]
     delete_registry_key(&config.registry_key_name);
 
     if let Some(shortcut) = &config.shortcut_path {
@@ -148,13 +147,19 @@ fn schedule_self_delete(exe_path: &str) {
     let _ = exe_path;
 }
 
-#[cfg(target_os = "windows")]
 fn delete_registry_key(key_name: &str) {
-    use winreg::enums::HKEY_CURRENT_USER;
-    use winreg::RegKey;
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = format!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{key_name}");
-    let _ = hkcu.delete_subkey_all(path);
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let path = format!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{key_name}");
+        let _ = hkcu.delete_subkey_all(path);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = key_name;
+    }
 }
 
 fn confirm(message: &str) -> bool {
