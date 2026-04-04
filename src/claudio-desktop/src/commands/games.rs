@@ -8,9 +8,8 @@ pub async fn install_game(
     app: AppHandle,
     state: State<'_, InstallState>,
     game: RemoteGame,
-    token: String,
 ) -> Result<InstalledGame, String> {
-    game_install::install_game(app, state, game, token).await
+    game_install::install_game(app, state, game).await
 }
 
 #[tauri::command]

@@ -1,5 +1,7 @@
+mod auth;
 mod commands;
 mod models;
+mod protocol;
 mod registry;
 mod services;
 mod settings;
@@ -37,8 +39,85 @@ fn restore_main_window(app: &AppHandle) {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
+    let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+    let check_updates_item =
+        MenuItemBuilder::with_id("check-updates", "Check for Updates...").build(app)?;
+
+    let mut app_submenu = SubmenuBuilder::new(app, "Claudio").about(None).separator();
+    if logged_in {
+        app_submenu = app_submenu.item(&settings_item);
+    }
+
+    let app_submenu = app_submenu
+        .item(&check_updates_item)
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
+
+    let edit_submenu = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+
+    let window_submenu = SubmenuBuilder::new(app, "Window")
+        .minimize()
+        .maximize()
+        .close_window()
+        .separator()
+        .fullscreen()
+        .build()?;
+
+    let menu = MenuBuilder::new(app)
+        .item(&app_submenu)
+        .item(&edit_submenu)
+        .item(&window_submenu)
+        .build()?;
+
+    app.set_menu(menu)?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn build_app_menu(_app: &AppHandle, _logged_in: bool) -> tauri::Result<()> {
+    Ok(())
+}
+
+pub(crate) fn refresh_auth_state_ui(app: &AppHandle, logged_in: bool) -> Result<(), String> {
+    build_app_menu(app, logged_in).map_err(|error| error.to_string())?;
+
+    if !logged_in {
+        if let Some(window) = app.get_webview_window("settings") {
+            let _ = window.close();
+        }
+    }
+
+    Ok(())
+}
+
 pub fn run() {
     let app = tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol("claudio", |context, request, responder| {
+            let app = context.app_handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let response = protocol::handle_request(&app, request).await;
+                responder.respond(response);
+            });
+        })
         .manage(services::game_install::InstallState::default())
         .manage(services::game_runtime::RunningGamesState::default())
         .plugin(
@@ -73,6 +152,11 @@ pub fn run() {
             commands::games::set_game_exe,
             commands::games::stop_game,
             commands::games::uninstall_game,
+            commands::desktop_complete_external_login,
+            commands::desktop_get_session,
+            commands::desktop_login,
+            commands::desktop_logout,
+            commands::desktop_proxy_login,
             commands::ping::ping,
             commands::get_settings,
             commands::update_settings,
@@ -99,55 +183,11 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             window.set_decorations(false)?;
 
-            #[cfg(target_os = "macos")]
-            {
-                let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
-                    .accelerator("CmdOrCtrl+,")
-                    .build(app)?;
-                let check_updates_item =
-                    MenuItemBuilder::with_id("check-updates", "Check for Updates...").build(app)?;
-
-                let app_submenu = SubmenuBuilder::new(app, "Claudio")
-                    .about(None)
-                    .separator()
-                    .item(&settings_item)
-                    .item(&check_updates_item)
-                    .separator()
-                    .services()
-                    .separator()
-                    .hide()
-                    .hide_others()
-                    .show_all()
-                    .separator()
-                    .quit()
-                    .build()?;
-
-                let edit_submenu = SubmenuBuilder::new(app, "Edit")
-                    .undo()
-                    .redo()
-                    .separator()
-                    .cut()
-                    .copy()
-                    .paste()
-                    .select_all()
-                    .build()?;
-
-                let window_submenu = SubmenuBuilder::new(app, "Window")
-                    .minimize()
-                    .maximize()
-                    .close_window()
-                    .separator()
-                    .fullscreen()
-                    .build()?;
-
-                let menu = MenuBuilder::new(app)
-                    .item(&app_submenu)
-                    .item(&edit_submenu)
-                    .item(&window_submenu)
-                    .build()?;
-
-                app.set_menu(menu)?;
-            }
+            let logged_in =
+                tauri::async_runtime::block_on(auth::restore_session(&settings::load()))
+                    .map(|session| session.is_logged_in)
+                    .unwrap_or(false);
+            build_app_menu(app.handle(), logged_in)?;
 
             let show_item = MenuItemBuilder::with_id("tray-show", "Show Claudio")
                 .accelerator("CmdOrCtrl+O")

@@ -1,3 +1,5 @@
+import { isDesktop } from "../../desktop/hooks/use-desktop";
+
 function getServerBase(): string {
   const serverUrl = localStorage.getItem("claudio_server_url");
   return serverUrl ? `${serverUrl}/api` : "/api";
@@ -6,6 +8,14 @@ function getServerBase(): string {
 function getServerOrigin(): string {
   const serverUrl = localStorage.getItem("claudio_server_url");
   return serverUrl ?? "";
+}
+
+function getApiBase(): string {
+  return isDesktop ? "claudio://api" : getServerBase();
+}
+
+function getConnectBase(): string {
+  return isDesktop ? "claudio://connect" : `${getServerOrigin()}/connect`;
 }
 
 export function resolveServerUrl(path: string): string {
@@ -39,16 +49,30 @@ function toHeaderRecord(headers?: HeadersInit): Record<string, string> {
   return normalized;
 }
 
+function buildRequestHeaders(init: RequestInit | undefined, isFormData: boolean): HeadersInit {
+  const token = isDesktop ? null : localStorage.getItem("token");
+
+  return {
+    ...(isDesktop ? {} : getCustomHeaders()),
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...toHeaderRecord(init?.headers),
+  };
+}
+
 async function tryRefreshToken(): Promise<string | null> {
+  if (isDesktop) return null;
+
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) return null;
+
   try {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
       client_id: "claudio-spa",
     });
-    const res = await fetch(`${getServerOrigin()}/connect/token`, {
+    const res = await fetch(`${getConnectBase()}/token`, {
       method: "POST",
       headers: {
         ...getCustomHeaders(),
@@ -57,32 +81,45 @@ async function tryRefreshToken(): Promise<string | null> {
       body: body.toString(),
     });
     if (!res.ok) return null;
+
     const data = await res.json();
     const newToken: string = data.access_token;
     localStorage.setItem("token", newToken);
-    if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+    if (data.refresh_token) {
+      localStorage.setItem("refresh_token", data.refresh_token);
+    }
     return newToken;
   } catch {
     return null;
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("token");
-  const isFormData = init?.body instanceof FormData;
-  const headers: HeadersInit = {
-    ...getCustomHeaders(),
-    ...(isFormData ? {} : { "Content-Type": "application/json" }),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...toHeaderRecord(init?.headers),
-  };
+function redirectToLogin() {
+  globalThis.location.href = "/login";
+}
 
-  const res = await fetch(`${getServerBase()}${path}`, { ...init, headers });
+function reportDesktopUnauthorized(path: string, message: string) {
+  console.error(`Desktop API unauthorized for ${path}: ${message}`);
+}
+
+function clearWebAuthState() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refresh_token");
+}
+
+async function readError(response: Response, fallback: string): Promise<string> {
+  const body = await response.text();
+  return body || fallback;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
+  const headers = buildRequestHeaders(init, isFormData);
+  const res = await fetch(`${getApiBase()}${path}`, { ...init, headers });
 
   if (res.status === 401) {
     const isAuthEndpoint = path.startsWith("/auth/");
-    if (!isAuthEndpoint) {
-      // Attempt silent token refresh before giving up
+    if (!isDesktop && !isAuthEndpoint) {
       const newToken = await tryRefreshToken();
       if (newToken) {
         const retryHeaders: HeadersInit = {
@@ -90,26 +127,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
           Authorization: `Bearer ${newToken}`,
           ...toHeaderRecord(init?.headers),
         };
-        const retryRes = await fetch(`${getServerBase()}${path}`, {
-          ...init,
-          headers: retryHeaders,
-        });
+        const retryRes = await fetch(`${getApiBase()}${path}`, { ...init, headers: retryHeaders });
         if (retryRes.ok) {
           if (retryRes.status === 204 || retryRes.status === 202) return undefined as T;
           return retryRes.json();
         }
       }
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh_token");
-      globalThis.location.href = "/login";
+
+      clearWebAuthState();
+      redirectToLogin();
     }
-    const body = await res.text();
-    throw new Error(body || "Unauthorized");
+
+    if (isDesktop && !isAuthEndpoint) {
+      reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
+      redirectToLogin();
+    }
+
+    throw new Error(await readError(res, "Unauthorized"));
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body || res.statusText);
+    throw new Error(await readError(res, res.statusText));
   }
 
   if (res.status === 204 || res.status === 202) return undefined as T;
@@ -117,37 +155,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
-  const token = localStorage.getItem("token");
-  const headers: HeadersInit = {
-    ...getCustomHeaders(),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...toHeaderRecord(init?.headers),
-  };
-
-  const res = await fetch(`${getServerBase()}${path}`, { ...init, headers });
+  const headers = buildRequestHeaders(init, true);
+  const res = await fetch(`${getApiBase()}${path}`, { ...init, headers });
 
   if (res.status === 401) {
-    const newToken = await tryRefreshToken();
-    if (newToken) {
-      const retryHeaders: HeadersInit = {
-        Authorization: `Bearer ${newToken}`,
-        ...toHeaderRecord(init?.headers),
-      };
-      const retryRes = await fetch(`${getServerBase()}${path}`, {
-        ...init,
-        headers: retryHeaders,
-      });
-      if (retryRes.ok) return retryRes.arrayBuffer();
+    if (!isDesktop) {
+      const newToken = await tryRefreshToken();
+      if (newToken) {
+        const retryHeaders: HeadersInit = {
+          Authorization: `Bearer ${newToken}`,
+          ...toHeaderRecord(init?.headers),
+        };
+        const retryRes = await fetch(`${getApiBase()}${path}`, { ...init, headers: retryHeaders });
+        if (retryRes.ok) return retryRes.arrayBuffer();
+      }
+
+      clearWebAuthState();
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-    globalThis.location.href = "/login";
+
+    if (isDesktop) {
+      reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
+    }
+
+    redirectToLogin();
     throw new Error("Unauthorized");
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body || res.statusText);
+    throw new Error(await readError(res, res.statusText));
   }
 
   return res.arrayBuffer();

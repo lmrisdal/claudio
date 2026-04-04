@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Logo from "../../core/components/logo";
 import { useDesktop } from "../hooks/use-desktop";
+import { buildDesktopCustomHeaders } from "../utils/custom-headers";
 
 export default function DesktopSetup({
   onConnected,
@@ -46,13 +47,7 @@ export default function DesktopSetup({
   }, [getSettings]);
 
   function buildCustomHeaders() {
-    const customHeaders: Record<string, string> = {};
-    for (const h of headers) {
-      const name = h.name.trim();
-      const value = h.value.trim();
-      if (name && value) customHeaders[name] = value;
-    }
-    return customHeaders;
+    return buildDesktopCustomHeaders(headers);
   }
 
   async function handleTest() {
@@ -67,8 +62,17 @@ export default function DesktopSetup({
     setTestResult("");
 
     try {
+      const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
+      if (forbiddenHeaders.length > 0) {
+        setTestResult("error");
+        setError(
+          `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+        );
+        return;
+      }
+
       const res = await fetch(`${trimmed}/api/auth/providers`, {
-        headers: buildCustomHeaders(),
+        headers: customHeaders,
       });
       if (res.ok) {
         setTestResult("success");
@@ -94,7 +98,13 @@ export default function DesktopSetup({
       return;
     }
 
-    const customHeaders = buildCustomHeaders();
+    const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
+    if (forbiddenHeaders.length > 0) {
+      setError(
+        `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+      );
+      return;
+    }
 
     setSaving(true);
     try {

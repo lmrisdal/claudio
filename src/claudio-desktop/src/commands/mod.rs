@@ -1,7 +1,7 @@
 pub mod games;
 pub mod ping;
 
-use crate::settings;
+use crate::{auth, refresh_auth_state_ui, settings};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[tauri::command]
@@ -20,7 +20,89 @@ pub fn restart_app(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+pub async fn desktop_get_session(app: tauri::AppHandle) -> Result<auth::DesktopSession, String> {
+    let session = match auth::restore_session(&settings::load()).await {
+        Ok(session) => session,
+        Err(message) => {
+            auth::maybe_show_secure_storage_dialog(&app, &message);
+            return Err(message);
+        }
+    };
+    refresh_auth_state_ui(&app, session.is_logged_in)?;
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn desktop_login(
+    app: tauri::AppHandle,
+    username: String,
+    password: String,
+) -> Result<auth::DesktopSession, String> {
+    let session = match auth::login_with_password(&settings::load(), &username, &password).await {
+        Ok(session) => session,
+        Err(message) => {
+            auth::maybe_show_secure_storage_dialog(&app, &message);
+            return Err(message);
+        }
+    };
+    refresh_auth_state_ui(&app, session.is_logged_in)?;
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn desktop_complete_external_login(
+    app: tauri::AppHandle,
+    nonce: String,
+) -> Result<auth::DesktopSession, String> {
+    let session = match auth::complete_external_login(&settings::load(), &nonce).await {
+        Ok(session) => session,
+        Err(message) => {
+            auth::maybe_show_secure_storage_dialog(&app, &message);
+            return Err(message);
+        }
+    };
+    refresh_auth_state_ui(&app, session.is_logged_in)?;
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn desktop_proxy_login(app: tauri::AppHandle) -> Result<auth::DesktopSession, String> {
+    let session = match auth::proxy_login(&settings::load()).await {
+        Ok(session) => session,
+        Err(message) => {
+            auth::maybe_show_secure_storage_dialog(&app, &message);
+            return Err(message);
+        }
+    };
+    refresh_auth_state_ui(&app, session.is_logged_in)?;
+    Ok(session)
+}
+
+#[tauri::command]
+pub fn desktop_logout(app: tauri::AppHandle) -> Result<auth::DesktopSession, String> {
+    if let Err(message) = auth::clear_tokens(&settings::load()) {
+        auth::maybe_show_secure_storage_dialog(&app, &message);
+        return Err(message);
+    }
+    refresh_auth_state_ui(&app, false)?;
+    Ok(auth::DesktopSession::logged_out())
+}
+
+#[tauri::command]
 pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    let session = match auth::restore_session(&settings::load()).await {
+        Ok(session) => session,
+        Err(message) => {
+            auth::maybe_show_secure_storage_dialog(&app, &message);
+            return Err(message);
+        }
+    };
+    refresh_auth_state_ui(&app, session.is_logged_in)?;
+
+    if !session.is_logged_in {
+        return Err("You must be signed in to open Settings.".to_string());
+    }
+
     log::info!("Opening settings window");
 
     if let Some(window) = app.get_webview_window("settings") {
@@ -33,19 +115,15 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 
     log::info!("Building settings window webview");
 
-    let result = WebviewWindowBuilder::new(
-        &app,
-        "settings",
-        WebviewUrl::App("index.html".into()),
-    )
-    .title("Desktop Settings")
-    .inner_size(640.0, 620.0)
-    .min_inner_size(640.0, 620.0)
-    .center()
-    .resizable(true)
-    .visible(false)
-    .build()
-    .map(|_| ());
+    let result = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("index.html".into()))
+        .title("Desktop Settings")
+        .inner_size(640.0, 620.0)
+        .min_inner_size(640.0, 620.0)
+        .center()
+        .resizable(true)
+        .visible(false)
+        .build()
+        .map(|_| ());
 
     match result {
         Ok(()) => {

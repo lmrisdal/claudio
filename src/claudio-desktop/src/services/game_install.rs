@@ -1,4 +1,6 @@
+use crate::auth;
 use crate::models::{InstallProgress, InstallType, InstalledGame, RemoteGame};
+use crate::refresh_auth_state_ui;
 use crate::registry;
 use crate::settings;
 use flate2::read::GzDecoder;
@@ -75,11 +77,10 @@ pub async fn install_game(
     app: AppHandle,
     state: State<'_, InstallState>,
     game: RemoteGame,
-    token: String,
 ) -> Result<InstalledGame, String> {
     let cancel_token = state.start(game.id)?;
     let game_id = game.id;
-    let result = install_game_inner(&app, game, token, &cancel_token).await;
+    let result = install_game_inner(&app, game, &cancel_token).await;
     state.finish(game_id);
     if cancel_token.load(Ordering::Relaxed) {
         return Err("Install cancelled.".to_string());
@@ -176,7 +177,6 @@ pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String>
 async fn install_game_inner(
     app: &AppHandle,
     game: RemoteGame,
-    token: String,
     cancel_token: &Arc<AtomicBool>,
 ) -> Result<InstalledGame, String> {
     log::info!(
@@ -226,9 +226,9 @@ async fn install_game_inner(
     let download_info = download_package(
         app,
         &DownloadOptions {
+            settings: &settings,
             server_url: &server_url,
             custom_headers: &settings.custom_headers,
-            token: &token,
             speed_limit_kbs: settings.download_speed_limit_kbs,
         },
         game.id,
@@ -280,9 +280,9 @@ struct DownloadInfo {
 }
 
 struct DownloadOptions<'a> {
+    settings: &'a settings::DesktopSettings,
     server_url: &'a str,
     custom_headers: &'a HashMap<String, String>,
-    token: &'a str,
     speed_limit_kbs: Option<f64>,
 }
 
@@ -295,9 +295,9 @@ async fn download_package(
     cancel_token: &Arc<AtomicBool>,
 ) -> Result<DownloadInfo, String> {
     let DownloadOptions {
+        settings,
         server_url,
         custom_headers,
-        token,
         speed_limit_kbs,
     } = opts;
     let client = reqwest::Client::new();
@@ -309,13 +309,24 @@ async fn download_package(
         Some("Requesting download"),
     );
 
-    let auth_headers = build_headers(custom_headers, token)?;
-    let ticket_response = client
+    let auth_headers = authenticated_headers(app, settings, custom_headers).await?;
+    let mut ticket_response = client
         .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
         .headers(auth_headers.clone())
         .send()
         .await
         .map_err(|err| err.to_string())?;
+
+    if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        if let Some(refreshed_headers) = refreshed_headers(app, settings, custom_headers).await? {
+            ticket_response = client
+                .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+                .headers(refreshed_headers.clone())
+                .send()
+                .await
+                .map_err(|err| err.to_string())?;
+        }
+    }
 
     if !ticket_response.status().is_success() {
         return Err(format!(
@@ -333,7 +344,7 @@ async fn download_package(
         .and_then(|value| value.as_str())
         .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?;
 
-    let response = client
+    let mut response = client
         .get(format!(
             "{server_url}/api/games/{game_id}/download?ticket={ticket}"
         ))
@@ -341,6 +352,19 @@ async fn download_package(
         .send()
         .await
         .map_err(|err| err.to_string())?;
+
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        if let Some(refreshed_headers) = refreshed_headers(app, settings, custom_headers).await? {
+            response = client
+                .get(format!(
+                    "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+                ))
+                .headers(refreshed_headers)
+                .send()
+                .await
+                .map_err(|err| err.to_string())?;
+        }
+    }
 
     if !response.status().is_success() {
         return Err(format!(
@@ -637,19 +661,52 @@ async fn install_installer(
 
 fn build_headers(
     custom_headers: &HashMap<String, String>,
-    token: &str,
+    token: Option<&str>,
 ) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
     for (name, value) in custom_headers {
+        if settings::is_forbidden_custom_header(name) {
+            continue;
+        }
+
         let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|err| err.to_string())?;
         let header_value = HeaderValue::from_str(value).map_err(|err| err.to_string())?;
         headers.insert(header_name, header_value);
     }
 
-    let auth_value =
-        HeaderValue::from_str(&format!("Bearer {token}")).map_err(|err| err.to_string())?;
-    headers.insert(AUTHORIZATION, auth_value);
+    if let Some(token) = token {
+        let auth_value =
+            HeaderValue::from_str(&format!("Bearer {token}")).map_err(|err| err.to_string())?;
+        headers.insert(AUTHORIZATION, auth_value);
+    }
+
     Ok(headers)
+}
+
+async fn authenticated_headers(
+    app: &AppHandle,
+    settings: &settings::DesktopSettings,
+    custom_headers: &HashMap<String, String>,
+) -> Result<HeaderMap, String> {
+    let Some(access_token) = auth::access_token_for_request(settings).await? else {
+        let _ = refresh_auth_state_ui(app, false);
+        return Err("You need to sign in before installing games.".to_string());
+    };
+
+    build_headers(custom_headers, Some(&access_token))
+}
+
+async fn refreshed_headers(
+    app: &AppHandle,
+    settings: &settings::DesktopSettings,
+    custom_headers: &HashMap<String, String>,
+) -> Result<Option<HeaderMap>, String> {
+    let Some(access_token) = auth::refresh_access_token(settings).await? else {
+        let _ = refresh_auth_state_ui(app, false);
+        return Ok(None);
+    };
+
+    build_headers(custom_headers, Some(&access_token)).map(Some)
 }
 
 fn build_install_dir(install_root: &Path, game: &RemoteGame) -> PathBuf {

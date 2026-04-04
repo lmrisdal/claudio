@@ -522,7 +522,7 @@ export default function SettingsDialog({
                 setFocusZone("sidebar");
                 setSidebarIndex(signOutIndex);
                 onClose();
-                logout();
+                void logout();
               }}
               className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
             >
@@ -562,7 +562,7 @@ export default function SettingsDialog({
               <button
                 onClick={() => {
                   onClose();
-                  logout();
+                  void logout();
                 }}
                 className="mt-6 w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted transition-colors hover:bg-surface-raised hover:text-red-400 sm:hidden"
               >

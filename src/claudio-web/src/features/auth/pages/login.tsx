@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { resolveServerUrl } from "../../core/api/client";
 import Logo from "../../core/components/logo";
-import { getSettings, isDesktop } from "../../desktop/hooks/use-desktop";
+import { getSettings, isDesktop, updateSettings } from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
+
+const secureStorageErrorPrefix = "Secure storage unavailable:";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,8 +15,10 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
   const [providerLoading, setProviderLoading] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const canUseInsecureFallback = isDesktop && error.startsWith(secureStorageErrorPrefix);
 
   useEffect(() => {
     const parameters = new URLSearchParams(location.search);
@@ -62,6 +67,22 @@ export default function Login() {
     }
   }
 
+  async function handleEnableInsecureFallback() {
+    setError("");
+    setFallbackLoading(true);
+
+    try {
+      const settings = await getSettings();
+      await updateSettings({ ...settings, allowInsecureAuthStorage: true });
+      await login(username, password);
+      void navigate("/");
+    } catch (error_) {
+      setError(error_ instanceof Error ? error_.message : "Login failed");
+    } finally {
+      setFallbackLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-grid">
       <div className="w-full max-w-sm">
@@ -86,6 +107,25 @@ export default function Login() {
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5 mb-4">
               <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          {canUseInsecureFallback && (
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <p className="text-sm text-amber-200">
+                Secure storage is unavailable. You can continue with an insecure plaintext file on
+                this machine, but your desktop session will not be protected by the OS keyring.
+              </p>
+              <button
+                type="button"
+                onClick={handleEnableInsecureFallback}
+                disabled={
+                  fallbackLoading || loading || providerLoading !== null || !username || !password
+                }
+                className="mt-3 w-full rounded-lg border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                {fallbackLoading ? "Switching to insecure storage..." : "Use insecure file storage"}
+              </button>
             </div>
           )}
 
@@ -146,9 +186,7 @@ export default function Login() {
               {providers.localLoginEnabled && (
                 <div className="my-4 flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs uppercase tracking-[0.2em] text-text-muted">
-                    or
-                  </span>
+                  <span className="text-xs uppercase tracking-[0.2em] text-text-muted">or</span>
                   <div className="h-px flex-1 bg-border" />
                 </div>
               )}
@@ -156,7 +194,7 @@ export default function Login() {
               {providers.providers.map((provider) => (
                 <a
                   key={provider.slug}
-                  href={provider.startUrl}
+                  href={resolveServerUrl(provider.startUrl)}
                   onClick={() => setProviderLoading(provider.displayName)}
                   aria-disabled={providerLoading !== null}
                   className={`${providers.localLoginEnabled ? "mt-3 " : ""}flex not-last:mb-3 min-h-11 w-full items-center justify-center rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm font-semibold text-text-primary transition hover:border-accent/40 hover:bg-surface disabled:opacity-50`}

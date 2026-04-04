@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSettings, updateSettings, type DesktopSettings } from "../../desktop/hooks/use-desktop";
+import { buildDesktopCustomHeaders } from "../../desktop/utils/custom-headers";
 
 type HeaderField = { name: string; value: string };
 
@@ -75,13 +76,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   }, [active]);
 
   function buildCustomHeaders() {
-    const customHeaders: Record<string, string> = {};
-    for (const header of headers) {
-      const name = header.name.trim();
-      const value = header.value.trim();
-      if (name && value) customHeaders[name] = value;
-    }
-    return customHeaders;
+    return buildDesktopCustomHeaders(headers);
   }
 
   async function handleTest() {
@@ -95,8 +90,16 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     setConnectionMessage("");
 
     try {
+      const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
+      if (forbiddenHeaders.length > 0) {
+        setConnectionMessage(
+          `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+        );
+        return;
+      }
+
       const response = await fetch(`${trimmedUrl}/api/auth/providers`, {
-        headers: buildCustomHeaders(),
+        headers: customHeaders,
       });
 
       if (response.ok) {
@@ -121,7 +124,13 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         return;
       }
 
-      const customHeaders = buildCustomHeaders();
+      const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
+      if (forbiddenHeaders.length > 0) {
+        setSaveMessage(
+          `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+        );
+        return;
+      }
 
       const serverChanged = trimmedUrl !== (settings.serverUrl ?? "");
       const headersChanged =

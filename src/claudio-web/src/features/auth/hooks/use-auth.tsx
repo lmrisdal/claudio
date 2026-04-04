@@ -24,7 +24,7 @@ export interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   completeExternalLogin: (nonce: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setToken: (token: string) => void;
   setUser: (user: {
     id: number;

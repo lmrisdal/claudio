@@ -109,11 +109,6 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
 
   const startDownload = useCallback(
     async (game: DesktopInstallGameInput): Promise<InstalledGame> => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("You need to sign in before installing games.");
-      }
-
       setActiveDownloads((previous) => {
         const next = new Map([
           ...previous,
@@ -130,7 +125,7 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
       });
 
       try {
-        const result = await installGame(game, token);
+        const result = await installGame(game);
         setActiveDownloads((previous) => {
           const next = new Map(previous);
           next.delete(game.id);

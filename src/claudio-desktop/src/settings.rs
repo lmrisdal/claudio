@@ -18,6 +18,8 @@ pub struct DesktopSettings {
     pub hide_dock_icon: bool,
     #[serde(default)]
     pub custom_headers: HashMap<String, String>,
+    #[serde(default)]
+    pub allow_insecure_auth_storage: bool,
     /// Download speed limit in megabits per second. None or 0 means unlimited.
     #[serde(default)]
     pub download_speed_limit_kbs: Option<f64>,
@@ -35,9 +37,34 @@ impl Default for DesktopSettings {
             close_to_tray: false,
             hide_dock_icon: false,
             custom_headers: HashMap::new(),
+            allow_insecure_auth_storage: false,
             download_speed_limit_kbs: None,
         }
     }
+}
+
+pub fn is_forbidden_custom_header(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "authorization" | "cookie" | "proxy-authorization"
+    )
+}
+
+pub fn sanitize_custom_headers(headers: &HashMap<String, String>) -> HashMap<String, String> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            if is_forbidden_custom_header(name) {
+                return None;
+            }
+
+            Some((name.clone(), value.clone()))
+        })
+        .collect()
+}
+
+fn sanitize_settings(settings: &mut DesktopSettings) {
+    settings.custom_headers = sanitize_custom_headers(&settings.custom_headers);
 }
 
 fn settings_path() -> PathBuf {
@@ -47,7 +74,11 @@ fn settings_path() -> PathBuf {
 pub fn load() -> DesktopSettings {
     let path = settings_path();
     match fs::read_to_string(&path) {
-        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Ok(contents) => {
+            let mut settings: DesktopSettings = serde_json::from_str(&contents).unwrap_or_default();
+            sanitize_settings(&mut settings);
+            settings
+        }
         Err(_) => DesktopSettings::default(),
     }
 }
@@ -55,14 +86,20 @@ pub fn load() -> DesktopSettings {
 pub async fn load_async() -> DesktopSettings {
     let path = settings_path();
     match tokio::fs::read_to_string(&path).await {
-        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Ok(contents) => {
+            let mut settings: DesktopSettings = serde_json::from_str(&contents).unwrap_or_default();
+            sanitize_settings(&mut settings);
+            settings
+        }
         Err(_) => DesktopSettings::default(),
     }
 }
 
 pub fn save(settings: &DesktopSettings) -> Result<(), String> {
     let path = settings_path();
-    let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    let mut settings = settings.clone();
+    sanitize_settings(&mut settings);
+    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())
 }
 
