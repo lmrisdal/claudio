@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGuide } from "../../core/hooks/use-guide";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import { sounds } from "../../core/utils/sounds";
-import { isDesktop } from "../../desktop/hooks/use-desktop";
+import { isDesktop, ping } from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
 import AccountTab from "./account-tab";
 import DesktopSettingsTab from "./desktop-settings-tab";
@@ -39,6 +39,8 @@ export default function AccountDialog({
   const [sidebarIndex, setSidebarIndex] = useState(0);
   const [contentIndex, setContentIndex] = useState(0);
   const [updateStatusMessage, setUpdateStatusMessage] = useState("");
+  const [appVersion, setAppVersion] = useState("");
+  const [showSidebarFocusRing, setShowSidebarFocusRing] = useState(false);
 
   const sidebarReferences = useRef<(HTMLButtonElement | null)[]>([]);
   const contentReferences = useRef<(HTMLButtonElement | HTMLInputElement | null)[]>([]);
@@ -77,7 +79,31 @@ export default function AccountDialog({
       }
       checkingStartedAtReference.current = null;
       setUpdateStatusMessage("");
+      setShowSidebarFocusRing(false);
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !isDesktop) {
+      return;
+    }
+
+    let active = true;
+    void ping()
+      .then((response) => {
+        if (active) {
+          setAppVersion(response.version);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAppVersion("");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -224,6 +250,7 @@ export default function AccountDialog({
     "arrowup",
     (e) => {
       e.preventDefault();
+      setShowSidebarFocusRing(true);
       if (focusZone === "sidebar") {
         focusSidebar(sidebarIndex - 1);
         void sounds.navigate();
@@ -244,6 +271,7 @@ export default function AccountDialog({
     "arrowdown",
     (e) => {
       e.preventDefault();
+      setShowSidebarFocusRing(true);
       if (focusZone === "sidebar") {
         focusSidebar(sidebarIndex + 1);
         void sounds.navigate();
@@ -259,6 +287,7 @@ export default function AccountDialog({
     "arrowright",
     (e) => {
       e.preventDefault();
+      setShowSidebarFocusRing(true);
       if (focusZone === "sidebar") {
         // Move into content
         setFocusZone("content");
@@ -273,6 +302,7 @@ export default function AccountDialog({
     "arrowleft",
     (e) => {
       e.preventDefault();
+      setShowSidebarFocusRing(true);
       if (focusZone === "content") {
         // Move back to sidebar
         setFocusZone("sidebar");
@@ -290,6 +320,7 @@ export default function AccountDialog({
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
       e.preventDefault();
+      setShowSidebarFocusRing(true);
       if (focusZone === "sidebar" && sidebarIndex < visibleTabs.length) {
         void sounds.select();
       } else {
@@ -312,6 +343,7 @@ export default function AccountDialog({
       setActiveTab(visibleTabs[nextIndex].id);
       setSidebarIndex(nextIndex);
       setContentIndex(0);
+      setShowSidebarFocusRing(true);
       void sounds.select();
     },
     [visibleTabs, activeTab],
@@ -341,6 +373,7 @@ export default function AccountDialog({
         ref={panelReference}
         className="relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
+        onPointerDownCapture={() => setShowSidebarFocusRing(false)}
         role="dialog"
         aria-label="Settings"
       >
@@ -375,17 +408,16 @@ export default function AccountDialog({
                   ref={(element) => {
                     sidebarReferences.current[index] = element;
                   }}
-                  onClick={() => selectTab(tab.id)}
-                  onMouseEnter={() => {
+                  onClick={() => {
                     setFocusZone("sidebar");
                     setSidebarIndex(index);
-                    sidebarReferences.current[index]?.focus();
+                    selectTab(tab.id);
                   }}
                   className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors sm:w-full ${
                     activeTab === tab.id
                       ? "bg-surface text-text-primary font-medium"
                       : "text-text-secondary hover:bg-surface hover:text-text-primary"
-                  } focus-visible:ring-2 focus-visible:ring-accent`}
+                  } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
                 >
                   {tab.label}
                 </button>
@@ -395,17 +427,17 @@ export default function AccountDialog({
 
           {hasCheckForUpdatesButton && (
             <div className="mx-5 mb-2 hidden sm:block">
+              {appVersion && <div className="px-3 py-1 text-xs text-text-muted">v{appVersion}</div>}
               <button
                 ref={(element) => {
                   sidebarReferences.current[checkForUpdatesIndex] = element;
                 }}
-                onClick={checkForUpdates}
-                onMouseEnter={() => {
+                onClick={() => {
                   setFocusZone("sidebar");
                   setSidebarIndex(checkForUpdatesIndex);
-                  sidebarReferences.current[checkForUpdatesIndex]?.focus();
+                  checkForUpdates();
                 }}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
               >
                 <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
                   {checkForUpdatesLabel}
@@ -420,15 +452,12 @@ export default function AccountDialog({
                 sidebarReferences.current[signOutIndex] = element;
               }}
               onClick={() => {
+                setFocusZone("sidebar");
+                setSidebarIndex(signOutIndex);
                 onClose();
                 logout();
               }}
-              onMouseEnter={() => {
-                setFocusZone("sidebar");
-                setSidebarIndex(signOutIndex);
-                sidebarReferences.current[signOutIndex]?.focus();
-              }}
-              className="m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-red-400 focus-visible:ring-2 focus-visible:ring-accent sm:block"
+              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-surface hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
             >
               Sign out
             </button>

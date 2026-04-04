@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "claudio-desktop"
-version = "0.1.2"
+version = "0.1.7"
 dependencies = [
  "dirs",
  "flate2",
