@@ -156,7 +156,7 @@ pub fn run() {
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
             "settings" => {
-                let _ = commands::open_settings_window(app.clone());
+                tauri::async_runtime::spawn(commands::open_settings_window(app.clone()));
             }
             "check-updates" | "tray-check-updates" => {
                 let _ = app.emit("check-for-updates", ());

@@ -20,7 +20,7 @@ pub fn restart_app(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Opening settings window");
 
     if let Some(window) = app.get_webview_window("settings") {
