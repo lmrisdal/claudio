@@ -2,24 +2,23 @@ use crate::models::{InstallType, InstalledGame};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
-use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 use winreg::RegKey;
+use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 
-use windows::core::Interface;
 use windows::Win32::Media::Audio::{
-    eConsole, eRender, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2,
-    IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
+    IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDeviceEnumerator,
+    ISimpleAudioVolume, MMDeviceEnumerator, eConsole, eRender,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
+    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
 };
+use windows::core::Interface;
 
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPPROCESS,
 };
 
-const UNINSTALL_ROOT: &str =
-    "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
 /// Mutes all audio sessions associated with the given process tree and/or executable name.
 /// Runs in a background thread and retries for up to 20 seconds to catch processes
@@ -141,9 +140,7 @@ fn try_mute_sessions(pid: u32, exe_name: Option<&str>) -> Result<usize, String> 
     // It launches via ShellExecute so setup.tmp is not a child of setup.exe — it
     // escapes the PID tree. Catch it by extension: any *.tmp process during an
     // install is virtually guaranteed to be an InnoSetup self-extractor.
-    for found_pid in find_pids_matching(|exe| {
-        exe.to_ascii_lowercase().ends_with(".tmp")
-    }) {
+    for found_pid in find_pids_matching(|exe| exe.to_ascii_lowercase().ends_with(".tmp")) {
         if !target_pids.contains(&found_pid) {
             target_pids.push(found_pid);
         }
@@ -322,10 +319,7 @@ fn write_registry(
 ) -> Result<(), String> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (key, _) = hkcu
-        .create_subkey_with_flags(
-            format!("{UNINSTALL_ROOT}\\{key_name}"),
-            KEY_WRITE,
-        )
+        .create_subkey_with_flags(format!("{UNINSTALL_ROOT}\\{key_name}"), KEY_WRITE)
         .map_err(|e| e.to_string())?;
 
     let uninstall_str = uninstall_exe.to_string_lossy();
@@ -335,11 +329,8 @@ fn write_registry(
         .map_err(|e| e.to_string())?;
     key.set_value("QuietUninstallString", &uninstall_str.as_ref())
         .map_err(|e| e.to_string())?;
-    key.set_value(
-        "InstallLocation",
-        &install_dir.to_string_lossy().as_ref(),
-    )
-    .map_err(|e| e.to_string())?;
+    key.set_value("InstallLocation", &install_dir.to_string_lossy().as_ref())
+        .map_err(|e| e.to_string())?;
     key.set_value("Publisher", &"Claudio")
         .map_err(|e| e.to_string())?;
     key.set_value("InstallDate", &install_date_string())

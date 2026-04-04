@@ -3,7 +3,7 @@ use crate::registry;
 use crate::settings;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_DISPOSITION};
+use reqwest::header::{AUTHORIZATION, CONTENT_DISPOSITION, HeaderMap, HeaderName, HeaderValue};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -121,9 +121,8 @@ pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), Str
         if let Some(installed) = removed {
             let path = PathBuf::from(&installed.install_path);
             if path.exists() {
-                fs::remove_dir_all(&path).map_err(|err| {
-                    format!("Failed to delete install folder: {err}")
-                })?;
+                fs::remove_dir_all(&path)
+                    .map_err(|err| format!("Failed to delete install folder: {err}"))?;
             }
         }
     }
@@ -143,8 +142,8 @@ pub fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
 }
 
 pub fn launch_game(remote_game_id: i32) -> Result<(), String> {
-    let game = registry::get(remote_game_id)?
-        .ok_or_else(|| "Game is not installed.".to_string())?;
+    let game =
+        registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
     let exe = game
         .game_exe
         .ok_or_else(|| "No executable is set for this game.".to_string())?;
@@ -156,15 +155,15 @@ pub fn launch_game(remote_game_id: i32) -> Result<(), String> {
 }
 
 pub fn set_game_exe(remote_game_id: i32, game_exe: String) -> Result<InstalledGame, String> {
-    let mut game = registry::get(remote_game_id)?
-        .ok_or_else(|| "Game is not installed.".to_string())?;
+    let mut game =
+        registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
     game.game_exe = Some(game_exe);
     registry::upsert(game)
 }
 
 pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String> {
-    let game = registry::get(remote_game_id)?
-        .ok_or_else(|| "Game is not installed.".to_string())?;
+    let game =
+        registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
     let root = PathBuf::from(&game.install_path);
 
     let mut exes = Vec::new();
@@ -195,7 +194,9 @@ async fn install_game_inner(
 ) -> Result<InstalledGame, String> {
     log::info!(
         "Starting install for '{}' (id={}, install_type={:?})",
-        game.title, game.id, game.install_type
+        game.title,
+        game.id,
+        game.install_type
     );
     emit_progress(
         app,
@@ -272,7 +273,11 @@ async fn install_game_inner(
     crate::windows_integration::register(app, &installed, game.desktop_shortcut.unwrap_or(false));
 
     let _ = fs::remove_dir_all(&temp_root);
-    log::info!("Install complete for '{}': {}", game.title, installed.install_path);
+    log::info!(
+        "Install complete for '{}': {}",
+        game.title,
+        installed.install_path
+    );
     emit_progress(
         app,
         game.id,
@@ -302,7 +307,12 @@ async fn download_package(
     temp_root: &Path,
     cancel_token: &Arc<AtomicBool>,
 ) -> Result<DownloadInfo, String> {
-    let DownloadOptions { server_url, custom_headers, token, speed_limit_kbs } = opts;
+    let DownloadOptions {
+        server_url,
+        custom_headers,
+        token,
+        speed_limit_kbs,
+    } = opts;
     let client = reqwest::Client::new();
     emit_progress(
         app,
@@ -381,8 +391,7 @@ async fn download_package(
             io::Write::write_all(&mut writer, &chunk)
                 .map_err(|e| format!("Failed to write download chunk: {e}"))?;
         }
-        io::Write::flush(&mut writer)
-            .map_err(|e| format!("Failed to flush download file: {e}"))?;
+        io::Write::flush(&mut writer).map_err(|e| format!("Failed to flush download file: {e}"))?;
         Ok(())
     });
 
@@ -395,13 +404,18 @@ async fn download_package(
         }
         let chunk = chunk.map_err(|err| err.to_string())?;
         let chunk_len = chunk.len() as u64;
-        chunk_tx.send(chunk.to_vec()).await.map_err(|_| "Writer thread died unexpectedly.".to_string())?;
+        chunk_tx
+            .send(chunk.to_vec())
+            .await
+            .map_err(|_| "Writer thread died unexpectedly.".to_string())?;
         downloaded += chunk_len;
         window_bytes += chunk_len;
 
         if window_start.elapsed().as_secs() >= 1 {
             let new_limit = settings::load_async().await.download_speed_limit_kbs;
-            bytes_per_second_limit = new_limit.filter(|v| *v > 0.0).map(|kbs| (kbs * 1024.0) as u64);
+            bytes_per_second_limit = new_limit
+                .filter(|v| *v > 0.0)
+                .map(|kbs| (kbs * 1024.0) as u64);
             window_start = std::time::Instant::now();
             window_bytes = 0;
         }
@@ -433,7 +447,9 @@ async fn download_package(
     }
 
     drop(chunk_tx);
-    writer_handle.await.map_err(|e| format!("Writer thread panicked: {e}"))??;
+    writer_handle
+        .await
+        .map_err(|e| format!("Writer thread panicked: {e}"))??;
     Ok(DownloadInfo {
         file_path: download_path,
     })
@@ -477,7 +493,13 @@ async fn install_portable(
         fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
 
         extract_archive_or_copy(&package_path_owned, &extract_root, &mut progress_cb)?;
-        emit_progress(&app_handle, gid, "extracting", Some(96.0), Some("Moving files…"));
+        emit_progress(
+            &app_handle,
+            gid,
+            "extracting",
+            Some(96.0),
+            Some("Moving files…"),
+        );
         normalize_into_final_dir(&extract_root, &target_dir_owned)?;
 
         let exe = game_exe_hint
@@ -495,8 +517,7 @@ async fn install_portable(
         Ok(exe)
     })
     .await
-    .map_err(|err| format!("Extract task failed: {err}"))?
-    ?;
+    .map_err(|err| format!("Extract task failed: {err}"))??;
 
     Ok(InstalledGame {
         remote_game_id: game.id,
@@ -563,10 +584,15 @@ async fn install_installer(
         }
         fs::create_dir_all(&staging_dir).map_err(|err| err.to_string())?;
         extract_archive_or_copy(&package_path_owned, &staging_dir, &mut progress_cb)?;
-        emit_progress(&app_handle, gid, "extracting", Some(86.0), Some("Extracting game…"));
+        emit_progress(
+            &app_handle,
+            gid,
+            "extracting",
+            Some(86.0),
+            Some("Extracting game…"),
+        );
 
-        let installer =
-            resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+        let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
 
         emit_progress_indeterminate(
             &app_handle,
@@ -598,8 +624,7 @@ async fn install_installer(
         Ok(exe)
     })
     .await
-    .map_err(|err| format!("Install task failed: {err}"))?
-    ?;
+    .map_err(|err| format!("Install task failed: {err}"))??;
 
     Ok(InstalledGame {
         remote_game_id: game.id,
@@ -657,7 +682,11 @@ fn infer_filename(headers: &HeaderMap) -> Option<String> {
     })
 }
 
-fn extract_archive_or_copy<F>(source: &Path, destination: &Path, mut progress: F) -> Result<(), String>
+fn extract_archive_or_copy<F>(
+    source: &Path,
+    destination: &Path,
+    mut progress: F,
+) -> Result<(), String>
 where
     F: FnMut(f64),
 {
@@ -834,8 +863,22 @@ fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 const SCENE_GROUP_FOLDERS: &[&str] = &[
-    "SKIDROW", "CODEX", "CPY", "PLAZA", "RELOADED", "RUNE", "EMPRESS", "VOKSI",
-    "FLT", "BAT", "PROPHET", "DARKSIDERS", "DODI", "HOODLUM", "RAZOR1911", "FAIRLIGHT",
+    "SKIDROW",
+    "CODEX",
+    "CPY",
+    "PLAZA",
+    "RELOADED",
+    "RUNE",
+    "EMPRESS",
+    "VOKSI",
+    "FLT",
+    "BAT",
+    "PROPHET",
+    "DARKSIDERS",
+    "DODI",
+    "HOODLUM",
+    "RAZOR1911",
+    "FAIRLIGHT",
     "voices38",
 ];
 
@@ -1038,7 +1081,11 @@ fn run_installer(path: &Path, target_dir: &Path, force_interactive: bool) -> Res
             })
         }
         InstallerType::Msi => {
-            let msi_args = format!("/i \"{}\" /qn TARGETDIR=\"{}\"", path.to_string_lossy(), target);
+            let msi_args = format!(
+                "/i \"{}\" /qn TARGETDIR=\"{}\"",
+                path.to_string_lossy(),
+                target
+            );
             let mut cmd = std::process::Command::new("msiexec");
             cmd.arg("/i")
                 .arg(path)
@@ -1085,15 +1132,8 @@ fn run_innosetup_silent(path: &Path, target: &str) -> Result<(), String> {
 /// Spawns a process, attempts to mute its audio on Windows, and waits for it to exit.
 /// Handles UAC elevation (Error 740) by falling back to PowerShell's RunAs.
 #[cfg(target_os = "windows")]
-fn spawn_mute_wait(
-    mut cmd: std::process::Command,
-    path: &Path,
-    args: &str,
-) -> Result<(), String> {
-    let exe_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map(String::from);
+fn spawn_mute_wait(mut cmd: std::process::Command, path: &Path, args: &str) -> Result<(), String> {
+    let exe_name = path.file_name().and_then(|n| n.to_str()).map(String::from);
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -1125,7 +1165,10 @@ fn spawn_mute_wait(
 /// even when Claudio itself is not running as administrator.
 #[cfg(target_os = "windows")]
 fn run_elevated(path: &Path, args: &str) -> Result<std::process::ExitStatus, String> {
-    log::info!("Installer requires elevation, requesting UAC prompt for {}", path.display());
+    log::info!(
+        "Installer requires elevation, requesting UAC prompt for {}",
+        path.display()
+    );
     let path_esc = path.to_string_lossy().replace('\'', "''");
     let args_esc = args.replace('\'', "''");
 
@@ -1143,7 +1186,14 @@ fn run_elevated(path: &Path, args: &str) -> Result<std::process::ExitStatus, Str
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     std::process::Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script])
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &ps_script,
+        ])
         .stdin(Stdio::null())
         .creation_flags(CREATE_NO_WINDOW)
         .status()

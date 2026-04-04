@@ -6,12 +6,12 @@ mod settings;
 #[cfg(target_os = "windows")]
 mod windows_integration;
 
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
 #[cfg(target_os = "macos")]
 use tauri::menu::SubmenuBuilder;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager};
 use tauri::webview::PageLoadEvent;
+use tauri::{AppHandle, Emitter, Manager};
 
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
 
@@ -71,13 +71,11 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-
                 let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
                     .accelerator("CmdOrCtrl+,")
                     .build(app)?;
                 let check_updates_item =
-                    MenuItemBuilder::with_id("check-updates", "Check for Updates...")
-                        .build(app)?;
+                    MenuItemBuilder::with_id("check-updates", "Check for Updates...").build(app)?;
 
                 let app_submenu = SubmenuBuilder::new(app, "Claudio")
                     .about(None)
@@ -148,22 +146,20 @@ pub fn run() {
             let _ = window;
             Ok(())
         })
-        .on_menu_event(|app, event| {
-            match event.id().as_ref() {
-                "settings" => {
-                    let _ = commands::open_settings_window(app.clone());
-                }
-                "check-updates" | "tray-check-updates" => {
-                    let _ = app.emit("check-for-updates", ());
-                }
-                "tray-show" => {
-                    restore_main_window(app);
-                }
-                "tray-quit" => {
-                    app.exit(0);
-                }
-                _ => {}
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "settings" => {
+                let _ = commands::open_settings_window(app.clone());
             }
+            "check-updates" | "tray-check-updates" => {
+                let _ = app.emit("check-for-updates", ());
+            }
+            "tray-show" => {
+                restore_main_window(app);
+            }
+            "tray-quit" => {
+                app.exit(0);
+            }
+            _ => {}
         })
         .on_page_load(|webview, payload| {
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {
