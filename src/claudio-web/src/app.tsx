@@ -22,6 +22,7 @@ const Library = lazy(() => import("./features/library/pages/library"));
 const Login = lazy(() => import("./features/auth/pages/login"));
 const ExternalAuthCallback = lazy(() => import("./features/auth/pages/external-auth-callback"));
 const Register = lazy(() => import("./features/auth/pages/register"));
+const DesktopSetup = lazy(() => import("./features/desktop/pages/desktop-setup"));
 
 export default function App() {
   useTheme(); // keeps OS colour-scheme subscription alive for the lifetime of the app
@@ -63,6 +64,21 @@ export default function App() {
                     </GuestRoute>
                   }
                 />
+                {isDesktop && (
+                  <Route
+                    path="/desktop-setup"
+                    element={
+                      <GuestRoute>
+                        <DesktopSetup
+                          onConnected={(serverUrl) => {
+                            localStorage.setItem("claudio_server_url", serverUrl);
+                            globalThis.location.href = "/login";
+                          }}
+                        />
+                      </GuestRoute>
+                    }
+                  />
+                )}
                 <Route path="/auth/callback" element={<ExternalAuthCallback />} />
                 <Route
                   path="/"

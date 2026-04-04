@@ -169,5 +169,5 @@ jobs:
           tagName: v__VERSION__
           releaseName: Claudio v__VERSION__
           releaseBody: See the assets below to download and install Claudio for your platform.
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false

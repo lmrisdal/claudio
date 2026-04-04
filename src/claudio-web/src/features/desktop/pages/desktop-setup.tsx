@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Logo from "../../core/components/logo";
 import { useDesktop } from "../hooks/use-desktop";
 
@@ -15,6 +15,35 @@ export default function DesktopSetup({
   const [testResult, setTestResult] = useState<"success" | "error" | "">("");
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getSettings()
+      .then((settings) => {
+        if (cancelled) return;
+
+        setUrl(settings.serverUrl ?? "");
+
+        const customHeaders = settings.customHeaders ?? {};
+        const loadedHeaders = Object.entries(customHeaders).map(([name, value]) => ({
+          name,
+          value,
+        }));
+
+        setHeaders(loadedHeaders);
+        setShowHeaders(loadedHeaders.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUrl("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getSettings]);
 
   function buildCustomHeaders() {
     const customHeaders: Record<string, string> = {};

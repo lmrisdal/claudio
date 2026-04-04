@@ -213,8 +213,12 @@ jobs:
           projectPath: src/claudio-desktop
           tauriScript: ../claudio-web/node_modules/.bin/tauri
           args: ${{ matrix.args }}
-          tagName: v__VERSION__
-          releaseName: Claudio v__VERSION__
-          releaseBody: See the assets below to download and install Claudio for your platform.
+          tagName: dev
+          releaseName: Claudio Dev Build
+          releaseBody: "Latest development build from main. Commit: ${{ github.sha }}"
+          # Per-commit tags (creates a separate draft for each commit):
+          # tagName: dev-${{ github.sha }}
+          # releaseName: "Claudio Dev Build (${{ github.sha }})"
+          # releaseBody: "Development build from commit ${{ github.sha }}"
           releaseDraft: true
           prerelease: true

@@ -39,7 +39,7 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         WebviewUrl::App("index.html".into()),
     )
     .title("Desktop Settings")
-    .inner_size(760.0, 780.0)
+    .inner_size(640.0, 620.0)
     .min_inner_size(640.0, 620.0)
     .center()
     .resizable(true)

@@ -9,13 +9,27 @@ mod windows_integration;
 #[cfg(target_os = "macos")]
 use tauri::menu::SubmenuBuilder;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};
 
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
 
+#[cfg(target_os = "macos")]
+fn set_dock_visibility(app: &AppHandle, visible: bool) {
+    let policy = if visible {
+        tauri::ActivationPolicy::Regular
+    } else {
+        tauri::ActivationPolicy::Accessory
+    };
+    let _ = app.set_activation_policy(policy);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_dock_visibility(_app: &AppHandle, _visible: bool) {}
+
 fn restore_main_window(app: &AppHandle) {
+    set_dock_visibility(app, true);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
@@ -24,7 +38,7 @@ fn restore_main_window(app: &AppHandle) {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .manage(services::game_install::InstallState::default())
         .manage(services::game_runtime::RunningGamesState::default())
         .plugin(
@@ -43,6 +57,7 @@ pub fn run() {
                     tauri_plugin_window_state::StateFlags::all()
                         & !tauri_plugin_window_state::StateFlags::VISIBLE,
                 )
+                .with_denylist(&["settings"])
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
@@ -70,9 +85,13 @@ pub fn run() {
 
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    if settings::load().close_to_tray {
+                    let current_settings = settings::load();
+                    if current_settings.close_to_tray {
                         api.prevent_close();
                         let _ = window_for_close.hide();
+                        if current_settings.hide_dock_icon {
+                            set_dock_visibility(&window_for_close.app_handle(), false);
+                        }
                     }
                 }
             });
@@ -150,7 +169,19 @@ pub fn run() {
                 .icon(tray_icon)
                 .menu(&tray_menu)
                 .tooltip("Claudio")
-                .show_menu_on_left_click(true)
+                .show_menu_on_left_click(false)
+                .on_tray_icon_event(|tray, event| {
+                    if matches!(
+                        event,
+                        TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        }
+                    ) {
+                        restore_main_window(tray.app_handle());
+                    }
+                })
                 .icon_as_template(cfg!(target_os = "macos"))
                 .build(app)?;
 
@@ -205,6 +236,13 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Claudio");
+        .build(tauri::generate_context!())
+        .expect("error while building Claudio");
+
+    app.run(|app, event| {
+        #[cfg(target_os = "macos")]
+        if matches!(event, tauri::RunEvent::Reopen { .. }) {
+            restore_main_window(app);
+        }
+    });
 }

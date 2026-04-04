@@ -10,6 +10,8 @@ export interface AppSettingsFormState {
   setInstallPath: (value: string) => void;
   closeToTray: boolean;
   setCloseToTray: (value: boolean) => void;
+  hideDockIcon: boolean;
+  setHideDockIcon: (value: boolean) => void;
   speedLimit: string;
   setSpeedLimit: (value: string) => void;
   headers: HeaderField[];
@@ -29,6 +31,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [serverUrl, setServerUrl] = useState("");
   const [installPath, setInstallPath] = useState("");
   const [closeToTray, setCloseToTray] = useState(false);
+  const [hideDockIcon, setHideDockIcon] = useState(false);
   const [speedLimit, setSpeedLimit] = useState("");
   const [headers, setHeaders] = useState<HeaderField[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
@@ -49,6 +52,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       setServerUrl(loadedSettings.serverUrl ?? "");
       setInstallPath(loadedSettings.defaultInstallPath ?? "");
       setCloseToTray(loadedSettings.closeToTray ?? false);
+      setHideDockIcon(loadedSettings.hideDockIcon ?? false);
       setSpeedLimit(
         loadedSettings.downloadSpeedLimitKbs ? String(loadedSettings.downloadSpeedLimitKbs) : "",
       );
@@ -108,26 +112,31 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   }
 
   async function handleSave() {
-    if (!settings) return;
-
-    const trimmedUrl = serverUrl.trim().replace(/\/+$/, "");
-    if (!trimmedUrl) {
-      setSaveMessage("Server URL is required.");
-      return;
-    }
-
-    const customHeaders = buildCustomHeaders();
-
-    setSaving(true);
-    setSaveMessage("");
-
     try {
+      if (!settings) return;
+
+      const trimmedUrl = serverUrl.trim().replace(/\/+$/, "");
+      if (!trimmedUrl) {
+        setSaveMessage("Server URL is required.");
+        return;
+      }
+
+      const customHeaders = buildCustomHeaders();
+
+      const serverChanged = trimmedUrl !== (settings.serverUrl ?? "");
+      const headersChanged =
+        JSON.stringify(customHeaders) !== JSON.stringify(settings.customHeaders ?? {});
+
+      setSaving(true);
+      setSaveMessage("");
+
       const parsedLimit = Number.parseFloat(speedLimit);
       const updated: DesktopSettings = {
         ...settings,
         serverUrl: trimmedUrl,
         defaultInstallPath: installPath.trim() || null,
         closeToTray,
+        hideDockIcon,
         customHeaders,
         downloadSpeedLimitKbs: parsedLimit > 0 ? parsedLimit : null,
       };
@@ -136,22 +145,55 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       localStorage.setItem("claudio_server_url", trimmedUrl);
       localStorage.setItem("claudio_custom_headers", JSON.stringify(customHeaders));
 
-      const serverChanged = trimmedUrl !== (settings.serverUrl ?? "");
-      const headersChanged =
-        JSON.stringify(customHeaders) !== JSON.stringify(settings.customHeaders ?? {});
-
       if (serverChanged || headersChanged) {
         globalThis.location.reload();
         return;
       }
 
       setSettings(updated);
-      setSaveMessage("Settings saved.");
     } catch {
       setSaveMessage("Failed to save settings.");
     } finally {
       setSaving(false);
     }
+  }
+
+  function saveGeneralSettings(updated: DesktopSettings) {
+    setSaving(true);
+    setSaveMessage("");
+
+    void updateSettings(updated)
+      .then(() => {
+        setSettings(updated);
+      })
+      .catch(() => {
+        setSaveMessage("Failed to save settings.");
+      })
+      .finally(() => {
+        setSaving(false);
+      });
+  }
+
+  function handleCloseToTrayChange(value: boolean) {
+    setCloseToTray(value);
+    if (!settings) return;
+
+    saveGeneralSettings({
+      ...settings,
+      closeToTray: value,
+      hideDockIcon,
+    });
+  }
+
+  function handleHideDockIconChange(value: boolean) {
+    setHideDockIcon(value);
+    if (!settings) return;
+
+    saveGeneralSettings({
+      ...settings,
+      closeToTray,
+      hideDockIcon: value,
+    });
   }
 
   return {
@@ -160,7 +202,9 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     installPath,
     setInstallPath,
     closeToTray,
-    setCloseToTray,
+    setCloseToTray: handleCloseToTrayChange,
+    hideDockIcon,
+    setHideDockIcon: handleHideDockIconChange,
     speedLimit,
     setSpeedLimit,
     headers,

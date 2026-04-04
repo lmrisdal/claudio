@@ -4,18 +4,19 @@ import { useGuide } from "../../core/hooks/use-guide";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import { sounds } from "../../core/utils/sounds";
 import { isDesktop, ping } from "../../desktop/hooks/use-desktop";
+import { useAppSettingsForm } from "../hooks/use-app-settings-form";
+import { type SettingsTab } from "../hooks/use-settings-dialog";
 import AccountTab from "./account-tab";
 import AppDownloadsSettingsTab from "./app-downloads-settings-tab";
 import AppGeneralSettingsTab from "./app-general-settings-tab";
 import AppServerSettingsTab from "./app-server-settings-tab";
 import InterfaceTab from "./interface-tab";
-import { type SettingsTab } from "../hooks/use-settings-dialog";
-import { useAppSettingsForm } from "../hooks/use-app-settings-form";
 
 const CHECK_FOR_UPDATES_EVENT = "claudio:check-for-updates";
 const INSTALL_PREPARED_UPDATE_EVENT = "claudio:install-prepared-update";
 const CHECKING_FOR_UPDATES_MESSAGE = "Checking for updates...";
 const MIN_CHECKING_STATUS_MS = 1000;
+const SETTINGS_TAB_STORAGE_KEY = "claudio_settings_active_tab";
 
 const allTabs: { id: SettingsTab; label: string }[] = [
   { id: "account", label: "Account" },
@@ -96,6 +97,11 @@ export default function SettingsDialog({
       setShowSidebarFocusRing(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    globalThis.sessionStorage.setItem(SETTINGS_TAB_STORAGE_KEY, activeTab);
+  }, [open, activeTab]);
 
   useEffect(() => {
     if (!open || !isDesktop) {
@@ -196,7 +202,9 @@ export default function SettingsDialog({
     if (open) {
       previousFocusReference.current = document.activeElement as HTMLElement | null;
     } else if (previousFocusReference.current) {
-      previousFocusReference.current.focus({ focusVisible: true } as FocusOptions);
+      previousFocusReference.current.focus({
+        focusVisible: true,
+      } as FocusOptions);
       previousFocusReference.current = null;
     }
   }, [open]);
@@ -265,12 +273,11 @@ export default function SettingsDialog({
     globalThis.dispatchEvent(new CustomEvent(INSTALL_PREPARED_UPDATE_EVENT));
   }
 
-  const checkForUpdatesLabel =
-    isInstallingUpdate
-      ? "Installing update..."
-      : canInstallUpdate
-        ? "Install update"
-        : updateStatusMessage || "Check for updates";
+  const checkForUpdatesLabel = isInstallingUpdate
+    ? "Installing update..."
+    : canInstallUpdate
+      ? "Install update"
+      : updateStatusMessage || "Check for updates";
   const isCheckingForUpdates = updateStatusMessage === CHECKING_FOR_UPDATES_MESSAGE;
 
   // ── Keyboard navigation (capture phase) ──
@@ -356,7 +363,15 @@ export default function SettingsDialog({
     (e) => {
       // Don't intercept Enter on form inputs — let the form submit naturally
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "BUTTON" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
 
       e.preventDefault();
       setShowSidebarFocusRing(true);
@@ -420,7 +435,7 @@ export default function SettingsDialog({
         role="dialog"
         aria-label="Settings"
       >
-        <nav className="flex flex-col border-border bg-[var(--settings-sidebar-bg)] sm:w-56 sm:shrink-0 sm:border-r">
+        <nav className="flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r">
           <div className="flex items-start justify-between border-b border-border p-4 sm:border-b-0 sm:p-5 sm:pb-0">
             <div>
               <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
@@ -433,11 +448,11 @@ export default function SettingsDialog({
                 )}
               </div>
             </div>
-              <button
-                onClick={onClose}
-                className="rounded-lg p-1.5 text-text-muted transition hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
-                aria-label="Close"
-              >
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-text-muted transition hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
+              aria-label="Close"
+            >
               {closeIcon}
             </button>
           </div>
@@ -460,10 +475,10 @@ export default function SettingsDialog({
                       selectTab(tab.id);
                     }}
                     className={`w-full rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors ${
-                       activeTab === tab.id
-                        ? "bg-[var(--settings-sidebar-active-bg)] text-text-primary font-medium"
-                        : "text-text-secondary hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary"
-                     } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                      activeTab === tab.id
+                        ? "bg-(--settings-sidebar-active-bg) text-text-primary font-medium"
+                        : "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary"
+                    } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
                   >
                     {tab.label}
                   </button>
@@ -489,7 +504,7 @@ export default function SettingsDialog({
 
                   checkForUpdates();
                 }}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
               >
                 <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
                   {checkForUpdatesLabel}
@@ -509,7 +524,7 @@ export default function SettingsDialog({
                 onClose();
                 logout();
               }}
-              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-[var(--settings-sidebar-hover-bg)] hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
+              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
             >
               Sign out
             </button>

@@ -121,10 +121,22 @@ export default function AppServerSettingsTab({
             </button>
           </div>
         )}
+      </div>
 
-        <div className="border-b border-border pb-3">
+      {settings.saveMessage && (
+        <p
+          className={`text-sm ${settings.saveMessage.includes("saved") ? "text-accent" : "text-red-400"}`}
+          role="alert"
+        >
+          {settings.saveMessage}
+        </p>
+      )}
+
+      <div className="flex items-start justify-between pt-2">
+        <div>
           <button
             ref={(element) => setIndexedReference(contentRefs, testButtonIndex, element)}
+            type="button"
             onClick={settings.handleTest}
             disabled={settings.testing || !settings.serverUrl.trim()}
             className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary transition hover:bg-surface-raised hover:text-text-primary disabled:opacity-60"
@@ -140,20 +152,10 @@ export default function AppServerSettingsTab({
             </p>
           )}
         </div>
-      </div>
 
-      {settings.saveMessage && (
-        <p
-          className={`text-sm ${settings.saveMessage.includes("saved") ? "text-accent" : "text-red-400"}`}
-          role="alert"
-        >
-          {settings.saveMessage}
-        </p>
-      )}
-
-      <div className="flex justify-end border-t border-border pt-4">
         <button
           ref={(element) => setIndexedReference(contentRefs, saveButtonIndex, element)}
+          type="button"
           onClick={settings.handleSave}
           disabled={settings.saving}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-accent-hover disabled:opacity-60"

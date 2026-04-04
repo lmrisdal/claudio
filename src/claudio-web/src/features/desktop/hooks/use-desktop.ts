@@ -11,6 +11,7 @@ interface DesktopSettings {
   windowY: number | null;
   defaultInstallPath: string | null;
   closeToTray: boolean;
+  hideDockIcon: boolean;
   customHeaders: Record<string, string>;
   downloadSpeedLimitKbs: number | null;
 }

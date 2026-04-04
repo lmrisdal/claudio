@@ -8,6 +8,7 @@ const PENDING_UPDATE_VERSION_KEY = "claudio_pending_update_version";
 const CHECK_EVENT = "claudio:check-for-updates";
 const CHECK_RESULT_EVENT = "claudio:update-check-result";
 const INSTALL_PREPARED_UPDATE_EVENT = "claudio:install-prepared-update";
+const UPDATE_CHECK_TIMEOUT_MS = 15_000;
 
 type ToastMode = "update-available" | "up-to-date" | "installing" | "error";
 type CheckSource = "startup" | "settings" | "native";
@@ -23,6 +24,22 @@ function toErrorMessage(error: unknown) {
   }
 
   return "Could not complete update operation.";
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
+  let timeoutId: number | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = globalThis.setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId !== null) {
+      globalThis.clearTimeout(timeoutId);
+    }
+  });
 }
 
 export default function UpdateToast() {
@@ -110,7 +127,10 @@ export default function UpdateToast() {
       setToastTitle("Installing update");
       setToastBody(`Installing v${update.version}. Claudio will restart when done.`);
       setVisible(true);
-      emitResult(`Installing update v${update.version}...`, { canInstall: false, isInstalling: true });
+      emitResult(`Installing update v${update.version}...`, {
+        canInstall: false,
+        isInstalling: true,
+      });
 
       try {
         await startDownload(update);
@@ -153,7 +173,11 @@ export default function UpdateToast() {
       }
 
       try {
-        const update = await check();
+        const update = await withTimeout(
+          check(),
+          UPDATE_CHECK_TIMEOUT_MS,
+          "Update check timed out. Please try again.",
+        );
 
         if (!update) {
           localStorage.removeItem(PENDING_UPDATE_VERSION_KEY);
@@ -205,14 +229,15 @@ export default function UpdateToast() {
 
         void startDownload(update);
       } catch (error) {
+        const errorMessage = toErrorMessage(error);
         setMode("error");
         setToastTitle("Update check failed");
-        setToastBody(toErrorMessage(error));
+        setToastBody(errorMessage);
         updateRef.current = null;
         setUpdateVersion(null);
 
         if (manual || showToastForCheck) {
-          emitResult("Could not check for updates.", { canInstall: false, isInstalling: false });
+          emitResult(errorMessage, { canInstall: false, isInstalling: false });
         }
 
         if (showToastForCheck) {

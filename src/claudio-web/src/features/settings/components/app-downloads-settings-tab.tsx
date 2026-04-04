@@ -23,6 +23,7 @@ export default function AppDownloadsSettingsTab({
           type="text"
           value={settings.installPath}
           onChange={(event) => settings.setInstallPath(event.target.value)}
+          onBlur={() => void settings.handleSave()}
           placeholder="Leave empty for default..."
           spellCheck={false}
           className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
@@ -45,6 +46,7 @@ export default function AppDownloadsSettingsTab({
             step="any"
             value={settings.speedLimit}
             onChange={(event) => settings.setSpeedLimit(event.target.value)}
+            onBlur={() => void settings.handleSave()}
             placeholder="Unlimited"
             className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
           />
@@ -53,24 +55,10 @@ export default function AppDownloadsSettingsTab({
       </div>
 
       {settings.saveMessage && (
-        <p
-          className={`text-sm ${settings.saveMessage.includes("saved") ? "text-accent" : "text-red-400"}`}
-          role="alert"
-        >
+        <p className="text-sm text-red-400" role="alert">
           {settings.saveMessage}
         </p>
       )}
-
-      <div className="flex justify-end border-t border-border pt-4">
-        <button
-          ref={(element) => setIndexedReference(contentRefs, 2, element)}
-          onClick={settings.handleSave}
-          disabled={settings.saving}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-accent-hover disabled:opacity-60"
-        >
-          {settings.saving ? "Saving..." : "Save"}
-        </button>
-      </div>
     </div>
   );
 }

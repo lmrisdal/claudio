@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import Logo from "../../core/components/logo";
+import { getSettings, isDesktop } from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
 
 export default function Login() {
@@ -12,6 +13,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [providerLoading, setProviderLoading] = useState<string | null>(null);
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const parameters = new URLSearchParams(location.search);
@@ -23,6 +25,28 @@ export default function Login() {
       setError("");
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+
+    let cancelled = false;
+
+    void getSettings()
+      .then((settings) => {
+        if (cancelled) return;
+
+        setServerUrl(settings.serverUrl ?? "Not configured");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setServerUrl("Unavailable");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,13 +65,21 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-grid">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-10">
+        <div className="text-center mb-2">
           <Logo className="text-5xl" />
           <p className="text-text-muted text-sm mt-3">
             {providers.localLoginEnabled
               ? "Sign in to your library"
               : "Sign in with your identity provider"}
           </p>
+          {isDesktop && serverUrl !== null && (
+            <Link
+              to="/desktop-setup"
+              className="mt-8 inline-block text-xs text-accent hover:underline"
+            >
+              URL: {serverUrl}
+            </Link>
+          )}
         </div>
 
         <div className="card bg-surface rounded-xl p-6 ring-1 ring-border">
@@ -114,7 +146,9 @@ export default function Login() {
               {providers.localLoginEnabled && (
                 <div className="my-4 flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs uppercase tracking-[0.2em] text-text-muted">or</span>
+                  <span className="text-xs uppercase tracking-[0.2em] text-text-muted">
+                    or
+                  </span>
                   <div className="h-px flex-1 bg-border" />
                 </div>
               )}
