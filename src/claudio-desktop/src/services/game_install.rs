@@ -1380,7 +1380,7 @@ fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
     for attempt in 1..=10 {
         match fs::remove_dir_all(target_dir) {
             Ok(()) => return Ok(()),
-            Err(error) if !target_dir.exists() => return Ok(()),
+            Err(_error) if !target_dir.exists() => return Ok(()),
             Err(error) => {
                 last_error = Some(error.to_string());
                 log::info!(

@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager};
 use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, SYNCHRONIZE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
     IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDeviceEnumerator,
     ISimpleAudioVolume, MMDeviceEnumerator, eConsole, eRender,
@@ -20,7 +20,7 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows::Win32::System::Threading::{
     GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
-    SYNCHRONIZE, TerminateProcess, WaitForSingleObject,
+    TerminateProcess, WaitForSingleObject,
 };
 
 const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
