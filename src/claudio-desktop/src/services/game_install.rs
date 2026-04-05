@@ -749,6 +749,18 @@ async fn install_installer(
             let requests_elevation = launch_kind == InstallerLaunchKind::Exe
                 && file_requests_elevation(&installer)?;
             let mut force_run_as_invoker = !run_as_administrator && requests_elevation;
+            if requests_elevation {
+                log::info!(
+                    "[installer {gid}] detected embedded elevation request in {}",
+                    installer.display()
+                );
+            }
+            if force_run_as_invoker {
+                log::info!(
+                    "[installer {gid}] trying non-admin launch with RunAsInvoker for {}",
+                    installer.display()
+                );
+            }
             log::info!(
                 "[installer {gid}] starting {} installer from {}",
                 if force_interactive {
@@ -805,9 +817,15 @@ async fn install_installer(
                         return Err("Install cancelled.".to_string());
                     }
                     Err(RunInstallerError::RequiresAdministrator) => {
+                        log::warn!(
+                            "[installer {gid}] installer still required administrator privileges after non-admin attempt"
+                        );
                         if confirm_installer_elevation(&app_handle) {
                             run_as_administrator = true;
                             force_run_as_invoker = false;
+                            log::info!(
+                                "[installer {gid}] retrying installer launch as administrator after fallback prompt"
+                            );
                             emit_progress_indeterminate(
                                 &app_handle,
                                 gid,
@@ -819,6 +837,9 @@ async fn install_installer(
                             continue;
                         }
 
+                        log::info!(
+                            "[installer {gid}] user declined administrator prompt after non-admin attempt"
+                        );
                         return Err("Install cancelled.".to_string());
                     }
                     Err(RunInstallerError::Failed(message)) => return Err(message),
@@ -1401,6 +1422,7 @@ fn confirm_installer_elevation(app: &AppHandle) -> bool {
 
 #[cfg(target_os = "windows")]
 fn apply_run_as_invoker_env(cmd: &mut std::process::Command) {
+    log::info!("[installer] applying RunAsInvoker compatibility layer for non-admin launch");
     cmd.env("__COMPAT_LAYER", "RunAsInvoker");
 }
 
@@ -1700,13 +1722,23 @@ fn spawn_mute_wait(
     let exe_name = path.file_name().and_then(|n| n.to_str()).map(String::from);
 
     if run_as_administrator {
+        log::info!(
+            "[installer] launching {} with administrator privileges",
+            path.display()
+        );
         let elevated = launch_elevated_command(path, args).map_err(RunInstallerError::Failed)?;
         return wait_for_elevated_installer(elevated, path, exe_name, control);
     }
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
-        Err(err) if err.raw_os_error() == Some(740) => return Err(RunInstallerError::RequiresAdministrator),
+        Err(err) if err.raw_os_error() == Some(740) => {
+            log::warn!(
+                "[installer] Windows reported elevation required (error 740) for {}",
+                path.display()
+            );
+            return Err(RunInstallerError::RequiresAdministrator);
+        }
         Err(err) => return Err(RunInstallerError::Failed(err.to_string())),
     };
 
