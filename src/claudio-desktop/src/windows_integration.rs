@@ -1,22 +1,26 @@
 use crate::models::{InstallType, InstalledGame};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
-use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 use winreg::RegKey;
+use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 
-use windows::core::Interface;
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{
-    eConsole, eRender, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2,
-    IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
+    IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDeviceEnumerator,
+    ISimpleAudioVolume, MMDeviceEnumerator, eConsole, eRender,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
+    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
 };
+use windows::core::Interface;
 
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPPROCESS,
+};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    SYNCHRONIZE, TerminateProcess, WaitForSingleObject,
 };
 
 const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
@@ -65,24 +69,15 @@ pub fn terminate_tracked_processes(
     exe_name: Option<&str>,
 ) -> Result<(), String> {
     let mut target_pids = collect_tracked_processes(seed_pids, exe_name);
+    log::info!(
+        "[installer] terminating tracked processes {:?} (exe_name={:?})",
+        target_pids,
+        exe_name
+    );
 
     for _ in 0..3 {
         for target_pid in &target_pids {
-            let _ = Command::new("taskkill")
-                .args(["/PID", &target_pid.to_string(), "/T", "/F"])
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-        }
-
-        if let Some(name) = exe_name {
-            let _ = Command::new("taskkill")
-                .args(["/IM", name, "/F"])
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
+            terminate_process(*target_pid);
         }
 
         std::thread::sleep(std::time::Duration::from_millis(120));
@@ -93,6 +88,70 @@ pub fn terminate_tracked_processes(
     }
 
     Ok(())
+}
+
+pub fn is_process_running(pid: u32) -> bool {
+    with_process_handle(
+        pid,
+        PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+        |handle| unsafe { WaitForSingleObject(handle, 0) == WAIT_TIMEOUT },
+    )
+    .unwrap_or(false)
+}
+
+pub fn process_exit_code(pid: u32) -> Result<Option<u32>, String> {
+    match with_process_handle(
+        pid,
+        PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+        |handle| unsafe {
+            match WaitForSingleObject(handle, 0) {
+                WAIT_TIMEOUT => Ok(None),
+                WAIT_OBJECT_0 => {
+                    let mut code = 0u32;
+                    GetExitCodeProcess(handle, &mut code).map_err(|error| error.to_string())?;
+                    Ok(Some(code))
+                }
+                other => Err(format!(
+                    "WaitForSingleObject returned unexpected status {other:?}"
+                )),
+            }
+        },
+    ) {
+        Some(result) => result,
+        None => Ok(Some(0)),
+    }
+}
+
+fn terminate_process(pid: u32) {
+    let result = with_process_handle(
+        pid,
+        PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+        |handle| unsafe {
+            let _ = TerminateProcess(handle, 1);
+            let _ = WaitForSingleObject(handle, 2_000);
+        },
+    );
+
+    if result.is_some() {
+        log::info!("[installer] terminate requested for PID {pid}");
+    }
+}
+
+fn with_process_handle<T>(
+    pid: u32,
+    access: windows::Win32::System::Threading::PROCESS_ACCESS_RIGHTS,
+    callback: impl FnOnce(HANDLE) -> T,
+) -> Option<T> {
+    unsafe {
+        let handle = match OpenProcess(access, false, pid) {
+            Ok(handle) if !handle.is_invalid() => handle,
+            _ => return None,
+        };
+
+        let result = callback(handle);
+        let _ = CloseHandle(handle);
+        Some(result)
+    }
 }
 
 /// Collects all (pid, parent_pid) pairs from a toolhelp snapshot, then builds

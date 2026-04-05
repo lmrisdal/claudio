@@ -615,8 +615,11 @@ export default function GameDetail() {
     installProgress.status !== "failed";
 
   const desktopInstallLabel = hasActiveInstallProgress
-    ? installProgress?.status === "stopping"
-      ? (installProgress.detail ?? "Stopping installation...")
+    ? installProgress?.status === "stopping" || installProgress?.status === "installing-interactive"
+      ? (installProgress.detail ??
+        (installProgress.status === "installing-interactive"
+          ? "Running installer interactively..."
+          : "Stopping installation..."))
       : typeof installProgress?.percent === "number"
       ? `Installing ${Math.round(installProgress.percent)}%`
       : "Installing..."

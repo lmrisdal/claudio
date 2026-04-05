@@ -140,6 +140,7 @@ impl InstallState {
             .lock()
             .map_err(|_| "Install state lock poisoned.".to_string())?;
         if let Some(control) = installs.get(&game_id) {
+            log::info!("[installer {game_id}] stop requested");
             control.set_cancelled(true);
             emit_progress_indeterminate(
                 app,
@@ -162,6 +163,7 @@ impl InstallState {
             .lock()
             .map_err(|_| "Install state lock poisoned.".to_string())?;
         if let Some(control) = installs.get(&game_id) {
+            log::info!("[installer {game_id}] restart interactive requested");
             control.request_restart_interactive();
             emit_progress_indeterminate(
                 app,
@@ -183,6 +185,11 @@ impl InstallState {
 fn terminate_external_installer(control: &InstallControl) {
     control.refresh_tracked_processes();
     let (pids, exe_name) = control.installer_snapshot();
+    log::info!(
+        "[installer] force terminating tracked processes {:?} (exe_name={:?})",
+        pids,
+        exe_name
+    );
     let _ = crate::windows_integration::terminate_tracked_processes(&pids, exe_name.as_deref());
 }
 
@@ -731,6 +738,15 @@ async fn install_installer(
         );
 
         let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+        log::info!(
+            "[installer {gid}] starting {} installer from {}",
+            if force_interactive {
+                "interactive"
+            } else {
+                "silent"
+            },
+            installer.display()
+        );
 
         loop {
             let detail = if force_interactive {
@@ -738,10 +754,15 @@ async fn install_installer(
             } else {
                 "Running installer silently. This may take a while…"
             };
+            let install_status = if force_interactive {
+                "installing-interactive"
+            } else {
+                "installing"
+            };
             emit_progress_indeterminate(
                 &app_handle,
                 gid,
-                "installing",
+                install_status,
                 Some(87.0),
                 Some(detail),
                 true,
@@ -749,17 +770,23 @@ async fn install_installer(
             match run_installer(&installer, &target_dir_owned, force_interactive, &control) {
                 Ok(()) => break,
                 Err(RunInstallerError::RestartInteractiveRequested) => {
+                    log::info!("[installer {gid}] restarting interactively after forced stop");
+                    cleanup_partial_install_dir(&target_dir_owned)?;
                     force_interactive = true;
                     emit_progress_indeterminate(
                         &app_handle,
                         gid,
-                        "installing",
+                        "stopping",
                         Some(87.0),
                         Some("Restarting installer in interactive mode…"),
                         true,
                     );
                 }
-                Err(RunInstallerError::Cancelled) => return Err("Install cancelled.".to_string()),
+                Err(RunInstallerError::Cancelled) => {
+                    log::info!("[installer {gid}] install cancelled during installer phase");
+                    cleanup_partial_install_dir(&target_dir_owned)?;
+                    return Err("Install cancelled.".to_string());
+                }
                 Err(RunInstallerError::Failed(message)) => return Err(message),
             }
         }
@@ -1338,6 +1365,95 @@ enum RunInstallerError {
     Failed(String),
 }
 
+#[cfg(target_os = "windows")]
+fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
+    if !target_dir.exists() {
+        return Ok(());
+    }
+
+    log::info!(
+        "[installer] removing partial install directory {}",
+        target_dir.display()
+    );
+
+    let mut last_error = None;
+    for attempt in 1..=10 {
+        match fs::remove_dir_all(target_dir) {
+            Ok(()) => return Ok(()),
+            Err(error) if !target_dir.exists() => return Ok(()),
+            Err(error) => {
+                last_error = Some(error.to_string());
+                log::info!(
+                    "[installer] partial install cleanup attempt {attempt} failed for {}",
+                    target_dir.display()
+                );
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
+    }
+
+    Err(format!(
+        "Failed to remove partial install directory: {}",
+        last_error.unwrap_or_else(|| "unknown error".to_string())
+    ))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn cleanup_partial_install_dir(_target_dir: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+struct ElevatedInstallerProcess {
+    handle: windows::Win32::Foundation::HANDLE,
+    pid: u32,
+}
+
+#[cfg(target_os = "windows")]
+impl ElevatedInstallerProcess {
+    fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    fn try_wait(&self) -> Result<Option<u32>, String> {
+        use windows::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
+        use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject};
+
+        unsafe {
+            match WaitForSingleObject(self.handle, 0) {
+                WAIT_TIMEOUT => Ok(None),
+                WAIT_OBJECT_0 => {
+                    let mut code = 0u32;
+                    GetExitCodeProcess(self.handle, &mut code)
+                        .map_err(|error| error.to_string())?;
+                    Ok(Some(code))
+                }
+                other => Err(format!(
+                    "WaitForSingleObject returned unexpected status {other:?}"
+                )),
+            }
+        }
+    }
+
+    fn terminate(&self) {
+        use windows::Win32::System::Threading::{TerminateProcess, WaitForSingleObject};
+
+        unsafe {
+            let _ = TerminateProcess(self.handle, 1);
+            let _ = WaitForSingleObject(self.handle, 2_000);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for ElevatedInstallerProcess {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = windows::Win32::Foundation::CloseHandle(self.handle);
+        }
+    }
+}
+
 /// Spawns a process, attempts to mute its audio on Windows, and waits for it to exit.
 /// Handles UAC elevation (Error 740) by falling back to PowerShell's RunAs.
 #[cfg(target_os = "windows")]
@@ -1352,34 +1468,68 @@ fn spawn_mute_wait(
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(err) if err.raw_os_error() == Some(740) => {
-            // Elevated process won't be in our PID tree, but name-matching will find it.
-            control.set_installer_process(0, exe_name.clone());
-            crate::windows_integration::mute_process_audio(0, exe_name);
-            let status = run_elevated(path, args).map_err(RunInstallerError::Failed)?;
-            control.clear_installer_processes();
-            if control.take_restart_interactive_request() {
-                control.set_cancelled(false);
-                return Err(RunInstallerError::RestartInteractiveRequested);
-            }
-            if control.is_cancelled() {
-                return Err(RunInstallerError::Cancelled);
-            }
-            if status.success() {
-                return Ok(());
-            } else {
-                return Err(RunInstallerError::Failed(format!(
-                    "Installer exited with status {status}."
-                )));
+            let elevated =
+                launch_elevated_installer(path, args).map_err(RunInstallerError::Failed)?;
+            log::info!(
+                "[installer] launched elevated installer {} with PID {}",
+                path.display(),
+                elevated.pid()
+            );
+            control.set_installer_process(elevated.pid(), exe_name.clone());
+            crate::windows_integration::mute_process_audio(elevated.pid(), exe_name);
+
+            loop {
+                control.refresh_tracked_processes();
+                if control.take_restart_interactive_request() {
+                    log::info!("[installer] stopping elevated installer to relaunch interactively");
+                    elevated.terminate();
+                    terminate_external_installer(control);
+                    control.clear_installer_processes();
+                    control.set_cancelled(false);
+                    return Err(RunInstallerError::RestartInteractiveRequested);
+                }
+
+                if control.is_cancelled() {
+                    log::info!("[installer] stopping elevated installer after cancel request");
+                    elevated.terminate();
+                    terminate_external_installer(control);
+                    control.clear_installer_processes();
+                    return Err(RunInstallerError::Cancelled);
+                }
+
+                match elevated.try_wait() {
+                    Ok(Some(0)) => {
+                        control.clear_installer_processes();
+                        return Ok(());
+                    }
+                    Ok(Some(code)) => {
+                        control.clear_installer_processes();
+                        return Err(RunInstallerError::Failed(format!(
+                            "Installer exited with status code {code}."
+                        )));
+                    }
+                    Ok(None) => std::thread::sleep(std::time::Duration::from_millis(120)),
+                    Err(error) => {
+                        control.clear_installer_processes();
+                        return Err(RunInstallerError::Failed(error));
+                    }
+                }
             }
         }
         Err(err) => return Err(RunInstallerError::Failed(err.to_string())),
     };
 
+    log::info!(
+        "[installer] launched installer {} with PID {}",
+        path.display(),
+        child.id()
+    );
     control.set_installer_process(child.id(), exe_name.clone());
     crate::windows_integration::mute_process_audio(child.id(), exe_name);
     loop {
         control.refresh_tracked_processes();
         if control.take_restart_interactive_request() {
+            log::info!("[installer] stopping installer to relaunch interactively");
             terminate_external_installer(control);
             control.clear_installer_processes();
             control.set_cancelled(false);
@@ -1387,6 +1537,7 @@ fn spawn_mute_wait(
         }
 
         if control.is_cancelled() {
+            log::info!("[installer] stopping installer after cancel request");
             terminate_external_installer(control);
             control.clear_installer_processes();
             return Err(RunInstallerError::Cancelled);
@@ -1411,44 +1562,60 @@ fn spawn_mute_wait(
     }
 }
 
-/// Re-launches `path` with elevated privileges via a UAC prompt.
-/// Uses PowerShell's Start-Process with -Verb RunAs so the prompt appears
-/// even when Claudio itself is not running as administrator.
+/// Re-launches `path` with elevated privileges via a UAC prompt and returns the
+/// real installer PID so Claudio can poll and terminate it directly.
 #[cfg(target_os = "windows")]
-fn run_elevated(path: &Path, args: &str) -> Result<std::process::ExitStatus, String> {
+fn launch_elevated_installer(path: &Path, args: &str) -> Result<ElevatedInstallerProcess, String> {
+    use std::ffi::OsStr;
+    use std::iter;
+    use std::os::windows::ffi::OsStrExt;
+    use windows::Win32::System::Threading::GetProcessId;
+    use windows::Win32::UI::Shell::{SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW};
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows::core::PCWSTR;
+
     log::info!(
         "Installer requires elevation, requesting UAC prompt for {}",
         path.display()
     );
-    let path_esc = path.to_string_lossy().replace('\'', "''");
-    let args_esc = args.replace('\'', "''");
 
-    let ps_script = if args_esc.is_empty() {
-        format!(
-            "try {{ $p = Start-Process -FilePath '{path_esc}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1 }}"
-        )
-    } else {
-        format!(
-            "try {{ $p = Start-Process -FilePath '{path_esc}' -ArgumentList '{args_esc}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1 }}"
-        )
-    };
+    let wide = |value: &OsStr| -> Vec<u16> { value.encode_wide().chain(iter::once(0)).collect() };
 
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let verb = wide(OsStr::new("runas"));
+    let file = wide(path.as_os_str());
+    let parameters = (!args.is_empty()).then(|| wide(OsStr::new(args)));
+    let directory = path.parent().map(|parent| wide(parent.as_os_str()));
 
-    std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-WindowStyle",
-            "Hidden",
-            "-Command",
-            &ps_script,
-        ])
-        .stdin(Stdio::null())
-        .creation_flags(CREATE_NO_WINDOW)
-        .status()
-        .map_err(|err| err.to_string())
+    let mut exec_info = SHELLEXECUTEINFOW::default();
+    exec_info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    exec_info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    exec_info.lpVerb = PCWSTR(verb.as_ptr());
+    exec_info.lpFile = PCWSTR(file.as_ptr());
+    exec_info.lpParameters = parameters
+        .as_ref()
+        .map_or(PCWSTR::null(), |value| PCWSTR(value.as_ptr()));
+    exec_info.lpDirectory = directory
+        .as_ref()
+        .map_or(PCWSTR::null(), |value| PCWSTR(value.as_ptr()));
+    exec_info.nShow = SW_SHOWNORMAL.0;
+
+    unsafe {
+        ShellExecuteExW(&mut exec_info).map_err(|error| error.to_string())?;
+        if exec_info.hProcess.is_invalid() {
+            return Err("Elevated installer launch did not return a process handle.".to_string());
+        }
+
+        let pid = GetProcessId(exec_info.hProcess);
+        if pid == 0 {
+            let _ = windows::Win32::Foundation::CloseHandle(exec_info.hProcess);
+            return Err("Elevated installer launch did not return a valid PID.".to_string());
+        }
+
+        Ok(ElevatedInstallerProcess {
+            handle: exec_info.hProcess,
+            pid,
+        })
+    }
 }
 
 #[cfg(target_os = "windows")]
