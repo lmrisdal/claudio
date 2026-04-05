@@ -9,6 +9,8 @@ use reqwest::header::{AUTHORIZATION, CONTENT_DISPOSITION, HeaderMap, HeaderName,
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::io;
+#[cfg(target_os = "windows")]
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -16,6 +18,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use tauri::{AppHandle, Emitter, State};
+#[cfg(target_os = "windows")]
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use zip::read::ZipArchive;
 
 pub struct InstallState {
@@ -709,10 +713,12 @@ async fn install_installer(
     let package_path_owned = package_path.to_path_buf();
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
+    let initial_run_as_administrator = game.run_as_administrator.unwrap_or(false);
     let initial_force_interactive = game.force_interactive.unwrap_or(false);
     let control = control.clone();
 
     let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+        let mut run_as_administrator = initial_run_as_administrator;
         let mut force_interactive = initial_force_interactive;
         let mut progress_cb = |p: f64| {
             emit_progress(
@@ -739,6 +745,28 @@ async fn install_installer(
             );
 
             let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+            let launch_kind = installer_launch_kind(&installer);
+            let requests_elevation = launch_kind == InstallerLaunchKind::Exe
+                && file_requests_elevation(&installer)?;
+            let non_admin_installer = if run_as_administrator {
+                None
+            } else {
+                match prepare_non_admin_installer_copy(&installer, launch_kind, requests_elevation) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        log::warn!(
+                            "[installer {gid}] failed to prepare non-admin installer copy for {}: {error}",
+                            installer.display()
+                        );
+                        if confirm_installer_elevation(&app_handle) {
+                            run_as_administrator = true;
+                            None
+                        } else {
+                            return Err("Install cancelled.".to_string());
+                        }
+                    }
+                }
+            };
             log::info!(
                 "[installer {gid}] starting {} installer from {}",
                 if force_interactive {
@@ -750,8 +778,19 @@ async fn install_installer(
             );
 
             loop {
+                let active_installer = if run_as_administrator {
+                    &installer
+                } else {
+                    non_admin_installer.as_deref().unwrap_or(&installer)
+                };
                 let detail = if force_interactive {
-                    "Running installer interactively…"
+                    if run_as_administrator {
+                        "Running installer interactively as administrator…"
+                    } else {
+                        "Running installer interactively…"
+                    }
+                } else if run_as_administrator {
+                    "Running installer silently as administrator. This may take a while…"
                 } else {
                     "Running installer silently. This may take a while…"
                 };
@@ -768,7 +807,13 @@ async fn install_installer(
                     Some(detail),
                     true,
                 );
-                match run_installer(&installer, &target_dir_owned, force_interactive, &control) {
+                match run_installer(
+                    active_installer,
+                    &target_dir_owned,
+                    force_interactive,
+                    run_as_administrator,
+                    &control,
+                ) {
                     Ok(()) => break,
                     Err(RunInstallerError::RestartInteractiveRequested) => {
                         log::info!("[installer {gid}] restarting interactively after forced stop");
@@ -785,6 +830,22 @@ async fn install_installer(
                     }
                     Err(RunInstallerError::Cancelled) => {
                         log::info!("[installer {gid}] install cancelled during installer phase");
+                        return Err("Install cancelled.".to_string());
+                    }
+                    Err(RunInstallerError::RequiresAdministrator) => {
+                        if confirm_installer_elevation(&app_handle) {
+                            run_as_administrator = true;
+                            emit_progress_indeterminate(
+                                &app_handle,
+                                gid,
+                                "stopping",
+                                Some(87.0),
+                                Some("Restarting installer as administrator…"),
+                                true,
+                            );
+                            continue;
+                        }
+
                         return Err("Install cancelled.".to_string());
                     }
                     Err(RunInstallerError::Failed(message)) => return Err(message),
@@ -1254,6 +1315,14 @@ enum InstallerType {
     Unknown,
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InstallerLaunchKind {
+    Exe,
+    Msi,
+    Unknown,
+}
+
 #[cfg(target_os = "windows")]
 fn detect_installer_type(path: &Path) -> InstallerType {
     let ext = path
@@ -1285,10 +1354,280 @@ fn detect_installer_type(path: &Path) -> InstallerType {
 }
 
 #[cfg(target_os = "windows")]
+fn installer_launch_kind(path: &Path) -> InstallerLaunchKind {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some(ext) if ext.eq_ignore_ascii_case("exe") => InstallerLaunchKind::Exe,
+        Some(ext) if ext.eq_ignore_ascii_case("msi") => InstallerLaunchKind::Msi,
+        _ => InstallerLaunchKind::Unknown,
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn installer_launch_kind(_path: &Path) -> InstallerLaunchKind {
+    InstallerLaunchKind::Unknown
+}
+
+#[cfg(target_os = "windows")]
+fn file_requests_elevation(path: &Path) -> Result<bool, String> {
+    let mut file = fs::File::open(path).map_err(|error| error.to_string())?;
+    stream_requests_elevation(&mut file)
+}
+
+#[cfg(target_os = "windows")]
+fn stream_requests_elevation(reader: &mut impl Read) -> Result<bool, String> {
+    const BUFFER_SIZE: usize = 8192;
+    let patterns = [
+        b"requireAdministrator".as_slice(),
+        b"highestAvailable".as_slice(),
+        b"r\0e\0q\0u\0i\0r\0e\0A\0d\0m\0i\0n\0i\0s\0t\0r\0a\0t\0o\0r\0".as_slice(),
+        b"h\0i\0g\0h\0e\0s\0t\0A\0v\0a\0i\0l\0a\0b\0l\0e\0".as_slice(),
+    ];
+    let overlap = patterns.iter().map(|pattern| pattern.len()).max().unwrap_or(0);
+    let mut buffer = vec![0u8; BUFFER_SIZE + overlap];
+    let mut carried = 0usize;
+
+    loop {
+        let read = reader
+            .read(&mut buffer[carried..])
+            .map_err(|error| error.to_string())?;
+        if read == 0 {
+            return Ok(false);
+        }
+
+        let total = carried + read;
+        for pattern in patterns {
+            if buffer[..total].windows(pattern.len()).any(|window| window == pattern) {
+                return Ok(true);
+            }
+        }
+
+        carried = overlap.min(total);
+        if carried > 0 {
+            buffer.copy_within(total - carried..total, 0);
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn file_requests_elevation(_path: &Path) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(target_os = "windows")]
+fn prepare_non_admin_installer_copy(
+    path: &Path,
+    launch_kind: InstallerLaunchKind,
+    requests_elevation: bool,
+) -> Result<Option<PathBuf>, String> {
+    if launch_kind != InstallerLaunchKind::Exe || !requests_elevation {
+        return Ok(None);
+    }
+
+    let copy_path = non_admin_copy_path(path);
+    fs::copy(path, &copy_path).map_err(|error| {
+        format!(
+            "Failed to copy installer for non-admin launch from {} to {}: {error}",
+            path.display(),
+            copy_path.display()
+        )
+    })?;
+
+    patch_manifest_as_invoker(&copy_path)?;
+    Ok(Some(copy_path))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn prepare_non_admin_installer_copy(
+    _path: &Path,
+    _launch_kind: InstallerLaunchKind,
+    _requests_elevation: bool,
+) -> Result<Option<PathBuf>, String> {
+    Ok(None)
+}
+
+#[cfg(target_os = "windows")]
+fn non_admin_copy_path(path: &Path) -> PathBuf {
+    let stem = path.file_stem().and_then(|value| value.to_str()).unwrap_or("setup");
+    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("exe");
+    path.with_file_name(format!("{stem}.claudio-nonadmin.{extension}"))
+}
+
+#[cfg(target_os = "windows")]
+fn confirm_installer_elevation(app: &AppHandle) -> bool {
+    app.dialog()
+        .message("This installer requires administrator privileges. Continue?")
+        .title("Administrator Privileges Required")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Continue".to_string(),
+            "Cancel".to_string(),
+        ))
+        .blocking_show()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn confirm_installer_elevation(_app: &AppHandle) -> bool {
+    false
+}
+
+#[cfg(target_os = "windows")]
+fn patch_manifest_as_invoker(path: &Path) -> Result<(), String> {
+    use std::ffi::OsStr;
+    use std::iter;
+    use std::os::windows::ffi::OsStrExt;
+    use windows::Win32::Foundation::{BOOL, FreeLibrary, HANDLE, HMODULE};
+    use windows::Win32::System::LibraryLoader::{
+        BeginUpdateResourceW, EndUpdateResourceW, EnumResourceLanguagesW, EnumResourceNamesW,
+        LOAD_LIBRARY_AS_DATAFILE, LoadLibraryExW, UpdateResourceW,
+    };
+    use windows::core::PCWSTR;
+
+    #[derive(Clone)]
+    struct ManifestResource {
+        name: usize,
+        languages: Vec<u16>,
+    }
+
+    unsafe extern "system" fn enum_manifest_names(
+        _module: HMODULE,
+        _resource_type: PCWSTR,
+        name: PCWSTR,
+        param: isize,
+    ) -> BOOL {
+        let names = unsafe { &mut *(param as *mut Vec<usize>) };
+        names.push(name.0 as usize);
+        BOOL(1)
+    }
+
+    unsafe extern "system" fn enum_manifest_languages(
+        _module: HMODULE,
+        _resource_type: PCWSTR,
+        _name: PCWSTR,
+        language: u16,
+        param: isize,
+    ) -> BOOL {
+        let languages = unsafe { &mut *(param as *mut Vec<u16>) };
+        languages.push(language);
+        BOOL(1)
+    }
+
+    fn wide(value: &OsStr) -> Vec<u16> {
+        value.encode_wide().chain(iter::once(0)).collect()
+    }
+
+    fn make_int_resource(id: u16) -> PCWSTR {
+        PCWSTR(id as usize as *const u16)
+    }
+
+    let manifest_bytes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>
+"#;
+    let wide_path = wide(path.as_os_str());
+    let manifest_type = make_int_resource(24);
+
+    let module = unsafe {
+        LoadLibraryExW(
+            PCWSTR(wide_path.as_ptr()),
+            HANDLE::default(),
+            LOAD_LIBRARY_AS_DATAFILE,
+        )
+        .map_err(|error| error.to_string())?
+    };
+
+    let manifest_resources = (|| -> Result<Vec<ManifestResource>, String> {
+        let mut names = Vec::new();
+        let names_ok = unsafe {
+            EnumResourceNamesW(
+                module,
+                manifest_type,
+                Some(enum_manifest_names),
+                (&mut names as *mut Vec<usize>) as isize,
+            )
+        };
+        if !names_ok.as_bool() {
+            return Err(windows::core::Error::from_win32().to_string());
+        }
+
+        let mut resources = Vec::new();
+        for name in names {
+            let mut languages = Vec::new();
+            unsafe {
+                EnumResourceLanguagesW(
+                    module,
+                    manifest_type,
+                    PCWSTR(name as *const u16),
+                    Some(enum_manifest_languages),
+                    (&mut languages as *mut Vec<u16>) as isize,
+                )
+                .map_err(|error| error.to_string())?;
+            }
+            if languages.is_empty() {
+                languages.push(0);
+            }
+            resources.push(ManifestResource { name, languages });
+        }
+
+        if resources.is_empty() {
+            return Err("Installer manifest resource not found in copied executable.".to_string());
+        }
+
+        Ok(resources)
+    })();
+
+    unsafe {
+        FreeLibrary(module).map_err(|error| error.to_string())?;
+    }
+
+    let manifest_resources = manifest_resources?;
+    let update_handle = unsafe {
+        BeginUpdateResourceW(PCWSTR(wide_path.as_ptr()), false).map_err(|error| error.to_string())?
+    };
+
+    let update_result = (|| -> Result<(), String> {
+        for resource in manifest_resources {
+            for language in resource.languages {
+                unsafe {
+                    UpdateResourceW(
+                        update_handle,
+                        manifest_type,
+                        PCWSTR(resource.name as *const u16),
+                        language,
+                        Some(manifest_bytes.as_ptr().cast()),
+                        manifest_bytes.len() as u32,
+                    )
+                    .map_err(|error| error.to_string())?;
+                }
+            }
+        }
+
+        Ok(())
+    })();
+
+    match update_result {
+        Ok(()) => unsafe {
+            EndUpdateResourceW(update_handle, false).map_err(|error| error.to_string())
+        },
+        Err(error) => {
+            let _ = unsafe { EndUpdateResourceW(update_handle, true) };
+            Err(error)
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
 fn run_installer(
     path: &Path,
     target_dir: &Path,
     force_interactive: bool,
+    run_as_administrator: bool,
     control: &InstallControl,
 ) -> Result<(), RunInstallerError> {
     let target = target_dir.to_string_lossy();
@@ -1306,10 +1645,23 @@ fn run_installer(
     );
 
     if force_interactive {
+        if matches!(installer_type, InstallerType::Msi) {
+            let msi_args = format!("/i \"{}\"", path.to_string_lossy());
+            let mut cmd = std::process::Command::new("msiexec");
+            cmd.arg("/i").arg(path).stdin(Stdio::null());
+            return spawn_mute_wait(
+                cmd,
+                Path::new("msiexec"),
+                &msi_args,
+                run_as_administrator,
+                control,
+            );
+        }
+
         let mut cmd = std::process::Command::new(path);
         cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
             .stdin(Stdio::null());
-        return spawn_mute_wait(cmd, path, "", control);
+        return spawn_mute_wait(cmd, path, "", run_as_administrator, control);
     }
 
     match installer_type {
@@ -1318,7 +1670,7 @@ fn run_installer(
                 log::warn!("innoextract failed ({err}), falling back to silent InnoSetup install");
                 // Clean up any partial output before falling back to the silent installer
                 let _ = fs::remove_dir_all(target_dir);
-                run_innosetup_silent(path, &target, control)
+                run_innosetup_silent(path, &target, run_as_administrator, control)
             })
         }
         InstallerType::Msi => {
@@ -1333,9 +1685,15 @@ fn run_installer(
                 .arg("/qn")
                 .arg(format!("TARGETDIR={target}"))
                 .stdin(Stdio::null());
-            spawn_mute_wait(cmd, Path::new("msiexec"), &msi_args, control)
+            spawn_mute_wait(
+                cmd,
+                Path::new("msiexec"),
+                &msi_args,
+                run_as_administrator,
+                control,
+            )
         }
-        InstallerType::InnoSetup => run_innosetup_silent(path, &target, control),
+        InstallerType::InnoSetup => run_innosetup_silent(path, &target, run_as_administrator, control),
         InstallerType::Nsis => {
             // /D= must be the last argument and cannot be quoted
             let nsis_args = format!("/S /D={target}");
@@ -1343,14 +1701,14 @@ fn run_installer(
             cmd.arg("/S")
                 .arg(format!("/D={target}"))
                 .stdin(Stdio::null());
-            spawn_mute_wait(cmd, path, &nsis_args, control)
+            spawn_mute_wait(cmd, path, &nsis_args, run_as_administrator, control)
         }
         InstallerType::Unknown => {
             // Fall back to interactive; user chooses install location
             let mut cmd = std::process::Command::new(path);
             cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
                 .stdin(Stdio::null());
-            spawn_mute_wait(cmd, path, "", control)
+            spawn_mute_wait(cmd, path, "", run_as_administrator, control)
         }
     }
 }
@@ -1359,6 +1717,7 @@ fn run_installer(
 fn run_innosetup_silent(
     path: &Path,
     target: &str,
+    run_as_administrator: bool,
     control: &InstallControl,
 ) -> Result<(), RunInstallerError> {
     // Quote the path so spaces in the install directory are handled correctly.
@@ -1371,13 +1730,14 @@ fn run_innosetup_silent(
         .arg(format!("/DIR={target}"))
         .stdin(Stdio::null());
 
-    spawn_mute_wait(cmd, path, &args, control)
+    spawn_mute_wait(cmd, path, &args, run_as_administrator, control)
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 enum RunInstallerError {
     Cancelled,
     RestartInteractiveRequested,
+    RequiresAdministrator,
     Failed(String),
 }
 
@@ -1490,61 +1850,19 @@ fn spawn_mute_wait(
     mut cmd: std::process::Command,
     path: &Path,
     args: &str,
+    run_as_administrator: bool,
     control: &InstallControl,
 ) -> Result<(), RunInstallerError> {
     let exe_name = path.file_name().and_then(|n| n.to_str()).map(String::from);
 
+    if run_as_administrator {
+        let elevated = launch_elevated_command(path, args).map_err(RunInstallerError::Failed)?;
+        return wait_for_elevated_installer(elevated, path, exe_name, control);
+    }
+
     let mut child = match cmd.spawn() {
         Ok(c) => c,
-        Err(err) if err.raw_os_error() == Some(740) => {
-            let elevated =
-                launch_elevated_installer(path, args).map_err(RunInstallerError::Failed)?;
-            log::info!(
-                "[installer] launched elevated installer {} with PID {}",
-                path.display(),
-                elevated.pid()
-            );
-            control.set_installer_process(elevated.pid(), exe_name.clone());
-            crate::windows_integration::mute_process_audio(elevated.pid(), exe_name);
-
-            loop {
-                control.refresh_tracked_processes();
-                if control.take_restart_interactive_request() {
-                    log::info!("[installer] stopping elevated installer to relaunch interactively");
-                    elevated.terminate();
-                    terminate_external_installer(control);
-                    control.clear_installer_processes();
-                    control.set_cancelled(false);
-                    return Err(RunInstallerError::RestartInteractiveRequested);
-                }
-
-                if control.is_cancelled() {
-                    log::info!("[installer] stopping elevated installer after cancel request");
-                    elevated.terminate();
-                    terminate_external_installer(control);
-                    control.clear_installer_processes();
-                    return Err(RunInstallerError::Cancelled);
-                }
-
-                match elevated.try_wait() {
-                    Ok(Some(0)) => {
-                        control.clear_installer_processes();
-                        return Ok(());
-                    }
-                    Ok(Some(code)) => {
-                        control.clear_installer_processes();
-                        return Err(RunInstallerError::Failed(format!(
-                            "Installer exited with status code {code}."
-                        )));
-                    }
-                    Ok(None) => std::thread::sleep(std::time::Duration::from_millis(120)),
-                    Err(error) => {
-                        control.clear_installer_processes();
-                        return Err(RunInstallerError::Failed(error));
-                    }
-                }
-            }
-        }
+        Err(err) if err.raw_os_error() == Some(740) => return Err(RunInstallerError::RequiresAdministrator),
         Err(err) => return Err(RunInstallerError::Failed(err.to_string())),
     };
 
@@ -1591,10 +1909,64 @@ fn spawn_mute_wait(
     }
 }
 
+#[cfg(target_os = "windows")]
+fn wait_for_elevated_installer(
+    elevated: ElevatedInstallerProcess,
+    path: &Path,
+    exe_name: Option<String>,
+    control: &InstallControl,
+) -> Result<(), RunInstallerError> {
+    log::info!(
+        "[installer] launched elevated installer {} with PID {}",
+        path.display(),
+        elevated.pid()
+    );
+    control.set_installer_process(elevated.pid(), exe_name.clone());
+    crate::windows_integration::mute_process_audio(elevated.pid(), exe_name);
+
+    loop {
+        control.refresh_tracked_processes();
+        if control.take_restart_interactive_request() {
+            log::info!("[installer] stopping elevated installer to relaunch interactively");
+            elevated.terminate();
+            terminate_external_installer(control);
+            control.clear_installer_processes();
+            control.set_cancelled(false);
+            return Err(RunInstallerError::RestartInteractiveRequested);
+        }
+
+        if control.is_cancelled() {
+            log::info!("[installer] stopping elevated installer after cancel request");
+            elevated.terminate();
+            terminate_external_installer(control);
+            control.clear_installer_processes();
+            return Err(RunInstallerError::Cancelled);
+        }
+
+        match elevated.try_wait() {
+            Ok(Some(0)) => {
+                control.clear_installer_processes();
+                return Ok(());
+            }
+            Ok(Some(code)) => {
+                control.clear_installer_processes();
+                return Err(RunInstallerError::Failed(format!(
+                    "Installer exited with status code {code}."
+                )));
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(120)),
+            Err(error) => {
+                control.clear_installer_processes();
+                return Err(RunInstallerError::Failed(error));
+            }
+        }
+    }
+}
+
 /// Re-launches `path` with elevated privileges via a UAC prompt and returns the
 /// real installer PID so Claudio can poll and terminate it directly.
 #[cfg(target_os = "windows")]
-fn launch_elevated_installer(path: &Path, args: &str) -> Result<ElevatedInstallerProcess, String> {
+fn launch_elevated_command(path: &Path, args: &str) -> Result<ElevatedInstallerProcess, String> {
     use std::ffi::OsStr;
     use std::iter;
     use std::os::windows::ffi::OsStrExt;
@@ -1775,6 +2147,7 @@ fn run_installer(
     _path: &Path,
     _target_dir: &Path,
     _force_interactive: bool,
+    _run_as_administrator: bool,
     _control: &InstallControl,
 ) -> Result<(), RunInstallerError> {
     Err(RunInstallerError::Failed(

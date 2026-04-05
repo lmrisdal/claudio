@@ -1,6 +1,7 @@
 using System.Formats.Tar;
 using System.IO.Compression;
 using System.Security.Claims;
+using System.Text;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
 using Claudio.Api.Enums;
@@ -20,6 +21,8 @@ public static class GameEndpoints
 
         group.MapGet("/", GetAll);
         group.MapGet("/{id:int}", GetById);
+        group.MapGet("/{id:int}/executables", ListExecutables);
+        group.MapGet("/{id:int}/installer-inspection", InspectInstaller);
         group.MapPost("/{id:int}/download-ticket", CreateDownloadTicket);
         group.MapGet("/{id:int}/download", Download).AllowAnonymous();
         group.MapGet("/{id:int}/browse", BrowseGameFiles);
@@ -52,6 +55,46 @@ public static class GameEndpoints
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
         return Results.Ok(ToDto(game));
+    }
+
+    private static async Task<IResult> ListExecutables(int id, AppDbContext db)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+        if (!ExistsOnDisk(game))
+            return Results.Ok(Array.Empty<string>());
+
+        return Results.Ok(ListGameExecutables(game));
+    }
+
+    private static async Task<IResult> InspectInstaller(int id, [FromQuery] string? path, AppDbContext db)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+        if (!ExistsOnDisk(game))
+            return Results.Problem("Game folder not found on disk.", statusCode: 404);
+
+        var normalizedPath = NormalizeRelativePath(path ?? string.Empty);
+        if (normalizedPath is null)
+            return Results.BadRequest("Invalid installer path.");
+
+        if (!TryOpenGameEntryStream(game, normalizedPath, out var stream))
+            return Results.NotFound();
+
+        using (stream)
+        {
+            var extension = Path.GetExtension(normalizedPath).ToLowerInvariant();
+            var requestsElevation = extension == ".exe" && StreamContainsEmbeddedElevationRequest(stream);
+            return Results.Ok(new InstallerInspectionResponse(
+                InstallerType: extension switch
+                {
+                    ".exe" => "exe",
+                    ".msi" => "msi",
+                    _ => "unknown",
+                },
+                RequestsElevation: requestsElevation,
+                CanPatchCopyForNonAdmin: extension == ".exe" && requestsElevation));
+        }
     }
 
     private static async Task<IResult> CreateDownloadTicket(int id, AppDbContext db, DownloadTicketService ticketService, DownloadService downloadService)
@@ -160,6 +203,36 @@ public static class GameEndpoints
         IsProcessing = game.IsProcessing,
         IsArchive = IsStandaloneArchive(game) || (Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is not null),
     };
+
+    internal static List<string> ListGameExecutables(Game game)
+    {
+        if (IsStandaloneArchive(game))
+            return [];
+
+        var exes = new List<string>();
+        string[] extensions = [".exe", ".iso"];
+
+        var singleArchive = FindSingleArchive(game.FolderPath);
+        if (singleArchive is not null)
+        {
+            foreach (var (name, _) in ReadArchiveEntries(singleArchive))
+            {
+                if (extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+                    exes.Add(name);
+            }
+        }
+        else
+        {
+            foreach (var ext in extensions)
+            {
+                exes.AddRange(
+                    Directory.GetFiles(game.FolderPath, $"*{ext}", SearchOption.AllDirectories)
+                        .Select(f => Path.GetRelativePath(game.FolderPath, f).Replace('\\', '/')));
+            }
+        }
+
+        return exes.OrderBy(f => f).ToList();
+    }
 
     public record EmulationInfoResponse(
         bool Supported,
@@ -510,6 +583,119 @@ public static class GameEndpoints
         return entries;
     }
 
+    private static bool TryOpenGameEntryStream(Game game, string relativePath, out Stream stream)
+    {
+        stream = Stream.Null;
+
+        if (TryResolveGameFilePath(game, relativePath, out var fullPath))
+        {
+            stream = File.OpenRead(fullPath);
+            return true;
+        }
+
+        var archivePath = IsStandaloneArchive(game)
+            ? game.FolderPath
+            : FindSingleArchive(game.FolderPath);
+        if (archivePath is null)
+            return false;
+
+        stream = OpenArchiveEntryStream(archivePath, relativePath);
+        return stream != Stream.Null;
+    }
+
+    private static Stream OpenArchiveEntryStream(string archivePath, string relativePath)
+    {
+        var lower = archivePath.ToLowerInvariant();
+
+        try
+        {
+            if (lower.EndsWith(".zip"))
+            {
+                using var archive = ZipFile.OpenRead(archivePath);
+                var entry = archive.Entries.FirstOrDefault(entry =>
+                    string.Equals(
+                        entry.FullName.Replace('\\', '/').TrimEnd('/'),
+                        relativePath,
+                        StringComparison.OrdinalIgnoreCase));
+                if (entry is null)
+                    return Stream.Null;
+
+                var buffer = new MemoryStream();
+                using var source = entry.Open();
+                source.CopyTo(buffer);
+                buffer.Position = 0;
+                return buffer;
+            }
+
+            Stream archiveStream = File.OpenRead(archivePath);
+            if (lower.EndsWith(".gz") || lower.EndsWith(".tgz"))
+                archiveStream = new GZipStream(archiveStream, CompressionMode.Decompress);
+
+            {
+                using (archiveStream)
+                {
+                    using var reader = new TarReader(archiveStream);
+                    while (reader.GetNextEntry() is { } entry)
+                    {
+                        if (!string.Equals(entry.Name.Replace('\\', '/'), relativePath, StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        if (entry.DataStream is null)
+                            return Stream.Null;
+
+                        var buffer = new MemoryStream();
+                        entry.DataStream.CopyTo(buffer);
+                        buffer.Position = 0;
+                        return buffer;
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            return Stream.Null;
+        }
+
+        return Stream.Null;
+    }
+
+    private static bool StreamContainsEmbeddedElevationRequest(Stream stream)
+    {
+        stream.Position = 0;
+
+        byte[][] patterns =
+        [
+            Encoding.UTF8.GetBytes("requireAdministrator"),
+            Encoding.UTF8.GetBytes("highestAvailable"),
+            Encoding.Unicode.GetBytes("requireAdministrator"),
+            Encoding.Unicode.GetBytes("highestAvailable"),
+        ];
+
+        var overlap = patterns.Max(pattern => pattern.Length) - 1;
+        var buffer = new byte[8192 + overlap];
+        var carried = 0;
+
+        while (true)
+        {
+            var read = stream.Read(buffer, carried, buffer.Length - carried);
+            if (read == 0)
+                break;
+
+            var total = carried + read;
+            var span = buffer.AsSpan(0, total);
+            foreach (var pattern in patterns)
+            {
+                if (span.IndexOf(pattern) >= 0)
+                    return true;
+            }
+
+            carried = Math.Min(overlap, total);
+            if (carried > 0)
+                span[^carried..].CopyTo(buffer);
+        }
+
+        return false;
+    }
+
     private static List<BrowseEntry> BrowseArchiveEntries(string archivePath, string internalPrefix)
     {
         var rawEntries = ReadArchiveEntries(archivePath);
@@ -662,4 +848,9 @@ public static class GameEndpoints
                 resultEntries.OrderBy(e => !e.IsDirectory).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList()));
         }
     }
+
+    public record InstallerInspectionResponse(
+        string InstallerType,
+        bool RequestsElevation,
+        bool CanPatchCopyForNonAdmin);
 }

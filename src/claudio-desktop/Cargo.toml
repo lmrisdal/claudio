@@ -11,9 +11,13 @@ path = "src/main.rs"
 name = "claudio_desktop"
 path = "src/lib.rs"
 
+[features]
+default = []
+devtools = ["tauri/devtools"]
+
 [dependencies]
 base64 = "0.22"
-tauri = { version = "2", features = ["devtools", "image-png", "tray-icon"] }
+tauri = { version = "2", features = ["image-png", "tray-icon"] }
 tauri-plugin-log = "2"
 tauri-plugin-updater = "2"
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
@@ -51,6 +55,7 @@ windows = { version = "0.58", features = [
   "Win32_Media_Audio",
   "Win32_System_Com",
   "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_LibraryLoader",
   "Win32_System_ProcessStatus",
   "Win32_System_Registry",
   "Win32_System_Threading",

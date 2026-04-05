@@ -148,14 +148,14 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-22.04
-            args: ""
+            args: --features devtools
             rust-targets: ""
           - platform: windows-latest
-            args: --target x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc --features devtools
             rust-targets: ""
             uninstaller-target: x86_64-pc-windows-msvc
           - platform: macos-latest
-            args: --target universal-apple-darwin
+            args: --target universal-apple-darwin --features devtools
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}

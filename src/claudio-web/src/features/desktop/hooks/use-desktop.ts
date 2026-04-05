@@ -43,6 +43,7 @@ interface DesktopInstallGameInput {
   gameExe?: string | null;
   installPath?: string | null;
   desktopShortcut?: boolean;
+  runAsAdministrator?: boolean;
   forceInteractive?: boolean;
   summary?: string | null;
   genre?: string | null;

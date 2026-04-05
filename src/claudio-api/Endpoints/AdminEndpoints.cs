@@ -131,34 +131,7 @@ public static class AdminEndpoints
         if (!GameEndpoints.ExistsOnDisk(game))
             return Results.Ok(Array.Empty<string>());
 
-        if (GameEndpoints.IsStandaloneArchive(game))
-            return Results.Ok(Array.Empty<string>());
-
-        var exes = new List<string>();
-        string[] extensions = [".exe", ".iso"];
-
-        var singleArchive = GameEndpoints.FindSingleArchive(game.FolderPath);
-        if (singleArchive is not null)
-        {
-            // Single-archive game: list executables inside
-            foreach (var (name, _) in GameEndpoints.ReadArchiveEntries(singleArchive))
-            {
-                if (extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
-                    exes.Add(name);
-            }
-        }
-        else
-        {
-            // Regular game folder
-            foreach (var ext in extensions)
-            {
-                exes.AddRange(
-                    Directory.GetFiles(game.FolderPath, $"*{ext}", SearchOption.AllDirectories)
-                        .Select(f => Path.GetRelativePath(game.FolderPath, f).Replace('\\', '/')));
-            }
-        }
-
-        return Results.Ok(exes.OrderBy(f => f).ToList());
+        return Results.Ok(GameEndpoints.ListGameExecutables(game));
     }
 
     private static async Task<IResult> UpdateGame(int id, GameUpdateRequest request, AppDbContext db)

@@ -1,42 +1,83 @@
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { api } from "../../core/api/client";
 import { isWindows } from "../../core/utils/os";
 import ExeListbox from "./exe-listbox";
 
+interface InstallerInspection {
+  installerType: "exe" | "msi" | "unknown";
+  requestsElevation: boolean;
+  canPatchCopyForNonAdmin: boolean;
+}
+
 interface InstallDialogProperties {
   open: boolean;
+  gameId: number;
   title: string;
   defaultPath: string;
   isPortable?: boolean;
   exeLabel?: string;
   exeOptions?: string[];
+  installerPath?: string;
   onClose: () => void;
   onConfirm: (
     path: string | undefined,
     exe?: string,
     desktopShortcut?: boolean,
+    runAsAdministrator?: boolean,
     forceInteractive?: boolean,
   ) => void;
 }
 
 export default function InstallDialog({
   open,
+  gameId,
   title,
   defaultPath,
   isPortable = false,
   exeLabel,
   exeOptions = [],
+  installerPath,
   onClose,
   onConfirm,
 }: InstallDialogProperties) {
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
   const [desktopShortcut, setDesktopShortcut] = useState(true);
+  const [runAsAdministratorOverrides, setRunAsAdministratorOverrides] = useState<
+    Record<string, boolean>
+  >({});
   const [forceInteractive, setForceInteractive] = useState(false);
 
   const showExePicker = exeLabel !== undefined && exeOptions.length > 0;
   const canInstall = !showExePicker || exe !== "";
+  const effectiveInstallerPath = useMemo(() => {
+    if (isPortable) {
+      return;
+    }
+
+    if (showExePicker) {
+      return exe || undefined;
+    }
+
+    return installerPath || undefined;
+  }, [exe, installerPath, isPortable, showExePicker]);
+  const { data: installerInspection } = useQuery({
+    queryKey: ["installerInspection", gameId, effectiveInstallerPath],
+    queryFn: () =>
+      api.get<InstallerInspection>(
+        `/games/${gameId}/installer-inspection?path=${encodeURIComponent(effectiveInstallerPath!)}`,
+      ),
+    enabled: open && !isPortable && !!effectiveInstallerPath,
+  });
+  const effectiveInstallerKey = effectiveInstallerPath ?? "";
+  const canToggleRunAsAdministrator = effectiveInstallerKey !== "";
+  const runAsAdministrator =
+    runAsAdministratorOverrides[effectiveInstallerKey] ??
+    installerInspection?.requestsElevation ??
+    false;
 
   async function handleBrowse() {
     try {
@@ -58,6 +99,17 @@ export default function InstallDialog({
     } catch (error) {
       console.error("Failed to open dialog", error);
     }
+  }
+
+  function handleRunAsAdministratorChange(checked: boolean) {
+    if (!effectiveInstallerKey) {
+      return;
+    }
+
+    setRunAsAdministratorOverrides((current) => ({
+      ...current,
+      [effectiveInstallerKey]: checked,
+    }));
   }
 
   return (
@@ -128,20 +180,44 @@ export default function InstallDialog({
               )}
 
               {isPortable ? null : (
-                <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
-                  <input
-                    type="checkbox"
-                    checked={forceInteractive}
-                    onChange={(e) => setForceInteractive(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
-                  />
-                  <div>
-                    <span className="text-sm text-text-primary">Run installer interactively</span>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      Show the installer&apos;s setup wizard instead of installing silently.
-                    </p>
-                  </div>
-                </label>
+                <>
+                  <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
+                    <input
+                      type="checkbox"
+                      checked={runAsAdministrator}
+                      disabled={!canToggleRunAsAdministrator}
+                      onChange={(e) => handleRunAsAdministratorChange(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <div>
+                      <span className="text-sm text-text-primary">
+                        Run installer as administrator
+                      </span>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        {canToggleRunAsAdministrator
+                          ? installerInspection?.installerType === "msi"
+                            ? "MSI installers default to standard privileges unless you enable elevation."
+                            : "Request administrator privileges before starting the installer."
+                          : "Select a setup executable to inspect its administrator requirements."}
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
+                    <input
+                      type="checkbox"
+                      checked={forceInteractive}
+                      onChange={(e) => setForceInteractive(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="text-sm text-text-primary">Run installer interactively</span>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Show the installer&apos;s setup wizard instead of installing silently.
+                      </p>
+                    </div>
+                  </label>
+                </>
               )}
             </div>
           </div>
@@ -159,6 +235,7 @@ export default function InstallDialog({
                   installPath || undefined,
                   exe || undefined,
                   isPortable ? desktopShortcut : undefined,
+                  isPortable ? undefined : runAsAdministrator,
                   isPortable ? undefined : forceInteractive,
                 )
               }
