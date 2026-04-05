@@ -1721,22 +1721,6 @@ fn infer_filename(headers: &HeaderMap) -> Option<String> {
     })
 }
 
-fn dir_size(path: &Path) -> u64 {
-    let mut total = 0u64;
-    let Ok(entries) = fs::read_dir(path) else {
-        return 0;
-    };
-    for entry in entries.flatten() {
-        let Ok(meta) = entry.metadata() else { continue };
-        if meta.is_dir() {
-            total += dir_size(&entry.path());
-        } else {
-            total += meta.len();
-        }
-    }
-    total
-}
-
 async fn extract_archive_subprocess<F>(
     source: &Path,
     destination: &Path,
@@ -1784,11 +1768,6 @@ where
         .spawn()
         .map_err(|err| format!("Failed to start extractor: {err}"))?;
 
-    let source_size = fs::metadata(source).map(|m| m.len()).unwrap_or(0);
-    // Archives are typically ~1.5x smaller than their extracted payload.
-    let estimated_total = (source_size as f64 * 1.5).max(1.0);
-    let dest_owned = destination.to_path_buf();
-
     loop {
         if cancel_token.load(Ordering::Relaxed) {
             let _ = child.start_kill();
@@ -1808,12 +1787,7 @@ where
                 return Err(format!("Extractor exited with status {status}"));
             }
             _ = tokio::time::sleep(std::time::Duration::from_millis(400)) => {
-                let path = dest_owned.clone();
-                let extracted = tokio::task::spawn_blocking(move || dir_size(&path))
-                    .await
-                    .unwrap_or(0);
-                let ratio = ((extracted as f64) / estimated_total).clamp(0.0, 0.99);
-                on_progress(Some(ratio));
+                on_progress(None);
             }
         }
     }

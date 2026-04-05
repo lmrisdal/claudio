@@ -2,7 +2,7 @@ use claudio_desktop::integration_test_api::{
     DownloadPackageInput, InstallController, PlaintextAuthGuard, StoredTokens, data_dir,
     download_game_package, save_settings, store_tokens, temp_dir, with_test_data_dir_async,
 };
-use claudio_desktop_tests::support::archive::write_zip_archive;
+use claudio_desktop_tests::support::archive::{write_tar_gz_archive, write_zip_archive};
 use claudio_desktop_tests::support::fixtures::desktop_settings;
 use claudio_desktop_tests::support::fs::TestWorkspace;
 use claudio_desktop_tests::support::http::{TestResponse, TestServer};
@@ -74,9 +74,9 @@ async fn download_package_flow_saves_archive_when_extract_is_false() {
 async fn download_package_flow_extracts_archive_when_requested() {
     let _auth_guard = PlaintextAuthGuard::new();
     let workspace = TestWorkspace::new();
-    let archive_path = workspace.data_dir.join("extract.zip");
+    let archive_path = workspace.data_dir.join("extract.tar.gz");
     fs::create_dir_all(&workspace.data_dir).expect("workspace data dir should exist");
-    write_zip_archive(
+    write_tar_gz_archive(
         &archive_path,
         &[("Game/game.exe", b"binary"), ("Game/readme.txt", b"hello")],
     );
@@ -88,7 +88,7 @@ async fn download_package_flow_extracts_archive_when_requested() {
             status: 200,
             headers: vec![(
                 "content-disposition".to_string(),
-                "attachment; filename=portable.zip".to_string(),
+                "attachment; filename=portable.tar.gz".to_string(),
             )],
             body: archive_body.clone(),
         },
