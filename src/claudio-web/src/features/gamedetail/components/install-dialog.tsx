@@ -190,12 +190,39 @@ export default function InstallDialog({
                       checked={runAsAdministrator}
                       disabled={!canToggleRunAsAdministrator}
                       onChange={(e) => handleRunAsAdministratorChange(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      className="sr-only"
                     />
+                    <span
+                      aria-hidden="true"
+                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                        runAsAdministrator
+                          ? canToggleRunAsAdministrator
+                            ? "border-accent bg-accent text-neutral-950"
+                            : "border-accent/80 bg-accent/80 text-neutral-950 opacity-85"
+                          : canToggleRunAsAdministrator
+                            ? "border-border bg-surface-raised text-transparent"
+                            : "border-border/70 bg-surface-raised/80 text-transparent opacity-70"
+                      }`}
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
+                        <path
+                          d="M3.5 8.5 6.5 11.5 12.5 4.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
                     <div>
                       <span className="text-sm text-text-primary">
                         Run installer as administrator
                       </span>
+                      {requiresAdministrator && (
+                        <span className="ml-2 inline-flex rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-accent">
+                          Required
+                        </span>
+                      )}
                       <p className="text-xs text-text-muted mt-0.5">
                         {canToggleRunAsAdministrator
                           ? installerInspection?.installerType === "msi"
