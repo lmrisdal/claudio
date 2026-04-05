@@ -621,8 +621,8 @@ export default function GameDetail() {
           ? "Running installer interactively..."
           : "Stopping installation..."))
       : typeof installProgress?.percent === "number"
-      ? `Installing ${Math.round(installProgress.percent)}%`
-      : "Installing..."
+        ? `Installing ${Math.round(installProgress.percent)}%`
+        : "Installing..."
     : installMutation.isPending
       ? "Starting install…"
       : "Install";

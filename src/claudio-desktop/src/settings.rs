@@ -3,10 +3,28 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+fn normalize_log_level(value: &str) -> String {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "error" => "error",
+        "warn" | "warning" => "warn",
+        "info" => "info",
+        "debug" => "debug",
+        "trace" => "trace",
+        _ => "info",
+    }
+    .to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopSettings {
     pub server_url: Option<String>,
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
     pub window_width: f64,
     pub window_height: f64,
     pub window_x: Option<f64>,
@@ -29,6 +47,7 @@ impl Default for DesktopSettings {
     fn default() -> Self {
         Self {
             server_url: None,
+            log_level: default_log_level(),
             window_width: 1280.0,
             window_height: 800.0,
             window_x: None,
@@ -64,7 +83,19 @@ pub fn sanitize_custom_headers(headers: &HashMap<String, String>) -> HashMap<Str
 }
 
 fn sanitize_settings(settings: &mut DesktopSettings) {
+    settings.log_level = normalize_log_level(&settings.log_level);
     settings.custom_headers = sanitize_custom_headers(&settings.custom_headers);
+}
+
+pub fn log_level_filter(settings: &DesktopSettings) -> log::LevelFilter {
+    match settings.log_level.as_str() {
+        "error" => log::LevelFilter::Error,
+        "warn" => log::LevelFilter::Warn,
+        "info" => log::LevelFilter::Info,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Info,
+    }
 }
 
 fn settings_path() -> PathBuf {
@@ -135,4 +166,35 @@ pub fn resolve_install_root(settings: &DesktopSettings) -> Result<PathBuf, Strin
     let path = default_install_root(settings);
     fs::create_dir_all(&path).map_err(|err| err.to_string())?;
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_log_level_defaults_to_info() {
+        let mut settings = DesktopSettings {
+            log_level: "verbose".to_string(),
+            ..DesktopSettings::default()
+        };
+
+        sanitize_settings(&mut settings);
+
+        assert_eq!(settings.log_level, "info");
+        assert_eq!(log_level_filter(&settings), log::LevelFilter::Info);
+    }
+
+    #[test]
+    fn warning_alias_normalizes_to_warn() {
+        let mut settings = DesktopSettings {
+            log_level: " WARNING ".to_string(),
+            ..DesktopSettings::default()
+        };
+
+        sanitize_settings(&mut settings);
+
+        assert_eq!(settings.log_level, "warn");
+        assert_eq!(log_level_filter(&settings), log::LevelFilter::Warn);
+    }
 }

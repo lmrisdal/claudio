@@ -110,6 +110,7 @@ pub(crate) fn refresh_auth_state_ui(app: &AppHandle, logged_in: bool) -> Result<
 }
 
 pub fn run() {
+    let initial_settings = settings::load();
     let app = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol("claudio", |context, request, responder| {
             let app = context.app_handle().clone();
@@ -122,7 +123,7 @@ pub fn run() {
         .manage(services::game_runtime::RunningGamesState::default())
         .plugin(
             tauri_plugin_log::Builder::new()
-                .level(log::LevelFilter::Info)
+                .level(settings::log_level_filter(&initial_settings))
                 .max_file_size(10 * 1024 * 1024) // 10 MB
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
                 .build(),

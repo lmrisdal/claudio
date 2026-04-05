@@ -16,6 +16,7 @@ interface DesktopSessionUser {
 
 interface DesktopSettings {
   serverUrl: string | null;
+  logLevel: "error" | "warn" | "info" | "debug" | "trace";
   windowWidth: number;
   windowHeight: number;
   windowX: number | null;

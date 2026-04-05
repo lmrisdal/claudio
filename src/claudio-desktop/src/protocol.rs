@@ -75,7 +75,7 @@ async fn forward_request(
     };
 
     let retry_builder = builder_with_auth.try_clone();
-    log::info!(
+    log::debug!(
         "desktop proxy {} {} auth_attached={}",
         method,
         target,
@@ -85,7 +85,7 @@ async fn forward_request(
         .send()
         .await
         .map_err(|error| error.to_string())?;
-    log::info!("desktop proxy response {} {}", target, response.status());
+    log_proxy_response(&target, response.status(), false);
 
     let response = if response.status() == reqwest::StatusCode::UNAUTHORIZED
         && is_authenticated_route(request.uri())
@@ -101,11 +101,7 @@ async fn forward_request(
                     .send()
                     .await
                     .map_err(|error| error.to_string())?;
-                log::info!(
-                    "desktop proxy retry response {} {}",
-                    target,
-                    retried.status()
-                );
+                log_proxy_response(&target, retried.status(), true);
                 retried
             }
             _ => {
@@ -178,6 +174,22 @@ fn should_skip_request_header(name: &str) -> bool {
             | "access-control-request-method"
             | "access-control-request-headers"
     )
+}
+
+fn log_proxy_response(target: &str, status: reqwest::StatusCode, is_retry: bool) {
+    let label = if is_retry {
+        "desktop proxy retry response"
+    } else {
+        "desktop proxy response"
+    };
+
+    if status.is_server_error() {
+        log::warn!("{label} {target} {status}");
+    } else if status.is_client_error() {
+        log::info!("{label} {target} {status}");
+    } else {
+        log::debug!("{label} {target} {status}");
+    }
 }
 
 fn cors_response(

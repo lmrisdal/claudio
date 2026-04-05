@@ -31,10 +31,7 @@ function updateActionProgress(
   const existing = previous.get(gameId);
   if (!existing) return previous;
 
-  return new Map([
-    ...previous,
-    [gameId, { ...existing, progress, speedBps: null }],
-  ]);
+  return new Map([...previous, [gameId, { ...existing, progress, speedBps: null }]]);
 }
 
 export function DownloadManagerProvider({ children }: { children: React.ReactNode }) {
@@ -173,17 +170,15 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
 
   const cancelDownload = useCallback(async (gameId: number) => {
     let previousProgress: InstallProgress | null = null;
-    setActiveDownloads((previous) =>
-      {
-        previousProgress = previous.get(gameId)?.progress ?? null;
-        return updateActionProgress(previous, gameId, {
-          gameId,
-          status: "stopping",
-          detail: "Stopping installation...",
-          indeterminate: true,
-        });
-      },
-    );
+    setActiveDownloads((previous) => {
+      previousProgress = previous.get(gameId)?.progress ?? null;
+      return updateActionProgress(previous, gameId, {
+        gameId,
+        status: "stopping",
+        detail: "Stopping installation...",
+        indeterminate: true,
+      });
+    });
     try {
       await cancelInstall(gameId);
     } catch (error) {
@@ -197,17 +192,15 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
 
   const restartDownloadInteractive = useCallback(async (gameId: number) => {
     let previousProgress: InstallProgress | null = null;
-    setActiveDownloads((previous) =>
-      {
-        previousProgress = previous.get(gameId)?.progress ?? null;
-        return updateActionProgress(previous, gameId, {
-          gameId,
-          status: "stopping",
-          detail: "Stopping installation to restart interactively...",
-          indeterminate: true,
-        });
-      },
-    );
+    setActiveDownloads((previous) => {
+      previousProgress = previous.get(gameId)?.progress ?? null;
+      return updateActionProgress(previous, gameId, {
+        gameId,
+        status: "stopping",
+        detail: "Stopping installation to restart interactively...",
+        indeterminate: true,
+      });
+    });
     try {
       await restartInstallInteractive(gameId);
     } catch (error) {

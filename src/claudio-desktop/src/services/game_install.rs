@@ -725,90 +725,106 @@ async fn install_installer(
         };
 
         if staging_dir.exists() {
-            fs::remove_dir_all(&staging_dir).map_err(|err| err.to_string())?;
+            cleanup_directory(&staging_dir, "installer staging directory")?;
         }
         fs::create_dir_all(&staging_dir).map_err(|err| err.to_string())?;
-        extract_archive_or_copy(&package_path_owned, &staging_dir, &mut progress_cb)?;
-        emit_progress(
-            &app_handle,
-            gid,
-            "extracting",
-            Some(86.0),
-            Some("Extracting game…"),
-        );
+        let install_result = (|| -> Result<Option<String>, String> {
+            extract_archive_or_copy(&package_path_owned, &staging_dir, &mut progress_cb)?;
+            emit_progress(
+                &app_handle,
+                gid,
+                "extracting",
+                Some(86.0),
+                Some("Extracting game…"),
+            );
 
-        let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
-        log::info!(
-            "[installer {gid}] starting {} installer from {}",
-            if force_interactive {
-                "interactive"
-            } else {
-                "silent"
-            },
-            installer.display()
-        );
+            let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+            log::info!(
+                "[installer {gid}] starting {} installer from {}",
+                if force_interactive {
+                    "interactive"
+                } else {
+                    "silent"
+                },
+                installer.display()
+            );
 
-        loop {
-            let detail = if force_interactive {
-                "Running installer interactively…"
-            } else {
-                "Running installer silently. This may take a while…"
-            };
-            let install_status = if force_interactive {
-                "installing-interactive"
-            } else {
-                "installing"
-            };
+            loop {
+                let detail = if force_interactive {
+                    "Running installer interactively…"
+                } else {
+                    "Running installer silently. This may take a while…"
+                };
+                let install_status = if force_interactive {
+                    "installing-interactive"
+                } else {
+                    "installing"
+                };
+                emit_progress_indeterminate(
+                    &app_handle,
+                    gid,
+                    install_status,
+                    Some(87.0),
+                    Some(detail),
+                    true,
+                );
+                match run_installer(&installer, &target_dir_owned, force_interactive, &control) {
+                    Ok(()) => break,
+                    Err(RunInstallerError::RestartInteractiveRequested) => {
+                        log::info!("[installer {gid}] restarting interactively after forced stop");
+                        cleanup_partial_install_dir(&target_dir_owned)?;
+                        force_interactive = true;
+                        emit_progress_indeterminate(
+                            &app_handle,
+                            gid,
+                            "stopping",
+                            Some(87.0),
+                            Some("Restarting installer in interactive mode…"),
+                            true,
+                        );
+                    }
+                    Err(RunInstallerError::Cancelled) => {
+                        log::info!("[installer {gid}] install cancelled during installer phase");
+                        return Err("Install cancelled.".to_string());
+                    }
+                    Err(RunInstallerError::Failed(message)) => return Err(message),
+                }
+            }
             emit_progress_indeterminate(
                 &app_handle,
                 gid,
-                install_status,
-                Some(87.0),
-                Some(detail),
-                true,
+                "installing",
+                Some(97.0),
+                Some("Applying patches…"),
+                false,
             );
-            match run_installer(&installer, &target_dir_owned, force_interactive, &control) {
-                Ok(()) => break,
-                Err(RunInstallerError::RestartInteractiveRequested) => {
-                    log::info!("[installer {gid}] restarting interactively after forced stop");
-                    cleanup_partial_install_dir(&target_dir_owned)?;
-                    force_interactive = true;
-                    emit_progress_indeterminate(
-                        &app_handle,
-                        gid,
-                        "stopping",
-                        Some(87.0),
-                        Some("Restarting installer in interactive mode…"),
-                        true,
-                    );
+            let installer_dir = installer.parent().unwrap_or(&staging_dir);
+            apply_scene_overrides(installer_dir, &target_dir_owned)?;
+
+            let _ = cleanup_directory(&staging_dir, "installer staging directory");
+
+            let exe = game_exe_hint
+                .as_ref()
+                .map(|entry| target_dir_owned.join(entry))
+                .filter(|path| path.exists())
+                .map(|path| path.to_string_lossy().into_owned());
+            Ok(exe)
+        })();
+
+        match install_result {
+            Ok(exe) => Ok(exe),
+            Err(install_error) => {
+                if let Err(cleanup_error) =
+                    cleanup_failed_installer_state(&target_dir_owned, &staging_dir)
+                {
+                    return Err(format!(
+                        "{install_error} Cleanup also failed: {cleanup_error}"
+                    ));
                 }
-                Err(RunInstallerError::Cancelled) => {
-                    log::info!("[installer {gid}] install cancelled during installer phase");
-                    cleanup_partial_install_dir(&target_dir_owned)?;
-                    return Err("Install cancelled.".to_string());
-                }
-                Err(RunInstallerError::Failed(message)) => return Err(message),
+
+                Err(install_error)
             }
         }
-        emit_progress_indeterminate(
-            &app_handle,
-            gid,
-            "installing",
-            Some(97.0),
-            Some("Applying patches…"),
-            false,
-        );
-        let installer_dir = installer.parent().unwrap_or(&staging_dir);
-        apply_scene_overrides(installer_dir, &target_dir_owned)?;
-
-        let _ = fs::remove_dir_all(&staging_dir);
-
-        let exe = game_exe_hint
-            .as_ref()
-            .map(|entry| target_dir_owned.join(entry))
-            .filter(|path| path.exists())
-            .map(|path| path.to_string_lossy().into_owned());
-        Ok(exe)
     })
     .await
     .map_err(|err| format!("Install task failed: {err}"))??;
@@ -1365,27 +1381,23 @@ enum RunInstallerError {
     Failed(String),
 }
 
-#[cfg(target_os = "windows")]
-fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
-    if !target_dir.exists() {
+fn cleanup_directory(path: &Path, label: &str) -> Result<(), String> {
+    if !path.exists() {
         return Ok(());
     }
 
-    log::info!(
-        "[installer] removing partial install directory {}",
-        target_dir.display()
-    );
+    log::info!("[installer] removing {label} {}", path.display());
 
     let mut last_error = None;
     for attempt in 1..=10 {
-        match fs::remove_dir_all(target_dir) {
+        match fs::remove_dir_all(path) {
             Ok(()) => return Ok(()),
-            Err(_error) if !target_dir.exists() => return Ok(()),
+            Err(_error) if !path.exists() => return Ok(()),
             Err(error) => {
                 last_error = Some(error.to_string());
                 log::info!(
-                    "[installer] partial install cleanup attempt {attempt} failed for {}",
-                    target_dir.display()
+                    "[installer] {label} cleanup attempt {attempt} failed for {}",
+                    path.display()
                 );
                 std::thread::sleep(std::time::Duration::from_millis(200));
             }
@@ -1393,14 +1405,31 @@ fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
     }
 
     Err(format!(
-        "Failed to remove partial install directory: {}",
+        "Failed to remove {label}: {}",
         last_error.unwrap_or_else(|| "unknown error".to_string())
     ))
 }
 
-#[cfg(not(target_os = "windows"))]
-fn cleanup_partial_install_dir(_target_dir: &Path) -> Result<(), String> {
-    Ok(())
+fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
+    cleanup_directory(target_dir, "partial install directory")
+}
+
+fn cleanup_failed_installer_state(target_dir: &Path, staging_dir: &Path) -> Result<(), String> {
+    let mut errors = Vec::new();
+
+    if let Err(error) = cleanup_partial_install_dir(target_dir) {
+        errors.push(error);
+    }
+
+    if let Err(error) = cleanup_directory(staging_dir, "installer staging directory") {
+        errors.push(error);
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join(" "))
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -1837,4 +1866,40 @@ fn open_path(path: &Path) -> Result<(), String> {
         .map_err(|err| err.to_string())?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "claudio-game-install-{name}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn cleanup_failed_installer_state_removes_target_and_staging_dirs() {
+        let root = unique_test_dir("cleanup");
+        let target_dir = root.join("Hades II");
+        let staging_dir = root.join("Hades II.installing");
+
+        fs::create_dir_all(&target_dir).expect("target dir should be created");
+        fs::create_dir_all(&staging_dir).expect("staging dir should be created");
+        fs::write(target_dir.join("game.exe"), b"binary").expect("target file should be created");
+        fs::write(staging_dir.join("setup.exe"), b"installer")
+            .expect("staging file should be created");
+
+        cleanup_failed_installer_state(&target_dir, &staging_dir)
+            .expect("cleanup should remove target and staging dirs");
+
+        assert!(!target_dir.exists());
+        assert!(!staging_dir.exists());
+        let _ = fs::remove_dir_all(root);
+    }
 }
