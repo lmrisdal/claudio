@@ -195,13 +195,22 @@ fn is_process_running(pid: u32) -> bool {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("kill")
-            .args(["-0", &pid.to_string()])
+        Command::new("ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::null())
-            .status()
-            .map(|status| status.success())
+            .output()
+            .map(|output| {
+                if !output.status.success() {
+                    return false;
+                }
+
+                let state = String::from_utf8_lossy(&output.stdout);
+                let state = state.trim();
+
+                !state.is_empty() && !state.starts_with('Z')
+            })
             .unwrap_or(false)
     }
 }
@@ -284,12 +293,10 @@ mod tests {
             .ensure_not_running(8)
             .expect("stale process should be removed");
 
-        assert!(
-            state
-                .remove(8)
-                .expect("state lookup should succeed")
-                .is_none()
-        );
+        assert!(state
+            .remove(8)
+            .expect("state lookup should succeed")
+            .is_none());
     }
 
     #[test]
@@ -306,12 +313,10 @@ mod tests {
 
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].game_id, 1);
-        assert!(
-            state
-                .remove(2)
-                .expect("state lookup should succeed")
-                .is_none()
-        );
+        assert!(state
+            .remove(2)
+            .expect("state lookup should succeed")
+            .is_none());
     }
 
     #[test]
@@ -329,11 +334,9 @@ mod tests {
 
         let _ = waiter.join().expect("waiter thread should join");
         assert!(!is_process_running(pid));
-        assert!(
-            state
-                .remove(99)
-                .expect("state lookup should succeed")
-                .is_none()
-        );
+        assert!(state
+            .remove(99)
+            .expect("state lookup should succeed")
+            .is_none());
     }
 }
