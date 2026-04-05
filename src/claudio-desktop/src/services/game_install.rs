@@ -748,13 +748,19 @@ async fn install_installer(
             let launch_kind = installer_launch_kind(&installer);
             let requests_elevation = launch_kind == InstallerLaunchKind::Exe
                 && file_requests_elevation(&installer)?;
-            let mut force_run_as_invoker = !run_as_administrator && requests_elevation;
             if requests_elevation {
                 log::info!(
                     "[installer {gid}] detected embedded elevation request in {}",
                     installer.display()
                 );
             }
+            if requests_elevation && !run_as_administrator {
+                log::info!(
+                    "[installer {gid}] forcing administrator launch because the extracted installer requests elevation"
+                );
+                run_as_administrator = true;
+            }
+            let mut force_run_as_invoker = !run_as_administrator && requests_elevation;
             if force_run_as_invoker {
                 log::info!(
                     "[installer {gid}] trying non-admin launch with RunAsInvoker for {}",
@@ -773,9 +779,9 @@ async fn install_installer(
 
             loop {
                 let detail = if force_interactive {
-                    "Running installer interactively…"
+                    "Installing… The installer may ask for administrator permission."
                 } else {
-                    "Running installer. This may take a while…"
+                    "Installing… The installer may ask for administrator permission. This may take a while…"
                 };
                 let install_status = if force_interactive {
                     "installing-interactive"
@@ -1716,7 +1722,7 @@ fn spawn_mute_wait(
     path: &Path,
     args: &str,
     run_as_administrator: bool,
-    _force_run_as_invoker: bool,
+    force_run_as_invoker: bool,
     control: &InstallControl,
 ) -> Result<(), RunInstallerError> {
     let exe_name = path.file_name().and_then(|n| n.to_str()).map(String::from);
@@ -1741,6 +1747,13 @@ fn spawn_mute_wait(
         }
         Err(err) => return Err(RunInstallerError::Failed(err.to_string())),
     };
+
+    if force_run_as_invoker {
+        log::info!(
+            "[installer] non-admin launch started successfully for {}; any later UAC prompt is coming from the installer, not Claudio fallback",
+            path.display()
+        );
+    }
 
     log::info!(
         "[installer] launched installer {} with PID {}",

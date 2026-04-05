@@ -73,11 +73,14 @@ export default function InstallDialog({
     enabled: open && !isPortable && !!effectiveInstallerPath,
   });
   const effectiveInstallerKey = effectiveInstallerPath ?? "";
-  const canToggleRunAsAdministrator = effectiveInstallerKey !== "";
-  const runAsAdministrator =
-    runAsAdministratorOverrides[effectiveInstallerKey] ??
-    installerInspection?.requestsElevation ??
-    false;
+  const requiresAdministrator =
+    installerInspection?.installerType === "exe" && installerInspection.requestsElevation;
+  const canToggleRunAsAdministrator = effectiveInstallerKey !== "" && !requiresAdministrator;
+  const runAsAdministrator = requiresAdministrator
+    ? true
+    : (runAsAdministratorOverrides[effectiveInstallerKey] ??
+      installerInspection?.requestsElevation ??
+      false);
 
   async function handleBrowse() {
     try {
@@ -198,7 +201,9 @@ export default function InstallDialog({
                           ? installerInspection?.installerType === "msi"
                             ? "MSI installers default to standard privileges unless you enable elevation."
                             : "Request administrator privileges before starting the installer."
-                          : "Select a setup executable to inspect its administrator requirements."}
+                          : requiresAdministrator
+                            ? "This installer requires administrator privileges."
+                            : "Select a setup executable to inspect its administrator requirements."}
                       </p>
                     </div>
                   </label>
