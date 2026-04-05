@@ -1,6 +1,8 @@
 use crate::models::{InstallType, InstalledGame};
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(any(test, feature = "integration-tests"))]
+use std::sync::{LazyLock, Mutex};
 use tauri::{AppHandle, Manager};
 use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
@@ -23,7 +25,62 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+pub(crate) const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+
+#[cfg(any(test, feature = "integration-tests"))]
+static START_MENU_DIR_OVERRIDE: LazyLock<Mutex<Option<PathBuf>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+#[cfg(any(test, feature = "integration-tests"))]
+static DESKTOP_DIR_OVERRIDE: LazyLock<Mutex<Option<PathBuf>>> = LazyLock::new(|| Mutex::new(None));
+
+#[cfg(any(test, feature = "integration-tests"))]
+static TEST_SHELL_DIRS_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+#[cfg(any(test, feature = "integration-tests"))]
+struct TestShellDirsGuard {
+    _lock: std::sync::MutexGuard<'static, ()>,
+}
+
+#[cfg(any(test, feature = "integration-tests"))]
+impl TestShellDirsGuard {
+    fn new(start_menu_dir: PathBuf, desktop_dir: PathBuf) -> Self {
+        let lock = TEST_SHELL_DIRS_LOCK
+            .lock()
+            .expect("test shell dirs lock should not be poisoned");
+
+        if let Ok(mut override_dir) = START_MENU_DIR_OVERRIDE.lock() {
+            *override_dir = Some(start_menu_dir);
+        }
+        if let Ok(mut override_dir) = DESKTOP_DIR_OVERRIDE.lock() {
+            *override_dir = Some(desktop_dir);
+        }
+
+        Self { _lock: lock }
+    }
+}
+
+#[cfg(any(test, feature = "integration-tests"))]
+impl Drop for TestShellDirsGuard {
+    fn drop(&mut self) {
+        if let Ok(mut override_dir) = START_MENU_DIR_OVERRIDE.lock() {
+            *override_dir = None;
+        }
+        if let Ok(mut override_dir) = DESKTOP_DIR_OVERRIDE.lock() {
+            *override_dir = None;
+        }
+    }
+}
+
+#[cfg(any(test, feature = "integration-tests"))]
+pub(crate) fn with_test_shell_dirs<T>(
+    start_menu_dir: PathBuf,
+    desktop_dir: PathBuf,
+    run: impl FnOnce() -> T,
+) -> T {
+    let _guard = TestShellDirsGuard::new(start_menu_dir, desktop_dir);
+    run()
+}
 
 /// Mutes all audio sessions associated with the given process tree and/or executable name.
 /// Runs in a background thread and retries for up to 20 seconds to catch processes
@@ -296,6 +353,22 @@ fn try_mute_sessions(pid: u32, exe_name: Option<&str>) -> Result<usize, String> 
 }
 
 pub fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {
+    let resource_dir = match app.path().resource_dir() {
+        Ok(dir) => dir,
+        Err(err) => {
+            log::warn!("Could not resolve resource dir for '{}': {err}", game.title);
+            return;
+        }
+    };
+
+    register_from_resource_dir(&resource_dir, game, desktop_shortcut);
+}
+
+pub(crate) fn register_from_resource_dir(
+    resource_dir: &Path,
+    game: &InstalledGame,
+    desktop_shortcut: bool,
+) {
     // Installer-based games register themselves via their own installer.
     if !matches!(game.install_type, InstallType::Portable) {
         return;
@@ -305,7 +378,7 @@ pub fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {
     let install_dir = PathBuf::from(&game.install_path);
     let shortcut_path = start_menu_shortcut_path(&game.title);
 
-    if let Err(err) = deploy_uninstaller(app, game, &key_name, &shortcut_path) {
+    if let Err(err) = deploy_uninstaller(resource_dir, game, &key_name, &shortcut_path) {
         log::warn!("Could not deploy uninstaller for '{}': {err}", game.title);
     }
 
@@ -346,30 +419,43 @@ pub fn deregister(game: &InstalledGame) {
     let _ = fs::remove_file(desktop_shortcut_path(&game.title));
 }
 
-fn registry_key_name(remote_game_id: i32) -> String {
+pub(crate) fn registry_key_name(remote_game_id: i32) -> String {
     format!("Claudio-{remote_game_id}")
 }
 
-fn start_menu_shortcut_path(title: &str) -> PathBuf {
+pub(crate) fn start_menu_shortcut_path(title: &str) -> PathBuf {
+    #[cfg(any(test, feature = "integration-tests"))]
+    if let Ok(override_dir) = START_MENU_DIR_OVERRIDE.lock() {
+        if let Some(path) = override_dir.clone() {
+            return path.join(format!("{title}.lnk"));
+        }
+    }
+
     dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from(r"C:\Users\Default\AppData\Roaming"))
         .join(r"Microsoft\Windows\Start Menu\Programs")
         .join(format!("{title}.lnk"))
 }
 
-fn desktop_shortcut_path(title: &str) -> PathBuf {
+pub(crate) fn desktop_shortcut_path(title: &str) -> PathBuf {
+    #[cfg(any(test, feature = "integration-tests"))]
+    if let Ok(override_dir) = DESKTOP_DIR_OVERRIDE.lock() {
+        if let Some(path) = override_dir.clone() {
+            return path.join(format!("{title}.lnk"));
+        }
+    }
+
     dirs::desktop_dir()
         .unwrap_or_else(|| PathBuf::from(r"C:\Users\Default\Desktop"))
         .join(format!("{title}.lnk"))
 }
 
 fn deploy_uninstaller(
-    app: &AppHandle,
+    resource_dir: &Path,
     game: &InstalledGame,
     key_name: &str,
     shortcut_path: &Path,
 ) -> Result<(), String> {
-    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     let source = resource_dir.join("claudio-game-uninstaller.exe");
     if !source.exists() {
         return Err("Bundled claudio-game-uninstaller.exe not found in resources".to_string());
@@ -486,4 +572,111 @@ fn dir_size_kb(path: &Path) -> Result<u64, ()> {
     let mut total = 0u64;
     recurse(path, &mut total);
     Ok(total / 1024)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "claudio-windows-integration-{name}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos()
+        ))
+    }
+
+    fn installed_game(remote_game_id: i32, install_path: &Path, exe_path: &Path) -> InstalledGame {
+        InstalledGame {
+            remote_game_id,
+            title: format!("Test Game {remote_game_id}"),
+            platform: "windows".to_string(),
+            install_type: InstallType::Portable,
+            install_path: install_path.to_string_lossy().into_owned(),
+            game_exe: Some(exe_path.to_string_lossy().into_owned()),
+            installed_at: "1".to_string(),
+            summary: None,
+            genre: None,
+            release_year: None,
+            cover_url: None,
+            hero_url: None,
+            developer: None,
+            publisher: None,
+            game_mode: None,
+            series: None,
+            franchise: None,
+            game_engine: None,
+        }
+    }
+
+    #[test]
+    fn expand_process_tree_finds_descendants_across_multiple_levels() {
+        let tree = expand_process_tree(&[(10, 1), (11, 10), (12, 11), (99, 50)], &[1]);
+
+        assert_eq!(tree, vec![1, 10, 11, 12]);
+    }
+
+    #[test]
+    fn days_to_ymd_matches_known_epoch_dates() {
+        assert_eq!(days_to_ymd(0), (1970, 1, 1));
+        assert_eq!(days_to_ymd(31), (1970, 2, 1));
+    }
+
+    #[test]
+    fn create_shortcut_writes_lnk_file() {
+        let root = unique_test_dir("shortcut");
+        let shortcut = root.join("game.lnk");
+
+        create_shortcut(
+            std::env::current_exe()
+                .expect("current exe should exist")
+                .to_string_lossy()
+                .as_ref(),
+            &shortcut,
+        )
+        .expect("shortcut should be created");
+
+        assert!(shortcut.exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn write_registry_creates_expected_uninstall_values() {
+        let root = unique_test_dir("registry");
+        let install_dir = root.join("game");
+        fs::create_dir_all(&install_dir).expect("install dir should exist");
+        fs::write(install_dir.join("game.exe"), b"binary").expect("game exe should exist");
+        fs::write(install_dir.join("data.bin"), vec![0_u8; 4096]).expect("data file should exist");
+
+        let game = installed_game(91, &install_dir, &install_dir.join("game.exe"));
+        let key_name = registry_key_name(game.remote_game_id);
+        let uninstall_exe = install_dir.join("uninstall.exe");
+        fs::write(&uninstall_exe, b"binary").expect("uninstaller should exist");
+
+        write_registry(&game, &key_name, &install_dir, &uninstall_exe)
+            .expect("registry should be written");
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let key = hkcu
+            .open_subkey(format!("{UNINSTALL_ROOT}\\{key_name}"))
+            .expect("registry key should exist");
+        let display_name: String = key
+            .get_value("DisplayName")
+            .expect("display name should exist");
+        let install_location: String = key
+            .get_value("InstallLocation")
+            .expect("install location should exist");
+        let publisher: String = key.get_value("Publisher").expect("publisher should exist");
+
+        assert_eq!(display_name, game.title);
+        assert_eq!(install_location, install_dir.to_string_lossy());
+        assert_eq!(publisher, "Claudio");
+
+        let _ = hkcu.delete_subkey_all(format!("{UNINSTALL_ROOT}\\{key_name}"));
+        let _ = fs::remove_dir_all(root);
+    }
 }

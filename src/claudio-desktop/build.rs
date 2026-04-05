@@ -2,9 +2,9 @@ fn main() {
     tauri_build::build();
 
     // On Windows release builds, compile the standalone uninstaller so Tauri
-    // can bundle it as a resource. The compiled binary ends up at
-    // ../claudio-uninstaller/target/release/uninstall.exe, which is the path
-    // declared in tauri.conf.json's bundle.resources.
+    // can bundle it as a resource. In the workspace layout the compiled binary
+    // ends up at ../../target/release/claudio-game-uninstaller.exe relative to
+    // this crate, which matches tauri.windows.conf.json's bundle.resources.
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
     build_uninstaller();
 }
@@ -27,7 +27,5 @@ fn build_uninstaller() {
     // Tell Cargo to re-run this if the uninstaller source changes.
     println!("cargo:rerun-if-changed=../claudio-uninstaller/src/main.rs");
     println!("cargo:rerun-if-changed=../claudio-uninstaller/Cargo.toml");
-    println!(
-        "cargo:rerun-if-changed=../claudio-uninstaller/target/release/claudio-game-uninstaller.exe"
-    );
+    println!("cargo:rerun-if-changed=../../target/release/claudio-game-uninstaller.exe");
 }

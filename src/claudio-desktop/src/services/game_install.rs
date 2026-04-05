@@ -1,5 +1,7 @@
 use crate::auth;
-use crate::models::{DownloadPackageInput, InstallProgress, InstallType, InstalledGame, RemoteGame};
+use crate::models::{
+    DownloadPackageInput, InstallProgress, InstallType, InstalledGame, RemoteGame,
+};
 use crate::refresh_auth_state_ui;
 use crate::registry;
 use crate::settings;
@@ -226,9 +228,7 @@ pub async fn download_game_package(
     let target_existed = target_dir.exists();
     let result = download_game_package_inner(&app, &input, &control).await;
     state.finish(game_id);
-    let temp_root = settings::data_dir()
-        .join("tmp")
-        .join(format!("download-{}", input.id));
+    let temp_root = download_temp_root(input.id);
     let _ = fs::remove_dir_all(&temp_root);
     if control.is_cancelled() {
         if !target_existed {
@@ -269,9 +269,7 @@ async fn download_game_package_inner(
     fs::create_dir_all(&target_dir)
         .map_err(|err| format!("Failed to create target folder: {err}"))?;
 
-    let temp_root = settings::data_dir()
-        .join("tmp")
-        .join(format!("download-{}", input.id));
+    let temp_root = download_temp_root(input.id);
     if temp_root.exists() {
         fs::remove_dir_all(&temp_root).map_err(|err| err.to_string())?;
     }
@@ -499,6 +497,506 @@ pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String>
         .collect())
 }
 
+#[cfg(feature = "integration-tests")]
+pub(crate) mod integration_testing {
+    use super::*;
+
+    #[derive(Clone)]
+    pub struct TestInstallController {
+        control: InstallControl,
+    }
+
+    #[cfg(target_os = "windows")]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum TestInstallerLaunchKind {
+        Exe,
+        Msi,
+        Unknown,
+    }
+
+    #[cfg(target_os = "windows")]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum TestInstallerOutcome {
+        Success,
+        RestartInteractiveRequested,
+        Cancelled,
+        RequiresAdministrator,
+        Failed,
+    }
+
+    #[cfg(target_os = "windows")]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct TestInstallerAttempt {
+        pub force_interactive: bool,
+        pub run_as_administrator: bool,
+        pub force_run_as_invoker: bool,
+    }
+
+    #[cfg(target_os = "windows")]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct TestInstallerSimulation {
+        pub launch_kind: TestInstallerLaunchKind,
+        pub attempts: Vec<TestInstallerAttempt>,
+        pub final_error: Option<String>,
+        pub confirm_elevation_calls: usize,
+    }
+
+    impl TestInstallController {
+        pub fn new() -> Self {
+            Self {
+                control: InstallControl::new(),
+            }
+        }
+
+        pub fn cancel(&self) {
+            self.control.set_cancelled(true);
+        }
+
+        pub fn request_restart_interactive(&self) {
+            self.control.request_restart_interactive();
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn simulate_installer_session(
+        installer_path: &Path,
+        requests_elevation: bool,
+        initial_run_as_administrator: bool,
+        initial_force_interactive: bool,
+        outcomes: Vec<TestInstallerOutcome>,
+        confirm_elevation_responses: Vec<bool>,
+    ) -> TestInstallerSimulation {
+        let mut attempts = Vec::new();
+        let mut outcome_iter = outcomes.into_iter();
+        let mut confirm_iter = confirm_elevation_responses.into_iter();
+        let mut confirm_elevation_calls = 0usize;
+
+        let launch_kind = match installer_launch_kind(installer_path) {
+            InstallerLaunchKind::Exe => TestInstallerLaunchKind::Exe,
+            InstallerLaunchKind::Msi => TestInstallerLaunchKind::Msi,
+            InstallerLaunchKind::Unknown => TestInstallerLaunchKind::Unknown,
+        };
+
+        let result = run_installer_with_retries(
+            installer_attempt_config(
+                initial_force_interactive,
+                initial_run_as_administrator,
+                requests_elevation,
+            ),
+            |attempt| {
+                attempts.push(TestInstallerAttempt {
+                    force_interactive: attempt.force_interactive,
+                    run_as_administrator: attempt.run_as_administrator,
+                    force_run_as_invoker: attempt.force_run_as_invoker,
+                });
+
+                match outcome_iter.next().unwrap_or(TestInstallerOutcome::Success) {
+                    TestInstallerOutcome::Success => Ok(()),
+                    TestInstallerOutcome::RestartInteractiveRequested => {
+                        Err(RunInstallerError::RestartInteractiveRequested)
+                    }
+                    TestInstallerOutcome::Cancelled => Err(RunInstallerError::Cancelled),
+                    TestInstallerOutcome::RequiresAdministrator => {
+                        Err(RunInstallerError::RequiresAdministrator)
+                    }
+                    TestInstallerOutcome::Failed => Err(RunInstallerError::Failed(
+                        "Installer exited with status 1.".to_string(),
+                    )),
+                }
+            },
+            || Ok(()),
+            || {
+                confirm_elevation_calls += 1;
+                confirm_iter.next().unwrap_or(false)
+            },
+        );
+
+        TestInstallerSimulation {
+            launch_kind,
+            attempts,
+            final_error: result.err(),
+            confirm_elevation_calls,
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn cleanup_failed_installer_state(
+        target_dir: &Path,
+        staging_dir: &Path,
+    ) -> Result<(), String> {
+        super::cleanup_failed_installer_state(target_dir, staging_dir)
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn run_innoextract_with_binary(
+        bin: &Path,
+        installer: &Path,
+        target_dir: &Path,
+    ) -> Result<(), String> {
+        super::run_innoextract_with_binary(bin, installer, target_dir)
+    }
+
+    pub async fn download_game_package<F, G>(
+        input: DownloadPackageInput,
+        controller: &TestInstallController,
+        mut on_progress: F,
+        mut on_logged_out: G,
+    ) -> Result<String, String>
+    where
+        F: FnMut(InstallProgress),
+        G: FnMut() -> Result<(), String>,
+    {
+        emit_progress_with_bytes_to(
+            &mut on_progress,
+            input.id,
+            "starting",
+            Some(0.0),
+            Some("Preparing download"),
+            None,
+            None,
+            None,
+        );
+
+        let settings = settings::load();
+        let server_url = settings
+            .server_url
+            .clone()
+            .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
+
+        let target_dir = PathBuf::from(&input.target_dir);
+        fs::create_dir_all(&target_dir)
+            .map_err(|err| format!("Failed to create target folder: {err}"))?;
+
+        let temp_root = download_temp_root(input.id);
+        if temp_root.exists() {
+            fs::remove_dir_all(&temp_root).map_err(|err| err.to_string())?;
+        }
+        fs::create_dir_all(&temp_root).map_err(|err| err.to_string())?;
+
+        let download_info = download_package_with(
+            &DownloadOptions {
+                settings: &settings,
+                server_url: &server_url,
+                custom_headers: &settings.custom_headers,
+                speed_limit_kbs: settings.download_speed_limit_kbs,
+                progress_scale: if input.extract { 60.0 } else { 100.0 },
+            },
+            input.id,
+            input.title.as_str(),
+            &temp_root,
+            &controller.control,
+            &mut on_progress,
+            &mut on_logged_out,
+        )
+        .await?;
+
+        let final_path = if input.extract {
+            emit_progress_with_bytes_to(
+                &mut on_progress,
+                input.id,
+                "extracting",
+                Some(60.0),
+                Some("Extracting archive…"),
+                None,
+                None,
+                None,
+            );
+            let staging = temp_root.join("extract");
+            if staging.exists() {
+                fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
+            }
+            fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
+
+            extract_archive_subprocess(
+                &download_info.file_path,
+                &staging,
+                &controller.control.cancel_token,
+                |ratio| {
+                    let percent = ratio.map(|r| 60.0 + r * 35.0);
+                    emit_progress_with_bytes_to(
+                        &mut on_progress,
+                        input.id,
+                        "extracting",
+                        percent,
+                        Some("Extracting archive…"),
+                        None,
+                        None,
+                        None,
+                    );
+                },
+            )
+            .await?;
+
+            let moved_entries = tokio::task::spawn_blocking({
+                let staging_for_move = staging.clone();
+                let dest = target_dir.clone();
+                move || -> Result<Vec<PathBuf>, String> {
+                    let entries = visible_entries(&staging_for_move)?;
+                    let move_source = if entries.len() == 1 && entries[0].is_dir() {
+                        entries[0].clone()
+                    } else {
+                        staging_for_move.clone()
+                    };
+
+                    let mut moved = Vec::new();
+                    for entry in visible_entries(&move_source)? {
+                        let target = dest.join(entry.file_name().ok_or_else(|| {
+                            "Extracted entry was missing a file name.".to_string()
+                        })?);
+                        if target.exists() {
+                            if target.is_dir() {
+                                fs::remove_dir_all(&target).map_err(|err| err.to_string())?;
+                            } else {
+                                fs::remove_file(&target).map_err(|err| err.to_string())?;
+                            }
+                        }
+                        fs::rename(&entry, &target).map_err(|err| err.to_string())?;
+                        moved.push(target);
+                    }
+                    Ok(moved)
+                }
+            })
+            .await
+            .map_err(|err| format!("Move task failed: {err}"))??;
+
+            if controller.control.is_cancelled() {
+                for path in &moved_entries {
+                    if path.is_dir() {
+                        let _ = fs::remove_dir_all(path);
+                    } else {
+                        let _ = fs::remove_file(path);
+                    }
+                }
+                let _ = fs::remove_dir_all(&temp_root);
+                return Err("Install cancelled.".to_string());
+            }
+
+            target_dir.clone()
+        } else {
+            emit_progress_with_bytes_to(
+                &mut on_progress,
+                input.id,
+                "extracting",
+                Some(96.0),
+                Some("Saving archive…"),
+                None,
+                None,
+                None,
+            );
+            let filename = download_info
+                .file_path
+                .file_name()
+                .ok_or_else(|| "Downloaded package had no file name.".to_string())?;
+            let dest_path = target_dir.join(filename);
+            if dest_path.exists() {
+                fs::remove_file(&dest_path).map_err(|err| err.to_string())?;
+            }
+            if fs::rename(&download_info.file_path, &dest_path).is_err() {
+                fs::copy(&download_info.file_path, &dest_path).map_err(|err| err.to_string())?;
+            }
+            dest_path
+        };
+
+        let _ = fs::remove_dir_all(&temp_root);
+        emit_progress_with_bytes_to(
+            &mut on_progress,
+            input.id,
+            "completed",
+            Some(100.0),
+            Some("Download complete"),
+            None,
+            None,
+            None,
+        );
+        Ok(final_path.to_string_lossy().into_owned())
+    }
+
+    pub async fn install_portable_game<F, G>(
+        game: RemoteGame,
+        controller: &TestInstallController,
+        mut on_progress: F,
+        mut on_logged_out: G,
+    ) -> Result<InstalledGame, String>
+    where
+        F: FnMut(InstallProgress),
+        G: FnMut() -> Result<(), String>,
+    {
+        emit_progress_with_bytes_to(
+            &mut on_progress,
+            game.id,
+            "starting",
+            Some(0.0),
+            Some("Preparing install"),
+            None,
+            None,
+            None,
+        );
+
+        let settings = settings::load();
+        let server_url = settings
+            .server_url
+            .clone()
+            .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
+
+        let target_dir = match game.install_path.as_deref() {
+            Some(path) => PathBuf::from(path),
+            None => {
+                let install_root = settings::resolve_install_root(&settings)?;
+                build_install_dir(&install_root, &game)
+            }
+        };
+
+        if target_dir.exists() {
+            return Err(format!(
+                "Install target already exists: {}",
+                target_dir.display()
+            ));
+        }
+
+        let temp_root = install_temp_root(game.id);
+        if temp_root.exists() {
+            fs::remove_dir_all(&temp_root).map_err(|err| err.to_string())?;
+        }
+        fs::create_dir_all(&temp_root).map_err(|err| err.to_string())?;
+
+        let download_info = download_package_with(
+            &DownloadOptions {
+                settings: &settings,
+                server_url: &server_url,
+                custom_headers: &settings.custom_headers,
+                speed_limit_kbs: settings.download_speed_limit_kbs,
+                progress_scale: 60.0,
+            },
+            game.id,
+            game.title.as_str(),
+            &temp_root,
+            &controller.control,
+            &mut on_progress,
+            &mut on_logged_out,
+        )
+        .await?;
+
+        emit_progress_with_bytes_to(
+            &mut on_progress,
+            game.id,
+            "extracting",
+            Some(60.0),
+            Some("Extracting game"),
+            None,
+            None,
+            None,
+        );
+
+        let (progress_tx, mut progress_rx) =
+            tokio::sync::mpsc::unbounded_channel::<InstallProgress>();
+        let gid = game.id;
+        let game_exe_hint = game.game_exe.clone();
+        let extract_root = target_dir.with_extension("extracting");
+        let target_dir_owned = target_dir.clone();
+        let package_path_owned = download_info.file_path.clone();
+        let cancel_token = controller.control.cancel_token.clone();
+        let progress_task =
+            tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+                let mut progress_cb = |p: f64| {
+                    let _ = progress_tx.send(InstallProgress {
+                        game_id: gid,
+                        status: "extracting".to_string(),
+                        percent: Some(60.0 + (p * 35.0)),
+                        indeterminate: None,
+                        detail: Some("Extracting game…".to_string()),
+                        bytes_downloaded: None,
+                        total_bytes: None,
+                    });
+                };
+
+                if extract_root.exists() {
+                    fs::remove_dir_all(&extract_root).map_err(|err| err.to_string())?;
+                }
+                fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
+
+                extract_archive_or_copy(
+                    &package_path_owned,
+                    &extract_root,
+                    &cancel_token,
+                    &mut progress_cb,
+                )?;
+                let _ = progress_tx.send(InstallProgress {
+                    game_id: gid,
+                    status: "extracting".to_string(),
+                    percent: Some(96.0),
+                    indeterminate: None,
+                    detail: Some("Moving files…".to_string()),
+                    bytes_downloaded: None,
+                    total_bytes: None,
+                });
+
+                normalize_into_final_dir(&extract_root, &target_dir_owned)?;
+
+                let exe = game_exe_hint
+                    .as_ref()
+                    .and_then(|entry| {
+                        let candidate = target_dir_owned.join(entry);
+                        candidate
+                            .exists()
+                            .then(|| candidate.to_string_lossy().into_owned())
+                    })
+                    .or_else(|| {
+                        detect_windows_executable(&target_dir_owned)
+                            .map(|path| path.to_string_lossy().into_owned())
+                    });
+                Ok(exe)
+            });
+
+        while let Some(progress) = progress_rx.recv().await {
+            on_progress(progress);
+        }
+
+        let game_exe = progress_task
+            .await
+            .map_err(|err| format!("Extract task failed: {err}"))??;
+
+        if controller.control.is_cancelled() {
+            let _ = fs::remove_dir_all(&temp_root);
+            let _ = fs::remove_dir_all(&target_dir);
+            return Err("Install cancelled.".to_string());
+        }
+
+        let installed = registry::upsert(InstalledGame {
+            remote_game_id: game.id,
+            title: game.title.clone(),
+            platform: game.platform.clone(),
+            install_type: game.install_type.clone(),
+            install_path: target_dir.to_string_lossy().into_owned(),
+            game_exe,
+            installed_at: current_timestamp(),
+            summary: game.summary.clone(),
+            genre: game.genre.clone(),
+            release_year: game.release_year,
+            cover_url: game.cover_url.clone(),
+            hero_url: game.hero_url.clone(),
+            developer: game.developer.clone(),
+            publisher: game.publisher.clone(),
+            game_mode: game.game_mode.clone(),
+            series: game.series.clone(),
+            franchise: game.franchise.clone(),
+            game_engine: game.game_engine.clone(),
+        })?;
+
+        let _ = fs::remove_dir_all(&temp_root);
+        emit_progress_with_bytes_to(
+            &mut on_progress,
+            game.id,
+            "completed",
+            Some(100.0),
+            Some("Install complete"),
+            None,
+            None,
+            None,
+        );
+        Ok(installed)
+    }
+}
+
 async fn install_game_inner(
     app: &AppHandle,
     game: RemoteGame,
@@ -540,9 +1038,7 @@ async fn install_game_inner(
         ));
     }
 
-    let temp_root = settings::data_dir()
-        .join("tmp")
-        .join(format!("install-{}", game.id));
+    let temp_root = install_temp_root(game.id);
     if temp_root.exists() {
         fs::remove_dir_all(&temp_root).map_err(|err| err.to_string())?;
     }
@@ -621,6 +1117,33 @@ async fn download_package(
     temp_root: &Path,
     control: &InstallControl,
 ) -> Result<DownloadInfo, String> {
+    download_package_with(
+        opts,
+        game_id,
+        game_title,
+        temp_root,
+        control,
+        |progress| {
+            let _ = app.emit("install-progress", progress);
+        },
+        || refresh_auth_state_ui(app, false),
+    )
+    .await
+}
+
+async fn download_package_with<F, G>(
+    opts: &DownloadOptions<'_>,
+    game_id: i32,
+    game_title: &str,
+    temp_root: &Path,
+    control: &InstallControl,
+    mut on_progress: F,
+    mut on_logged_out: G,
+) -> Result<DownloadInfo, String>
+where
+    F: FnMut(InstallProgress),
+    G: FnMut() -> Result<(), String>,
+{
     let DownloadOptions {
         settings,
         server_url,
@@ -630,15 +1153,19 @@ async fn download_package(
     } = opts;
     let progress_scale = *progress_scale;
     let client = reqwest::Client::new();
-    emit_progress(
-        app,
+    emit_progress_with_bytes_to(
+        &mut on_progress,
         game_id,
         "requestingTicket",
         Some(0.0),
         Some("Requesting download"),
+        None,
+        None,
+        None,
     );
 
-    let auth_headers = authenticated_headers(app, settings, custom_headers).await?;
+    let auth_headers =
+        authenticated_headers_with(settings, custom_headers, &mut on_logged_out).await?;
     let mut ticket_response = client
         .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
         .headers(auth_headers.clone())
@@ -647,7 +1174,9 @@ async fn download_package(
         .map_err(|err| err.to_string())?;
 
     if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        if let Some(refreshed_headers) = refreshed_headers(app, settings, custom_headers).await? {
+        if let Some(refreshed_headers) =
+            refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
+        {
             ticket_response = client
                 .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
                 .headers(refreshed_headers.clone())
@@ -683,7 +1212,9 @@ async fn download_package(
         .map_err(|err| err.to_string())?;
 
     if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        if let Some(refreshed_headers) = refreshed_headers(app, settings, custom_headers).await? {
+        if let Some(refreshed_headers) =
+            refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
+        {
             response = client
                 .get(format!(
                     "{server_url}/api/games/{game_id}/download?ticket={ticket}"
@@ -773,8 +1304,8 @@ async fn download_package(
             let percent = total_bytes
                 .filter(|total| *total > 0)
                 .map(|total| (downloaded as f64 / total as f64) * progress_scale);
-            emit_progress_with_bytes(
-                app,
+            emit_progress_with_bytes_to(
+                &mut on_progress,
                 game_id,
                 "downloading",
                 percent,
@@ -834,7 +1365,12 @@ async fn install_portable(
         }
         fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
 
-        extract_archive_or_copy(&package_path_owned, &extract_root, &cancel_token, &mut progress_cb)?;
+        extract_archive_or_copy(
+            &package_path_owned,
+            &extract_root,
+            &cancel_token,
+            &mut progress_cb,
+        )?;
         emit_progress(
             &app_handle,
             gid,
@@ -914,8 +1450,6 @@ async fn install_installer(
     let control = control.clone();
 
     let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
-        let mut run_as_administrator = initial_run_as_administrator;
-        let mut force_interactive = initial_force_interactive;
         let mut progress_cb = |p: f64| {
             emit_progress(
                 &app_handle,
@@ -955,14 +1489,12 @@ async fn install_installer(
                     installer.display()
                 );
             }
-            if requests_elevation && !run_as_administrator {
-                log::info!(
-                    "[installer {gid}] forcing administrator launch because the extracted installer requests elevation"
-                );
-                run_as_administrator = true;
-            }
-            let mut force_run_as_invoker = !run_as_administrator && requests_elevation;
-            if force_run_as_invoker {
+            let initial_attempt = installer_attempt_config(
+                initial_force_interactive,
+                initial_run_as_administrator,
+                requests_elevation,
+            );
+            if initial_attempt.force_run_as_invoker {
                 log::info!(
                     "[installer {gid}] trying non-admin launch with RunAsInvoker for {}",
                     installer.display()
@@ -970,7 +1502,7 @@ async fn install_installer(
             }
             log::info!(
                 "[installer {gid}] starting {} installer from {}",
-                if force_interactive {
+                if initial_attempt.force_interactive {
                     "interactive"
                 } else {
                     "silent"
@@ -978,80 +1510,75 @@ async fn install_installer(
                 installer.display()
             );
 
-            loop {
-                let detail = if force_interactive {
-                    "Installing… The installer may ask for administrator permission."
-                } else {
-                    "Installing… The installer may ask for administrator permission. This may take a while…"
-                };
-                let install_status = if force_interactive {
-                    "installing-interactive"
-                } else {
-                    "installing"
-                };
-                emit_progress_indeterminate(
-                    &app_handle,
-                    gid,
-                    install_status,
-                    Some(87.0),
-                    Some(detail),
-                    true,
-                );
-                match run_installer(
-                    &installer,
-                    &target_dir_owned,
-                    force_interactive,
-                    run_as_administrator,
-                    force_run_as_invoker,
-                    &control,
-                ) {
-                    Ok(()) => break,
-                    Err(RunInstallerError::RestartInteractiveRequested) => {
-                        log::info!("[installer {gid}] restarting interactively after forced stop");
-                        cleanup_partial_install_dir(&target_dir_owned)?;
-                        force_interactive = true;
+            run_installer_with_retries(
+                initial_attempt,
+                |attempt| {
+                    let detail = if attempt.force_interactive {
+                        "Installing… The installer may ask for administrator permission."
+                    } else {
+                        "Installing… The installer may ask for administrator permission. This may take a while…"
+                    };
+                    let install_status = if attempt.force_interactive {
+                        "installing-interactive"
+                    } else {
+                        "installing"
+                    };
+                    emit_progress_indeterminate(
+                        &app_handle,
+                        gid,
+                        install_status,
+                        Some(87.0),
+                        Some(detail),
+                        true,
+                    );
+
+                    run_installer(
+                        &installer,
+                        &target_dir_owned,
+                        attempt.force_interactive,
+                        attempt.run_as_administrator,
+                        attempt.force_run_as_invoker,
+                        &control,
+                    )
+                },
+                || {
+                    log::info!("[installer {gid}] restarting interactively after forced stop");
+                    cleanup_partial_install_dir(&target_dir_owned)?;
+                    emit_progress_indeterminate(
+                        &app_handle,
+                        gid,
+                        "stopping",
+                        Some(87.0),
+                        Some("Restarting installer in interactive mode…"),
+                        true,
+                    );
+                    Ok(())
+                },
+                || {
+                    log::warn!(
+                        "[installer {gid}] installer still required administrator privileges after non-admin attempt"
+                    );
+                    if confirm_installer_elevation(&app_handle) {
+                        log::info!(
+                            "[installer {gid}] retrying installer launch as administrator after fallback prompt"
+                        );
                         emit_progress_indeterminate(
                             &app_handle,
                             gid,
                             "stopping",
                             Some(87.0),
-                            Some("Restarting installer in interactive mode…"),
+                            Some("Restarting installer as administrator…"),
                             true,
                         );
+                        return true;
                     }
-                    Err(RunInstallerError::Cancelled) => {
-                        log::info!("[installer {gid}] install cancelled during installer phase");
-                        return Err("Install cancelled.".to_string());
-                    }
-                    Err(RunInstallerError::RequiresAdministrator) => {
-                        log::warn!(
-                            "[installer {gid}] installer still required administrator privileges after non-admin attempt"
-                        );
-                        if confirm_installer_elevation(&app_handle) {
-                            run_as_administrator = true;
-                            force_run_as_invoker = false;
-                            log::info!(
-                                "[installer {gid}] retrying installer launch as administrator after fallback prompt"
-                            );
-                            emit_progress_indeterminate(
-                                &app_handle,
-                                gid,
-                                "stopping",
-                                Some(87.0),
-                                Some("Restarting installer as administrator…"),
-                                true,
-                            );
-                            continue;
-                        }
 
-                        log::info!(
-                            "[installer {gid}] user declined administrator prompt after non-admin attempt"
-                        );
-                        return Err("Install cancelled.".to_string());
-                    }
-                    Err(RunInstallerError::Failed(message)) => return Err(message),
-                }
-            }
+                    log::info!(
+                        "[installer {gid}] user declined administrator prompt after non-admin attempt"
+                    );
+                    false
+                },
+            )?;
             emit_progress_indeterminate(
                 &app_handle,
                 gid,
@@ -1137,26 +1664,32 @@ fn build_headers(
     Ok(headers)
 }
 
-async fn authenticated_headers(
-    app: &AppHandle,
+async fn authenticated_headers_with<G>(
     settings: &settings::DesktopSettings,
     custom_headers: &HashMap<String, String>,
-) -> Result<HeaderMap, String> {
+    mut on_logged_out: G,
+) -> Result<HeaderMap, String>
+where
+    G: FnMut() -> Result<(), String>,
+{
     let Some(access_token) = auth::access_token_for_request(settings).await? else {
-        let _ = refresh_auth_state_ui(app, false);
+        let _ = on_logged_out();
         return Err("You need to sign in before installing games.".to_string());
     };
 
     build_headers(custom_headers, Some(&access_token))
 }
 
-async fn refreshed_headers(
-    app: &AppHandle,
+async fn refreshed_headers_with<G>(
     settings: &settings::DesktopSettings,
     custom_headers: &HashMap<String, String>,
-) -> Result<Option<HeaderMap>, String> {
+    mut on_logged_out: G,
+) -> Result<Option<HeaderMap>, String>
+where
+    G: FnMut() -> Result<(), String>,
+{
     let Some(access_token) = auth::refresh_access_token(settings).await? else {
-        let _ = refresh_auth_state_ui(app, false);
+        let _ = on_logged_out();
         return Ok(None);
     };
 
@@ -1165,6 +1698,14 @@ async fn refreshed_headers(
 
 fn build_install_dir(install_root: &Path, game: &RemoteGame) -> PathBuf {
     install_root.join(sanitize_segment(&game.title))
+}
+
+fn download_temp_root(game_id: i32) -> PathBuf {
+    settings::temp_dir().join(format!("download-{game_id}"))
+}
+
+fn install_temp_root(game_id: i32) -> PathBuf {
+    settings::temp_dir().join(format!("install-{game_id}"))
 }
 
 fn infer_filename(headers: &HeaderMap) -> Option<String> {
@@ -1221,10 +1762,7 @@ where
             c.arg("-xf").arg(source).arg("-C").arg(destination);
             c
         }
-    } else if lower.ends_with(".tar.gz")
-        || lower.ends_with(".tgz")
-        || lower.ends_with(".tar")
-    {
+    } else if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") || lower.ends_with(".tar") {
         let mut c = tokio::process::Command::new("tar");
         c.arg("-xf").arg(source).arg("-C").arg(destination);
         c
@@ -1669,11 +2207,18 @@ enum InstallerType {
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InstallerLaunchKind {
     Exe,
     Msi,
     Unknown,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct InstallerAttemptConfig {
+    force_interactive: bool,
+    run_as_administrator: bool,
+    force_run_as_invoker: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -1715,6 +2260,53 @@ fn installer_launch_kind(path: &Path) -> InstallerLaunchKind {
     }
 }
 
+fn installer_attempt_config(
+    force_interactive: bool,
+    run_as_administrator: bool,
+    requests_elevation: bool,
+) -> InstallerAttemptConfig {
+    InstallerAttemptConfig {
+        force_interactive,
+        run_as_administrator,
+        force_run_as_invoker: requests_elevation && !run_as_administrator,
+    }
+}
+
+fn run_installer_with_retries<F, G, H>(
+    mut attempt: InstallerAttemptConfig,
+    mut run_once: F,
+    mut on_restart_interactive: G,
+    mut confirm_elevation: H,
+) -> Result<(), String>
+where
+    F: FnMut(InstallerAttemptConfig) -> Result<(), RunInstallerError>,
+    G: FnMut() -> Result<(), String>,
+    H: FnMut() -> bool,
+{
+    loop {
+        match run_once(attempt) {
+            Ok(()) => return Ok(()),
+            Err(RunInstallerError::RestartInteractiveRequested) => {
+                on_restart_interactive()?;
+                attempt.force_interactive = true;
+            }
+            Err(RunInstallerError::Cancelled) => {
+                return Err("Install cancelled.".to_string());
+            }
+            Err(RunInstallerError::RequiresAdministrator) => {
+                if confirm_elevation() {
+                    attempt.run_as_administrator = true;
+                    attempt.force_run_as_invoker = false;
+                    continue;
+                }
+
+                return Err("Install cancelled.".to_string());
+            }
+            Err(RunInstallerError::Failed(message)) => return Err(message),
+        }
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 fn installer_launch_kind(_path: &Path) -> InstallerLaunchKind {
     InstallerLaunchKind::Unknown
@@ -1735,7 +2327,11 @@ fn stream_requests_elevation(reader: &mut impl Read) -> Result<bool, String> {
         b"r\0e\0q\0u\0i\0r\0e\0A\0d\0m\0i\0n\0i\0s\0t\0r\0a\0t\0o\0r\0".as_slice(),
         b"h\0i\0g\0h\0e\0s\0t\0A\0v\0a\0i\0l\0a\0b\0l\0e\0".as_slice(),
     ];
-    let overlap = patterns.iter().map(|pattern| pattern.len()).max().unwrap_or(0);
+    let overlap = patterns
+        .iter()
+        .map(|pattern| pattern.len())
+        .max()
+        .unwrap_or(0);
     let mut buffer = vec![0u8; BUFFER_SIZE + overlap];
     let mut carried = 0usize;
 
@@ -1749,7 +2345,10 @@ fn stream_requests_elevation(reader: &mut impl Read) -> Result<bool, String> {
 
         let total = carried + read;
         for pattern in patterns {
-            if buffer[..total].windows(pattern.len()).any(|window| window == pattern) {
+            if buffer[..total]
+                .windows(pattern.len())
+                .any(|window| window == pattern)
+            {
                 return Ok(true);
             }
         }
@@ -1958,6 +2557,7 @@ fn run_innosetup_silent(
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+#[derive(Debug)]
 enum RunInstallerError {
     Cancelled,
     RestartInteractiveRequested,
@@ -2267,6 +2867,15 @@ fn run_innoextract(installer: &Path, target_dir: &Path) -> Result<(), String> {
     let bin = ensure_innoextract()?;
     log::info!("Using innoextract binary: {}", bin.display());
 
+    run_innoextract_with_binary(&bin, installer, target_dir)
+}
+
+#[cfg(target_os = "windows")]
+fn run_innoextract_with_binary(
+    bin: &Path,
+    installer: &Path,
+    target_dir: &Path,
+) -> Result<(), String> {
     let status = std::process::Command::new(&bin)
         .arg("-d")
         .arg(target_dir)
@@ -2318,7 +2927,7 @@ fn ensure_innoextract() -> Result<PathBuf, String> {
     }
 
     // Check cached copy in the app's data dir
-    let cached = settings::data_dir().join("tools").join("innoextract.exe");
+    let cached = innoextract_cache_path();
     if cached.exists() {
         log::info!("Using cached innoextract: {}", cached.display());
         return Ok(cached);
@@ -2438,18 +3047,41 @@ fn emit_progress_with_bytes(
     total_bytes: Option<u64>,
     indeterminate: Option<bool>,
 ) {
-    let _ = app.emit(
-        "install-progress",
-        InstallProgress {
-            game_id,
-            status: status.to_string(),
-            percent,
-            indeterminate,
-            detail: detail.map(ToString::to_string),
-            bytes_downloaded,
-            total_bytes,
+    emit_progress_with_bytes_to(
+        &mut |progress| {
+            let _ = app.emit("install-progress", progress);
         },
+        game_id,
+        status,
+        percent,
+        detail,
+        bytes_downloaded,
+        total_bytes,
+        indeterminate,
     );
+}
+
+fn emit_progress_with_bytes_to<F>(
+    on_progress: &mut F,
+    game_id: i32,
+    status: &str,
+    percent: Option<f64>,
+    detail: Option<&str>,
+    bytes_downloaded: Option<u64>,
+    total_bytes: Option<u64>,
+    indeterminate: Option<bool>,
+) where
+    F: FnMut(InstallProgress),
+{
+    on_progress(InstallProgress {
+        game_id,
+        status: status.to_string(),
+        percent,
+        indeterminate,
+        detail: detail.map(ToString::to_string),
+        bytes_downloaded,
+        total_bytes,
+    });
 }
 
 fn current_timestamp() -> String {
@@ -2457,6 +3089,11 @@ fn current_timestamp() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs().to_string())
         .unwrap_or_else(|_| "0".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn innoextract_cache_path() -> PathBuf {
+    settings::tools_dir().join("innoextract.exe")
 }
 
 fn open_path(path: &Path) -> Result<(), String> {
@@ -2487,6 +3124,13 @@ fn open_path(path: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::{StoredTokens, TestAuthGuard, store_tokens};
+    use crate::test_support::{TestResponse, TestServer};
+    use flate2::{Compression, write::GzEncoder};
+    use reqwest::header::HeaderValue;
+    use std::sync::Arc as StdArc;
+    use std::sync::atomic::AtomicUsize;
+    use zip::write::SimpleFileOptions;
 
     fn unique_test_dir(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
@@ -2497,6 +3141,70 @@ mod tests {
                 .expect("system time should be after epoch")
                 .as_nanos()
         ))
+    }
+
+    fn installed_game(remote_game_id: i32, title: &str, install_path: &Path) -> InstalledGame {
+        InstalledGame {
+            remote_game_id,
+            title: title.to_string(),
+            platform: "windows".to_string(),
+            install_type: InstallType::Portable,
+            install_path: install_path.to_string_lossy().into_owned(),
+            game_exe: None,
+            installed_at: "1".to_string(),
+            summary: None,
+            genre: None,
+            release_year: None,
+            cover_url: None,
+            hero_url: None,
+            developer: None,
+            publisher: None,
+            game_mode: None,
+            series: None,
+            franchise: None,
+            game_engine: None,
+        }
+    }
+
+    fn download_settings(server_url: &str) -> settings::DesktopSettings {
+        settings::DesktopSettings {
+            server_url: Some(server_url.to_string()),
+            allow_insecure_auth_storage: true,
+            ..settings::DesktopSettings::default()
+        }
+    }
+
+    fn write_zip_archive(path: &Path, entries: &[(&str, &[u8])]) {
+        let file = fs::File::create(path).expect("zip file should be created");
+        let mut archive = zip::ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+
+        for (name, contents) in entries {
+            archive
+                .start_file(name, options)
+                .expect("zip entry should start");
+            std::io::Write::write_all(&mut archive, contents).expect("zip entry should be written");
+        }
+
+        archive.finish().expect("zip archive should finish");
+    }
+
+    fn write_tar_gz_archive(path: &Path, entries: &[(&str, &[u8])]) {
+        let file = fs::File::create(path).expect("tar.gz file should be created");
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut archive = tar::Builder::new(encoder);
+
+        for (name, contents) in entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            archive
+                .append_data(&mut header, name, std::io::Cursor::new(*contents))
+                .expect("tar entry should be written");
+        }
+
+        archive.finish().expect("tar archive should finish");
     }
 
     #[test]
@@ -2517,5 +3225,506 @@ mod tests {
         assert!(!target_dir.exists());
         assert!(!staging_dir.exists());
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn temp_roots_use_overridden_data_dir() {
+        crate::settings::with_test_data_dir(unique_test_dir("temp-roots"), || {
+            let download_root = download_temp_root(42);
+            let install_root = install_temp_root(9);
+
+            assert_eq!(
+                download_root,
+                crate::settings::temp_dir().join("download-42")
+            );
+            assert_eq!(install_root, crate::settings::temp_dir().join("install-9"));
+        });
+    }
+
+    #[test]
+    fn visible_entries_skips_macos_metadata() {
+        let root = unique_test_dir("visible-entries");
+        fs::create_dir_all(root.join("Game")).expect("game dir should be created");
+        fs::create_dir_all(root.join("__MACOSX")).expect("metadata dir should be created");
+        fs::write(root.join(".DS_Store"), b"meta").expect("ds_store should be created");
+
+        let entries = visible_entries(&root).expect("entries should load");
+        assert_eq!(entries, vec![root.join("Game")]);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn normalize_into_final_dir_flattens_single_extracted_root() {
+        let root = unique_test_dir("normalize");
+        let staging_root = root.join("extracting");
+        let nested_root = staging_root.join("Game");
+        let final_dir = root.join("final");
+
+        fs::create_dir_all(&nested_root).expect("nested root should be created");
+        fs::write(nested_root.join("game.exe"), b"binary").expect("game file should exist");
+
+        normalize_into_final_dir(&staging_root, &final_dir)
+            .expect("single extracted root should be flattened");
+
+        assert!(final_dir.join("game.exe").exists());
+        assert!(!staging_root.exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn sanitize_segment_replaces_invalid_path_characters() {
+        assert_eq!(
+            sanitize_segment(" Halo: Reach / GOTY?* "),
+            "Halo_ Reach _ GOTY__"
+        );
+        assert_eq!(sanitize_segment("   "), "game");
+    }
+
+    #[test]
+    fn infer_filename_prefers_utf8_content_disposition_name() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            CONTENT_DISPOSITION,
+            HeaderValue::from_static(
+                "attachment; filename*=UTF-8''Game%20Pack.zip; filename=ignored.zip",
+            ),
+        );
+
+        assert_eq!(infer_filename(&headers).as_deref(), Some("Game%20Pack.zip"));
+    }
+
+    #[test]
+    fn build_headers_ignores_forbidden_custom_headers_and_sets_bearer_token() {
+        let headers = build_headers(
+            &HashMap::from([
+                ("X-Test".to_string(), "ok".to_string()),
+                ("Authorization".to_string(), "blocked".to_string()),
+            ]),
+            Some("token-123"),
+        )
+        .expect("headers should build");
+
+        assert_eq!(
+            headers.get("x-test").and_then(|v| v.to_str().ok()),
+            Some("ok")
+        );
+        assert_eq!(
+            headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()),
+            Some("Bearer token-123")
+        );
+        assert_eq!(headers.len(), 2);
+    }
+
+    #[test]
+    fn build_install_dir_uses_sanitized_title() {
+        let game = RemoteGame {
+            id: 1,
+            title: "Max Payne: GOTY".to_string(),
+            platform: "windows".to_string(),
+            install_type: InstallType::Portable,
+            installer_exe: None,
+            game_exe: None,
+            install_path: None,
+            desktop_shortcut: None,
+            run_as_administrator: None,
+            force_interactive: None,
+            summary: None,
+            genre: None,
+            release_year: None,
+            cover_url: None,
+            hero_url: None,
+            developer: None,
+            publisher: None,
+            game_mode: None,
+            series: None,
+            franchise: None,
+            game_engine: None,
+        };
+
+        let path = build_install_dir(Path::new("/games"), &game);
+
+        assert_eq!(path, PathBuf::from("/games/Max Payne_ GOTY"));
+    }
+
+    #[test]
+    fn detect_installer_and_windows_executable_find_sorted_matches() {
+        let root = unique_test_dir("detectors");
+        fs::create_dir_all(root.join("nested")).expect("nested root should be created");
+        fs::write(root.join("nested").join("setup.exe"), b"setup").expect("setup should exist");
+        fs::write(root.join("aaa.exe"), b"game").expect("exe should exist");
+
+        assert_eq!(
+            detect_installer(&root),
+            Some(root.join("nested").join("setup.exe"))
+        );
+        assert_eq!(detect_windows_executable(&root), Some(root.join("aaa.exe")));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolve_installer_path_uses_hint_when_present() {
+        let root = unique_test_dir("installer-hint");
+        fs::create_dir_all(&root).expect("root should be created");
+        fs::write(root.join("custom-installer.exe"), b"installer").expect("installer should exist");
+
+        let installer = resolve_installer_path(&root, Some("custom-installer.exe"))
+            .expect("hinted installer should resolve");
+
+        assert_eq!(installer, root.join("custom-installer.exe"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn installer_launch_kind_detects_common_extensions() {
+        #[cfg(target_os = "windows")]
+        {
+            assert_eq!(
+                installer_launch_kind(Path::new("setup.exe")),
+                InstallerLaunchKind::Exe
+            );
+            assert_eq!(
+                installer_launch_kind(Path::new("setup.msi")),
+                InstallerLaunchKind::Msi
+            );
+            assert_eq!(
+                installer_launch_kind(Path::new("setup.bin")),
+                InstallerLaunchKind::Unknown
+            );
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            assert_eq!(
+                installer_launch_kind(Path::new("setup.exe")),
+                InstallerLaunchKind::Unknown
+            );
+            assert_eq!(
+                installer_launch_kind(Path::new("setup.msi")),
+                InstallerLaunchKind::Unknown
+            );
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn run_installer_fails_closed_on_non_windows() {
+        let error = run_installer(
+            Path::new("setup.exe"),
+            Path::new("/tmp/game"),
+            false,
+            false,
+            false,
+            &InstallControl::new(),
+        )
+        .err()
+        .expect("non-windows installer should fail");
+
+        match error {
+            RunInstallerError::Failed(message) => {
+                assert_eq!(
+                    message,
+                    "Installer-based PC installs are only supported on Windows."
+                );
+            }
+            other => panic!("unexpected installer error: {other:?}"),
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn stream_requests_elevation_detects_ascii_and_utf16_markers() {
+        let mut ascii = std::io::Cursor::new(b"prefix requireAdministrator suffix".to_vec());
+        let mut utf16 = std::io::Cursor::new(
+            b"x\0h\0i\0g\0h\0e\0s\0t\0A\0v\0a\0i\0l\0a\0b\0l\0e\0y\0".to_vec(),
+        );
+
+        assert!(stream_requests_elevation(&mut ascii).expect("ascii marker should be read"));
+        assert!(stream_requests_elevation(&mut utf16).expect("utf16 marker should be read"));
+    }
+
+    #[test]
+    fn extract_archive_or_copy_extracts_zip_archives() {
+        let root = unique_test_dir("extract-zip");
+        let archive_path = root.join("game.zip");
+        let destination = root.join("out");
+        fs::create_dir_all(&root).expect("root should be created");
+        write_zip_archive(&archive_path, &[("Game/game.exe", b"binary")]);
+
+        extract_archive_or_copy(
+            &archive_path,
+            &destination,
+            &Arc::new(AtomicBool::new(false)),
+            |_| {},
+        )
+        .expect("zip archive should extract");
+
+        assert!(destination.join("Game").join("game.exe").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn extract_archive_or_copy_extracts_tar_gz_archives() {
+        let root = unique_test_dir("extract-targz");
+        let archive_path = root.join("game.tar.gz");
+        let destination = root.join("out");
+        fs::create_dir_all(&root).expect("root should be created");
+        write_tar_gz_archive(&archive_path, &[("Game/readme.txt", b"hello")]);
+
+        extract_archive_or_copy(
+            &archive_path,
+            &destination,
+            &Arc::new(AtomicBool::new(false)),
+            |_| {},
+        )
+        .expect("tar.gz archive should extract");
+
+        assert!(destination.join("Game").join("readme.txt").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn extract_archive_or_copy_respects_pre_cancelled_copy_requests() {
+        let root = unique_test_dir("extract-copy-cancelled");
+        let source = root.join("game.bin");
+        let destination = root.join("out");
+        fs::create_dir_all(&root).expect("root should be created");
+        fs::write(&source, b"binary").expect("source should exist");
+
+        let error = extract_archive_or_copy(
+            &source,
+            &destination,
+            &Arc::new(AtomicBool::new(true)),
+            |_| {},
+        )
+        .expect_err("pre-cancelled copy should fail");
+
+        assert_eq!(error, "Install cancelled.");
+        assert!(destination.exists());
+        assert!(!destination.join("game.bin").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn uninstall_game_can_preserve_or_delete_install_files() {
+        crate::settings::with_test_data_dir(unique_test_dir("uninstall"), || {
+            let keep_dir = crate::settings::data_dir().join("keep");
+            let delete_dir = crate::settings::data_dir().join("delete");
+            fs::create_dir_all(&keep_dir).expect("keep dir should exist");
+            fs::create_dir_all(&delete_dir).expect("delete dir should exist");
+
+            crate::registry::upsert(installed_game(1, "Keep", &keep_dir))
+                .expect("keep game should be saved");
+            crate::registry::upsert(installed_game(2, "Delete", &delete_dir))
+                .expect("delete game should be saved");
+
+            uninstall_game(1, false).expect("keep uninstall should succeed");
+            uninstall_game(2, true).expect("delete uninstall should succeed");
+
+            assert!(keep_dir.exists());
+            assert!(!delete_dir.exists());
+            assert!(
+                crate::registry::get(1)
+                    .expect("registry should load")
+                    .is_none()
+            );
+            assert!(
+                crate::registry::get(2)
+                    .expect("registry should load")
+                    .is_none()
+            );
+        });
+    }
+
+    #[tokio::test]
+    async fn download_package_with_downloads_file_and_uses_filename_header() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let server = TestServer::spawn(|request| match request.path.as_str() {
+            "/api/games/5/download-ticket" => TestResponse::json(200, r#"{"ticket":"abc"}"#),
+            "/api/games/5/download?ticket=abc" => TestResponse {
+                status: 200,
+                headers: vec![(
+                    "content-disposition".to_string(),
+                    "attachment; filename=game-package.zip".to_string(),
+                )],
+                body: b"payload".to_vec(),
+            },
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("download-success"), || async {
+            let settings = download_settings(server.url());
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let control = InstallControl::new();
+            let temp_root = crate::settings::temp_dir().join("download-success");
+            fs::create_dir_all(&temp_root).expect("temp root should exist");
+            let mut progress = Vec::new();
+
+            let download = download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: None,
+                    progress_scale: 100.0,
+                },
+                5,
+                "Game",
+                &temp_root,
+                &control,
+                |event| progress.push(event.status),
+                || Ok(()),
+            )
+            .await
+            .expect("download should succeed");
+
+            assert_eq!(download.file_path, temp_root.join("game-package.zip"));
+            assert_eq!(
+                fs::read(&download.file_path).expect("downloaded file should exist"),
+                b"payload"
+            );
+            assert!(progress.iter().any(|status| status == "requestingTicket"));
+            assert!(progress.iter().any(|status| status == "downloading"));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn download_package_with_refreshes_when_ticket_and_download_require_reauth() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let fresh_count = StdArc::new(AtomicUsize::new(0));
+        let fresh_count_for_server = fresh_count.clone();
+        let server = TestServer::spawn(move |request| {
+            let auth = request
+                .headers
+                .get("authorization")
+                .cloned()
+                .unwrap_or_default();
+            match request.path.as_str() {
+                "/api/games/7/download-ticket" if auth == "Bearer stale-token" => {
+                    TestResponse::text(401, "expired")
+                }
+                "/api/games/7/download-ticket" if auth == "Bearer fresh-token" => {
+                    fresh_count_for_server.fetch_add(1, Ordering::SeqCst);
+                    TestResponse::json(200, r#"{"ticket":"retry"}"#)
+                }
+                "/api/games/7/download?ticket=retry" if auth == "Bearer stale-token" => {
+                    TestResponse::text(401, "expired")
+                }
+                "/api/games/7/download?ticket=retry" if auth == "Bearer fresh-token" => {
+                    fresh_count_for_server.fetch_add(1, Ordering::SeqCst);
+                    TestResponse::text(200, "ok")
+                }
+                "/connect/token" => TestResponse::json(
+                    200,
+                    r#"{"access_token":"fresh-token","refresh_token":"fresh-refresh"}"#,
+                ),
+                _ => TestResponse::text(404, "missing"),
+            }
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("download-refresh"), || async {
+            let settings = download_settings(server.url());
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "stale-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let control = InstallControl::new();
+            let temp_root = crate::settings::temp_dir().join("download-refresh");
+            fs::create_dir_all(&temp_root).expect("temp root should exist");
+
+            let download = download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: None,
+                    progress_scale: 100.0,
+                },
+                7,
+                "Game",
+                &temp_root,
+                &control,
+                |_| {},
+                || Ok(()),
+            )
+            .await
+            .expect("download should succeed after refresh");
+
+            assert_eq!(
+                fs::read(&download.file_path).expect("downloaded file should exist"),
+                b"ok"
+            );
+            assert_eq!(fresh_count.load(Ordering::SeqCst), 2);
+            let stored = crate::auth::load_tokens(&settings)
+                .expect("tokens should load")
+                .expect("tokens should exist");
+            assert_eq!(stored.access_token, "fresh-token");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn download_package_with_cleans_temp_root_when_cancelled() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let server = TestServer::spawn(|request| match request.path.as_str() {
+            "/api/games/9/download-ticket" => TestResponse::json(200, r#"{"ticket":"cancel"}"#),
+            "/api/games/9/download?ticket=cancel" => TestResponse::text(200, "ok"),
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("download-cancel"), || async {
+            let settings = download_settings(server.url());
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let control = InstallControl::new();
+            control.set_cancelled(true);
+            let temp_root = crate::settings::temp_dir().join("download-cancel");
+            fs::create_dir_all(&temp_root).expect("temp root should exist");
+
+            let error = download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: None,
+                    progress_scale: 100.0,
+                },
+                9,
+                "Game",
+                &temp_root,
+                &control,
+                |_| {},
+                || Ok(()),
+            )
+            .await
+            .err()
+            .expect("cancelled download should fail");
+
+            assert_eq!(error, "Install cancelled.");
+            assert!(!temp_root.exists());
+        })
+        .await;
     }
 }

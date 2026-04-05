@@ -500,5 +500,6 @@ docs/.astro/
 .claude/
 
 # Rust
+/target/
 src/claudio-desktop/target/
 src/claudio-uninstaller/target/

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "src/claudio-desktop",
+  "src/claudio-uninstaller",
+  "tests/claudio-desktop",
+]
+resolver = "3"

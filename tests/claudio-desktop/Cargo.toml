@@ -1,0 +1,21 @@
+[package]
+name = "claudio-desktop-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+claudio-desktop = { path = "../../src/claudio-desktop", features = ["integration-tests"] }
+flate2 = "1"
+serde_json = "1"
+tar = "0.4"
+tempfile = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+serial_test = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"

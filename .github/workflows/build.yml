@@ -40,7 +40,10 @@ jobs:
             desktop:
               - "src/claudio-desktop/**"
               - "src/claudio-uninstaller/**"
+              - "tests/claudio-desktop/**"
               - "src/claudio-web/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
 
   web-image:
     needs: [detect-changes, web-tests]
@@ -138,8 +141,39 @@ jobs:
       - name: Run tests
         run: dotnet run --project tests/Claudio.Api.Tests --no-build
 
-  desktop:
+  desktop-tests:
     needs: detect-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Run desktop Rust tests
+        run: cargo test --workspace
+
+  desktop:
+    needs: [detect-changes, desktop-tests]
     if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop == 'true'
     permissions:
       contents: write
@@ -185,14 +219,13 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: src/claudio-desktop -> target
+          workspaces: . -> target
 
       - name: Build uninstaller (Windows)
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          cd src/claudio-uninstaller
-          cargo build --release --target ${{ matrix.uninstaller-target }}
+          cargo build --release -p claudio-uninstaller --target ${{ matrix.uninstaller-target }}
           mkdir -p target/release
           cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
 

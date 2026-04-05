@@ -150,8 +150,8 @@ fn schedule_self_delete(exe_path: &str) {
 fn delete_registry_key(key_name: &str) {
     #[cfg(target_os = "windows")]
     {
-        use winreg::enums::HKEY_CURRENT_USER;
         use winreg::RegKey;
+        use winreg::enums::HKEY_CURRENT_USER;
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let path = format!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{key_name}");
         let _ = hkcu.delete_subkey_all(path);

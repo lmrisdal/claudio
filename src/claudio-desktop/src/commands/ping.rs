@@ -15,3 +15,16 @@ pub fn ping() -> PingResponse {
         platform: std::env::consts::OS.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ping_returns_current_platform_and_version() {
+        let response = ping();
+
+        assert_eq!(response.platform, std::env::consts::OS);
+        assert_eq!(response.version, version::display_version());
+    }
+}

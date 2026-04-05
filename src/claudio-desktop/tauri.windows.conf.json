@@ -1,7 +1,7 @@
 {
   "bundle": {
     "resources": {
-      "../claudio-uninstaller/target/release/claudio-game-uninstaller.exe": "claudio-game-uninstaller.exe"
+      "../../target/release/claudio-game-uninstaller.exe": "claudio-game-uninstaller.exe"
     }
   }
 }

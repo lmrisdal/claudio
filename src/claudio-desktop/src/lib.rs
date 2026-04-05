@@ -1,10 +1,14 @@
 mod auth;
 mod commands;
+#[cfg(feature = "integration-tests")]
+pub mod integration_test_api;
 mod models;
 mod protocol;
 mod registry;
 mod services;
 mod settings;
+#[cfg(any(test, feature = "integration-tests"))]
+mod test_support;
 mod version;
 #[cfg(target_os = "windows")]
 mod windows_integration;
