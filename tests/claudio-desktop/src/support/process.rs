@@ -14,8 +14,8 @@ pub fn spawn_long_running_process() -> Child {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("sh")
-            .args(["-c", "sleep 30"])
+        Command::new("sleep")
+            .arg("30")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())

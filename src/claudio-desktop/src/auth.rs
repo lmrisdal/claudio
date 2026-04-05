@@ -83,16 +83,16 @@ impl TestAuthGuard {
     pub(crate) fn plain_file_secure_storage_unavailable() -> Self {
         let lock = TEST_AUTH_OVERRIDE_LOCK
             .lock()
-            .expect("auth override lock should not be poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         cache_tokens(None);
         clear_secure_storage_dialog_state();
         *TEST_STORAGE_BACKEND_OVERRIDE
             .write()
-            .expect("storage backend override lock should not be poisoned") =
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
             Some(AuthStorageBackend::PlainFile);
         *TEST_PROBE_SECURE_STORAGE_OVERRIDE
             .write()
-            .expect("secure storage override lock should not be poisoned") =
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
             Some(Err("Secure storage unavailable: test".to_string()));
         Self { _lock: lock }
     }

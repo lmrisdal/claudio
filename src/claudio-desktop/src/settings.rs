@@ -190,13 +190,13 @@ impl TestDataDirGuard {
     fn new(path: PathBuf) -> Self {
         let lock = TEST_DATA_DIR_LOCK
             .lock()
-            .expect("test data dir lock should not be poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("test data dir should be created");
 
         let mut override_path = DATA_DIR_OVERRIDE
             .lock()
-            .expect("data dir override lock should not be poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         *override_path = Some(path.clone());
         drop(override_path);
 

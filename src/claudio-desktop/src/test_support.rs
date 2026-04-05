@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -65,8 +66,10 @@ impl TestServer {
         let requests_for_thread = requests.clone();
         let stop_for_thread = stop.clone();
         let handler = Arc::new(handler);
+        let (ready_tx, ready_rx) = mpsc::channel();
 
         let handle = thread::spawn(move || {
+            let _ = ready_tx.send(());
             while !stop_for_thread.load(Ordering::SeqCst) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
@@ -85,6 +88,18 @@ impl TestServer {
                 }
             }
         });
+
+        ready_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("test server thread should start");
+
+        let address_string = address.to_string();
+        for _ in 0..50 {
+            if TcpStream::connect(&address_string).is_ok() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
 
         Self {
             url,
