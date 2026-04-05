@@ -14,8 +14,10 @@ mod version;
 mod windows_integration;
 
 #[cfg(target_os = "macos")]
+use tauri::menu::AboutMetadataBuilder;
+#[cfg(target_os = "macos")]
 use tauri::menu::SubmenuBuilder;
-use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder};
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};

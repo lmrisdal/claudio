@@ -169,11 +169,14 @@ fn kill_process_tree(pid: u32) -> Result<(), String> {
             .stderr(Stdio::null())
             .status();
 
-        if is_process_running(pid) {
-            Err(format!("Failed to stop game process (PID {pid})."))
-        } else {
-            Ok(())
+        for _ in 0..12 {
+            if !is_process_running(pid) {
+                return Ok(());
+            }
+            thread::sleep(Duration::from_millis(100));
         }
+
+        Err(format!("Failed to stop game process (PID {pid})."))
     }
 }
 
