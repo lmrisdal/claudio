@@ -13,6 +13,16 @@ fn main() {
 fn build_uninstaller() {
     let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let uninstaller_dir = manifest_dir.join("../claudio-uninstaller");
+    let bundled_uninstaller =
+        manifest_dir.join("../../target/release/claudio-game-uninstaller.exe");
+
+    println!("cargo:rerun-if-env-changed=CLAUDIO_SKIP_UNINSTALLER_BUILD");
+    println!("cargo:rerun-if-changed=../../target/release/claudio-game-uninstaller.exe");
+
+    if std::env::var_os("CLAUDIO_SKIP_UNINSTALLER_BUILD").is_some() && bundled_uninstaller.exists()
+    {
+        return;
+    }
 
     let status = std::process::Command::new("cargo")
         .args(["build", "--release"])
@@ -27,5 +37,4 @@ fn build_uninstaller() {
     // Tell Cargo to re-run this if the uninstaller source changes.
     println!("cargo:rerun-if-changed=../claudio-uninstaller/src/main.rs");
     println!("cargo:rerun-if-changed=../claudio-uninstaller/Cargo.toml");
-    println!("cargo:rerun-if-changed=../../target/release/claudio-game-uninstaller.exe");
 }

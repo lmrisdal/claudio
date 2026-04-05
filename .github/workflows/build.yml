@@ -19,7 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.filter.outputs.web }}
-      desktop: ${{ steps.filter.outputs.desktop }}
+      desktop-tests: ${{ steps.filter.outputs.desktop-tests }}
+      desktop-build: ${{ steps.filter.outputs.desktop-build }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,10 +38,16 @@ jobs:
               - "Directory.Build.props"
               - "Directory.Packages.props"
               - "Claudio.slnx"
-            desktop:
+            desktop-tests:
               - "src/claudio-desktop/**"
               - "src/claudio-uninstaller/**"
               - "tests/claudio-desktop/**"
+              - "src/claudio-web/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+            desktop-build:
+              - "src/claudio-desktop/**"
+              - "src/claudio-uninstaller/**"
               - "src/claudio-web/**"
               - "Cargo.toml"
               - "Cargo.lock"
@@ -143,7 +150,7 @@ jobs:
 
   desktop-tests:
     needs: detect-changes
-    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop == 'true'
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-tests == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -182,7 +189,7 @@ jobs:
 
   desktop:
     needs: [detect-changes, desktop-tests]
-    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop == 'true'
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true'
     permissions:
       contents: write
     env:
@@ -249,6 +256,7 @@ jobs:
 
       - uses: tauri-apps/tauri-action@v0
         env:
+          CLAUDIO_SKIP_UNINSTALLER_BUILD: ${{ matrix.platform == 'windows-latest' && '1' || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
