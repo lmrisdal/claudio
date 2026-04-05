@@ -94,9 +94,7 @@ export default function GameDetail() {
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
   const [defaultInstallPath, setDefaultInstallPath] = useState("");
   const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
-  const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(
-    null,
-  );
+  const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(null);
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
   const [aboutNeedsExpand, setAboutNeedsExpand] = useState(false);

@@ -74,6 +74,10 @@ export default function SettingsDialog({
   const signOutIndex = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0);
   const sidebarCount =
     visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (canSignOut ? 1 : 0);
+  const appVersionLabel =
+    appVersion && /^\d+\.\d+\.\d+([-.+][0-9A-Za-z.-]+)?$/.test(appVersion)
+      ? `v${appVersion}`
+      : appVersion;
 
   useEffect(() => {
     if (!open) return;
@@ -490,7 +494,9 @@ export default function SettingsDialog({
 
           {hasCheckForUpdatesButton && (
             <div className="mx-5 mb-2 hidden sm:block">
-              {appVersion && <div className="px-3 py-1 text-xs text-text-muted">v{appVersion}</div>}
+              {appVersionLabel && (
+                <div className="px-3 py-1 text-xs text-text-muted">{appVersionLabel}</div>
+              )}
               <button
                 ref={(element) => {
                   sidebarReferences.current[checkForUpdatesIndex] = element;

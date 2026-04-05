@@ -5,17 +5,20 @@ mod protocol;
 mod registry;
 mod services;
 mod settings;
+mod version;
 #[cfg(target_os = "windows")]
 mod windows_integration;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::SubmenuBuilder;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};
 
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
+#[cfg(target_os = "macos")]
+const ABOUT_ICON_PNG: &[u8] = include_bytes!("../icons/icon.png");
 
 #[cfg(target_os = "macos")]
 fn set_dock_visibility(app: &AppHandle, visible: bool) {
@@ -47,7 +50,15 @@ fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
     let check_updates_item =
         MenuItemBuilder::with_id("check-updates", "Check for Updates...").build(app)?;
 
-    let mut app_submenu = SubmenuBuilder::new(app, "Claudio").about(None).separator();
+    let about_icon = tauri::image::Image::from_bytes(ABOUT_ICON_PNG)?;
+    let about_metadata = AboutMetadataBuilder::new()
+        .version(Some(version::display_version()))
+        .icon(Some(about_icon))
+        .build();
+
+    let mut app_submenu = SubmenuBuilder::new(app, "Claudio")
+        .about(Some(about_metadata))
+        .separator();
     if logged_in {
         app_submenu = app_submenu.item(&settings_item);
     }
