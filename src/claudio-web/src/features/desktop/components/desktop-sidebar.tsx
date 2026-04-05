@@ -51,7 +51,10 @@ export default function DesktopSidebar() {
     queryFn: listInstalledGames,
     refetchInterval: 30_000,
   });
-  const { activeDownloads, cancelDownload } = useDownloadManager();
+  const { activeDownloads: allActiveDownloads, cancelDownload } = useDownloadManager();
+  const activeDownloads = new Map(
+    [...allActiveDownloads].filter(([, entry]) => entry.kind === "install"),
+  );
 
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, String(collapsed));

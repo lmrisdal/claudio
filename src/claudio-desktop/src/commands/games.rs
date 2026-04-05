@@ -1,4 +1,4 @@
-use crate::models::{InstalledGame, RemoteGame, RunningGameInfo};
+use crate::models::{DownloadPackageInput, InstalledGame, RemoteGame, RunningGameInfo};
 use crate::services::game_install::{self, InstallState};
 use crate::services::game_runtime::{self, RunningGamesState};
 use tauri::{AppHandle, State};
@@ -10,6 +10,15 @@ pub async fn install_game(
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
     game_install::install_game(app, state, game).await
+}
+
+#[tauri::command]
+pub async fn download_game_package(
+    app: AppHandle,
+    state: State<'_, InstallState>,
+    input: DownloadPackageInput,
+) -> Result<String, String> {
+    game_install::download_game_package(app, state, input).await
 }
 
 #[tauri::command]

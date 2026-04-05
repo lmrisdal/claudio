@@ -142,6 +142,7 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             commands::games::cancel_install,
+            commands::games::download_game_package,
             commands::games::get_installed_game,
             commands::games::install_game,
             commands::games::launch_game,

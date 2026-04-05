@@ -70,6 +70,15 @@ pub struct InstallProgress {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DownloadPackageInput {
+    pub id: i32,
+    pub title: String,
+    pub target_dir: String,
+    pub extract: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RunningGameInfo {
     pub game_id: i32,
     pub pid: u32,

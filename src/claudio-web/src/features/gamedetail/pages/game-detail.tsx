@@ -72,8 +72,13 @@ export default function GameDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isDesktop, getInstalledGame: getDesktopInstalledGame } = useDesktop();
-  const { startDownload, getProgress, cancelDownload, restartDownloadInteractive } =
-    useDownloadManager();
+  const {
+    startDownload,
+    startPackageDownload,
+    getProgress,
+    cancelDownload,
+    restartDownloadInteractive,
+  } = useDownloadManager();
   const [pickExeOpen, setPickExeOpen] = useState(false);
   const [pickExeOptions, setPickExeOptions] = useState<string[]>([]);
   const [playContextMenu, setPlayContextMenu] = useState<{
@@ -88,6 +93,10 @@ export default function GameDetail() {
   const [installError, setInstallError] = useState<string | null>(null);
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
   const [defaultInstallPath, setDefaultInstallPath] = useState("");
+  const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
+  const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
   const [aboutNeedsExpand, setAboutNeedsExpand] = useState(false);
@@ -264,7 +273,10 @@ export default function GameDetail() {
     };
   }, [game, installedGame]);
 
-  const isDesktopPcGame = isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
+  const isDesktopPcGame =
+    isDesktop && !isMac && !!displayGame && isPcPlatform(displayGame.platform);
+  const isDesktopPcDownload =
+    isDesktop && isMac && !!displayGame && isPcPlatform(displayGame.platform);
   const isGameRunning =
     !!displayGame && runningGames.some((runningGame) => runningGame.gameId === displayGame.id);
 
@@ -317,6 +329,38 @@ export default function GameDetail() {
           : error instanceof Error
             ? error.message
             : "Installation failed unexpectedly. Please try again.";
+      if (message.toLowerCase().includes("cancel")) return;
+      setInstallError(message);
+    },
+  });
+
+  const packageDownloadMutation = useMutation({
+    mutationFn: async (input: { targetDir: string; extract: boolean }) => {
+      if (!displayGame) throw new Error("No game loaded.");
+      return startPackageDownload(
+        {
+          id: displayGame.id,
+          title: displayGame.title,
+          targetDir: input.targetDir,
+          extract: input.extract,
+        },
+        {
+          id: displayGame.id,
+          title: displayGame.title,
+          platform: displayGame.platform,
+        },
+      );
+    },
+    onMutate: () => {
+      setInstallError(null);
+    },
+    onError: (error: unknown) => {
+      const message =
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Download failed unexpectedly. Please try again.";
       if (message.toLowerCase().includes("cancel")) return;
       setInstallError(message);
     },
@@ -1608,17 +1652,15 @@ export default function GameDetail() {
                           type="button"
                           data-nav
                           disabled={
-                            (isMac && displayGame.installType === "installer") ||
                             installMutation.isPending ||
                             hasActiveInstallProgress ||
                             isInstalledGameLoading
                           }
                           onClick={handleInstallClick}
-                          title={
-                            isMac && displayGame.installType === "installer"
-                              ? "Installer-based games are only available on Windows and Linux"
-                              : undefined
-                          }
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setInstallButtonMenu({ x: e.clientX, y: e.clientY });
+                          }}
                           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                         >
                           <svg
@@ -1683,6 +1725,75 @@ export default function GameDetail() {
                         )}
                       </div>
                     )
+                  ) : isDesktopPcDownload ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        data-nav
+                        disabled={packageDownloadMutation.isPending || hasActiveInstallProgress}
+                        onClick={handleInstallClick}
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                      >
+                        <svg
+                          className={`h-4 w-4 ${packageDownloadMutation.isPending || hasActiveInstallProgress ? "animate-spin" : ""}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.25}
+                        >
+                          {packageDownloadMutation.isPending || hasActiveInstallProgress ? (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364 6.364-2.121-2.121M8.757 8.757 6.636 6.636m10.728 0-2.121 2.121M8.757 15.243l-2.121 2.121"
+                            />
+                          ) : (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                            />
+                          )}
+                        </svg>
+                        {hasActiveInstallProgress
+                          ? installProgress?.status === "stopping"
+                            ? (installProgress.detail ?? "Stopping download...")
+                            : installProgress?.status === "extracting"
+                              ? typeof installProgress?.percent === "number"
+                                ? `Extracting ${Math.round(installProgress.percent)}%`
+                                : "Extracting..."
+                              : typeof installProgress?.percent === "number"
+                                ? `Downloading ${Math.round(installProgress.percent)}%`
+                                : "Downloading..."
+                          : packageDownloadMutation.isPending
+                            ? "Starting download…"
+                            : "Download"}
+                      </button>
+                      {(packageDownloadMutation.isPending || hasActiveInstallProgress) && (
+                        <button
+                          type="button"
+                          data-nav
+                          onClick={() => void cancelDownload(displayGame.id)}
+                          aria-label="Cancel download"
+                          disabled={installProgress?.status === "stopping"}
+                          className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-3 text-sm text-text-secondary transition hover:border-red-400 hover:text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.25}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18 18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <DownloadButton gameId={displayGame.id} size={displayGame.sizeBytes} />
                   )}
@@ -1705,9 +1816,30 @@ export default function GameDetail() {
                   installerPath={
                     displayGame.installType === "installer" ? displayGame.installerExe : undefined
                   }
-                  onClose={() => setShowInstallConfirm(false)}
-                  onConfirm={(path, exe, desktopShortcut, runAsAdministrator, forceInteractive) => {
+                  downloadMode={isDesktopPcDownload || installerDownloadOverride}
+                  onClose={() => {
                     setShowInstallConfirm(false);
+                    setInstallerDownloadOverride(false);
+                  }}
+                  onConfirm={(
+                    path,
+                    exe,
+                    desktopShortcut,
+                    runAsAdministrator,
+                    forceInteractive,
+                    extract,
+                  ) => {
+                    const isDownloadFlow = isDesktopPcDownload || installerDownloadOverride;
+                    setShowInstallConfirm(false);
+                    setInstallerDownloadOverride(false);
+                    if (isDownloadFlow) {
+                      if (!path) {
+                        setInstallError("Please choose a download location.");
+                        return;
+                      }
+                      packageDownloadMutation.mutate({ targetDir: path, extract: extract ?? true });
+                      return;
+                    }
                     // game and displayGame are guaranteed non-null here due to the guard clause
                     installMutation.mutate({
                       ...game!,
@@ -1720,6 +1852,35 @@ export default function GameDetail() {
                     });
                   }}
                 />
+
+                {installButtonMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setInstallButtonMenu(null)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setInstallButtonMenu(null);
+                      }}
+                    />
+                    <div
+                      className="fixed z-50 min-w-48 rounded-lg border border-border bg-surface shadow-xl py-1"
+                      style={{ left: installButtonMenu.x, top: installButtonMenu.y }}
+                    >
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-raised transition"
+                        onClick={() => {
+                          setInstallButtonMenu(null);
+                          setInstallerDownloadOverride(true);
+                          void handleInstallClick();
+                        }}
+                      >
+                        Download installer
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
 

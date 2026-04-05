@@ -34,6 +34,13 @@ interface PingResponse {
   platform: string;
 }
 
+interface DownloadPackageInput {
+  id: number;
+  title: string;
+  targetDir: string;
+  extract: boolean;
+}
+
 interface DesktopInstallGameInput {
   id: number;
   title: string;
@@ -140,6 +147,10 @@ export async function installGame(game: DesktopInstallGameInput): Promise<Instal
   return invoke<InstalledGame>("install_game", { game });
 }
 
+export async function downloadGamePackage(input: DownloadPackageInput): Promise<string> {
+  return invoke<string>("download_game_package", { input });
+}
+
 export async function resolveInstallPath(gameTitle: string): Promise<string> {
   return invoke<string>("resolve_install_path", { gameTitle });
 }
@@ -218,6 +229,7 @@ export function useDesktop() {
 
 export type {
   DesktopInstallGameInput,
+  DownloadPackageInput,
   DesktopSession,
   DesktopSettings,
   InstalledGame,

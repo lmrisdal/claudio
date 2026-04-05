@@ -21,6 +21,7 @@ interface InstallDialogProperties {
   exeLabel?: string;
   exeOptions?: string[];
   installerPath?: string;
+  downloadMode?: boolean;
   onClose: () => void;
   onConfirm: (
     path: string | undefined,
@@ -28,6 +29,7 @@ interface InstallDialogProperties {
     desktopShortcut?: boolean,
     runAsAdministrator?: boolean,
     forceInteractive?: boolean,
+    extract?: boolean,
   ) => void;
 }
 
@@ -40,6 +42,7 @@ export default function InstallDialog({
   exeLabel,
   exeOptions = [],
   installerPath,
+  downloadMode = false,
   onClose,
   onConfirm,
 }: InstallDialogProperties) {
@@ -50,6 +53,7 @@ export default function InstallDialog({
     Record<string, boolean>
   >({});
   const [forceInteractive, setForceInteractive] = useState(false);
+  const [extract, setExtract] = useState(true);
 
   const showExePicker = exeLabel !== undefined && exeOptions.length > 0;
   const canInstall = !showExePicker || exe !== "";
@@ -70,7 +74,7 @@ export default function InstallDialog({
       api.get<InstallerInspection>(
         `/games/${gameId}/installer-inspection?path=${encodeURIComponent(effectiveInstallerPath!)}`,
       ),
-    enabled: open && !isPortable && !!effectiveInstallerPath,
+    enabled: open && !downloadMode && !isPortable && !!effectiveInstallerPath,
   });
   const effectiveInstallerKey = effectiveInstallerPath ?? "";
   const requiresAdministrator =
@@ -137,14 +141,18 @@ export default function InstallDialog({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold">Install {title}</h3>
+              <h3 className="text-lg font-semibold">
+                {downloadMode ? "Download" : "Install"} {title}
+              </h3>
               <p className="text-sm text-text-secondary mt-1">
-                Choose where you want to install this game.
+                {downloadMode
+                  ? "Choose where you want to download this game."
+                  : "Choose where you want to install this game."}
               </p>
 
               <div className="mt-4">
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  Install Location
+                  {downloadMode ? "Download Location" : "Install Location"}
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -164,13 +172,30 @@ export default function InstallDialog({
                 </div>
               </div>
 
-              {showExePicker && (
+              {showExePicker && !downloadMode && (
                 <div className="mt-4">
                   <ExeListbox label={exeLabel} value={exe} onChange={setExe} options={exeOptions} />
                 </div>
               )}
 
-              {isPortable && isWindows && (
+              {downloadMode && (
+                <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
+                  <input
+                    type="checkbox"
+                    checked={extract}
+                    onChange={(e) => setExtract(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
+                  />
+                  <div>
+                    <span className="text-sm text-text-primary">Extract downloaded archive</span>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Unpack the archive into the chosen folder after downloading.
+                    </p>
+                  </div>
+                </label>
+              )}
+
+              {!downloadMode && isPortable && isWindows && (
                 <label className="mt-4 flex items-center gap-2.5 cursor-pointer select-none w-fit">
                   <input
                     type="checkbox"
@@ -182,7 +207,7 @@ export default function InstallDialog({
                 </label>
               )}
 
-              {isPortable ? null : (
+              {downloadMode || isPortable ? null : (
                 <>
                   <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
                     <input
@@ -266,15 +291,16 @@ export default function InstallDialog({
                 onConfirm(
                   installPath || undefined,
                   exe || undefined,
-                  isPortable ? desktopShortcut : undefined,
-                  isPortable ? undefined : runAsAdministrator,
-                  isPortable ? undefined : forceInteractive,
+                  downloadMode || !isPortable ? undefined : desktopShortcut,
+                  downloadMode || isPortable ? undefined : runAsAdministrator,
+                  downloadMode || isPortable ? undefined : forceInteractive,
+                  downloadMode ? extract : undefined,
                 )
               }
-              disabled={!canInstall}
+              disabled={downloadMode ? false : !canInstall}
               className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-neutral-950 hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
-              Install
+              {downloadMode ? "Download" : "Install"}
             </button>
           </div>
         </DialogPanel>

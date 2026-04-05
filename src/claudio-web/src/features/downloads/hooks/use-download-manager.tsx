@@ -2,11 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   cancelInstall,
+  downloadGamePackage,
   installGame,
   isDesktop,
   listenToInstallProgress,
   restartInstallInteractive,
   type DesktopInstallGameInput,
+  type DownloadPackageInput,
   type InstalledGame,
   type InstallProgress,
 } from "../../desktop/hooks/use-desktop";
@@ -133,6 +135,7 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
               game,
               progress: { gameId: game.id, status: "starting", percent: 0 },
               speedBps: null,
+              kind: "install",
             },
           ],
         ]);
@@ -155,6 +158,55 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
           return next;
         });
         speedState.current.delete(game.id);
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const startPackageDownload = useCallback(
+    async (
+      input: DownloadPackageInput,
+      game: Pick<DesktopInstallGameInput, "id" | "title" | "platform">,
+    ): Promise<string> => {
+      const stub: DesktopInstallGameInput = {
+        id: game.id,
+        title: game.title,
+        platform: game.platform,
+        installType: "portable",
+      };
+      setActiveDownloads((previous) => {
+        const next = new Map([
+          ...previous,
+          [
+            input.id,
+            {
+              game: stub,
+              progress: { gameId: input.id, status: "starting", percent: 0 },
+              speedBps: null,
+              kind: "package",
+            },
+          ],
+        ]);
+        return next;
+      });
+
+      try {
+        const result = await downloadGamePackage(input);
+        setActiveDownloads((previous) => {
+          const next = new Map(previous);
+          next.delete(input.id);
+          return next;
+        });
+        speedState.current.delete(input.id);
+        return result;
+      } catch (error) {
+        setActiveDownloads((previous) => {
+          const next = new Map(previous);
+          next.delete(input.id);
+          return next;
+        });
+        speedState.current.delete(input.id);
         throw error;
       }
     },
@@ -216,6 +268,7 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     activeDownloads,
     activeCount: activeDownloads.size,
     startDownload,
+    startPackageDownload,
     getProgress,
     cancelDownload,
     restartDownloadInteractive,
