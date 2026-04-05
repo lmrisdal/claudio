@@ -24,6 +24,13 @@ npx tsc --noEmit                          # type-check without emitting
 npm run lint                              # ESLint
 ```
 
+### Desktop (Tauri)
+
+```bash
+./scripts/check-windows-xwin.sh           # cross-check Windows desktop + uninstaller via cargo-xwin
+./scripts/build-windows-xwin.sh           # cross-build Windows desktop + uninstaller via cargo-xwin
+```
+
 ### EF Core Migrations
 
 ```bash

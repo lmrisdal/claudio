@@ -233,6 +233,23 @@ npm run dev
 
 The Vite dev server runs on port 5173 and proxies API requests to the backend on port 5118.
 
+### Desktop Windows Cross-Check From macOS/Linux
+
+For faster local Windows-target validation without changing the release target, install `cargo-xwin` once:
+
+```bash
+cargo install cargo-xwin
+```
+
+Then run either of these from the repo root:
+
+```bash
+./scripts/check-windows-xwin.sh
+./scripts/build-windows-xwin.sh
+```
+
+These scripts cross-check or cross-build the Windows desktop app and bundled uninstaller for `x86_64-pc-windows-msvc`. They do not replace the real Windows packaging/release flow, which still runs on Windows for NSIS/updater artifacts.
+
 ### Desktop release versioning
 
 Use a single Makefile helper to bump desktop version, commit, and tag in one step:

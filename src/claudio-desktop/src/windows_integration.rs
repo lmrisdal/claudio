@@ -2,25 +2,25 @@ use crate::models::{InstallType, InstalledGame};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
-use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+use winreg::RegKey;
 
-use windows::Win32::Foundation::{CloseHandle, HANDLE, SYNCHRONIZE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::core::Interface;
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Media::Audio::{
-    IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDeviceEnumerator,
-    ISimpleAudioVolume, MMDeviceEnumerator, eConsole, eRender,
+    eConsole, eRender, IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2,
+    IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
 };
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
-use windows::core::Interface;
 
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
 };
 use windows::Win32::System::Threading::{
-    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
-    TerminateProcess, WaitForSingleObject,
+    OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_QUERY_LIMITED_INFORMATION,
+    PROCESS_TERMINATE,
 };
 
 const UNINSTALL_ROOT: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
@@ -90,42 +90,10 @@ pub fn terminate_tracked_processes(
     Ok(())
 }
 
-pub fn is_process_running(pid: u32) -> bool {
-    with_process_handle(
-        pid,
-        PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
-        |handle| unsafe { WaitForSingleObject(handle, 0) == WAIT_TIMEOUT },
-    )
-    .unwrap_or(false)
-}
-
-pub fn process_exit_code(pid: u32) -> Result<Option<u32>, String> {
-    match with_process_handle(
-        pid,
-        PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
-        |handle| unsafe {
-            match WaitForSingleObject(handle, 0) {
-                WAIT_TIMEOUT => Ok(None),
-                WAIT_OBJECT_0 => {
-                    let mut code = 0u32;
-                    GetExitCodeProcess(handle, &mut code).map_err(|error| error.to_string())?;
-                    Ok(Some(code))
-                }
-                other => Err(format!(
-                    "WaitForSingleObject returned unexpected status {other:?}"
-                )),
-            }
-        },
-    ) {
-        Some(result) => result,
-        None => Ok(Some(0)),
-    }
-}
-
 fn terminate_process(pid: u32) {
     let result = with_process_handle(
         pid,
-        PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+        PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
         |handle| unsafe {
             let _ = TerminateProcess(handle, 1);
             let _ = WaitForSingleObject(handle, 2_000);
