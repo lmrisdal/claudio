@@ -53,9 +53,6 @@ pub struct TestServer {
 impl TestServer {
     pub fn spawn(handler: impl Fn(TestRequest) -> TestResponse + Send + Sync + 'static) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("test server should bind");
-        listener
-            .set_nonblocking(true)
-            .expect("test server should be nonblocking");
         let address = listener
             .local_addr()
             .expect("test server should have address");
@@ -69,6 +66,9 @@ impl TestServer {
             while !stop_for_thread.load(Ordering::SeqCst) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
+                        if stop_for_thread.load(Ordering::SeqCst) {
+                            break;
+                        }
                         if let Ok(request) = read_request(&mut stream) {
                             if let Ok(mut captured) = requests_for_thread.lock() {
                                 captured.push(request.clone());
@@ -77,14 +77,8 @@ impl TestServer {
                             let _ = write_response(&mut stream, response);
                         }
                     }
-                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(10));
-                    }
                     Err(_) => {
-                        if stop_for_thread.load(Ordering::SeqCst) {
-                            break;
-                        }
-                        thread::sleep(Duration::from_millis(10));
+                        break;
                     }
                 }
             }

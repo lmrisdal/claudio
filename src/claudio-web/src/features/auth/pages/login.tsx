@@ -2,15 +2,35 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { resolveServerUrl } from "../../core/api/client";
 import Logo from "../../core/components/logo";
+import { useServerStatus } from "../../core/hooks/use-server-status";
 import { getSettings, isDesktop, updateSettings } from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
 
 const secureStorageErrorPrefix = "Secure storage unavailable:";
 
+function getDesktopConnectionMessage(serverUrl: string | null): string {
+  if (serverUrl && serverUrl !== "Not configured" && serverUrl !== "Unavailable") {
+    return `Can't connect to the Claudio server at ${serverUrl}. Check that the server is running and the URL is correct.`;
+  }
+
+  return "Can't connect to the Claudio server. Check that the server URL is configured and the server is running.";
+}
+
+function toLoginErrorMessage(error_: unknown, connectionMessage: string): string {
+  const message = error_ instanceof Error ? error_.message : "";
+
+  if (message.startsWith(secureStorageErrorPrefix)) {
+    return message;
+  }
+
+  return connectionMessage || message || "Login failed";
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, providers } = useAuth();
+  const { isConnected } = useServerStatus();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,6 +38,8 @@ export default function Login() {
   const [fallbackLoading, setFallbackLoading] = useState(false);
   const [providerLoading, setProviderLoading] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const connectionMessage = isDesktop && !isConnected ? getDesktopConnectionMessage(serverUrl) : "";
+  const displayedError = error || connectionMessage;
   const canUseInsecureFallback = isDesktop && error.startsWith(secureStorageErrorPrefix);
 
   useEffect(() => {
@@ -61,7 +83,7 @@ export default function Login() {
       await login(username, password);
       void navigate("/");
     } catch (error_) {
-      setError(error_ instanceof Error ? error_.message : "Login failed");
+      setError(toLoginErrorMessage(error_, connectionMessage));
     } finally {
       setLoading(false);
     }
@@ -77,7 +99,7 @@ export default function Login() {
       await login(username, password);
       void navigate("/");
     } catch (error_) {
-      setError(error_ instanceof Error ? error_.message : "Login failed");
+      setError(toLoginErrorMessage(error_, connectionMessage));
     } finally {
       setFallbackLoading(false);
     }
@@ -104,9 +126,9 @@ export default function Login() {
         </div>
 
         <div className="card bg-surface rounded-xl p-6 ring-1 ring-border">
-          {error && (
+          {displayedError && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5 mb-4">
-              <p className="text-red-400 text-sm">{error}</p>
+              <p className="text-red-400 text-sm">{displayedError}</p>
             </div>
           )}
 
@@ -173,10 +195,10 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                disabled={loading || providerLoading !== null}
+                disabled={loading || providerLoading !== null || Boolean(connectionMessage)}
                 className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-semibold py-2.5 rounded-lg transition text-sm mt-2"
               >
-                {loading ? "Signing in…" : "Sign in"}
+                {loading ? "Signing in…" : connectionMessage ? "Server unavailable" : "Sign in"}
               </button>
             </form>
           )}
@@ -195,9 +217,16 @@ export default function Login() {
                 <a
                   key={provider.slug}
                   href={resolveServerUrl(provider.startUrl)}
-                  onClick={() => setProviderLoading(provider.displayName)}
-                  aria-disabled={providerLoading !== null}
-                  className={`${providers.localLoginEnabled ? "mt-3 " : ""}flex not-last:mb-3 min-h-11 w-full items-center justify-center rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm font-semibold text-text-primary transition hover:border-accent/40 hover:bg-surface disabled:opacity-50`}
+                  onClick={(event) => {
+                    if (connectionMessage) {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    setProviderLoading(provider.displayName);
+                  }}
+                  aria-disabled={providerLoading !== null || Boolean(connectionMessage)}
+                  className={`${providers.localLoginEnabled ? "mt-3 " : ""}flex not-last:mb-3 min-h-11 w-full items-center justify-center rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm font-semibold text-text-primary transition hover:border-accent/40 hover:bg-surface ${connectionMessage ? "pointer-events-none opacity-50" : ""}`}
                 >
                   {provider.logoUrl ? (
                     <img
