@@ -1,5 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../core/components/header";
+import { sounds } from "../../core/utils/sounds";
+import {
+  DesktopShellNavigationContext,
+  type DesktopShellNavigationContextValue,
+} from "../hooks/use-desktop-shell-navigation";
 import DesktopSidebar, {
   COLLAPSED_KEY,
   COLLAPSED_WIDTH,
@@ -7,6 +12,18 @@ import DesktopSidebar, {
   HEADER_HEIGHT,
   WIDTH_KEY,
 } from "./desktop-sidebar";
+
+function isVisibleFocusableElement(element: HTMLElement) {
+  if (element.hasAttribute("disabled")) {
+    return false;
+  }
+
+  if (element.getAttribute("aria-hidden") === "true") {
+    return false;
+  }
+
+  return element.getClientRects().length > 0;
+}
 
 export default function DesktopLayoutInner({ children }: { children: React.ReactNode }) {
   const [marginLeft, setMarginLeft] = useState(() => {
@@ -16,6 +33,8 @@ export default function DesktopLayoutInner({ children }: { children: React.React
     return saved ? Number(saved) : DEFAULT_WIDTH;
   });
   const [animateMargin, setAnimateMargin] = useState(true);
+  const sidebarReference = useRef<HTMLElement>(null);
+  const contentReference = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onSidebarChanged(e: Event) {
@@ -33,11 +52,63 @@ export default function DesktopLayoutInner({ children }: { children: React.React
     return () => globalThis.removeEventListener("sidebar-collapse-changed", onSidebarChanged);
   }, []);
 
+  const focusSidebar = useCallback(() => {
+    const sidebar = sidebarReference.current;
+    if (!sidebar) {
+      return false;
+    }
+
+    const items = [...sidebar.querySelectorAll<HTMLElement>("[data-desktop-sidebar-nav]")].filter(
+      (element) => isVisibleFocusableElement(element),
+    );
+    if (items.length === 0) {
+      return false;
+    }
+
+    const target =
+      items.find((item) => item.dataset.desktopSidebarActive === "true") ??
+      items.find((item) => item === document.activeElement) ??
+      items[0];
+
+    target.focus({ focusVisible: true } as FocusOptions);
+    void sounds.navigate();
+    return true;
+  }, []);
+
+  const focusPage = useCallback(() => {
+    const content = contentReference.current;
+    if (!content) {
+      return false;
+    }
+
+    const items = [
+      ...content.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ].filter(
+      (element) =>
+        !Object.hasOwn(element.dataset, "desktopSidebarNav") && isVisibleFocusableElement(element),
+    );
+    if (items.length === 0) {
+      return false;
+    }
+
+    items[0].focus({ focusVisible: true } as FocusOptions);
+    void sounds.navigate();
+    return true;
+  }, []);
+
+  const navigationValue = useMemo<DesktopShellNavigationContextValue>(
+    () => ({ focusPage, focusSidebar }),
+    [focusPage, focusSidebar],
+  );
+
   return (
-    <>
-      <DesktopSidebar />
+    <DesktopShellNavigationContext.Provider value={navigationValue}>
+      <DesktopSidebar navigationReference={sidebarReference} />
       <Header />
       <div
+        ref={contentReference}
         style={{
           marginLeft,
           marginTop: HEADER_HEIGHT,
@@ -47,6 +118,6 @@ export default function DesktopLayoutInner({ children }: { children: React.React
       >
         {children}
       </div>
-    </>
+    </DesktopShellNavigationContext.Provider>
   );
 }

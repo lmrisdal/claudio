@@ -3,6 +3,7 @@ import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "../../core/api/client";
+import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isWindows } from "../../core/utils/os";
 import ExeListbox from "./exe-listbox";
 
@@ -46,6 +47,13 @@ export default function InstallDialog({
   onClose,
   onConfirm,
 }: InstallDialogProperties) {
+  useInputScope({
+    id: "install-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: open,
+  });
+
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
   const [desktopShortcut, setDesktopShortcut] = useState(true);

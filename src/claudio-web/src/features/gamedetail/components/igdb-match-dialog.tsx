@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { useInputScope } from "../../core/hooks/use-input-scope";
 import type { IgdbCandidate } from "../shared";
 
 interface IgdbMatchDialogProperties {
@@ -26,6 +27,13 @@ export default function IgdbMatchDialog({
   onSearch,
   onSelectCandidate,
 }: IgdbMatchDialogProperties) {
+  useInputScope({
+    id: "igdb-match-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: open,
+  });
+
   if (!open) {
     return null;
   }

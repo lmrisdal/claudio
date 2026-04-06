@@ -7,3 +7,17 @@ export function setIndexedRef<T>(
   next[index] = element;
   references.current = next;
 }
+
+export function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  return (
+    target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']") !== null
+  );
+}

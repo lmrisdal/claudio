@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { useInputScope } from "../../core/hooks/use-input-scope";
+import { useShortcut } from "../../core/hooks/use-shortcut";
 
 export default function SidebarContextMenu({
   x,
@@ -17,7 +19,15 @@ export default function SidebarContextMenu({
   onUninstall?: () => void;
   onCancelInstall?: () => void;
 }) {
+  useInputScope({
+    id: "sidebar-context-menu",
+    kind: "menu",
+    blocks: ["guide", "page-nav", "search"],
+  });
+
   const menuReference = useRef<HTMLDivElement>(null);
+
+  useShortcut("escape", () => onClose());
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -25,14 +35,9 @@ export default function SidebarContextMenu({
         onClose();
       }
     }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
     document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
     };
   }, [onClose]);
 

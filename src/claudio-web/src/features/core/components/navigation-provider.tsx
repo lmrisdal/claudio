@@ -3,6 +3,7 @@ import { useLocation } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { useGamepad } from "../hooks/use-gamepad";
 import { useGuide } from "../hooks/use-guide";
+import { useInputScopeState } from "../hooks/use-input-scope";
 import { NavigationContext } from "../hooks/use-navigation";
 import { useGamepadEvent, useShortcut } from "../hooks/use-shortcut";
 import { getShortcuts } from "../utils/shortcuts";
@@ -14,6 +15,7 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   const [searchOpen, setSearchOpen] = useState(false);
   const { isLoggedIn } = useAuth();
   const guide = useGuide();
+  const { isActionBlocked } = useInputScopeState();
   const location = useLocation();
 
   interface HistoryState {
@@ -51,6 +53,7 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   // Ctrl+K / Cmd+K toggles search (only when logged in)
   useShortcut("mod+k", (e) => {
     if (!isLoggedIn) return;
+    if (isActionBlocked("search")) return;
     e.preventDefault();
     toggleSearch();
   });
@@ -59,6 +62,7 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   useGamepadEvent("gamepad-search", () => {
     if (!isLoggedIn) return;
     if (document.body.dataset.emulatorActive) return;
+    if (isActionBlocked("search")) return;
     toggleSearch();
   });
 
@@ -75,6 +79,7 @@ export default function NavigationProvider({ children }: { children: ReactNode }
 
   useShortcut(guideKey, (e) => {
     if (!isLoggedIn) return;
+    if (isActionBlocked("guide")) return;
     e.preventDefault();
     guide.toggle();
   });
@@ -82,6 +87,7 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   // Gamepad guide button toggles the guide overlay (only when logged in)
   useGamepadEvent("gamepad-guide", () => {
     if (!isLoggedIn) return;
+    if (isActionBlocked("guide")) return;
     guide.toggle();
   });
 

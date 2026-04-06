@@ -6,19 +6,15 @@ const REPEAT_INTERVAL_START = 190;
 const REPEAT_INTERVAL_MIN = 70;
 const REPEAT_ACCEL = 0.83; // multiply interval by this each repeat
 
+export const GAMEPAD_NAV_UP_EVENT = "gamepad-nav-up";
+export const GAMEPAD_NAV_DOWN_EVENT = "gamepad-nav-down";
+export const GAMEPAD_NAV_LEFT_EVENT = "gamepad-nav-left";
+export const GAMEPAD_NAV_RIGHT_EVENT = "gamepad-nav-right";
+
 interface InputState {
   pressed: boolean;
   time: number;
   repeatCount: number;
-}
-
-// Set on gamepad-dispatched events so other handlers can skip their own throttle
-export let isGamepadEvent = false;
-const lastGamepadDispatchTimes: Record<string, number> = {};
-
-export function wasRecentlyDispatchedFromGamepad(key: string, withinMs = 250) {
-  const lastTime = lastGamepadDispatchTimes[key];
-  return typeof lastTime === "number" && performance.now() - lastTime <= withinMs;
 }
 
 export function useGamepad() {
@@ -26,6 +22,27 @@ export function useGamepad() {
 
   useEffect(() => {
     let rafId: number;
+
+    function dispatchDirectionalKey(key: string) {
+      if (document.body.dataset.emulatorActive) {
+        return;
+      }
+
+      if (document.activeElement instanceof HTMLIFrameElement) {
+        return;
+      }
+
+      const eventName =
+        key === "ArrowUp"
+          ? GAMEPAD_NAV_UP_EVENT
+          : key === "ArrowDown"
+            ? GAMEPAD_NAV_DOWN_EVENT
+            : key === "ArrowLeft"
+              ? GAMEPAD_NAV_LEFT_EVENT
+              : GAMEPAD_NAV_RIGHT_EVENT;
+
+      globalThis.dispatchEvent(new CustomEvent(eventName));
+    }
 
     function dispatchKey(key: string) {
       // Custom gamepad actions fire as window events
@@ -35,6 +52,11 @@ export function useGamepad() {
           return;
         }
         globalThis.dispatchEvent(new CustomEvent(key));
+        return;
+      }
+
+      if (key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight") {
+        dispatchDirectionalKey(key);
         return;
       }
 
@@ -54,10 +76,6 @@ export function useGamepad() {
         cancelable: true,
       };
 
-      // Flag so Library handler skips its own throttle
-      isGamepadEvent = true;
-      lastGamepadDispatchTimes[key] = performance.now();
-
       // Dispatch on active element (for React onKeyDown handlers)
       const target = document.activeElement ?? document.body;
       target.dispatchEvent(new KeyboardEvent("keydown", eventInit));
@@ -69,8 +87,6 @@ export function useGamepad() {
       if (key === "Enter" && document.activeElement instanceof HTMLElement) {
         document.activeElement.click();
       }
-
-      isGamepadEvent = false;
     }
 
     function handleInput(id: string, key: string, pressed: boolean, repeatable = true) {

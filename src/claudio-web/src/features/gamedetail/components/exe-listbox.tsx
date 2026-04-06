@@ -1,4 +1,6 @@
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
+import { useId } from "react";
+import { useGamepadDirectionalKeyBridge } from "../../core/hooks/use-gamepad-directional-key-bridge";
 
 export default function ExeListbox({
   label,
@@ -11,6 +13,9 @@ export default function ExeListbox({
   onChange: (v: string) => void;
   options: string[];
 }) {
+  const bridgeId = useId();
+  useGamepadDirectionalKeyBridge(bridgeId);
+
   return (
     <div>
       <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
@@ -18,7 +23,10 @@ export default function ExeListbox({
       </label>
       <Listbox value={value} onChange={onChange}>
         <div className="relative mt-1">
-          <ListboxButton className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:border-accent transition flex items-center justify-between gap-2">
+          <ListboxButton
+            data-gamepad-nav-bridge={bridgeId}
+            className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:border-accent transition flex items-center justify-between gap-2"
+          >
             <span className="truncate">{value || "None"}</span>
             <svg
               className="w-4 h-4 text-text-muted shrink-0"
@@ -36,10 +44,12 @@ export default function ExeListbox({
           </ListboxButton>
           <ListboxOptions
             anchor="bottom start"
+            data-gamepad-nav-bridge={bridgeId}
             className="z-20 w-(--button-width) max-h-48 overflow-auto rounded-lg bg-surface border border-border shadow-lg py-1 text-sm focus:outline-none"
           >
             <ListboxOption
               value=""
+              data-gamepad-nav-bridge={bridgeId}
               className="px-3 py-2 cursor-pointer data-focus:bg-surface-raised data-selected:text-accent transition-colors"
             >
               None
@@ -48,6 +58,7 @@ export default function ExeListbox({
               <ListboxOption
                 key={exe}
                 value={exe}
+                data-gamepad-nav-bridge={bridgeId}
                 className="px-3 py-2 cursor-pointer data-focus:bg-surface-raised data-selected:text-accent transition-colors truncate"
               >
                 {exe}

@@ -12,6 +12,7 @@
   --color-bg: var(--bg);
   --color-bg-blur: var(--bg-blur);
   --color-sidebar-blur: var(--sidebar-blur);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted-color);
@@ -43,6 +44,8 @@
   --text-secondary: #a0a0b0;
   --text-muted-color: #6b6b7b;
 
+  --sidebar-hover: rgba(255, 255, 255, 0.12);
+
   --settings-sidebar-bg: var(--surface-raised);
   --settings-sidebar-active-bg: var(--surface);
   --settings-sidebar-hover-bg: var(--surface);
@@ -70,6 +73,8 @@
   --text-primary: #1a1a2e;
   --text-secondary: #555566;
   --text-muted-color: #888899;
+
+  --sidebar-hover: rgba(0, 0, 0, 0.1);
 
   --settings-sidebar-bg: var(--surface);
   --settings-sidebar-active-bg: var(--surface-raised);

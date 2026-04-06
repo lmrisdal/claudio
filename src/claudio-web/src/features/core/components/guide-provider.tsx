@@ -9,18 +9,10 @@ export default function GuideProvider({ children }: { children: ReactNode }) {
   const [activeActions, setActiveActions] = useState<GuideActions | null>(null);
 
   const open = useCallback(() => {
-    globalThis.dispatchEvent(new CustomEvent("claudio:close-dialogs"));
     setIsOpen(true);
   }, []);
   const close = useCallback(() => setIsOpen(false), []);
-  const toggle = useCallback(
-    () =>
-      setIsOpen((previous) => {
-        if (!previous) globalThis.dispatchEvent(new CustomEvent("claudio:close-dialogs"));
-        return !previous;
-      }),
-    [],
-  );
+  const toggle = useCallback(() => setIsOpen((previous) => !previous), []);
 
   const register = useCallback((actions: GuideActions) => {
     setActiveActions(actions);

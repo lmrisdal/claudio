@@ -4,10 +4,12 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { api } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
+import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { isMac } from "../../core/utils/os";
 import { sounds } from "../../core/utils/sounds";
+import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import { useDesktop, type InstalledGame } from "../../desktop/hooks/use-desktop";
 import BrowseFilesDialog from "../components/browse-files-dialog";
 import GameDetailActions from "../components/game-detail-actions";
@@ -19,11 +21,19 @@ export default function GameDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isDesktop, getInstalledGame: getDesktopInstalledGame } = useDesktop();
+  const { focusSidebar } = useDesktopShellNavigation();
+  const { isActionBlocked } = useInputScopeState();
   const mainReference = useRef<HTMLElement>(null);
   const focusAnchorReference = useRef<HTMLDivElement>(null);
   const [browsePath, setBrowsePath] = useState<string | null>(null);
 
+  useInputScope({ id: "game-detail-page", kind: "page" });
+
   useShortcut("escape", () => {
+    if (isActionBlocked("page-nav")) {
+      return;
+    }
+
     if (browsePath !== null) {
       setBrowsePath(null);
       void sounds.back();
@@ -36,6 +46,7 @@ export default function GameDetail() {
 
   const handleMainKeyDown = useArrowNav(mainReference, {
     enabled: browsePath === null,
+    onExitLeft: focusSidebar,
   });
 
   const { data: game, isLoading } = useQuery({
@@ -146,6 +157,8 @@ export default function GameDetail() {
                 first.focus();
                 void sounds.navigate();
               }
+            } else if (event.key === "ArrowLeft" && focusSidebar()) {
+              event.preventDefault();
             }
           }}
         />
@@ -160,7 +173,7 @@ export default function GameDetail() {
           }}
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8] ${
             displayGame.heroUrl
-              ? "hero-glass-chip bg-black/30 text-white/85 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 hover:text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
+              ? "hero-glass-chip bg-black/30 dark:text-white/85 text-black/80 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 dark:hover:text-white hover:text-black shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
               : "text-text-muted hover:text-text-primary"
           }`}
         >

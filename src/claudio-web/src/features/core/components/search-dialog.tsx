@@ -1,11 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../api/client";
+import { useInputScope } from "../hooks/use-input-scope";
+import { GAMEPAD_NAV_DOWN_EVENT, GAMEPAD_NAV_UP_EVENT } from "../hooks/use-gamepad";
+import { useGamepadEvent, useKeydown } from "../hooks/use-shortcut";
 import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 
 export default function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useInputScope({
+    id: "search-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav"],
+    enabled: open,
+  });
+
   const [query, setQuery] = useState("");
   const inputReference = useRef<HTMLInputElement>(null);
   const listReference = useRef<HTMLDivElement>(null);
@@ -32,6 +42,19 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
   );
 
   const previousFocusReference = useRef<HTMLElement | null>(null);
+
+  const moveSelection = useCallback(
+    (direction: 1 | -1) => {
+      setSelectedIndex((index) => {
+        if (filtered.length === 0) {
+          return 0;
+        }
+
+        return Math.max(0, Math.min(index + direction, filtered.length - 1));
+      });
+    },
+    [filtered.length],
+  );
 
   const [previousOpen, setPreviousOpen] = useState(false);
   if (open !== previousOpen) {
@@ -73,9 +96,8 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
     }
   }, [selectedIndex]);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
+  useKeydown(
+    (e) => {
       switch (e.key) {
         case "Escape": {
           e.stopImmediatePropagation();
@@ -85,13 +107,13 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
         }
         case "ArrowDown": {
           e.preventDefault();
-          setSelectedIndex((index) => Math.min(index + 1, filtered.length - 1));
+          moveSelection(1);
 
           break;
         }
         case "ArrowUp": {
           e.preventDefault();
-          setSelectedIndex((index) => Math.max(index - 1, 0));
+          moveSelection(-1);
 
           break;
         }
@@ -103,10 +125,12 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
           }
         }
       }
-    }
-    globalThis.addEventListener("keydown", handleKeyDown);
-    return () => globalThis.removeEventListener("keydown", handleKeyDown);
-  }, [open, filtered, selectedIndex, navigate, onClose]);
+    },
+    { enabled: open },
+  );
+
+  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, () => moveSelection(1), open);
+  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, () => moveSelection(-1), open);
 
   if (!open) return null;
 

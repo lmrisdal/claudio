@@ -2,11 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "../../core/api/client";
-import { isGamepadEvent } from "../../core/hooks/use-gamepad";
+import {
+  GAMEPAD_NAV_DOWN_EVENT,
+  GAMEPAD_NAV_LEFT_EVENT,
+  GAMEPAD_NAV_RIGHT_EVENT,
+  GAMEPAD_NAV_UP_EVENT,
+} from "../../core/hooks/use-gamepad";
+import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
 import { useGamepadEvent } from "../../core/hooks/use-shortcut";
+import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game, TasksStatus } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 import { sounds } from "../../core/utils/sounds";
+import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import GameCard from "../components/game-card";
 
 let lastFocusedGameId: string | null = null;
@@ -27,6 +35,8 @@ function formatSize(bytes: number): string {
 
 export default function Library() {
   const navigate = useNavigate();
+  const { isActionBlocked } = useInputScopeState();
+  const { focusSidebar } = useDesktopShellNavigation();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem("library-platforms");
@@ -50,6 +60,24 @@ export default function Library() {
   );
   const [sortBy, setSortBy] = useState<"platform" | "title" | "year" | "size">("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  useInputScope({ id: "library-page", kind: "page" });
+  useInputScope({
+    id: "library-platform-dropdown",
+    kind: "menu",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: platformDropdownOpen,
+  });
+
+  useShortcut(
+    "escape",
+    (event) => {
+      event.preventDefault();
+      setPlatformDropdownOpen(false);
+      void sounds.back();
+    },
+    { enabled: platformDropdownOpen },
+  );
 
   function toggleSort(col: typeof sortBy) {
     if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -84,40 +112,7 @@ export default function Library() {
 
   const gridReference = useRef<HTMLDivElement>(null);
   const focusAnchorReference = useRef<HTMLDivElement>(null);
-
-  const handleFocusAnchorKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const grid = gridReference.current;
-    if (!grid) return;
-    const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
-    switch (e.key) {
-      case "ArrowDown":
-      case "ArrowRight": {
-        e.preventDefault();
-        if (firstElement) {
-          focusVisible(firstElement);
-          void sounds.navigate();
-        }
-        break;
-      }
-      case "ArrowUp": {
-        e.preventDefault();
-        void sounds.navigate();
-        break;
-      }
-    }
-  }, []);
-
-  const handleToolbarKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== "ArrowDown") return;
-    const grid = gridReference.current;
-    if (!grid) return;
-    const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
-    if (firstElement) {
-      e.preventDefault();
-      focusVisible(firstElement);
-      void sounds.navigate();
-    }
-  }, []);
+  const toolbarReference = useRef<HTMLDivElement>(null);
 
   const keyRepeatState = useRef<{ key: string; count: number; time: number }>({
     key: "",
@@ -143,6 +138,255 @@ export default function Library() {
     if (gameId) lastFocusedGameId = gameId;
   }, []);
 
+  const handleDirectionalNavigation = useCallback(
+    (key: string) => {
+      if (isActionBlocked("page-nav")) return false;
+
+      const grid = gridReference.current;
+      if (!grid) return false;
+
+      const focusAnchor = focusAnchorReference.current;
+      if (focusAnchor && document.activeElement === focusAnchor) {
+        const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
+        switch (key) {
+          case "ArrowDown":
+          case "ArrowRight": {
+            if (!firstElement) {
+              return false;
+            }
+
+            focusVisible(firstElement);
+            void sounds.navigate();
+            return true;
+          }
+          case "ArrowUp": {
+            void sounds.navigate();
+            return true;
+          }
+          case "ArrowLeft": {
+            return focusSidebar();
+          }
+          default: {
+            return false;
+          }
+        }
+      }
+
+      const toolbar = toolbarReference.current;
+      if (
+        toolbar &&
+        document.activeElement instanceof Node &&
+        toolbar.contains(document.activeElement)
+      ) {
+        if (key === "ArrowLeft") {
+          return focusSidebar();
+        }
+
+        if (key !== "ArrowDown") {
+          return false;
+        }
+
+        const firstElement = grid.querySelector<HTMLElement>("[data-group-toggle], a");
+        if (!firstElement) {
+          return false;
+        }
+
+        focusVisible(firstElement);
+        void sounds.navigate();
+        return true;
+      }
+
+      const activeElement = document.activeElement as HTMLElement;
+
+      // Handle navigation from a group toggle button
+      if (Object.hasOwn(activeElement.dataset, "groupToggle")) {
+        const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
+        const toggleIndex = toggles.indexOf(activeElement);
+        const section = activeElement.closest("section");
+        const groupGrid = section?.querySelector<HTMLElement>(".grid");
+        const firstLink = groupGrid?.querySelector<HTMLElement>("a");
+
+        switch (key) {
+          case "ArrowDown": {
+            // If group is expanded, go to first game card; otherwise next toggle
+            if (firstLink) {
+              focusVisible(firstLink);
+              void sounds.navigate();
+              return true;
+            }
+
+            if (toggleIndex + 1 < toggles.length) {
+              focusVisible(toggles[toggleIndex + 1]);
+              toggles[toggleIndex + 1].scrollIntoView({ block: "nearest" });
+              void sounds.navigate();
+              return true;
+            }
+
+            return false;
+          }
+          case "ArrowUp": {
+            if (toggleIndex > 0) {
+              // Go to previous group's last row first column, or previous toggle if collapsed
+              const previousSection = toggles[toggleIndex - 1].closest("section");
+              const previousGrid = previousSection?.querySelector<HTMLElement>(".grid");
+              const previousLinks = previousGrid
+                ? [...previousGrid.querySelectorAll<HTMLElement>("a")]
+                : [];
+              if (previousLinks.length > 0) {
+                const previousCols = previousGrid
+                  ? getComputedStyle(previousGrid).gridTemplateColumns?.split(" ").length || 1
+                  : 1;
+                const lastRowStart =
+                  Math.floor((previousLinks.length - 1) / previousCols) * previousCols;
+                focusVisible(previousLinks[lastRowStart]);
+              } else {
+                focusVisible(toggles[toggleIndex - 1]);
+                toggles[toggleIndex - 1].scrollIntoView({ block: "nearest" });
+              }
+              void sounds.navigate();
+              return true;
+            }
+
+            focusAnchorReference.current?.focus();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            void sounds.navigate();
+            return true;
+          }
+          case "ArrowRight": {
+            if (firstLink) {
+              focusVisible(firstLink);
+              void sounds.navigate();
+              return true;
+            }
+
+            return false;
+          }
+          case "ArrowLeft": {
+            return focusSidebar();
+          }
+          default: {
+            return false;
+          }
+        }
+      }
+
+      const allLinks = [...grid.querySelectorAll<HTMLElement>("a")];
+      const allIndex = allLinks.indexOf(activeElement);
+      if (allIndex === -1) return false;
+
+      // Find the nearest CSS grid container for accurate column count and scoped navigation
+      const gridContainer = activeElement.closest<HTMLElement>(".grid") ?? grid;
+      const cols = getComputedStyle(gridContainer).gridTemplateColumns?.split(" ").length || 1;
+      const scopedLinks = [...gridContainer.querySelectorAll<HTMLElement>("a")];
+      const scopedIndex = scopedLinks.indexOf(activeElement);
+      const isGroupedSectionCard = activeElement.closest("section") !== null;
+
+      switch (key) {
+        case "ArrowRight": {
+          const nextIndex = allIndex + 1;
+          if (nextIndex < allLinks.length) {
+            focusVisible(allLinks[nextIndex]);
+            void sounds.navigate();
+            return true;
+          }
+
+          return false;
+        }
+        case "ArrowLeft": {
+          if (isGroupedSectionCard && scopedIndex === 0) {
+            return focusSidebar();
+          }
+
+          const nextIndex = allIndex - 1;
+          if (nextIndex >= 0) {
+            focusVisible(allLinks[nextIndex]);
+            void sounds.navigate();
+            return true;
+          }
+
+          return focusSidebar();
+        }
+        case "ArrowDown": {
+          const nextIndex = scopedIndex + cols;
+          if (nextIndex < scopedLinks.length) {
+            focusVisible(scopedLinks[nextIndex]);
+            void sounds.navigate();
+            return true;
+          }
+
+          const currentCol = scopedIndex % cols;
+          const lastRowStart = Math.floor((scopedLinks.length - 1) / cols) * cols;
+          const currentRowStart = Math.floor(scopedIndex / cols) * cols;
+          if (currentRowStart < lastRowStart) {
+            // Not on the last row yet — go to same column on last row
+            const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1);
+            focusVisible(scopedLinks[target]);
+            void sounds.navigate();
+            return true;
+          }
+
+          // On the last row — jump to next group's toggle button
+          const section = activeElement.closest("section");
+          const nextSection = section?.nextElementSibling as HTMLElement | null;
+          const nextToggle = nextSection?.querySelector<HTMLElement>("[data-group-toggle]");
+          if (nextToggle) {
+            focusVisible(nextToggle);
+            nextToggle.scrollIntoView({ block: "nearest" });
+            void sounds.navigate();
+            return true;
+          }
+
+          return false;
+        }
+        case "ArrowUp": {
+          const nextIndex = scopedIndex - cols;
+          if (nextIndex >= 0) {
+            focusVisible(scopedLinks[nextIndex]);
+            void sounds.navigate();
+            return true;
+          }
+
+          // On first row — go to this group's toggle button
+          const section = activeElement.closest("section");
+          const toggle = section?.querySelector<HTMLElement>("[data-group-toggle]");
+          if (toggle) {
+            focusVisible(toggle);
+            toggle.scrollIntoView({ block: "nearest" });
+            void sounds.navigate();
+            return true;
+          }
+
+          focusAnchorReference.current?.focus();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          void sounds.navigate();
+          return true;
+        }
+        default: {
+          return false;
+        }
+      }
+    },
+    [focusSidebar, isActionBlocked],
+  );
+
+  const handleFocusAnchorKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (handleDirectionalNavigation(e.key)) {
+        e.preventDefault();
+      }
+    },
+    [handleDirectionalNavigation],
+  );
+
+  const handleToolbarKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowDown" && handleDirectionalNavigation(e.key)) {
+        e.preventDefault();
+      }
+    },
+    [handleDirectionalNavigation],
+  );
+
   const handleGridKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -152,8 +396,8 @@ export default function Library() {
       }
       if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) return;
 
-      // Throttle held keys with acceleration (gamepad handles its own throttle)
-      if (e.repeat && !isGamepadEvent) {
+      // Throttle held keys with acceleration.
+      if (e.repeat) {
         const now = performance.now();
         const rs = keyRepeatState.current;
         if (rs.key !== e.key) {
@@ -176,211 +420,59 @@ export default function Library() {
         };
       }
 
-      const grid = gridReference.current;
-      if (!grid) return;
-
-      const activeElement = document.activeElement as HTMLElement;
-
-      // Handle navigation from a group toggle button
-      if (Object.hasOwn(activeElement.dataset, "groupToggle")) {
-        const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
-        const toggleIndex = toggles.indexOf(activeElement);
-        const section = activeElement.closest("section");
-
-        switch (e.key) {
-          case "ArrowDown": {
-            e.preventDefault();
-            // If group is expanded, go to first game card; otherwise next toggle
-            const groupGrid = section?.querySelector<HTMLElement>(".grid");
-            const firstLink = groupGrid?.querySelector<HTMLElement>("a");
-            if (firstLink) {
-              focusVisible(firstLink);
-              void sounds.navigate();
-            } else if (toggleIndex + 1 < toggles.length) {
-              focusVisible(toggles[toggleIndex + 1]);
-              toggles[toggleIndex + 1].scrollIntoView({ block: "nearest" });
-              void sounds.navigate();
-            }
-            return;
-          }
-          case "ArrowUp": {
-            e.preventDefault();
-            if (toggleIndex > 0) {
-              // Go to previous group's last row first column, or previous toggle if collapsed
-              const previousSection = toggles[toggleIndex - 1].closest("section");
-              const previousGrid = previousSection?.querySelector<HTMLElement>(".grid");
-              const previousLinks = previousGrid
-                ? [...previousGrid.querySelectorAll<HTMLElement>("a")]
-                : [];
-              if (previousLinks.length > 0) {
-                const previousCols = previousGrid
-                  ? getComputedStyle(previousGrid).gridTemplateColumns?.split(" ").length || 1
-                  : 1;
-                const lastRowStart =
-                  Math.floor((previousLinks.length - 1) / previousCols) * previousCols;
-                focusVisible(previousLinks[lastRowStart]);
-              } else {
-                focusVisible(toggles[toggleIndex - 1]);
-                toggles[toggleIndex - 1].scrollIntoView({ block: "nearest" });
-              }
-              void sounds.navigate();
-            } else {
-              focusAnchorReference.current?.focus();
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              void sounds.navigate();
-            }
-            return;
-          }
-          case "ArrowRight": {
-            e.preventDefault();
-            const platform = activeElement.dataset.groupToggle!;
-            if (collapsedGroups.has(platform)) {
-              setCollapsedGroups((previous) => {
-                const next = new Set(previous);
-                next.delete(platform);
-                localStorage.setItem("library-collapsed", JSON.stringify([...next]));
-                return next;
-              });
-              void sounds.select();
-            }
-            return;
-          }
-          case "ArrowLeft": {
-            e.preventDefault();
-            const platform = activeElement.dataset.groupToggle!;
-            if (!collapsedGroups.has(platform)) {
-              setCollapsedGroups((previous) => {
-                const next = new Set([...previous, platform]);
-                localStorage.setItem("library-collapsed", JSON.stringify([...next]));
-                return next;
-              });
-              void sounds.select();
-            }
-            return;
-          }
-        }
-        return;
-      }
-
-      const allLinks = [...grid.querySelectorAll<HTMLElement>("a")];
-      const allIndex = allLinks.indexOf(activeElement);
-      if (allIndex === -1) return;
-
-      // Find the nearest CSS grid container for accurate column count and scoped navigation
-      const gridContainer = activeElement.closest<HTMLElement>(".grid") ?? grid;
-      const cols = getComputedStyle(gridContainer).gridTemplateColumns?.split(" ").length || 1;
-      const scopedLinks = [...gridContainer.querySelectorAll<HTMLElement>("a")];
-      const scopedIndex = scopedLinks.indexOf(activeElement);
-      let nextIndex = -1;
-
-      switch (e.key) {
-        case "ArrowRight": {
-          // Move to next item across all groups
-          nextIndex = allIndex + 1;
-          if (nextIndex < allLinks.length) {
-            e.preventDefault();
-            focusVisible(allLinks[nextIndex]);
-            void sounds.navigate();
-          }
-          return;
-        }
-        case "ArrowLeft": {
-          nextIndex = allIndex - 1;
-          if (nextIndex >= 0) {
-            e.preventDefault();
-            focusVisible(allLinks[nextIndex]);
-            void sounds.navigate();
-          }
-          return;
-        }
-        case "ArrowDown": {
-          nextIndex = scopedIndex + cols;
-          if (nextIndex < scopedLinks.length) {
-            e.preventDefault();
-            focusVisible(scopedLinks[nextIndex]);
-            void sounds.navigate();
-          } else {
-            const currentCol = scopedIndex % cols;
-            const lastRowStart = Math.floor((scopedLinks.length - 1) / cols) * cols;
-            const currentRowStart = Math.floor(scopedIndex / cols) * cols;
-            if (currentRowStart < lastRowStart) {
-              // Not on the last row yet — go to same column on last row
-              const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1);
-              e.preventDefault();
-              focusVisible(scopedLinks[target]);
-              void sounds.navigate();
-            } else {
-              // On the last row — jump to next group's toggle button
-              const section = activeElement.closest("section");
-              const nextSection = section?.nextElementSibling as HTMLElement | null;
-              const nextToggle = nextSection?.querySelector<HTMLElement>("[data-group-toggle]");
-              if (nextToggle) {
-                e.preventDefault();
-                focusVisible(nextToggle);
-                nextToggle.scrollIntoView({ block: "nearest" });
-                void sounds.navigate();
-              }
-            }
-          }
-          return;
-        }
-        case "ArrowUp": {
-          nextIndex = scopedIndex - cols;
-          if (nextIndex >= 0) {
-            e.preventDefault();
-            focusVisible(scopedLinks[nextIndex]);
-            void sounds.navigate();
-          } else {
-            // On first row — go to this group's toggle button
-            const section = activeElement.closest("section");
-            const toggle = section?.querySelector<HTMLElement>("[data-group-toggle]");
-            if (toggle) {
-              e.preventDefault();
-              focusVisible(toggle);
-              toggle.scrollIntoView({ block: "nearest" });
-              void sounds.navigate();
-            } else {
-              e.preventDefault();
-              focusAnchorReference.current?.focus();
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              void sounds.navigate();
-            }
-          }
-          return;
-        }
+      if (handleDirectionalNavigation(e.key)) {
+        e.preventDefault();
       }
     },
-    [collapsedGroups, saveGridFocus],
+    [handleDirectionalNavigation, saveGridFocus],
   );
 
-  // RB/LB bumpers: jump to next/previous group toggle
-  const jumpGroup = useCallback((direction: 1 | -1) => {
-    const grid = gridReference.current;
-    if (!grid) return;
-    const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
-    if (toggles.length === 0) return;
-    const activeElement = document.activeElement as HTMLElement;
-    // Find which group the active element belongs to
-    const currentSection = activeElement?.closest("section");
-    const currentToggle = currentSection?.querySelector<HTMLElement>("[data-group-toggle]");
-    const currentIndex = currentToggle ? toggles.indexOf(currentToggle) : -1;
-    let targetIndex: number;
-    if (currentIndex === -1) {
-      targetIndex = direction === 1 ? 0 : toggles.length - 1;
-    } else {
-      targetIndex = currentIndex + direction;
-      if (targetIndex < 0 || targetIndex >= toggles.length) return;
-    }
-    const targetSection = toggles[targetIndex].closest("section");
-    const firstLink = targetSection?.querySelector<HTMLElement>(".grid a");
-    const target = firstLink ?? toggles[targetIndex];
-    focusVisible(target);
-    target.scrollIntoView({ block: "center", behavior: "smooth" });
-    void sounds.navigate();
-  }, []);
+  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, () => handleDirectionalNavigation("ArrowUp"));
+  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, () => handleDirectionalNavigation("ArrowDown"));
+  useGamepadEvent(GAMEPAD_NAV_LEFT_EVENT, () => handleDirectionalNavigation("ArrowLeft"));
+  useGamepadEvent(GAMEPAD_NAV_RIGHT_EVENT, () => handleDirectionalNavigation("ArrowRight"));
 
-  useGamepadEvent("gamepad-rt", () => jumpGroup(1), view === "grouped");
-  useGamepadEvent("gamepad-lt", () => jumpGroup(-1), view === "grouped");
+  // RB/LB bumpers: jump to next/previous group toggle
+  const jumpGroup = useCallback(
+    (direction: 1 | -1) => {
+      if (isActionBlocked("page-nav")) return;
+
+      const grid = gridReference.current;
+      if (!grid) return;
+      const toggles = [...grid.querySelectorAll<HTMLElement>("[data-group-toggle]")];
+      if (toggles.length === 0) return;
+      const activeElement = document.activeElement as HTMLElement;
+      // Find which group the active element belongs to
+      const currentSection = activeElement?.closest("section");
+      const currentToggle = currentSection?.querySelector<HTMLElement>("[data-group-toggle]");
+      const currentIndex = currentToggle ? toggles.indexOf(currentToggle) : -1;
+      let targetIndex: number;
+      if (currentIndex === -1) {
+        targetIndex = direction === 1 ? 0 : toggles.length - 1;
+      } else {
+        targetIndex = currentIndex + direction;
+        if (targetIndex < 0 || targetIndex >= toggles.length) return;
+      }
+      const targetSection = toggles[targetIndex].closest("section");
+      const firstLink = targetSection?.querySelector<HTMLElement>(".grid a");
+      const target = firstLink ?? toggles[targetIndex];
+      focusVisible(target);
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      void sounds.navigate();
+    },
+    [isActionBlocked],
+  );
+
+  useGamepadEvent(
+    "gamepad-rt",
+    () => jumpGroup(1),
+    view === "grouped" && !isActionBlocked("page-nav"),
+  );
+  useGamepadEvent(
+    "gamepad-lt",
+    () => jumpGroup(-1),
+    view === "grouped" && !isActionBlocked("page-nav"),
+  );
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -486,7 +578,11 @@ export default function Library() {
   return (
     <main className="max-w-7xl mx-auto px-6 py-8 flex-1 flex flex-col w-full">
       {/* Toolbar */}
-      <div className="flex gap-3 mb-8 items-center" onKeyDown={handleToolbarKeyDown}>
+      <div
+        ref={toolbarReference}
+        className="flex gap-3 mb-8 items-center"
+        onKeyDown={handleToolbarKeyDown}
+      >
         <div className="relative min-w-40" ref={platformDropdownReference}>
           <button
             onClick={() => setPlatformDropdownOpen((v) => !v)}

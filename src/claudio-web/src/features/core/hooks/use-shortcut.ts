@@ -22,6 +22,10 @@ export function useShortcut(
     if (!enabled) return;
 
     function onKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented) {
+        return;
+      }
+
       if (matchKey(key, e)) {
         handlerReference.current(e);
       }
@@ -30,6 +34,28 @@ export function useShortcut(
     globalThis.addEventListener("keydown", onKeyDown, capture);
     return () => globalThis.removeEventListener("keydown", onKeyDown, capture);
   }, [key, enabled, capture]);
+}
+
+export function useKeydown(
+  handler: (e: KeyboardEvent) => void,
+  options: { enabled?: boolean; capture?: boolean } = {},
+) {
+  const { enabled = true, capture = false } = options;
+  const handlerReference = useRef(handler);
+  useEffect(() => {
+    handlerReference.current = handler;
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      handlerReference.current(e);
+    }
+
+    globalThis.addEventListener("keydown", onKeyDown, capture);
+    return () => globalThis.removeEventListener("keydown", onKeyDown, capture);
+  }, [enabled, capture]);
 }
 
 /**

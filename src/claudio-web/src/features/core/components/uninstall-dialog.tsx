@@ -1,5 +1,6 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useState } from "react";
+import { useInputScope } from "../hooks/use-input-scope";
 
 interface UninstallDialogProperties {
   open: boolean;
@@ -14,6 +15,13 @@ export default function UninstallDialog({
   onClose,
   onConfirm,
 }: UninstallDialogProperties) {
+  useInputScope({
+    id: "uninstall-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: open,
+  });
+
   const [loading, setLoading] = useState(false);
 
   async function handleConfirm(deleteFiles: boolean) {

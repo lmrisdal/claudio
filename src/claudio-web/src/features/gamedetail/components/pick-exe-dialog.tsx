@@ -1,5 +1,6 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useState } from "react";
+import { useInputScope } from "../../core/hooks/use-input-scope";
 import ExeListbox from "./exe-listbox";
 
 interface PickExeDialogProperties {
@@ -17,6 +18,13 @@ export default function PickExeDialog({
   onClose,
   onConfirm,
 }: PickExeDialogProperties) {
+  useInputScope({
+    id: "pick-exe-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: open,
+  });
+
   const [exe, setExe] = useState(exeOptions[0] ?? "");
 
   return (

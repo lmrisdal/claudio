@@ -1,16 +1,19 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, resolveServerUrl } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
+import { useGamepadDirectionalKeyBridge } from "../../core/hooks/use-gamepad-directional-key-bridge";
 import { useGuide } from "../../core/hooks/use-guide";
+import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
 import { matchKey, useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 import { isEmulatorFullscreenEnabled } from "../../core/utils/preferences";
 import { getShortcuts } from "../../core/utils/shortcuts";
 import { sounds } from "../../core/utils/sounds";
+import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 
 interface EmulationInfo {
   supported: boolean;
@@ -37,8 +40,16 @@ export default function GameEmulator() {
   const { id } = useParams();
   const navigate = useNavigate();
   const guide = useGuide();
+  const { isActionBlocked } = useInputScopeState();
+  const { focusSidebar } = useDesktopShellNavigation();
+  const loadStateMenuBridgeId = useId();
+  const candidateSelectBridgeId = useId();
   const [selectedPath, setSelectedPath] = useState("");
   const [activePath, setActivePath] = useState("");
+
+  useInputScope({ id: "game-emulator-page", kind: "page" });
+  useGamepadDirectionalKeyBridge(loadStateMenuBridgeId);
+  useGamepadDirectionalKeyBridge(candidateSelectBridgeId);
 
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const pageReference = useRef<HTMLDivElement>(null);
@@ -166,6 +177,7 @@ export default function GameEmulator() {
   useShortcut(
     "escape",
     () => {
+      if (isActionBlocked("page-nav")) return;
       if (frameUrl) return;
       void sounds.back();
       void navigate(`/games/${gameId}`);
@@ -264,7 +276,7 @@ export default function GameEmulator() {
     void sounds.navigate();
   }, []);
 
-  const handleNavKeyDown = useArrowNav(pageReference);
+  const handleNavKeyDown = useArrowNav(pageReference, { onExitLeft: focusSidebar });
 
   const canStart = emulation?.supported && Boolean(selectedPath);
 
@@ -286,11 +298,12 @@ export default function GameEmulator() {
   useGamepadEvent(
     "gamepad-start",
     () => {
+      if (isActionBlocked("page-nav")) return;
       if (!frameUrl && canStart && !sessionMutation.isPending) {
         void startEmulation();
       }
     },
-    !frameUrl,
+    !frameUrl && !isActionBlocked("page-nav"),
   );
 
   if (gameLoading || emulationLoading) {
@@ -323,9 +336,15 @@ export default function GameEmulator() {
           tabIndex={0}
           className="h-0 overflow-hidden outline-none"
           onKeyDown={(e) => {
+            if (isActionBlocked("page-nav")) {
+              return;
+            }
+
             if (e.key === "ArrowDown" || e.key === "ArrowRight") {
               e.preventDefault();
               focusNav(0);
+            } else if (e.key === "ArrowLeft" && focusSidebar()) {
+              e.preventDefault();
             }
           }}
         />
@@ -357,7 +376,10 @@ export default function GameEmulator() {
               <div className="flex items-center gap-2">
                 {saveStates && saveStates.length > 0 && (
                   <Menu as="div" className="relative">
-                    <MenuButton className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent">
+                    <MenuButton
+                      data-gamepad-nav-bridge={loadStateMenuBridgeId}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent"
+                    >
                       Load state…
                       <svg
                         className="h-4 w-4 text-white/40"
@@ -375,12 +397,14 @@ export default function GameEmulator() {
                     </MenuButton>
                     <MenuItems
                       anchor="bottom end"
+                      data-gamepad-nav-bridge={loadStateMenuBridgeId}
                       className="z-50 mt-1 w-64 origin-top-right rounded-xl border border-border bg-surface-raised p-1 shadow-xl transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
                     >
                       {saveStates.map((s) => (
                         <MenuItem key={s.id}>
                           <button
                             type="button"
+                            data-gamepad-nav-bridge={loadStateMenuBridgeId}
                             onClick={() => handleLoadState(s.id)}
                             className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary transition data-[focus]:bg-white/8"
                           >
@@ -429,6 +453,7 @@ export default function GameEmulator() {
                 </label>
                 <select
                   data-nav
+                  data-gamepad-nav-bridge={candidateSelectBridgeId}
                   value={selectedPath}
                   onChange={(event) => {
                     setSelectedPath(event.target.value);

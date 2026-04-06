@@ -1,5 +1,6 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import type { FormEvent } from "react";
+import { useInputScope } from "../../core/hooks/use-input-scope";
 import type { SgdbMode } from "../shared";
 
 interface SteamGridDbDialogProperties {
@@ -35,6 +36,13 @@ export default function SteamGridDbDialog({
   onSelectGame,
   onSelectImage,
 }: SteamGridDbDialogProperties) {
+  useInputScope({
+    id: `steamgriddb-dialog-${mode}`,
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: open,
+  });
+
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <DialogBackdrop className="app-modal-backdrop fixed inset-0" />

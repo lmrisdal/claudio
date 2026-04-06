@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth/hooks/use-auth";
+import {
+  GAMEPAD_NAV_DOWN_EVENT,
+  GAMEPAD_NAV_LEFT_EVENT,
+  GAMEPAD_NAV_RIGHT_EVENT,
+  GAMEPAD_NAV_UP_EVENT,
+} from "../../core/hooks/use-gamepad";
 import { useGuide } from "../../core/hooks/use-guide";
+import { useInputScope } from "../../core/hooks/use-input-scope";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import { sounds } from "../../core/utils/sounds";
 import { isDesktop, ping } from "../../desktop/hooks/use-desktop";
@@ -37,6 +44,13 @@ export default function SettingsDialog({
   onClose: () => void;
   embedded?: boolean;
 }) {
+  useInputScope({
+    id: embedded ? "settings-window" : "settings-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: open,
+  });
+
   const { user, logout } = useAuth();
   const { isOpen: guideOpen } = useGuide();
   const previousFocusReference = useRef<HTMLElement | null>(null);
@@ -285,6 +299,48 @@ export default function SettingsDialog({
       : updateStatusMessage || "Check for updates";
   const isCheckingForUpdates = updateStatusMessage === CHECKING_FOR_UPDATES_MESSAGE;
 
+  const handleArrowUp = useCallback(() => {
+    setShowSidebarFocusRing(true);
+    if (focusZone === "sidebar") {
+      focusSidebar(sidebarIndex - 1);
+      void sounds.navigate();
+    } else if (contentIndex === 0) {
+      setFocusZone("sidebar");
+      void sounds.navigate();
+    } else {
+      focusContent(contentIndex - 1);
+      void sounds.navigate();
+    }
+  }, [contentIndex, focusSidebar, focusContent, focusZone, sidebarIndex]);
+
+  const handleArrowDown = useCallback(() => {
+    setShowSidebarFocusRing(true);
+    if (focusZone === "sidebar") {
+      focusSidebar(sidebarIndex + 1);
+      void sounds.navigate();
+    } else {
+      focusContent(contentIndex + 1);
+      void sounds.navigate();
+    }
+  }, [contentIndex, focusSidebar, focusContent, focusZone, sidebarIndex]);
+
+  const handleArrowRight = useCallback(() => {
+    setShowSidebarFocusRing(true);
+    if (focusZone === "sidebar") {
+      setFocusZone("content");
+      setContentIndex(0);
+      void sounds.navigate();
+    }
+  }, [focusZone]);
+
+  const handleArrowLeft = useCallback(() => {
+    setShowSidebarFocusRing(true);
+    if (focusZone === "content") {
+      setFocusZone("sidebar");
+      void sounds.navigate();
+    }
+  }, [focusZone]);
+
   // ── Keyboard navigation (capture phase) ──
 
   useShortcut(
@@ -301,19 +357,7 @@ export default function SettingsDialog({
     "arrowup",
     (e) => {
       e.preventDefault();
-      setShowSidebarFocusRing(true);
-      if (focusZone === "sidebar") {
-        focusSidebar(sidebarIndex - 1);
-        void sounds.navigate();
-      } else {
-        if (contentIndex === 0) {
-          setFocusZone("sidebar");
-          void sounds.navigate();
-        } else {
-          focusContent(contentIndex - 1);
-          void sounds.navigate();
-        }
-      }
+      handleArrowUp();
     },
     { enabled: open && !guideOpen, capture: true },
   );
@@ -322,14 +366,7 @@ export default function SettingsDialog({
     "arrowdown",
     (e) => {
       e.preventDefault();
-      setShowSidebarFocusRing(true);
-      if (focusZone === "sidebar") {
-        focusSidebar(sidebarIndex + 1);
-        void sounds.navigate();
-      } else {
-        focusContent(contentIndex + 1);
-        void sounds.navigate();
-      }
+      handleArrowDown();
     },
     { enabled: open && !guideOpen, capture: true },
   );
@@ -338,13 +375,7 @@ export default function SettingsDialog({
     "arrowright",
     (e) => {
       e.preventDefault();
-      setShowSidebarFocusRing(true);
-      if (focusZone === "sidebar") {
-        // Move into content
-        setFocusZone("content");
-        setContentIndex(0);
-        void sounds.navigate();
-      }
+      handleArrowRight();
     },
     { enabled: open && !guideOpen, capture: true },
   );
@@ -353,15 +384,15 @@ export default function SettingsDialog({
     "arrowleft",
     (e) => {
       e.preventDefault();
-      setShowSidebarFocusRing(true);
-      if (focusZone === "content") {
-        // Move back to sidebar
-        setFocusZone("sidebar");
-        void sounds.navigate();
-      }
+      handleArrowLeft();
     },
     { enabled: open && !guideOpen, capture: true },
   );
+
+  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, handleArrowUp, open && !guideOpen);
+  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, handleArrowDown, open && !guideOpen);
+  useGamepadEvent(GAMEPAD_NAV_RIGHT_EVENT, handleArrowRight, open && !guideOpen);
+  useGamepadEvent(GAMEPAD_NAV_LEFT_EVENT, handleArrowLeft, open && !guideOpen);
 
   useShortcut(
     "enter",

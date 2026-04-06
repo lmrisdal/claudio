@@ -7,6 +7,7 @@ import AuthProvider from "./features/auth/components/auth-provider";
 import GuideProvider from "./features/core/components/guide-provider";
 import NavigationProvider from "./features/core/components/navigation-provider";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
+import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import "./index.css";
@@ -56,15 +57,17 @@ createRoot(document.querySelector("#root")!).render(
       <BrowserRouter>
         <ServerStatusProvider>
           <AuthProvider>
-            <GuideProvider>
-              <SettingsDialogProvider>
-                <NavigationProvider>
-                  <main data-ui-scroll-container>
-                    <App />
-                  </main>
-                </NavigationProvider>
-              </SettingsDialogProvider>
-            </GuideProvider>
+            <InputScopeProvider>
+              <GuideProvider>
+                <SettingsDialogProvider>
+                  <NavigationProvider>
+                    <main data-ui-scroll-container>
+                      <App />
+                    </main>
+                  </NavigationProvider>
+                </SettingsDialogProvider>
+              </GuideProvider>
+            </InputScopeProvider>
           </AuthProvider>
         </ServerStatusProvider>
       </BrowserRouter>

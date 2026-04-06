@@ -1,4 +1,6 @@
 import { formatSize } from "../../core/utils/format";
+import { useInputScope } from "../../core/hooks/use-input-scope";
+import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { BrowseResponse } from "../shared";
 
 interface BrowseFilesDialogProperties {
@@ -16,6 +18,22 @@ export default function BrowseFilesDialog({
   onClose,
   onNavigate,
 }: BrowseFilesDialogProperties) {
+  useInputScope({
+    id: "browse-files-dialog",
+    kind: "dialog",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: browsePath !== null,
+  });
+
+  useShortcut(
+    "escape",
+    (event) => {
+      event.preventDefault();
+      onClose();
+    },
+    { enabled: browsePath !== null },
+  );
+
   if (browsePath === null) {
     return null;
   }

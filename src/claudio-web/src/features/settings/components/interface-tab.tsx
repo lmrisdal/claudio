@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useInputScope } from "../../core/hooks/use-input-scope";
 import type { ThemePreference } from "../../core/hooks/use-theme";
 import { useTheme } from "../../core/hooks/use-theme";
+import { useKeydown } from "../../core/hooks/use-shortcut";
 import { setIndexedRef as setIndexedReference } from "../../core/utils/dom";
 import {
   isEmulatorFullscreenEnabled,
@@ -24,8 +26,16 @@ export default function InterfaceTab({
   const [soundsOn, setSoundsOn] = useState(isSoundsEnabled);
   const [shortcuts, setShortcuts] = useState(getShortcuts);
   const [recording, setRecording] = useState<keyof ShortcutMap | null>(null);
+  const [recordingArmed, setRecordingArmed] = useState(false);
   const defaults = getShortcutDefaults();
   const { theme, setTheme } = useTheme();
+
+  useInputScope({
+    id: "settings-shortcut-recording",
+    kind: "recording",
+    blocks: ["guide", "page-nav", "search"],
+    enabled: recording !== null,
+  });
 
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: "system", label: "System" },
@@ -38,10 +48,33 @@ export default function InterfaceTab({
   }
 
   useEffect(() => {
-    if (!recording) return;
+    if (!recording) {
+      setRecordingArmed(false);
+      return;
+    }
 
-    function handleKeyDown(e: KeyboardEvent) {
-      if (["Control", "Meta", "Shift", "Alt"].includes(e.key)) return;
+    const timer = setTimeout(() => {
+      setRecordingArmed(true);
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      setRecordingArmed(false);
+    };
+  }, [recording]);
+
+  useKeydown(
+    (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setRecording(null);
+        return;
+      }
+
+      if (!recordingArmed || ["Control", "Meta", "Shift", "Alt"].includes(e.key) || !recording) {
+        return;
+      }
 
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -53,30 +86,12 @@ export default function InterfaceTab({
       parts.push(e.key.toLowerCase());
       const pattern = parts.join("+");
 
-      setShortcut(recording!, pattern);
+      setShortcut(recording, pattern);
       setShortcuts(getShortcuts());
       setRecording(null);
-    }
-
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setRecording(null);
-      }
-    }
-
-    globalThis.addEventListener("keydown", handleEscape, true);
-    const timer = setTimeout(() => {
-      globalThis.addEventListener("keydown", handleKeyDown, true);
-    }, 0);
-
-    return () => {
-      clearTimeout(timer);
-      globalThis.removeEventListener("keydown", handleKeyDown, true);
-      globalThis.removeEventListener("keydown", handleEscape, true);
-    };
-  }, [recording]);
+    },
+    { enabled: recording !== null, capture: true },
+  );
 
   return (
     <div className="space-y-6">

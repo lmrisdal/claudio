@@ -2,7 +2,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
+import { sounds } from "../../core/utils/sounds";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
+import { useDesktopShellNavigation } from "../hooks/use-desktop-shell-navigation";
 import {
   isDesktop,
   listInstalledGames,
@@ -22,7 +24,11 @@ export const HEADER_HEIGHT = 56;
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 400;
 
-export default function DesktopSidebar() {
+export default function DesktopSidebar({
+  navigationReference,
+}: {
+  navigationReference: React.RefObject<HTMLElement | null>;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -34,7 +40,6 @@ export default function DesktopSidebar() {
   const isResizing = useRef(false);
   const [dragging, setDragging] = useState(false);
   const { activeCount } = useDownloadManager();
-  const navReference = useRef<HTMLElement>(null);
   const [contextMenu, setContextMenu] = useState<{
     gameId: number;
     x: number;
@@ -45,6 +50,7 @@ export default function DesktopSidebar() {
     id: number;
     title: string;
   } | null>(null);
+  const { focusPage } = useDesktopShellNavigation();
 
   const { data: installedGames = [] } = useQuery({
     queryKey: ["installedGames"],
@@ -87,6 +93,80 @@ export default function DesktopSidebar() {
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
+  const focusSidebarItem = useCallback(
+    (direction: 1 | -1) => {
+      const sidebar = navigationReference.current;
+      if (!sidebar) {
+        return false;
+      }
+
+      const items = [...sidebar.querySelectorAll<HTMLElement>("[data-desktop-sidebar-nav]")].filter(
+        (element) => element.getClientRects().length > 0 && !element.hasAttribute("disabled"),
+      );
+      if (items.length === 0) {
+        return false;
+      }
+
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+      const nextIndex =
+        currentIndex === -1
+          ? direction === 1
+            ? 0
+            : items.length - 1
+          : Math.max(0, Math.min(items.length - 1, currentIndex + direction));
+      if (nextIndex === currentIndex) {
+        return false;
+      }
+
+      items[nextIndex].focus({ focusVisible: true } as FocusOptions);
+      void sounds.navigate();
+      return true;
+    },
+    [navigationReference],
+  );
+
+  const playSelectSound = useCallback(() => {
+    void sounds.select();
+  }, []);
+
+  const handleSelectKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        playSelectSound();
+      }
+    },
+    [playSelectSound],
+  );
+
+  const handleSidebarKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      switch (event.key) {
+        case "ArrowDown": {
+          if (focusSidebarItem(1)) {
+            event.preventDefault();
+          }
+
+          break;
+        }
+        case "ArrowUp": {
+          if (focusSidebarItem(-1)) {
+            event.preventDefault();
+          }
+
+          break;
+        }
+        case "ArrowRight": {
+          if (focusPage()) {
+            event.preventDefault();
+          }
+
+          break;
+        }
+      }
+    },
+    [focusPage, focusSidebarItem],
+  );
+
   const onResizeStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -125,7 +205,8 @@ export default function DesktopSidebar() {
 
   return (
     <nav
-      ref={navReference}
+      ref={navigationReference}
+      onKeyDown={handleSidebarKeyDown}
       style={{
         width: sidebarWidth,
         top: sidebarTop,
@@ -140,13 +221,16 @@ export default function DesktopSidebar() {
           <Link
             key={item.to}
             to={item.to}
+            onKeyDown={handleSelectKeyDown}
+            data-desktop-sidebar-nav
+            data-desktop-sidebar-active={isActive(item.to) ? "true" : undefined}
             className={`flex items-center gap-3 rounded-lg transition text-sm font-medium ${
               collapsed ? "justify-center p-2.5" : "px-3 py-2"
             } ${
               isActive(item.to)
                 ? "bg-surface-raised text-text-primary"
-                : "text-text-secondary hover:text-text-primary hover:bg-surface-raised/50"
-            }`}
+                : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
+            } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             title={collapsed ? item.label : undefined}
           >
             <span className="relative shrink-0">
@@ -164,9 +248,11 @@ export default function DesktopSidebar() {
         {/* Settings button */}
         <button
           onClick={() => globalThis.dispatchEvent(new CustomEvent("claudio:open-desktop-settings"))}
-          className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised/50 ${
+          onKeyDown={handleSelectKeyDown}
+          data-desktop-sidebar-nav
+          className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-hover ${
             collapsed ? "justify-center p-2.5" : "px-3 py-2"
-          }`}
+          } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           title={collapsed ? "Settings" : undefined}
         >
           <SettingsIcon className="w-4.5 h-4.5 shrink-0" />
@@ -199,6 +285,9 @@ export default function DesktopSidebar() {
                   <Link
                     key={`installing-${game.id}`}
                     to={`/games/${game.id}`}
+                    onKeyDown={handleSelectKeyDown}
+                    data-desktop-sidebar-nav
+                    data-desktop-sidebar-active={active ? "true" : undefined}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setContextMenu({
@@ -213,8 +302,8 @@ export default function DesktopSidebar() {
                     } ${
                       active
                         ? "bg-surface-raised text-text-primary"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface-raised/50"
-                    }`}
+                        : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
+                    } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
                     title={game.title}
                   >
                     {/* Progress bar spanning the full entry width */}
@@ -284,6 +373,9 @@ export default function DesktopSidebar() {
                     <Link
                       key={installed.remoteGameId}
                       to={`/games/${installed.remoteGameId}`}
+                      onKeyDown={handleSelectKeyDown}
+                      data-desktop-sidebar-nav
+                      data-desktop-sidebar-active={active ? "true" : undefined}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setContextMenu({
@@ -298,8 +390,8 @@ export default function DesktopSidebar() {
                       } ${
                         active
                           ? "bg-surface-raised text-text-primary"
-                          : "text-text-secondary hover:text-text-primary hover:bg-surface-raised/50"
-                      }`}
+                          : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
+                      } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
                       title={installed.title}
                     >
                       {cover ? (
@@ -344,9 +436,11 @@ export default function DesktopSidebar() {
       <div className="px-2 py-2 border-t border-border shrink-0">
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className={`flex items-center gap-3 rounded-lg transition text-sm text-text-muted hover:text-text-primary hover:bg-surface-raised/50 w-full ${
+          onKeyDown={handleSelectKeyDown}
+          data-desktop-sidebar-nav
+          className={`flex items-center gap-3 rounded-lg transition text-sm text-text-muted hover:text-text-primary hover:bg-sidebar-hover w-full ${
             collapsed ? "justify-center p-2.5" : "px-3 py-2"
-          }`}
+          } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >

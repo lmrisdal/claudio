@@ -1,8 +1,10 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useId } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
+import { useGamepadDirectionalKeyBridge } from "../hooks/use-gamepad-directional-key-bridge";
 import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
 import { useServerStatus } from "../hooks/use-server-status";
 import { useNavigation } from "../hooks/use-navigation";
@@ -12,6 +14,9 @@ import SearchDialog from "./search-dialog";
 import TasksPopover from "./tasks-popover";
 
 export default function Header() {
+  const userMenuBridgeId = useId();
+  useGamepadDirectionalKeyBridge(userMenuBridgeId);
+
   const navigate = useNavigate();
   const { isLoggedIn, isAdmin, user, logout } = useAuth();
   const { isConnected } = useServerStatus();
@@ -131,6 +136,7 @@ export default function Header() {
                   <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
                     <Menu as="div" className="relative h-full flex items-center">
                       <MenuButton
+                        data-gamepad-nav-bridge={userMenuBridgeId}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-accent"
                         title="User menu"
                       >
@@ -152,10 +158,12 @@ export default function Header() {
 
                       <MenuItems
                         anchor="bottom end"
+                        data-gamepad-nav-bridge={userMenuBridgeId}
                         className="z-60 mt-2 w-52 rounded-xl bg-surface-raised border border-border shadow-2xl p-1.5 focus:outline-none"
                       >
                         <MenuItem>
                           <button
+                            data-gamepad-nav-bridge={userMenuBridgeId}
                             onClick={() => {
                               if (isDesktop) {
                                 void openSettingsWindow();
@@ -184,6 +192,7 @@ export default function Header() {
                         <div className="my-1.5 border-t border-border/40 mx-2" />
                         <MenuItem>
                           <button
+                            data-gamepad-nav-bridge={userMenuBridgeId}
                             onClick={logout}
                             className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-text-muted data-focus:bg-red-500/10 data-focus:text-red-400 transition"
                           >
