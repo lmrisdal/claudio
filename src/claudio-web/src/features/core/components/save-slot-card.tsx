@@ -82,7 +82,7 @@ const SaveSlotCard = forwardRef<HTMLButtonElement, SaveSlotCardProperties>(funct
             loading="lazy"
           />
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <div className="app-modal-backdrop absolute inset-0 flex items-center justify-center">
               <LoadingSpinner className="h-6 w-6 text-accent" />
             </div>
           )}
@@ -94,7 +94,7 @@ const SaveSlotCard = forwardRef<HTMLButtonElement, SaveSlotCardProperties>(funct
 
       {/* Action buttons overlay */}
       {isExpanded && (
-        <div className="absolute rounded-xl inset-0 flex items-center justify-center gap-2 bg-black/70 backdrop-blur-sm">
+        <div className="app-overlay-scrim-strong app-modal-backdrop-blur absolute inset-0 flex items-center justify-center gap-2 rounded-xl">
           {saveSlotActions.map((action, index) => (
             <button
               key={action.label}
@@ -105,7 +105,9 @@ const SaveSlotCard = forwardRef<HTMLButtonElement, SaveSlotCardProperties>(funct
               }}
               onMouseEnter={() => onActionHover?.(index)}
               className={`flex flex-col items-center gap-1 rounded-lg p-2.5 transition-colors outline-none ${action.style} ${
-                index === activeActionIndex ? "ring-2 ring-accent bg-white/10" : ""
+                index === activeActionIndex
+                  ? "overlay-reduced-active-surface ring-2 ring-accent bg-white/10"
+                  : ""
               }`}
               title={action.label}
             >

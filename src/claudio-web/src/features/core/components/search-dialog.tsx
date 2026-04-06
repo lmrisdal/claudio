@@ -116,7 +116,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
       className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]"
       onClick={onClose}
     >
-      <div className="fixed inset-0 bg-black/60" />
+      <div className="app-modal-backdrop fixed inset-0" />
       <div
         className="relative w-full max-w-lg mx-4 bg-surface rounded-xl ring-1 ring-border shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}

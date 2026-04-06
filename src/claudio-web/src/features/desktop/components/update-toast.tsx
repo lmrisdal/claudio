@@ -311,7 +311,7 @@ export default function UpdateToast() {
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[140] w-[min(24rem,calc(100vw-2rem))]">
       <div
-        className="pointer-events-auto rounded-xl border border-border bg-surface-raised/95 p-4 shadow-2xl backdrop-blur-sm"
+        className="app-glass-panel pointer-events-auto rounded-xl border border-border p-4 shadow-2xl"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

@@ -21,7 +21,7 @@ export default function PickExeDialog({
 
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
-      <DialogBackdrop className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+      <DialogBackdrop className="app-modal-backdrop app-modal-backdrop-blur fixed inset-0" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-md rounded-xl bg-surface border border-border shadow-2xl p-6">
           <h2 className="text-base font-semibold text-text-primary mb-1">Select game executable</h2>

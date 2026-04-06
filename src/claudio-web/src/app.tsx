@@ -17,6 +17,7 @@ import SettingsWindow from "./features/settings/components/settings-window";
 const Admin = lazy(() => import("./features/admin/pages/admin"));
 const Downloads = lazy(() => import("./features/downloads/pages/downloads"));
 const GameDetail = lazy(() => import("./features/gamedetail/pages/game-detail"));
+const GameEdit = lazy(() => import("./features/gamedetail/pages/game-edit"));
 const GameEmulator = lazy(() => import("./features/gamedetail/pages/game-emulator"));
 const Library = lazy(() => import("./features/library/pages/library"));
 const Login = lazy(() => import("./features/auth/pages/login"));
@@ -98,6 +99,16 @@ export default function App() {
                         <GameDetail />
                       </DesktopLayout>
                     </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/games/:id/edit"
+                  element={
+                    <AdminRoute>
+                      <DesktopLayout>
+                        <GameEdit />
+                      </DesktopLayout>
+                    </AdminRoute>
                   }
                 />
                 <Route

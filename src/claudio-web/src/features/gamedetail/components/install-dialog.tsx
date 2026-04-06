@@ -121,7 +121,7 @@ export default function InstallDialog({
 
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
-      <DialogBackdrop className="fixed inset-0 bg-black/60" />
+      <DialogBackdrop className="app-modal-backdrop fixed inset-0" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="bg-surface border border-border rounded-xl shadow-2xl w-full max-w-lg p-6 animate-[slideUpIn_150ms_ease-out]">
           <div className="flex items-start gap-4">

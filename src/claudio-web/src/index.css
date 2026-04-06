@@ -11,6 +11,7 @@
   --color-border-subtle: var(--border-subtle);
   --color-bg: var(--bg);
   --color-bg-blur: var(--bg-blur);
+  --color-sidebar-blur: var(--sidebar-blur);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted-color);
@@ -22,7 +23,17 @@
 /* Dark theme tokens (default) */
 :root {
   --bg: #0a0a0f;
-  --bg-blur: rgba(10, 10, 15, 0.8);
+  --bg-blur: rgba(10, 10, 15, 0.74);
+  --sidebar-blur: rgba(10, 10, 15, 0.68);
+  --hero-glass-bg: rgba(0, 0, 0, 0.3);
+  --hero-glass-bg-hover: rgba(0, 0, 0, 0.4);
+  --hero-glass-border: rgba(255, 255, 255, 0.1);
+  --modal-backdrop: rgba(0, 0, 0, 0.6);
+  --guide-backdrop: rgba(0, 0, 0, 0.8);
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+  --overlay-scrim-strong: rgba(0, 0, 0, 0.7);
+  --glass-panel-bg: rgba(26, 26, 36, 0.95);
+  --guide-panel-bg: rgba(255, 255, 255, 0.06);
   --surface: #111118;
   --surface-raised: #1a1a24;
   --surface-overlay: #22222e;
@@ -40,7 +51,17 @@
 /* Light theme tokens */
 .light {
   --bg: #f8f8fa;
-  --bg-blur: rgba(248, 248, 250, 0.85);
+  --bg-blur: rgba(248, 248, 250, 0.78);
+  --sidebar-blur: rgba(248, 248, 250, 0.72);
+  --hero-glass-bg: rgba(255, 255, 255, 0.45);
+  --hero-glass-bg-hover: rgba(255, 255, 255, 0.56);
+  --hero-glass-border: rgba(255, 255, 255, 0.35);
+  --modal-backdrop: rgba(26, 26, 46, 0.42);
+  --guide-backdrop: rgba(26, 26, 46, 0.5);
+  --overlay-scrim: rgba(26, 26, 46, 0.42);
+  --overlay-scrim-strong: rgba(26, 26, 46, 0.5);
+  --glass-panel-bg: rgba(255, 255, 255, 0.92);
+  --guide-panel-bg: rgba(255, 255, 255, 0.74);
   --surface: #ffffff;
   --surface-raised: #e9eaef;
   --surface-overlay: #dfe1e8;
@@ -94,6 +115,142 @@ body {
 
   button {
     cursor: pointer;
+  }
+}
+
+.hero-glass-chip {
+  background-color: var(--hero-glass-bg);
+  border-color: var(--hero-glass-border);
+}
+
+.hero-glass-chip:hover {
+  background-color: var(--hero-glass-bg-hover);
+}
+
+.app-modal-backdrop {
+  background-color: var(--modal-backdrop);
+}
+
+.app-guide-backdrop {
+  background-color: var(--guide-backdrop);
+}
+
+.app-overlay-scrim {
+  background-color: var(--overlay-scrim);
+}
+
+.app-overlay-scrim-strong {
+  background-color: var(--overlay-scrim-strong);
+}
+
+.app-modal-backdrop-blur {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.app-glass-panel {
+  background-color: var(--glass-panel-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.app-guide-panel {
+  background-color: var(--guide-panel-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.guide-reduced-hover-surface,
+.guide-reduced-active-surface,
+.guide-reduced-muted-surface,
+.guide-reduced-divider,
+.overlay-reduced-active-surface {
+  /* no-op outside reduced-transparency mode */
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --bg-blur: var(--bg);
+    --sidebar-blur: var(--surface);
+    --hero-glass-bg: var(--surface-raised);
+    --hero-glass-bg-hover: var(--surface-overlay);
+    --hero-glass-border: var(--border-color);
+    --modal-backdrop: var(--bg);
+    --guide-backdrop: var(--bg);
+    --overlay-scrim: var(--surface);
+    --overlay-scrim-strong: var(--surface);
+    --glass-panel-bg: var(--surface-raised);
+    --guide-panel-bg: var(--surface);
+  }
+
+  .light {
+    --bg-blur: var(--bg);
+    --sidebar-blur: var(--surface);
+    --hero-glass-bg: var(--surface);
+    --hero-glass-bg-hover: var(--surface-raised);
+    --hero-glass-border: var(--border-color);
+    --modal-backdrop: var(--bg);
+    --guide-backdrop: var(--bg);
+    --overlay-scrim: var(--surface);
+    --overlay-scrim-strong: var(--surface);
+    --glass-panel-bg: var(--surface);
+    --guide-panel-bg: var(--surface);
+  }
+
+  .app-blur-surface,
+  .hero-glass-chip,
+  .app-modal-backdrop-blur,
+  .app-glass-panel,
+  .app-guide-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .hero-glass-chip,
+  .app-glass-panel,
+  .app-guide-panel {
+    box-shadow: none;
+  }
+
+  .guide-reduced-hover-surface:hover,
+  .guide-reduced-hover-surface:focus-visible {
+    background-color: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .guide-reduced-active-surface {
+    background-color: var(--surface-overlay) !important;
+    color: var(--text-primary) !important;
+    box-shadow: none !important;
+  }
+
+  .guide-reduced-muted-surface {
+    background-color: var(--surface-raised) !important;
+  }
+
+  .guide-reduced-divider {
+    background-color: var(--border-color) !important;
+  }
+
+  .overlay-reduced-active-surface {
+    background-color: var(--surface-overlay) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

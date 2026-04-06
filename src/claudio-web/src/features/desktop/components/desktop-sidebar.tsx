@@ -131,7 +131,7 @@ export default function DesktopSidebar() {
         top: sidebarTop,
         height: `calc(100dvh - ${sidebarTop}px)`,
       }}
-      className={`desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border bg-bg select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
+      className={`app-blur-surface desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border bg-sidebar-blur backdrop-blur-xl select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
       aria-label="Desktop navigation"
     >
       {/* Navigation items */}

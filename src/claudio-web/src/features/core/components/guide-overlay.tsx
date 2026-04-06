@@ -671,7 +671,7 @@ export default function GuideOverlay({
     <div className="fixed inset-0 z-9999 flex">
       {/* Backdrop */}
       <div
-        className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity ${exiting ? "opacity-0" : "opacity-100 animate-[fadeIn_200ms_ease-out]"}`}
+        className={`app-guide-backdrop app-modal-backdrop-blur absolute inset-0 transition-opacity ${exiting ? "opacity-0" : "opacity-100 animate-[fadeIn_200ms_ease-out]"}`}
         style={exiting ? { transitionDuration: `${ANIM_DURATION}ms` } : undefined}
         onClick={onClose}
       />
@@ -694,8 +694,8 @@ export default function GuideOverlay({
               }}
               className={`relative flex items-center justify-center rounded-xl p-3 transition-all duration-150 outline-none ${
                 activeTab === tab.id
-                  ? "bg-white/18 text-white shadow-[0_1px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.15)] ring-1 ring-white/12"
-                  : "text-white/40 hover:bg-white/10 hover:text-white/80 hover:shadow-[0_1px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] hover:ring-1 hover:ring-white/8"
+                  ? "guide-reduced-active-surface bg-white/18 text-white shadow-[0_1px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.15)] ring-1 ring-white/12"
+                  : "guide-reduced-hover-surface text-white/40 hover:bg-white/10 hover:text-white/80 hover:shadow-[0_1px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] hover:ring-1 hover:ring-white/8"
               } focus-visible:ring-2 focus-visible:ring-accent`}
             >
               <tab.icon className="h-6 w-6" />
@@ -719,7 +719,7 @@ export default function GuideOverlay({
         {/* ── Main panel body ── */}
         <div
           ref={panelReference}
-          className="flex flex-1 flex-col overflow-hidden rounded-2xl bg-white/6 shadow-[0_8px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/8 backdrop-blur-2xl"
+          className="app-guide-panel flex flex-1 flex-col overflow-hidden rounded-2xl shadow-[0_8px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/8"
         >
           {/* Animated tab content */}
           <div
@@ -766,7 +766,7 @@ export default function GuideOverlay({
                         focusVisible: true,
                       } as FocusOptions);
                     }}
-                    className="group flex w-full items-center gap-5 rounded-xl px-5 py-4 text-[17px] font-normal text-white/80 transition-colors outline-none hover:bg-white/6 hover:text-white focus-visible:bg-white/8 focus-visible:text-white"
+                    className="guide-reduced-hover-surface group flex w-full items-center gap-5 rounded-xl px-5 py-4 text-[17px] font-normal text-white/80 transition-colors outline-none hover:bg-white/6 hover:text-white focus-visible:bg-white/8 focus-visible:text-white"
                   >
                     <item.icon className="h-6 w-6 shrink-0 text-white/50 transition-colors group-hover:text-white/70 group-focus-visible:text-accent" />
                     {item.label}
@@ -797,7 +797,7 @@ export default function GuideOverlay({
                         setFocusZone("savestates");
                         setSaveSlotFocusIndex(0);
                       }}
-                      className="group flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/3 text-white/40 transition-all outline-none hover:border-white/20 hover:bg-white/6 hover:text-white/60 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                      className="guide-reduced-hover-surface group flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/3 text-white/40 transition-all outline-none hover:border-white/20 hover:bg-white/6 hover:text-white/60 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
                     >
                       {savingState ? (
                         <LoadingSpinner className="h-5 w-5" />
@@ -860,12 +860,12 @@ export default function GuideOverlay({
                   void document.documentElement.requestFullscreen();
                 }
               }}
-              className="rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
+              className="guide-reduced-hover-surface rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
               title="Toggle Fullscreen"
             >
               <FullscreenIcon className="h-5 w-5" />
             </button>
-            <div className="mx-3 h-5 w-px bg-white/8" />
+            <div className="guide-reduced-divider mx-3 h-5 w-px bg-white/8" />
             <button
               ref={(element) => {
                 toolbarReferences.current[1] = element;
@@ -876,7 +876,7 @@ export default function GuideOverlay({
                 onClose();
                 openAccountDialog();
               }}
-              className="rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
+              className="guide-reduced-hover-surface rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
               title="Settings"
             >
               <SettingsIcon className="h-5 w-5" />

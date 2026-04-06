@@ -431,7 +431,7 @@ export default function SettingsDialog({
 
   return (
     <div className={containerClassName} onClick={embedded ? undefined : onClose}>
-      {!embedded && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />}
+      {!embedded && <div className="app-modal-backdrop app-modal-backdrop-blur fixed inset-0" />}
       <div
         ref={panelReference}
         className={panelClassName}
