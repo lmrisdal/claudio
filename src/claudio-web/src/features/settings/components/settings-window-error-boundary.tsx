@@ -37,7 +37,7 @@ export default class SettingsWindowErrorBoundary extends Component<
               Claudio hit an error while opening this window.
             </p>
             <button
-              className="mt-4 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-neutral-950 transition hover:bg-accent-hover"
+              className="mt-4 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent-hover"
               onClick={closeSettingsWindow}
             >
               Close window

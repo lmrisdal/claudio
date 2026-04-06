@@ -137,7 +137,7 @@ export default function Header() {
                     <Menu as="div" className="relative h-full flex items-center">
                       <MenuButton
                         data-gamepad-nav-bridge={userMenuBridgeId}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-accent"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-focus-ring"
                         title="User menu"
                       >
                         {user?.username}
@@ -220,7 +220,7 @@ export default function Header() {
             ) : (
               <Link
                 to="/login"
-                className="px-4 py-1.5 rounded-lg text-sm bg-accent hover:bg-accent-hover text-neutral-950 font-medium transition"
+                className="px-4 py-1.5 rounded-lg text-sm bg-accent hover:bg-accent-hover text-accent-foreground font-medium transition"
               >
                 Sign in
               </Link>

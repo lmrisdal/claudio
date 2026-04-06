@@ -283,7 +283,7 @@ export default function GameDetailActions({
                 void sounds.download();
               }
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+            className="inline-flex items-center gap-2 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
           >
             <svg
               className="h-4 w-4"
@@ -337,7 +337,7 @@ export default function GameDetailActions({
                 className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg) ${
                   isGameRunning || isStoppingGame
                     ? "bg-red-500 text-white hover:bg-red-400 focus-visible:ring-red-400"
-                    : "bg-accent text-neutral-950 hover:bg-accent-hover focus-visible:ring-accent"
+                    : "bg-accent text-accent-foreground hover:bg-accent-hover focus-visible:ring-focus-ring"
                 }`}
                 disabled={isStoppingGame}
               >
@@ -360,7 +360,7 @@ export default function GameDetailActions({
               <button
                 type="button"
                 onClick={() => setShowUninstallConfirm(true)}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-text-secondary ring-1 ring-border hover:text-red-400 hover:ring-red-400/30 transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-text-secondary ring-1 ring-border hover:text-red-400 hover:ring-red-400/30 transition outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
               >
                 <svg
                   className="h-4 w-4"
@@ -388,7 +388,7 @@ export default function GameDetailActions({
                     );
                   });
                 }}
-                className="inline-flex items-center justify-center rounded-lg px-3 py-3 text-text-secondary ring-1 ring-border hover:text-text-primary hover:ring-border/80 transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                className="inline-flex items-center justify-center rounded-lg px-3 py-3 text-text-secondary ring-1 ring-border hover:text-text-primary hover:ring-border/80 transition outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
               >
                 <svg
                   className="h-4 w-4"
@@ -418,7 +418,7 @@ export default function GameDetailActions({
                   event.preventDefault();
                   setInstallButtonMenu({ x: event.clientX, y: event.clientY });
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
               >
                 <svg
                   className={`h-4 w-4 ${installMutation.isPending || hasActiveInstallProgress ? "animate-spin" : ""}`}
@@ -452,7 +452,7 @@ export default function GameDetailActions({
                       data-nav
                       onClick={() => void restartDownloadInteractive(displayGame.id)}
                       disabled={installProgress?.status === "stopping"}
-                      className="inline-flex items-center rounded-lg border border-border px-3 py-3 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                      className="inline-flex items-center rounded-lg border border-border px-3 py-3 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                     >
                       Run interactively
                     </button>
@@ -486,7 +486,7 @@ export default function GameDetailActions({
               data-nav
               disabled={packageDownloadMutation.isPending || hasActiveInstallProgress}
               onClick={() => void handleInstallClick()}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
             >
               <svg
                 className={`h-4 w-4 ${packageDownloadMutation.isPending || hasActiveInstallProgress ? "animate-spin" : ""}`}

@@ -95,7 +95,7 @@ export default function AccountTab({
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary transition focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary transition focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring/30"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function AccountTab({
               onChange={(event) => setNewPassword(event.target.value)}
               required
               minLength={8}
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary transition focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary transition focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring/30"
             />
           </div>
 
@@ -133,7 +133,7 @@ export default function AccountTab({
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
               minLength={8}
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary transition focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary transition focus:border-focus-ring focus:outline-none focus:ring-1 focus:ring-focus-ring/30"
             />
           </div>
 
@@ -141,7 +141,7 @@ export default function AccountTab({
             ref={(element) => setIndexedReference(contentRefs, 3, element)}
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-accent-hover disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent-hover disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             {loading ? "Changing..." : "Change password"}
           </button>

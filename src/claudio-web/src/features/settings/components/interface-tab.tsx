@@ -106,7 +106,7 @@ export default function InterfaceTab({
               ref={(element) => setIndexedReference(contentRefs, index, element)}
               type="button"
               onClick={() => setTheme(opt.value)}
-              className={`flex-1 py-1.5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
+              className={`flex-1 py-1.5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring ${
                 theme === opt.value
                   ? "bg-surface-raised text-text-primary"
                   : "text-text-muted hover:bg-surface hover:text-text-secondary"
@@ -130,7 +130,7 @@ export default function InterfaceTab({
             setSoundsOn(next);
             setSoundsEnabled(next);
           }}
-          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent ${soundsOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
+          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring ${soundsOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
         >
           <span
             className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${soundsOn ? "translate-x-5" : "translate-x-0"}`}
@@ -150,7 +150,7 @@ export default function InterfaceTab({
             setFullscreenOn(next);
             setEmulatorFullscreenEnabled(next);
           }}
-          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent ${fullscreenOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
+          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring ${fullscreenOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
         >
           <span
             className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${fullscreenOn ? "translate-x-5" : "translate-x-0"}`}

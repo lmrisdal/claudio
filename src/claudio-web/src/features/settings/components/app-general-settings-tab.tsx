@@ -17,7 +17,7 @@ export default function AppGeneralSettingsTab({
           type="checkbox"
           checked={settings.closeToTray}
           onChange={(event) => settings.setCloseToTray(event.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-accent focus:ring-2 focus:ring-accent"
+          className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-accent focus:ring-2 focus:ring-focus-ring"
         />
         <span className="min-w-0">
           <span className="block text-sm font-medium text-text-primary">Close to tray</span>
@@ -34,7 +34,7 @@ export default function AppGeneralSettingsTab({
             type="checkbox"
             checked={settings.hideDockIcon}
             onChange={(event) => settings.setHideDockIcon(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-accent focus:ring-2 focus:ring-accent"
+            className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-accent focus:ring-2 focus:ring-focus-ring"
           />
           <span className="min-w-0">
             <span className="block text-sm font-medium text-text-primary">

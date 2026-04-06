@@ -486,7 +486,7 @@ export default function SettingsDialog({
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-text-muted transition hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
+              className="rounded-lg p-1.5 text-text-muted transition hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden"
               aria-label="Close"
             >
               {closeIcon}
@@ -514,7 +514,7 @@ export default function SettingsDialog({
                       activeTab === tab.id
                         ? "bg-(--settings-sidebar-active-bg) text-text-primary font-medium"
                         : "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary"
-                    } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                    } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
                   >
                     {tab.label}
                   </button>
@@ -542,7 +542,7 @@ export default function SettingsDialog({
 
                   checkForUpdates();
                 }}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"}`}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
               >
                 <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
                   {checkForUpdatesLabel}
@@ -562,7 +562,7 @@ export default function SettingsDialog({
                 onClose();
                 void logout();
               }}
-              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-accent" : "focus-visible:ring-0"} sm:block`}
+              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"} sm:block`}
             >
               Sign out
             </button>
@@ -576,7 +576,7 @@ export default function SettingsDialog({
             </h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-text-muted transition hover:bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded-lg p-1.5 text-text-muted transition hover:bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring"
               aria-label="Close"
             >
               {closeIcon}

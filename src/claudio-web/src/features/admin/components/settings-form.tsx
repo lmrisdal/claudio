@@ -101,7 +101,7 @@ export default function SettingsForm({ initialConfig }: { initialConfig: AdminCo
                     onChange={(e) => setIgdbClientId(e.target.value)}
                     placeholder="Twitch client ID…"
                     spellCheck={false}
-                    className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                    className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                   />
                 </div>
                 <div>
@@ -118,7 +118,7 @@ export default function SettingsForm({ initialConfig }: { initialConfig: AdminCo
                     onChange={(e) => setIgdbClientSecret(e.target.value)}
                     placeholder="Twitch client secret…"
                     spellCheck={false}
-                    className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                    className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                   />
                 </div>
               </div>
@@ -172,7 +172,7 @@ export default function SettingsForm({ initialConfig }: { initialConfig: AdminCo
                   onChange={(e) => setSgdbApiKey(e.target.value)}
                   placeholder="SteamGridDB API key…"
                   spellCheck={false}
-                  className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                  className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                 />
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function SettingsForm({ initialConfig }: { initialConfig: AdminCo
           <button
             type="submit"
             disabled={saveMutation.isPending}
-            className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-semibold px-5 py-2.5 rounded-lg transition text-sm"
+            className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-foreground font-semibold px-5 py-2.5 rounded-lg transition text-sm"
           >
             {saveMutation.isPending ? "Saving…" : "Save"}
           </button>

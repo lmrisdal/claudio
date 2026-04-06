@@ -91,7 +91,7 @@ export default function UsersTab() {
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
               required
-              className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+              className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-focus-ring transition"
             />
             <input
               type="password"
@@ -100,12 +100,12 @@ export default function UsersTab() {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               minLength={8}
-              className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+              className="input-field flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-focus-ring transition"
             />
             <button
               type="submit"
               disabled={addUserMutation.isPending}
-              className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-medium px-4 py-2 rounded-lg transition text-sm whitespace-nowrap"
+              className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-foreground font-medium px-4 py-2 rounded-lg transition text-sm whitespace-nowrap"
             >
               {addUserMutation.isPending ? "Adding..." : "Add"}
             </button>

@@ -67,7 +67,7 @@ export default function Register() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   autoFocus
-                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                 />
               </div>
               <div>
@@ -84,7 +84,7 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                 />
               </div>
               <div>
@@ -101,13 +101,13 @@ export default function Register() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-semibold py-2.5 rounded-lg transition text-sm mt-2"
+                className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-foreground font-semibold py-2.5 rounded-lg transition text-sm mt-2"
               >
                 {loading ? "Creating account…" : "Create account"}
               </button>

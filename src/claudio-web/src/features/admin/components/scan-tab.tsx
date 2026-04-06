@@ -91,7 +91,7 @@ export default function ScanTab() {
             <button
               onClick={triggerScan}
               disabled={scanning}
-              className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-semibold px-5 py-2.5 rounded-lg transition text-sm"
+              className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-foreground font-semibold px-5 py-2.5 rounded-lg transition text-sm"
             >
               {scanning ? (
                 <>

@@ -30,7 +30,7 @@ export default function AppServerSettingsTab({
           placeholder="https://claudio.example.com..."
           spellCheck={false}
           autoComplete="url"
-          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
         />
       </div>
 
@@ -71,7 +71,7 @@ export default function AppServerSettingsTab({
                     }}
                     placeholder="Header name..."
                     spellCheck={false}
-                    className="flex-1 rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="flex-1 rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
                   />
                   <input
                     ref={(element) => setIndexedReference(contentRefs, baseIndex + 1, element)}
@@ -84,7 +84,7 @@ export default function AppServerSettingsTab({
                     }}
                     placeholder="Value..."
                     spellCheck={false}
-                    className="flex-1 rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="flex-1 rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
                   />
                   <button
                     ref={(element) => setIndexedReference(contentRefs, baseIndex + 2, element)}
@@ -158,7 +158,7 @@ export default function AppServerSettingsTab({
           type="button"
           onClick={settings.handleSave}
           disabled={settings.saving}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-accent-hover disabled:opacity-60"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent-hover disabled:opacity-60"
         >
           {settings.saving ? "Saving..." : "Save"}
         </button>

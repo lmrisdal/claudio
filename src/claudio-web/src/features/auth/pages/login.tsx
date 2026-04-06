@@ -171,7 +171,7 @@ export default function Login() {
                   spellCheck="false"
                   required
                   autoFocus
-                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                 />
               </div>
               <div>
@@ -190,13 +190,13 @@ export default function Login() {
                   autoComplete="current-password"
                   autoCorrect="off"
                   spellCheck="false"
-                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
+                  className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || providerLoading !== null || Boolean(connectionMessage)}
-                className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-semibold py-2.5 rounded-lg transition text-sm mt-2"
+                className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-foreground font-semibold py-2.5 rounded-lg transition text-sm mt-2"
               >
                 {loading ? "Signing in…" : connectionMessage ? "Server unavailable" : "Sign in"}
               </button>

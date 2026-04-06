@@ -62,7 +62,7 @@ const SaveSlotCard = forwardRef<HTMLButtonElement, SaveSlotCardProperties>(funct
 
   return (
     <div
-      className="group relative overflow-hidden rounded-xl bg-white/5 ring-1 ring-white/8 transition-all hover:ring-white/15 has-focus-visible:ring-2 has-focus-visible:ring-accent"
+      className="group relative overflow-hidden rounded-xl bg-white/5 ring-1 ring-white/8 transition-all hover:ring-white/15 has-focus-visible:ring-2 has-focus-visible:ring-focus-ring"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onCollapse}
     >

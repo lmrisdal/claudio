@@ -56,7 +56,7 @@ export default function TasksPopover() {
           />
         </svg>
         {taskCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-accent text-[10px] font-bold text-neutral-950 flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-accent text-[10px] font-bold text-accent-foreground flex items-center justify-center">
             {taskCount}
           </span>
         )}

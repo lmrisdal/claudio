@@ -37,7 +37,7 @@ export default function ShortcutRow({
           ref={buttonRef}
           type="button"
           onClick={onRecord}
-          className={`inline-flex items-center gap-1.5 min-w-20 justify-center px-3 py-1.5 rounded-lg text-xs font-mono transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+          className={`inline-flex items-center gap-1.5 min-w-20 justify-center px-3 py-1.5 rounded-lg text-xs font-mono transition-colors outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
             recording
               ? "bg-accent/20 text-accent ring-1 ring-accent/40 animate-pulse"
               : "bg-surface-raised text-text-primary ring-1 ring-border hover:bg-surface hover:text-text-primary"

@@ -358,7 +358,7 @@ export default function UpdateToast() {
                 void installPreparedUpdate(updateRef.current);
               }}
               disabled={isInstalling || (isDownloading && !downloadedRef.current)}
-              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-neutral-950 transition hover:bg-accent-hover disabled:opacity-60"
+              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition hover:bg-accent-hover disabled:opacity-60"
             >
               {isInstalling
                 ? "Installing..."

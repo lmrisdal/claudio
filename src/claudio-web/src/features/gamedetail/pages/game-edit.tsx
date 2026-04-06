@@ -309,7 +309,7 @@ export default function GameEdit() {
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-12 flex-1 w-full">
         <Link
           to={`/games/${game.id}`}
-          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8] ${
+          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
             heroUrl
               ? "hero-glass-chip bg-black/30 text-white/85 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 hover:text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
               : "text-text-muted hover:text-text-primary"

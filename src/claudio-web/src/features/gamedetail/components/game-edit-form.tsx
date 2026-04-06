@@ -181,7 +181,7 @@ export default function GameEditForm({
                 value={editForm.igdbId}
                 onChange={(event) => onChange({ igdbId: event.target.value })}
                 placeholder="e.g. 12345"
-                className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+                className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-focus-ring transition"
               />
               {showTagFolderButton && (
                 <button
@@ -276,7 +276,7 @@ export default function GameEditForm({
         <button
           type="submit"
           disabled={formLocked}
-          className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-neutral-950 font-medium px-5 py-2.5 rounded-lg transition text-sm"
+          className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-foreground font-medium px-5 py-2.5 rounded-lg transition text-sm"
         >
           {savePending ? "Saving..." : "Save"}
         </button>

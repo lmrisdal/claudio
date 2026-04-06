@@ -149,7 +149,7 @@ export default function DesktopSetup({
               autoFocus
               spellCheck={false}
               autoComplete="url"
-              className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-transparent"
             />
           </div>
 
@@ -184,7 +184,7 @@ export default function DesktopSetup({
                       }}
                       placeholder="Header name…"
                       spellCheck={false}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-transparent"
                     />
                     <input
                       type="text"
@@ -196,7 +196,7 @@ export default function DesktopSetup({
                       }}
                       placeholder="Value…"
                       spellCheck={false}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-transparent"
                     />
                     <button
                       type="button"
@@ -254,7 +254,7 @@ export default function DesktopSetup({
             <button
               type="submit"
               disabled={saving || !url.trim()}
-              className="flex-1 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-neutral-950 font-medium text-sm transition disabled:opacity-60"
+              className="flex-1 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-accent-foreground font-medium text-sm transition disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save & continue"}
             </button>

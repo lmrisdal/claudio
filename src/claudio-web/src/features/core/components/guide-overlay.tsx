@@ -764,7 +764,7 @@ export default function GuideOverlay({
                 activeTab === tab.id
                   ? "guide-reduced-active-surface bg-white/18 text-white shadow-[0_1px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.15)] ring-1 ring-white/12"
                   : "guide-reduced-hover-surface text-white/40 hover:bg-white/10 hover:text-white/80 hover:shadow-[0_1px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] hover:ring-1 hover:ring-white/8"
-              } focus-visible:ring-2 focus-visible:ring-accent`}
+              } focus-visible:ring-2 focus-visible:ring-focus-ring`}
             >
               <tab.icon className="h-6 w-6" />
             </button>
@@ -778,7 +778,7 @@ export default function GuideOverlay({
             }}
             type="button"
             onClick={onClose}
-            className="flex items-center justify-center rounded-xl p-3 text-white/40 transition-all duration-150 outline-none hover:bg-white/10 hover:text-white/80 hover:shadow-[0_1px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] hover:ring-1 hover:ring-white/8 focus-visible:ring-2 focus-visible:ring-accent"
+            className="flex items-center justify-center rounded-xl p-3 text-white/40 transition-all duration-150 outline-none hover:bg-white/10 hover:text-white/80 hover:shadow-[0_1px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] hover:ring-1 hover:ring-white/8 focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
@@ -865,7 +865,7 @@ export default function GuideOverlay({
                         setFocusZone("savestates");
                         setSaveSlotFocusIndex(0);
                       }}
-                      className="guide-reduced-hover-surface group flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/3 text-white/40 transition-all outline-none hover:border-white/20 hover:bg-white/6 hover:text-white/60 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                      className="guide-reduced-hover-surface group flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/3 text-white/40 transition-all outline-none hover:border-white/20 hover:bg-white/6 hover:text-white/60 focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
                     >
                       {savingState ? (
                         <LoadingSpinner className="h-5 w-5" />
@@ -928,7 +928,7 @@ export default function GuideOverlay({
                   void document.documentElement.requestFullscreen();
                 }
               }}
-              className="guide-reduced-hover-surface rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
+              className="guide-reduced-hover-surface rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-focus-ring"
               title="Toggle Fullscreen"
             >
               <FullscreenIcon className="h-5 w-5" />
@@ -944,7 +944,7 @@ export default function GuideOverlay({
                 onClose();
                 openAccountDialog();
               }}
-              className="guide-reduced-hover-surface rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-accent"
+              className="guide-reduced-hover-surface rounded-lg p-2.5 text-white/40 transition-colors outline-none hover:bg-white/6 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-focus-ring"
               title="Settings"
             >
               <SettingsIcon className="h-5 w-5" />

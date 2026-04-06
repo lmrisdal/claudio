@@ -1,9 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-accent: #00d9b8;
-  --color-accent-hover: #00c4a6;
-  --color-accent-dim: oklch(from #00d9b8 l c h / 0.15);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-focus-ring: var(--focus-ring);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-overlay: var(--surface-overlay);
@@ -43,6 +45,11 @@
   --text-primary: #e5e5e5;
   --text-secondary: #a0a0b0;
   --text-muted-color: #6b6b7b;
+  --focus-ring: #00d9b8;
+  --accent: #00d9b8;
+  --accent-hover: #00c4a6;
+  --accent-dim: oklch(from #00d9b8 l c h / 0.15);
+  --accent-foreground: #0a0a0f;
 
   --sidebar-hover: rgba(255, 255, 255, 0.12);
 
@@ -55,7 +62,7 @@
 .light {
   --bg: #f8f8fa;
   --bg-blur: rgba(248, 248, 250, 0.78);
-  --sidebar-blur: rgba(248, 248, 250, 0.72);
+  --sidebar-blur: rgba(248, 248, 250, 0.9);
   --hero-glass-bg: rgba(255, 255, 255, 0.45);
   --hero-glass-bg-hover: rgba(255, 255, 255, 0.56);
   --hero-glass-border: rgba(255, 255, 255, 0.35);
@@ -73,6 +80,11 @@
   --text-primary: #1a1a2e;
   --text-secondary: #555566;
   --text-muted-color: #888899;
+  --focus-ring: #5b3fd6;
+  --accent: #5b3fd6;
+  --accent-hover: #4c31bf;
+  --accent-dim: oklch(from #5b3fd6 l c h / 0.15);
+  --accent-foreground: #ffffff;
 
   --sidebar-hover: rgba(0, 0, 0, 0.1);
 
@@ -273,7 +285,7 @@ html[data-desktop] [role="button"] {
 }
 
 :where(a, button, input, select, textarea, summary, [role="button"], [tabindex]):focus-visible {
-  outline-color: #00d9b8;
+  outline-color: var(--focus-ring);
 }
 
 /* Grid background */

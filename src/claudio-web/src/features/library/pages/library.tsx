@@ -586,7 +586,7 @@ export default function Library() {
         <div className="relative min-w-40" ref={platformDropdownReference}>
           <button
             onClick={() => setPlatformDropdownOpen((v) => !v)}
-            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition flex items-center justify-between gap-2"
+            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition flex items-center justify-between gap-2"
           >
             <span className="truncate">
               {selectedPlatforms.size === 0
@@ -639,7 +639,7 @@ export default function Library() {
                   >
                     {selectedPlatforms.has(p) && (
                       <svg
-                        className="w-2.5 h-2.5 text-white"
+                        className="w-2.5 h-2.5 text-accent-foreground"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -861,7 +861,7 @@ export default function Library() {
                     return next;
                   })
                 }
-                className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4 hover:text-accent transition-colors outline-none focus:text-accent focus:ring-2 focus:ring-accent/50 focus:ring-offset-4 focus:ring-offset-surface rounded px-1 -ml-1"
+                className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4 hover:text-accent transition-colors outline-none focus:text-accent focus:ring-2 focus:ring-focus-ring/50 focus:ring-offset-4 focus:ring-offset-surface rounded px-1 -ml-1"
               >
                 <svg
                   className={`w-4 h-4 transition-transform ${collapsedGroups.has(p) ? "-rotate-90" : ""}`}
@@ -955,7 +955,7 @@ export default function Library() {
                       to={`/games/${game.id}`}
                       data-game-id={game.id}
                       onFocus={() => preloadHeaderImage(game.heroUrl)}
-                      className={`font-medium hover:text-accent transition-colors outline-none focus-visible:text-accent ${game.isMissing ? "opacity-50" : ""}`}
+                      className={`font-medium hover:text-accent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-(--bg) rounded-sm ${game.isMissing ? "opacity-50" : ""}`}
                     >
                       {game.title}
                     </Link>

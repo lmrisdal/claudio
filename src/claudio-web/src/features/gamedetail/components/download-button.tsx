@@ -32,7 +32,7 @@ export default function DownloadButton({ gameId, size }: { gameId: number; size:
       data-nav
       aria-label={preparing ? "Preparing download" : `Download ${size} bytes`}
       title={preparing ? "Preparing download" : `Download ${formatSize(size)}`}
-      className="inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-neutral-950 font-semibold px-3 py-3 sm:px-6 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+      className="inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-75 text-accent-foreground font-semibold px-3 py-3 sm:px-6 rounded-lg transition text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
     >
       {preparing ? (
         <>

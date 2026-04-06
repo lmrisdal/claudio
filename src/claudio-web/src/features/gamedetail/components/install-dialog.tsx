@@ -168,7 +168,7 @@ export default function InstallDialog({
                     value={installPath}
                     onChange={(e) => setInstallPath(e.target.value)}
                     placeholder="e.g. C:\Games\My Game"
-                    className="flex-1 rounded-lg bg-surface-raised border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent transition"
+                    className="flex-1 rounded-lg bg-surface-raised border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-focus-ring transition"
                   />
                   <button
                     type="button"
@@ -230,8 +230,8 @@ export default function InstallDialog({
                       className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
                         runAsAdministrator
                           ? canToggleRunAsAdministrator
-                            ? "border-accent bg-accent text-neutral-950"
-                            : "border-accent/80 bg-accent/80 text-neutral-950 opacity-85"
+                            ? "border-accent bg-accent text-accent-foreground"
+                            : "border-accent/80 bg-accent/80 text-accent-foreground opacity-85"
                           : canToggleRunAsAdministrator
                             ? "border-border bg-surface-raised text-transparent"
                             : "border-border/70 bg-surface-raised/80 text-transparent opacity-70"
@@ -306,7 +306,7 @@ export default function InstallDialog({
                 )
               }
               disabled={downloadMode ? false : !canInstall}
-              className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-neutral-950 hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+              className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
               {downloadMode ? "Download" : "Install"}
             </button>

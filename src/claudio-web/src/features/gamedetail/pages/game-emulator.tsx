@@ -357,7 +357,7 @@ export default function GameEmulator() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void sounds.back();
               }}
-              className="rounded text-sm text-text-muted transition hover:text-accent outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8]"
+              className="rounded text-sm text-text-muted transition hover:text-accent outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)]"
             >
               ← Back to {game.title}
             </Link>
@@ -378,7 +378,7 @@ export default function GameEmulator() {
                   <Menu as="div" className="relative">
                     <MenuButton
                       data-gamepad-nav-bridge={loadStateMenuBridgeId}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent"
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus-ring"
                     >
                       Load state…
                       <svg
@@ -427,7 +427,7 @@ export default function GameEmulator() {
                   type="button"
                   disabled={savingState}
                   onClick={handleSaveState}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
                 >
                   <svg
                     className="h-4 w-4"
@@ -458,7 +458,7 @@ export default function GameEmulator() {
                   onChange={(event) => {
                     setSelectedPath(event.target.value);
                   }}
-                  className="min-w-80 rounded-xl border border-border bg-surface-raised px-3 py-2.5 text-sm text-text-primary transition focus:border-accent"
+                  className="min-w-80 rounded-xl border border-border bg-surface-raised px-3 py-2.5 text-sm text-text-primary transition focus:border-focus-ring"
                 >
                   {emulation.candidates.map((candidate) => (
                     <option key={candidate} value={candidate}>
@@ -541,7 +541,7 @@ export default function GameEmulator() {
                           type="button"
                           disabled={!canStart || sessionMutation.isPending}
                           onClick={startEmulation}
-                          className="inline-flex items-center gap-3 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg) disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center gap-3 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg) disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5.14v13.72c0 .79.87 1.27 1.54.84l10.28-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z" />

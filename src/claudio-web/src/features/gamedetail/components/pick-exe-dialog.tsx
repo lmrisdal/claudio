@@ -51,7 +51,7 @@ export default function PickExeDialog({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-text-secondary ring-1 ring-border hover:text-text-primary transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-text-secondary ring-1 ring-border hover:text-text-primary transition outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
             >
               Cancel
             </button>
@@ -61,7 +61,7 @@ export default function PickExeDialog({
               onClick={() => {
                 if (exe) onConfirm(exe);
               }}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition enabled:hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
             >
               Launch
             </button>

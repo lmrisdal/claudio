@@ -171,7 +171,7 @@ export default function GameDetail() {
               void sounds.back();
             }
           }}
-          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_#00d9b8] ${
+          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
             displayGame.heroUrl
               ? "hero-glass-chip bg-black/30 dark:text-white/85 text-black/80 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 dark:hover:text-white hover:text-black shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
               : "text-text-muted hover:text-text-primary"

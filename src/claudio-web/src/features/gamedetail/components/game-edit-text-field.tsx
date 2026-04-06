@@ -26,7 +26,7 @@ export default function GameEditTextField({
         onChange={(event) => onChange(event.target.value)}
         required={required}
         placeholder={placeholder}
-        className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent transition"
+        className="mt-1 w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-focus-ring transition"
       />
     </div>
   );

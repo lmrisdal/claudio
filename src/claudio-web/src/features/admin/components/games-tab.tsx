@@ -67,7 +67,7 @@ export default function GamesTab() {
             placeholder="Filter games..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-raised border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-accent transition placeholder:text-text-muted"
+            className="w-full bg-surface-raised border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-focus-ring transition placeholder:text-text-muted"
           />
         </div>
         <p className="text-sm text-text-secondary whitespace-nowrap">

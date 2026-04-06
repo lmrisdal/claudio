@@ -26,7 +26,7 @@ export default function AppDownloadsSettingsTab({
           onBlur={() => void settings.handleSave()}
           placeholder="Leave empty for default..."
           spellCheck={false}
-          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
         />
       </div>
 
@@ -48,7 +48,7 @@ export default function AppDownloadsSettingsTab({
             onChange={(event) => settings.setSpeedLimit(event.target.value)}
             onBlur={() => void settings.handleSave()}
             placeholder="Unlimited"
-            className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
           <span className="shrink-0 text-sm text-text-muted">KB/s</span>
         </div>

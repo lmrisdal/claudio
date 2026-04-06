@@ -230,13 +230,13 @@ export default function DesktopSidebar({
               isActive(item.to)
                 ? "bg-surface-raised text-text-primary"
                 : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
-            } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
             title={collapsed ? item.label : undefined}
           >
             <span className="relative shrink-0">
               <item.icon className="w-4.5 h-4.5" />
               {item.badge != undefined && (
-                <span className="absolute -top-1.5 -right-2 min-w-4 h-4 flex items-center justify-center rounded-full bg-accent text-neutral-950 text-[10px] font-bold px-1">
+                <span className="absolute -top-1.5 -right-2 min-w-4 h-4 flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold px-1">
                   {item.badge}
                 </span>
               )}
@@ -252,7 +252,7 @@ export default function DesktopSidebar({
           data-desktop-sidebar-nav
           className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-hover ${
             collapsed ? "justify-center p-2.5" : "px-3 py-2"
-          } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+          } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
           title={collapsed ? "Settings" : undefined}
         >
           <SettingsIcon className="w-4.5 h-4.5 shrink-0" />
@@ -303,7 +303,7 @@ export default function DesktopSidebar({
                       active
                         ? "bg-surface-raised text-text-primary"
                         : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
-                    } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+                    } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
                     title={game.title}
                   >
                     {/* Progress bar spanning the full entry width */}
@@ -391,7 +391,7 @@ export default function DesktopSidebar({
                         active
                           ? "bg-surface-raised text-text-primary"
                           : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
-                      } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+                      } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
                       title={installed.title}
                     >
                       {cover ? (
@@ -440,7 +440,7 @@ export default function DesktopSidebar({
           data-desktop-sidebar-nav
           className={`flex items-center gap-3 rounded-lg transition text-sm text-text-muted hover:text-text-primary hover:bg-sidebar-hover w-full ${
             collapsed ? "justify-center p-2.5" : "px-3 py-2"
-          } outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+          } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
