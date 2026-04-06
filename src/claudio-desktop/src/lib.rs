@@ -143,6 +143,14 @@ pub fn run() {
                 .level(settings::log_level_filter(&initial_settings))
                 .max_file_size(10 * 1024 * 1024) // 10 MB
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
+                        path: settings::data_dir(),
+                        file_name: Some("claudio".to_string()),
+                    }),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())

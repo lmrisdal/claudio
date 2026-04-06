@@ -164,9 +164,14 @@ pub fn save(settings: &DesktopSettings) -> Result<(), String> {
 }
 
 fn default_data_dir() -> PathBuf {
+    let folder = if cfg!(any(target_os = "windows", target_os = "macos")) {
+        "Claudio"
+    } else {
+        "claudio"
+    };
     dirs::data_local_dir()
         .expect("could not determine local data directory")
-        .join("claudio")
+        .join(folder)
 }
 
 pub fn data_dir() -> PathBuf {
