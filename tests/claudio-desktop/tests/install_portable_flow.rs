@@ -22,8 +22,8 @@ async fn portable_install_from_zip_persists_registry_and_detects_executable() {
     let archive_body = fs::read(&archive_path).expect("archive should be readable");
 
     let server = TestServer::spawn(move |request| match request.path.as_str() {
-        "/api/games/1/download-ticket" => TestResponse::json(200, r#"{"ticket":"zip-ticket"}"#),
-        "/api/games/1/download?ticket=zip-ticket" => TestResponse {
+        "/api/games/1/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
+        "/api/games/1/download" => TestResponse {
             status: 200,
             headers: vec![(
                 "content-disposition".to_string(),
@@ -104,8 +104,8 @@ async fn portable_install_from_tar_gz_honors_explicit_game_exe_hint() {
     let server = TestServer::spawn(move |request| {
         request_count_for_server.fetch_add(1, Ordering::SeqCst);
         match request.path.as_str() {
-            "/api/games/2/download-ticket" => TestResponse::json(200, r#"{"ticket":"tgz-ticket"}"#),
-            "/api/games/2/download?ticket=tgz-ticket" => TestResponse {
+            "/api/games/2/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
+            "/api/games/2/download" => TestResponse {
                 status: 200,
                 headers: vec![(
                     "content-disposition".to_string(),

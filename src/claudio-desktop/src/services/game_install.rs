@@ -1249,24 +1249,25 @@ where
         }
     }
 
-    if !manifest_response.status().is_success() {
-        return Err(format!(
-            "Failed to load download file manifest: {}",
-            manifest_response.status()
-        ));
-    }
-
-    let manifest_json: serde_json::Value = manifest_response
-        .json()
-        .await
-        .map_err(|err| err.to_string())?;
+    let manifest_missing = manifest_response.status() == reqwest::StatusCode::NOT_FOUND;
+    let file_manifest: Option<Vec<serde_json::Value>> = if manifest_missing {
+        // Backward compatibility: older servers may not expose the manifest endpoint.
+        // Prefer legacy ticket flow in this case to match older server behavior.
+        None
+    } else if !manifest_response.status().is_success() {
+            return Err(format!(
+                "Failed to load download file manifest: {}",
+                manifest_response.status()
+            ));
+    } else {
+        let manifest_json: serde_json::Value = manifest_response
+            .json()
+            .await
+            .map_err(|err| err.to_string())?;
+        manifest_json.get("files").and_then(|v| v.as_array()).cloned()
+    };
 
     // Check if the server provided a file manifest for individual-file download.
-    let file_manifest: Option<Vec<serde_json::Value>> = manifest_json
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned();
-
     // Use individual-file download when manifest is present and small enough.
     const INDIVIDUAL_FILE_THRESHOLD: usize = 50;
     if let Some(ref files) = file_manifest {
@@ -1285,12 +1286,76 @@ where
         }
     }
 
-    let mut response = client
-        .get(format!("{server_url}/api/games/{game_id}/download"))
-        .headers(auth_headers)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
+    let mut response = if manifest_missing {
+        let mut ticket_response = client
+            .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+            .headers(auth_headers.clone())
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
+
+        if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            if let Some(refreshed_headers) =
+                refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
+            {
+                ticket_response = client
+                    .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+                    .headers(refreshed_headers.clone())
+                    .send()
+                    .await
+                    .map_err(|err| err.to_string())?;
+            }
+        }
+
+        if !ticket_response.status().is_success() {
+            return Err(format!(
+                "Failed to create download ticket: {}",
+                ticket_response.status()
+            ));
+        }
+
+        let ticket_json: serde_json::Value = ticket_response
+            .json()
+            .await
+            .map_err(|err| err.to_string())?;
+        let ticket = ticket_json
+            .get("ticket")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
+            .to_owned();
+
+        let mut response = client
+            .get(format!(
+                "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+            ))
+            .headers(auth_headers.clone())
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
+
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            if let Some(refreshed_headers) =
+                refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
+            {
+                response = client
+                    .get(format!(
+                        "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+                    ))
+                    .headers(refreshed_headers)
+                    .send()
+                    .await
+                    .map_err(|err| err.to_string())?;
+            }
+        }
+        response
+    } else {
+        client
+            .get(format!("{server_url}/api/games/{game_id}/download"))
+            .headers(auth_headers.clone())
+            .send()
+            .await
+            .map_err(|err| err.to_string())?
+    };
 
     if response.status() == reqwest::StatusCode::UNAUTHORIZED {
         if let Some(refreshed_headers) =
@@ -1306,10 +1371,77 @@ where
     }
 
     if !response.status().is_success() {
-        return Err(format!(
-            "Failed to download game package: {}",
-            response.status()
-        ));
+        // Backward compatibility: servers with manifest but no direct /download may only expose
+        // ticket-based /download?ticket=... flow and return 404 for direct /download.
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            let mut ticket_response = client
+                .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+                .headers(auth_headers.clone())
+                .send()
+                .await
+                .map_err(|err| err.to_string())?;
+
+            if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                if let Some(refreshed_headers) =
+                    refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
+                {
+                    ticket_response = client
+                        .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+                        .headers(refreshed_headers.clone())
+                        .send()
+                        .await
+                        .map_err(|err| err.to_string())?;
+                }
+            }
+
+            if !ticket_response.status().is_success() {
+                return Err(format!(
+                    "Failed to create download ticket: {}",
+                    ticket_response.status()
+                ));
+            }
+
+            let ticket_json: serde_json::Value = ticket_response
+                .json()
+                .await
+                .map_err(|err| err.to_string())?;
+            let ticket = ticket_json
+                .get("ticket")
+                .and_then(|value| value.as_str())
+                .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
+                .to_owned();
+
+            response = client
+                .get(format!(
+                    "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+                ))
+                .headers(auth_headers.clone())
+                .send()
+                .await
+                .map_err(|err| err.to_string())?;
+
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+                if let Some(refreshed_headers) =
+                    refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
+                {
+                    response = client
+                        .get(format!(
+                            "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+                        ))
+                        .headers(refreshed_headers)
+                        .send()
+                        .await
+                        .map_err(|err| err.to_string())?;
+                }
+            }
+        }
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "Failed to download game package: {}",
+                response.status()
+            ));
+        }
     }
 
     let filename =
@@ -3566,6 +3698,7 @@ mod tests {
         archive.finish().expect("zip archive should finish");
     }
 
+    #[cfg(feature = "integration-tests")]
     fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut cursor = std::io::Cursor::new(Vec::<u8>::new());
         {
@@ -4130,6 +4263,123 @@ mod tests {
 
             assert_eq!(error, "Install cancelled.");
             assert!(!temp_root.exists());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn download_package_with_uses_legacy_ticket_when_manifest_endpoint_missing() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let server = TestServer::spawn(|request| match request.path.as_str() {
+            "/api/games/12/download-files-manifest" => TestResponse::text(404, "missing"),
+            "/api/games/12/download-ticket" => TestResponse::json(200, r#"{"ticket":"fallback"}"#),
+            "/api/games/12/download?ticket=fallback" => TestResponse {
+                status: 200,
+                headers: vec![(
+                    "content-disposition".to_string(),
+                    "attachment; filename=fallback.tar".to_string(),
+                )],
+                body: b"fallback-payload".to_vec(),
+            },
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("download-manifest-fallback"), || async {
+            let settings = download_settings(server.url());
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let control = InstallControl::new();
+            let temp_root = crate::settings::temp_dir().join("download-manifest-fallback");
+            fs::create_dir_all(&temp_root).expect("temp root should exist");
+            let download = download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: None,
+                    progress_scale: 100.0,
+                },
+                12,
+                "Fallback",
+                &temp_root,
+                &control,
+                |_| {},
+                || Ok(()),
+            )
+            .await
+            .expect("download should succeed using legacy ticket fallback");
+
+            assert_eq!(download.file_path, temp_root.join("fallback.tar"));
+            assert_eq!(
+                fs::read(&download.file_path).expect("downloaded file should exist"),
+                b"fallback-payload"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn download_package_with_falls_back_to_legacy_ticket_when_direct_download_missing() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let server = TestServer::spawn(|request| match request.path.as_str() {
+            "/api/games/13/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
+            "/api/games/13/download" => TestResponse::text(404, "missing"),
+            "/api/games/13/download-ticket" => TestResponse::json(200, r#"{"ticket":"legacy"}"#),
+            "/api/games/13/download?ticket=legacy" => TestResponse {
+                status: 200,
+                headers: vec![(
+                    "content-disposition".to_string(),
+                    "attachment; filename=legacy.tar".to_string(),
+                )],
+                body: b"legacy-payload".to_vec(),
+            },
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("download-legacy-fallback"), || async {
+            let settings = download_settings(server.url());
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let control = InstallControl::new();
+            let temp_root = crate::settings::temp_dir().join("download-legacy-fallback");
+            fs::create_dir_all(&temp_root).expect("temp root should exist");
+            let download = download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: None,
+                    progress_scale: 100.0,
+                },
+                13,
+                "LegacyFallback",
+                &temp_root,
+                &control,
+                |_| {},
+                || Ok(()),
+            )
+            .await
+            .expect("download should succeed through legacy ticket fallback");
+
+            assert_eq!(download.file_path, temp_root.join("legacy.tar"));
+            assert_eq!(
+                fs::read(&download.file_path).expect("downloaded file should exist"),
+                b"legacy-payload"
+            );
         })
         .await;
     }
