@@ -292,36 +292,49 @@ async fn download_game_package_inner(
     .await?;
 
     let final_path = if input.extract {
-        emit_progress(
-            app,
-            input.id,
-            "extracting",
-            Some(60.0),
-            Some("Extracting archive…"),
-        );
-        let staging = temp_root.join("extract");
-        if staging.exists() {
-            fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
-        }
-        fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
-        let extract_app = app.clone();
-        let extract_gid = input.id;
-        extract_archive_subprocess(
-            &download_info.file_path,
-            &staging,
-            &control.cancel_token,
-            move |ratio| {
-                let percent = ratio.map(|r| 60.0 + r * 35.0);
-                emit_progress(
-                    &extract_app,
-                    extract_gid,
-                    "extracting",
-                    percent,
-                    Some("Extracting archive…"),
-                );
-            },
-        )
-        .await?;
+        let staging = if download_info.is_individual {
+            // Files already downloaded individually into the staging dir — skip extraction.
+            emit_progress(
+                app,
+                input.id,
+                "extracting",
+                Some(95.0),
+                Some("Moving files…"),
+            );
+            download_info.file_path.clone()
+        } else {
+            emit_progress(
+                app,
+                input.id,
+                "extracting",
+                Some(60.0),
+                Some("Extracting archive…"),
+            );
+            let staging = temp_root.join("extract");
+            if staging.exists() {
+                fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
+            }
+            fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
+            let extract_app = app.clone();
+            let extract_gid = input.id;
+            extract_archive_subprocess(
+                &download_info.file_path,
+                &staging,
+                &control.cancel_token,
+                move |ratio| {
+                    let percent = ratio.map(|r| 60.0 + r * 35.0);
+                    emit_progress(
+                        &extract_app,
+                        extract_gid,
+                        "extracting",
+                        percent,
+                        Some("Extracting archive…"),
+                    );
+                },
+            )
+            .await?;
+            staging
+        };
 
         let dest = target_dir.clone();
         let staging_for_move = staging.clone();
@@ -691,41 +704,56 @@ pub(crate) mod integration_testing {
         .await?;
 
         let final_path = if input.extract {
-            emit_progress_with_bytes_to(
-                &mut on_progress,
-                input.id,
-                "extracting",
-                Some(60.0),
-                Some("Extracting archive…"),
-                None,
-                None,
-                None,
-            );
-            let staging = temp_root.join("extract");
-            if staging.exists() {
-                fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
-            }
-            fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
+            let staging = if download_info.is_individual {
+                emit_progress_with_bytes_to(
+                    &mut on_progress,
+                    input.id,
+                    "extracting",
+                    Some(95.0),
+                    Some("Moving files…"),
+                    None,
+                    None,
+                    None,
+                );
+                download_info.file_path.clone()
+            } else {
+                emit_progress_with_bytes_to(
+                    &mut on_progress,
+                    input.id,
+                    "extracting",
+                    Some(60.0),
+                    Some("Extracting archive…"),
+                    None,
+                    None,
+                    None,
+                );
+                let staging = temp_root.join("extract");
+                if staging.exists() {
+                    fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
+                }
+                fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
 
-            extract_archive_subprocess(
-                &download_info.file_path,
-                &staging,
-                &controller.control.cancel_token,
-                |ratio| {
-                    let percent = ratio.map(|r| 60.0 + r * 35.0);
-                    emit_progress_with_bytes_to(
-                        &mut on_progress,
-                        input.id,
-                        "extracting",
-                        percent,
-                        Some("Extracting archive…"),
-                        None,
-                        None,
-                        None,
-                    );
-                },
-            )
-            .await?;
+                extract_archive_subprocess(
+                    &download_info.file_path,
+                    &staging,
+                    &controller.control.cancel_token,
+                    |ratio| {
+                        let percent = ratio.map(|r| 60.0 + r * 35.0);
+                        emit_progress_with_bytes_to(
+                            &mut on_progress,
+                            input.id,
+                            "extracting",
+                            percent,
+                            Some("Extracting archive…"),
+                            None,
+                            None,
+                            None,
+                        );
+                    },
+                )
+                .await?;
+                staging
+            };
 
             let moved_entries = tokio::task::spawn_blocking({
                 let staging_for_move = staging.clone();
@@ -1099,6 +1127,9 @@ async fn install_game_inner(
 
 struct DownloadInfo {
     file_path: PathBuf,
+    /// True when files were downloaded individually into `file_path` (which is the temp_root/files dir),
+    /// so no archive extraction is needed — the directory can be moved directly to the target.
+    is_individual: bool,
 }
 
 struct DownloadOptions<'a> {
@@ -1200,7 +1231,33 @@ where
     let ticket = ticket_json
         .get("ticket")
         .and_then(|value| value.as_str())
-        .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?;
+        .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
+        .to_owned();
+
+    // Check if the server provided a file manifest for individual-file download.
+    let file_manifest: Option<Vec<serde_json::Value>> = ticket_json
+        .get("files")
+        .and_then(|v| v.as_array())
+        .cloned();
+
+    // Use individual-file download when manifest is present and small enough.
+    const INDIVIDUAL_FILE_THRESHOLD: usize = 50;
+    if let Some(ref files) = file_manifest {
+        if files.len() < INDIVIDUAL_FILE_THRESHOLD {
+            return download_files_individually(
+                opts,
+                game_id,
+                game_title,
+                temp_root,
+                control,
+                &mut on_progress,
+                &auth_headers,
+                &ticket,
+                files,
+            )
+            .await;
+        }
+    }
 
     let mut response = client
         .get(format!(
@@ -1323,7 +1380,173 @@ where
         .map_err(|e| format!("Writer thread panicked: {e}"))??;
     Ok(DownloadInfo {
         file_path: download_path,
+        is_individual: false,
     })
+}
+
+/// Downloads loose-folder game files individually in parallel and writes them
+/// to `temp_root/files/` preserving relative paths.
+/// Returns a `DownloadInfo` with `is_individual: true` so callers skip archive extraction.
+#[allow(clippy::too_many_arguments)]
+async fn download_files_individually<F>(
+    opts: &DownloadOptions<'_>,
+    game_id: i32,
+    game_title: &str,
+    temp_root: &Path,
+    control: &InstallControl,
+    on_progress: &mut F,
+    auth_headers: &HeaderMap,
+    _ticket: &str,
+    files: &[serde_json::Value],
+) -> Result<DownloadInfo, String>
+where
+    F: FnMut(InstallProgress),
+{
+    use futures_util::stream::{self, StreamExt as _};
+    use std::sync::atomic::AtomicU64;
+
+    let staging = temp_root.join("files");
+    fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
+
+    let total_bytes: u64 = files
+        .iter()
+        .filter_map(|f| f.get("size").and_then(|s| s.as_u64()))
+        .sum();
+    let downloaded_bytes = Arc::new(AtomicU64::new(0));
+    let file_count = files.len();
+
+    emit_progress_with_bytes_to(
+        on_progress,
+        game_id,
+        "downloading",
+        Some(0.0),
+        Some(&format!("Downloading {game_title}")),
+        Some(0),
+        Some(total_bytes),
+        None,
+    );
+
+    let server_url = opts.server_url.to_owned();
+    let progress_scale = opts.progress_scale;
+
+    let tasks: Vec<_> = files
+        .iter()
+        .enumerate()
+        .map(|(i, file)| {
+            let rel_path = file
+                .get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            let url = format!(
+                "{server_url}/api/games/{game_id}/download-file?path={}",
+                urlencoding_encode(&rel_path)
+            );
+            let dest = staging.join(
+                rel_path
+                    .replace('/', std::path::MAIN_SEPARATOR_STR)
+                    .trim_start_matches(std::path::MAIN_SEPARATOR),
+            );
+            let headers = auth_headers.clone();
+            let dl_bytes = Arc::clone(&downloaded_bytes);
+            let cancel_token = control.cancel_token.clone();
+            async move {
+                if cancel_token.load(Ordering::Relaxed) {
+                    return Err("Install cancelled.".to_string());
+                }
+                let client = reqwest::Client::new();
+                let response = client
+                    .get(&url)
+                    .headers(headers)
+                    .send()
+                    .await
+                    .map_err(|e| format!("Failed to download {rel_path}: {e}"))?;
+
+                if !response.status().is_success() {
+                    return Err(format!(
+                        "Failed to download {rel_path}: HTTP {}",
+                        response.status()
+                    ));
+                }
+
+                let bytes = response
+                    .bytes()
+                    .await
+                    .map_err(|e| format!("Failed to read {rel_path}: {e}"))?;
+
+                if let Some(parent) = dest.parent() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create directory for {rel_path}: {e}"))?;
+                }
+                fs::write(&dest, &bytes)
+                    .map_err(|e| format!("Failed to write {rel_path}: {e}"))?;
+
+                dl_bytes.fetch_add(bytes.len() as u64, Ordering::Relaxed);
+                Ok::<usize, String>(i)
+            }
+        })
+        .collect();
+
+    // Process tasks in parallel with a concurrency limit of 8.
+    let mut completed = 0usize;
+    let mut last_progress_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
+
+    let mut stream = stream::iter(tasks).buffer_unordered(8);
+    while let Some(result) = stream.next().await {
+        if control.is_cancelled() {
+            return Err("Install cancelled.".to_string());
+        }
+        result?;
+        completed += 1;
+
+        let now = std::time::Instant::now();
+        if now.duration_since(last_progress_emit).as_millis() >= 200 {
+            last_progress_emit = now;
+            let dl = downloaded_bytes.load(Ordering::Relaxed);
+            let percent = if total_bytes > 0 {
+                Some((dl as f64 / total_bytes as f64) * progress_scale)
+            } else if file_count > 0 {
+                Some((completed as f64 / file_count as f64) * progress_scale)
+            } else {
+                None
+            };
+            emit_progress_with_bytes_to(
+                on_progress,
+                game_id,
+                "downloading",
+                percent,
+                Some(&format!("Downloading {game_title} ({completed}/{file_count})")),
+                Some(dl),
+                Some(total_bytes),
+                None,
+            );
+        }
+    }
+
+    Ok(DownloadInfo {
+        file_path: staging,
+        is_individual: true,
+    })
+}
+
+fn urlencoding_encode(input: &str) -> String {
+    let mut encoded = String::with_capacity(input.len());
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char);
+            }
+            b'/' => encoded.push('/'),
+            other => {
+                encoded.push('%');
+                encoded.push(char::from_digit((other >> 4) as u32, 16).unwrap().to_ascii_uppercase());
+                encoded.push(char::from_digit((other & 0xf) as u32, 16).unwrap().to_ascii_uppercase());
+            }
+        }
+    }
+    encoded
 }
 
 async fn install_portable(

@@ -294,6 +294,108 @@ public class GameEndpointTests : IAsyncDisposable
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Test]
+    public async Task DownloadTicket_LooseFolder_IncludesFileManifest()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "game.exe"), "exe");
+        File.WriteAllText(Path.Combine(gameDir, "readme.txt"), "info");
+
+        await SeedGameAsync("Doom", "pc", "Doom", gameDir);
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.PostAsync("/api/games/1/download-ticket", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.TryGetProperty("ticket", out _).Should().BeTrue();
+        json.TryGetProperty("files", out var files).Should().BeTrue();
+        files.ValueKind.Should().Be(JsonValueKind.Array);
+        files.GetArrayLength().Should().Be(2);
+        var paths = Enumerable.Range(0, files.GetArrayLength())
+            .Select(i => files[i].GetProperty("path").GetString())
+            .ToList();
+        paths.Should().Contain("game.exe");
+        paths.Should().Contain("readme.txt");
+    }
+
+    [Test]
+    public async Task DownloadTicket_StandaloneArchive_OmitsFileManifest()
+    {
+        var archivePath = Path.Combine(_gamesDir, "pc", "game.zip");
+        Directory.CreateDirectory(Path.GetDirectoryName(archivePath)!);
+        File.WriteAllText(archivePath, "fake-zip");
+
+        await SeedGameAsync("ZipGame", "pc", "game.zip", archivePath);
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.PostAsync("/api/games/1/download-ticket", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.TryGetProperty("ticket", out _).Should().BeTrue();
+        json.TryGetProperty("files", out var files).Should().BeTrue();
+        files.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Test]
+    public async Task DownloadFile_WithAuth_ReturnsFile()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "game.exe"), "binary-content");
+
+        await SeedGameAsync("Doom", "pc", "Doom", gameDir);
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/games/1/download-file?path=game.exe");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Be("binary-content");
+    }
+
+    [Test]
+    public async Task DownloadFile_WithoutAuth_Returns401()
+    {
+        await SeedGameAsync("Doom", "pc", "Doom");
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/games/1/download-file?path=game.exe");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task DownloadFile_PathTraversal_ReturnsBadRequest()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "game.exe"), "binary-content");
+
+        await SeedGameAsync("Doom", "pc", "Doom", gameDir);
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/games/1/download-file?path=../../etc/passwd");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task DownloadFile_MissingFile_Returns404()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
+        Directory.CreateDirectory(gameDir);
+
+        await SeedGameAsync("Doom", "pc", "Doom", gameDir);
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/games/1/download-file?path=nonexistent.exe");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _factory.DisposeAsync();

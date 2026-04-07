@@ -25,6 +25,7 @@ public static class GameEndpoints
         group.MapGet("/{id:int}/installer-inspection", InspectInstaller);
         group.MapPost("/{id:int}/download-ticket", CreateDownloadTicket);
         group.MapGet("/{id:int}/download", Download).AllowAnonymous();
+        group.MapGet("/{id:int}/download-file", DownloadFile);
         group.MapGet("/{id:int}/browse", BrowseGameFiles);
         group.MapGet("/{id:int}/emulation", GetEmulationInfo);
         group.MapPost("/{id:int}/emulation/session", CreateEmulationSession);
@@ -97,7 +98,7 @@ public static class GameEndpoints
         }
     }
 
-    private static async Task<IResult> CreateDownloadTicket(int id, AppDbContext db, DownloadTicketService ticketService, DownloadService downloadService)
+    private static async Task<IResult> CreateDownloadTicket(int id, AppDbContext db, DownloadTicketService ticketService)
     {
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
@@ -106,17 +107,31 @@ public static class GameEndpoints
         if (!ExistsOnDisk(game))
             return Results.Problem("Game files not found on disk.", statusCode: 500);
 
-        // Pre-build tar if needed so the download endpoint can serve it immediately
-        if (!IsStandaloneArchive(game))
+        var ticket = ticketService.CreateTicket(id);
+
+        // For loose folders, include a file manifest so the client can choose its download strategy.
+        // Standalone archives and single-archive folders skip the manifest (tar path is used instead).
+        List<DownloadFileManifestEntry>? files = null;
+        if (!IsStandaloneArchive(game) && Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is null)
         {
-            var singleArchive = FindSingleArchive(game.FolderPath);
-            if (singleArchive is null)
-                await downloadService.CreateTarAsync(game);
+            files = Directory.GetFiles(game.FolderPath, "*", SearchOption.AllDirectories)
+                .Where(f => !Path.GetRelativePath(game.FolderPath, f)
+                    .Split(Path.DirectorySeparatorChar)
+                    .Any(segment => GameEndpoints.HiddenNames.Contains(segment)))
+                .Select(f =>
+                {
+                    var rel = Path.GetRelativePath(game.FolderPath, f).Replace('\\', '/');
+                    var size = new FileInfo(f).Length;
+                    return new DownloadFileManifestEntry(rel, size);
+                })
+                .OrderBy(e => e.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
-        var ticket = ticketService.CreateTicket(id);
-        return Results.Ok(new { ticket });
+        return Results.Ok(new { ticket, files });
     }
+
+    public record DownloadFileManifestEntry(string Path, long Size);
 
     private static async Task<IResult> Download(
         int id,
@@ -174,6 +189,24 @@ public static class GameEndpoints
             contentType: "application/x-tar",
             fileDownloadName: $"{game.Title}.tar",
             enableRangeProcessing: true);
+    }
+
+    private static async Task<IResult> DownloadFile(
+        int id,
+        [FromQuery] string path,
+        AppDbContext db)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+
+        var normalizedPath = NormalizeRelativePath(path);
+        if (normalizedPath is null)
+            return Results.BadRequest("Invalid file path.");
+
+        if (!TryResolveGameFilePath(game, normalizedPath, out var fullPath))
+            return Results.NotFound();
+
+        return Results.File(fullPath, "application/octet-stream", enableRangeProcessing: true);
     }
 
     public static GameDto ToDto(Game game) => new()
@@ -249,7 +282,7 @@ public static class GameEndpoints
     public record BrowseResult(string Path, bool InsideArchive, List<BrowseEntry> Entries);
 
     internal static readonly HashSet<string> HiddenNames = new(StringComparer.OrdinalIgnoreCase)
-        { "__MACOSX", ".DS_Store", "@eaDir", "#recycle", "Thumbs.db" };
+        { "__MACOSX", ".DS_Store", "@eaDir", "#recycle", "Thumbs.db", ".claudio" };
 
     private static readonly string[] ArchiveExtensions = [".zip", ".tar", ".tar.gz", ".tgz", ".iso"];
 
