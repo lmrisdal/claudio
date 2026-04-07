@@ -1,6 +1,6 @@
 use claudio_desktop::integration_test_api::{
     InstallController, PlaintextAuthGuard, StoredTokens, data_dir, install_portable_game,
-    list_installed_games, save_settings, store_tokens, temp_dir, with_test_data_dir_async,
+    list_installed_games, save_settings, store_tokens, with_test_data_dir_async,
 };
 use claudio_desktop_tests::support::archive::{write_tar_gz_archive, write_zip_archive};
 use claudio_desktop_tests::support::fixtures::{desktop_settings, portable_remote_game};
@@ -75,7 +75,7 @@ async fn portable_install_from_zip_persists_registry_and_detects_executable() {
                 .len(),
             1
         );
-        assert!(!temp_dir().join("install-1").exists());
+        assert!(!data_dir().join("downloads").join("Portable Install-1").exists());
         assert!(statuses.iter().any(|status| status == "downloading"));
         assert!(statuses.iter().any(|status| status == "extracting"));
         assert_eq!(statuses.last().map(String::as_str), Some("completed"));

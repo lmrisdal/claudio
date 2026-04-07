@@ -1,9 +1,9 @@
 use claudio_desktop::integration_test_api::{
     DesktopSettings, RunningGameInfo, command_get_installed_game, command_launch_game,
     command_list_game_executables, command_list_installed_games, command_list_running_games,
-    command_resolve_install_path, command_set_game_exe, command_stop_game, command_uninstall_game,
-    new_running_games_state, record_running_game_for_test, save_settings, upsert_installed_game,
-    with_test_data_dir_async,
+    command_resolve_download_path, command_resolve_install_path, command_set_game_exe,
+    command_stop_game, command_uninstall_game, new_running_games_state, record_running_game_for_test,
+    save_settings, upsert_installed_game, with_test_data_dir_async,
 };
 use claudio_desktop_tests::support::fixtures::installed_game;
 use claudio_desktop_tests::support::fs::TestWorkspace;
@@ -64,6 +64,16 @@ async fn command_registry_flow_lists_gets_updates_uninstalls_and_resolves_instal
         assert_eq!(
             resolved,
             install_root.join("Halo_ Reach _ GOTY__").to_string_lossy()
+        );
+
+        let resolved_download = command_resolve_download_path(" Halo: Reach / GOTY?* ");
+        assert_eq!(
+            resolved_download,
+            workspace
+                .data_dir
+                .join("downloads")
+                .join("Halo_ Reach _ GOTY__")
+                .to_string_lossy()
         );
 
         command_uninstall_game(31, false)

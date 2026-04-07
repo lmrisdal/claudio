@@ -1,6 +1,6 @@
 use claudio_desktop::integration_test_api::{
     DownloadPackageInput, InstallController, PlaintextAuthGuard, StoredTokens, data_dir,
-    download_game_package, save_settings, store_tokens, temp_dir, with_test_data_dir_async,
+    download_game_package, save_settings, store_tokens, with_test_data_dir_async,
 };
 use claudio_desktop_tests::support::archive::{write_tar_gz_archive, write_zip_archive};
 use claudio_desktop_tests::support::fixtures::desktop_settings;
@@ -64,7 +64,7 @@ async fn download_package_flow_saves_archive_when_extract_is_false() {
             target_dir.join("game-package.zip").to_string_lossy()
         );
         assert!(target_dir.join("game-package.zip").exists());
-        assert!(!temp_dir().join("download-10").exists());
+        assert!(!data_dir().join("downloads").join("Archive Download-10").exists());
     })
     .await;
 }

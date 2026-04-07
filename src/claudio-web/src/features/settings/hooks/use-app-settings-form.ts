@@ -1,14 +1,30 @@
 import { useEffect, useState } from "react";
-import { getSettings, updateSettings, type DesktopSettings } from "../../desktop/hooks/use-desktop";
+import {
+  getSettings,
+  resolveDefaultDownloadRoot,
+  updateSettings,
+  type DesktopSettings,
+} from "../../desktop/hooks/use-desktop";
 import { buildDesktopCustomHeaders } from "../../desktop/utils/custom-headers";
 
 type HeaderField = { name: string; value: string };
+
+function deriveDownloadPathFromInstallPath(installPath: string): string {
+  const trimmed = installPath.trim();
+  if (!trimmed) return "";
+
+  const normalized = trimmed.replace(/[\\/]+$/, "");
+  const separator = normalized.includes("\\") && !normalized.includes("/") ? "\\" : "/";
+  return `${normalized}${separator}downloads`;
+}
 
 export interface AppSettingsFormState {
   serverUrl: string;
   setServerUrl: (value: string) => void;
   installPath: string;
   setInstallPath: (value: string) => void;
+  downloadPath: string;
+  setDownloadPath: (value: string) => void;
   closeToTray: boolean;
   setCloseToTray: (value: boolean) => void;
   hideDockIcon: boolean;
@@ -31,6 +47,8 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
   const [serverUrl, setServerUrl] = useState("");
   const [installPath, setInstallPath] = useState("");
+  const [downloadPath, setDownloadPath] = useState("");
+  const [resolvedDefaultDownloadRoot, setResolvedDefaultDownloadRoot] = useState("");
   const [closeToTray, setCloseToTray] = useState(false);
   const [hideDockIcon, setHideDockIcon] = useState(false);
   const [speedLimit, setSpeedLimit] = useState("");
@@ -46,12 +64,19 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
 
     let cancelled = false;
 
-    void getSettings().then((loadedSettings) => {
+    void getSettings().then(async (loadedSettings) => {
       if (cancelled) return;
 
       setSettings(loadedSettings);
       setServerUrl(loadedSettings.serverUrl ?? "");
-      setInstallPath(loadedSettings.defaultInstallPath ?? "");
+      const loadedInstallPath = loadedSettings.defaultInstallPath ?? "";
+      const effectiveDefaultDownloadRoot = await resolveDefaultDownloadRoot().catch(() => "");
+      const fallbackDownloadPath =
+        effectiveDefaultDownloadRoot || deriveDownloadPathFromInstallPath(loadedInstallPath);
+      if (cancelled) return;
+      setInstallPath(loadedInstallPath);
+      setResolvedDefaultDownloadRoot(effectiveDefaultDownloadRoot);
+      setDownloadPath(loadedSettings.defaultDownloadPath ?? fallbackDownloadPath);
       setCloseToTray(loadedSettings.closeToTray ?? false);
       setHideDockIcon(loadedSettings.hideDockIcon ?? false);
       setSpeedLimit(
@@ -139,11 +164,17 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       setSaving(true);
       setSaveMessage("");
 
+      const normalizedInstallPath = installPath.trim();
+      const normalizedDownloadPath =
+        downloadPath.trim() ||
+        resolvedDefaultDownloadRoot ||
+        deriveDownloadPathFromInstallPath(normalizedInstallPath);
       const parsedLimit = Number.parseFloat(speedLimit);
       const updated: DesktopSettings = {
         ...settings,
         serverUrl: trimmedUrl,
-        defaultInstallPath: installPath.trim() || null,
+        defaultInstallPath: normalizedInstallPath || null,
+        defaultDownloadPath: normalizedDownloadPath || null,
         closeToTray,
         hideDockIcon,
         customHeaders,
@@ -210,6 +241,8 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     setServerUrl,
     installPath,
     setInstallPath,
+    downloadPath,
+    setDownloadPath,
     closeToTray,
     setCloseToTray: handleCloseToTrayChange,
     hideDockIcon,

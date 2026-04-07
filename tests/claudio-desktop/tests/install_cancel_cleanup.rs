@@ -1,6 +1,6 @@
 use claudio_desktop::integration_test_api::{
     InstallController, PlaintextAuthGuard, StoredTokens, data_dir, get_installed_game,
-    install_portable_game, save_settings, store_tokens, temp_dir, with_test_data_dir_async,
+    install_portable_game, save_settings, store_tokens, with_test_data_dir_async,
 };
 use claudio_desktop_tests::support::archive::write_tar_gz_archive;
 use claudio_desktop_tests::support::fixtures::{desktop_settings, portable_remote_game};
@@ -60,7 +60,7 @@ async fn portable_install_cleans_temp_and_target_when_cancelled() {
 
         assert_eq!(error, "Install cancelled.");
         assert!(!install_path.exists());
-        assert!(!temp_dir().join("install-12").exists());
+        assert!(!data_dir().join("downloads").join("Cancelled Install-12").exists());
         assert!(
             get_installed_game(12)
                 .expect("installed game should load")

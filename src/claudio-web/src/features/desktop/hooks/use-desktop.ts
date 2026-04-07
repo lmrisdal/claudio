@@ -22,6 +22,7 @@ interface DesktopSettings {
   windowX: number | null;
   windowY: number | null;
   defaultInstallPath: string | null;
+  defaultDownloadPath: string | null;
   closeToTray: boolean;
   hideDockIcon: boolean;
   customHeaders: Record<string, string>;
@@ -153,6 +154,14 @@ export async function downloadGamePackage(input: DownloadPackageInput): Promise<
 
 export async function resolveInstallPath(gameTitle: string): Promise<string> {
   return invoke<string>("resolve_install_path", { gameTitle });
+}
+
+export async function resolveDefaultDownloadRoot(): Promise<string> {
+  return invoke<string>("resolve_default_download_root");
+}
+
+export async function resolveDownloadPath(gameTitle: string): Promise<string> {
+  return invoke<string>("resolve_download_path", { gameTitle });
 }
 
 export async function getInstalledGame(remoteGameId: number): Promise<InstalledGame | null> {

@@ -177,6 +177,8 @@ pub fn run() {
             commands::games::list_running_games,
             commands::games::restart_install_interactive,
             commands::games::resolve_install_path,
+            commands::games::resolve_default_download_root,
+            commands::games::resolve_download_path,
             commands::games::open_install_folder,
             commands::games::set_game_exe,
             commands::games::stop_game,

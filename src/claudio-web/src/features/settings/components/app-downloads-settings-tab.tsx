@@ -32,6 +32,26 @@ export default function AppDownloadsSettingsTab({
 
       <div>
         <label
+          htmlFor="settings-download-path"
+          className="mb-1.5 block text-sm font-medium text-text-secondary"
+        >
+          Default downloads path
+        </label>
+        <input
+          ref={(element) => setIndexedReference(contentRefs, 1, element)}
+          id="settings-download-path"
+          type="text"
+          value={settings.downloadPath}
+          onChange={(event) => settings.setDownloadPath(event.target.value)}
+          onBlur={() => void settings.handleSave()}
+          placeholder="Leave empty for install path + /downloads..."
+          spellCheck={false}
+          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
+        />
+      </div>
+
+      <div>
+        <label
           htmlFor="settings-speed-limit"
           className="mb-1.5 block text-sm font-medium text-text-secondary"
         >
@@ -39,7 +59,7 @@ export default function AppDownloadsSettingsTab({
         </label>
         <div className="flex items-center gap-2">
           <input
-            ref={(element) => setIndexedReference(contentRefs, 1, element)}
+            ref={(element) => setIndexedReference(contentRefs, 2, element)}
             id="settings-speed-limit"
             type="number"
             min="0"

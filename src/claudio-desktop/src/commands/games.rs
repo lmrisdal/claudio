@@ -67,6 +67,14 @@ pub(crate) fn resolve_install_path_command(game_title: String) -> String {
     game_install::resolve_install_path(&game_title)
 }
 
+pub(crate) fn resolve_default_download_root_command() -> String {
+    game_install::resolve_default_download_root_path()
+}
+
+pub(crate) fn resolve_download_path_command(game_title: String) -> String {
+    game_install::resolve_download_path(&game_title)
+}
+
 #[tauri::command]
 pub async fn install_game(
     app: AppHandle,
@@ -155,4 +163,14 @@ pub async fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, S
 #[tauri::command]
 pub fn resolve_install_path(game_title: String) -> String {
     resolve_install_path_command(game_title)
+}
+
+#[tauri::command]
+pub fn resolve_default_download_root() -> String {
+    resolve_default_download_root_command()
+}
+
+#[tauri::command]
+pub fn resolve_download_path(game_title: String) -> String {
+    resolve_download_path_command(game_title)
 }

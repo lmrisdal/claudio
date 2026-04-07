@@ -80,10 +80,6 @@ pub fn data_dir() -> PathBuf {
     crate::settings::data_dir()
 }
 
-pub fn temp_dir() -> PathBuf {
-    crate::settings::temp_dir()
-}
-
 pub fn list_installed_games() -> Result<Vec<InstalledGame>, String> {
     crate::services::game_install::list_installed_games()
 }
@@ -110,6 +106,10 @@ pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String>
 
 pub fn resolve_install_path(game_title: &str) -> String {
     crate::services::game_install::resolve_install_path(game_title)
+}
+
+pub fn resolve_download_path(game_title: &str) -> String {
+    crate::services::game_install::resolve_download_path(game_title)
 }
 
 pub async fn command_list_installed_games() -> Result<Vec<InstalledGame>, String> {
@@ -153,6 +153,10 @@ pub async fn command_list_game_executables(remote_game_id: i32) -> Result<Vec<St
 
 pub fn command_resolve_install_path(game_title: &str) -> String {
     crate::commands::games::resolve_install_path_command(game_title.to_string())
+}
+
+pub fn command_resolve_download_path(game_title: &str) -> String {
+    crate::commands::games::resolve_download_path_command(game_title.to_string())
 }
 
 pub async fn download_game_package<F, G>(

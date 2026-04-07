@@ -38,6 +38,7 @@ pub struct DesktopSettings {
     pub window_x: Option<f64>,
     pub window_y: Option<f64>,
     pub default_install_path: Option<String>,
+    pub default_download_path: Option<String>,
     #[serde(default)]
     pub close_to_tray: bool,
     #[serde(default)]
@@ -61,6 +62,7 @@ impl Default for DesktopSettings {
             window_x: None,
             window_y: None,
             default_install_path: None,
+            default_download_path: None,
             close_to_tray: false,
             hide_dock_icon: false,
             custom_headers: HashMap::new(),
@@ -116,12 +118,6 @@ pub(crate) fn registry_path() -> PathBuf {
 
 pub(crate) fn auth_fallback_tokens_path() -> PathBuf {
     data_dir().join("auth-fallback.json")
-}
-
-pub(crate) fn temp_dir() -> PathBuf {
-    let dir = data_dir().join("tmp");
-    fs::create_dir_all(&dir).expect("could not create temp directory");
-    dir
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
@@ -260,6 +256,22 @@ pub fn resolve_install_root(settings: &DesktopSettings) -> Result<PathBuf, Strin
     Ok(path)
 }
 
+/// Returns the downloads root without creating any directories. Used to suggest
+/// default paths in the UI.
+pub fn default_download_root(settings: &DesktopSettings) -> PathBuf {
+    settings
+        .default_download_path
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir().join("downloads"))
+}
+
+pub fn resolve_download_root(settings: &DesktopSettings) -> Result<PathBuf, String> {
+    let path = default_download_root(settings);
+    fs::create_dir_all(&path).map_err(|err| err.to_string())?;
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,6 +320,7 @@ mod tests {
             let settings = DesktopSettings {
                 server_url: Some("https://example.com".to_string()),
                 default_install_path: Some("/tmp/games".to_string()),
+                default_download_path: Some("/tmp/downloads".to_string()),
                 custom_headers: HashMap::from([
                     ("X-Test".to_string(), "ok".to_string()),
                     ("Authorization".to_string(), "blocked".to_string()),
@@ -320,6 +333,7 @@ mod tests {
 
             assert_eq!(loaded.server_url.as_deref(), Some("https://example.com"));
             assert_eq!(loaded.default_install_path.as_deref(), Some("/tmp/games"));
+            assert_eq!(loaded.default_download_path.as_deref(), Some("/tmp/downloads"));
             assert_eq!(
                 loaded.custom_headers.get("X-Test").map(String::as_str),
                 Some("ok")
@@ -330,14 +344,11 @@ mod tests {
     }
 
     #[test]
-    fn temp_and_tools_dirs_are_created_under_overridden_data_dir() {
+    fn tools_dir_is_created_under_overridden_data_dir() {
         with_test_data_dir(unique_test_dir("subdirs"), || {
-            let tmp = temp_dir();
             let tools = tools_dir();
 
-            assert!(tmp.ends_with("tmp"));
             assert!(tools.ends_with("tools"));
-            assert!(tmp.exists());
             assert!(tools.exists());
         });
     }
@@ -352,6 +363,33 @@ mod tests {
         assert_eq!(
             default_install_root(&settings),
             PathBuf::from("/tmp/claudio-games")
+        );
+    }
+
+    #[test]
+    fn default_download_root_prefers_configured_path() {
+        let settings = DesktopSettings {
+            default_download_path: Some("/tmp/claudio-downloads".to_string()),
+            ..DesktopSettings::default()
+        };
+
+        assert_eq!(
+            default_download_root(&settings),
+            PathBuf::from("/tmp/claudio-downloads")
+        );
+    }
+
+    #[test]
+    fn default_download_root_falls_back_to_app_data_downloads_subdir() {
+        let settings = DesktopSettings {
+            default_install_path: Some("/tmp/claudio-games".to_string()),
+            default_download_path: None,
+            ..DesktopSettings::default()
+        };
+
+        assert_eq!(
+            default_download_root(&settings),
+            data_dir().join("downloads")
         );
     }
 
