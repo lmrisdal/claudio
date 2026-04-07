@@ -306,7 +306,7 @@ async fn download_game_package_inner(
             server_url: &server_url,
             custom_headers: &settings.custom_headers,
             speed_limit_kbs: settings.download_speed_limit_kbs,
-            progress_scale: if input.extract { 60.0 } else { 100.0 },
+            progress_scale: 100.0,
         },
         input.id,
         input.title.as_str(),
@@ -322,7 +322,7 @@ async fn download_game_package_inner(
                 app,
                 input.id,
                 "extracting",
-                Some(95.0),
+                None,
                 Some("Moving files…"),
             );
             download_info.file_path.clone()
@@ -331,7 +331,7 @@ async fn download_game_package_inner(
                 app,
                 input.id,
                 "extracting",
-                Some(60.0),
+                None,
                 Some("Extracting archive…"),
             );
             let staging = temp_root.join("extract");
@@ -345,13 +345,12 @@ async fn download_game_package_inner(
                 &download_info.file_path,
                 &staging,
                 &control.cancel_token,
-                move |ratio| {
-                    let percent = ratio.map(|r| 60.0 + r * 35.0);
+                move |_ratio| {
                     emit_progress(
                         &extract_app,
                         extract_gid,
                         "extracting",
-                        percent,
+                        None,
                         Some("Extracting archive…"),
                     );
                 },
@@ -407,7 +406,7 @@ async fn download_game_package_inner(
             app,
             input.id,
             "extracting",
-            Some(96.0),
+            None,
             Some("Saving archive…"),
         );
         let filename = download_info
@@ -716,7 +715,7 @@ pub(crate) mod integration_testing {
                 server_url: &server_url,
                 custom_headers: &settings.custom_headers,
                 speed_limit_kbs: settings.download_speed_limit_kbs,
-                progress_scale: if input.extract { 60.0 } else { 100.0 },
+                progress_scale: 100.0,
             },
             input.id,
             input.title.as_str(),
@@ -733,7 +732,7 @@ pub(crate) mod integration_testing {
                     &mut on_progress,
                     input.id,
                     "extracting",
-                    Some(95.0),
+                    None,
                     Some("Moving files…"),
                     None,
                     None,
@@ -745,7 +744,7 @@ pub(crate) mod integration_testing {
                     &mut on_progress,
                     input.id,
                     "extracting",
-                    Some(60.0),
+                    None,
                     Some("Extracting archive…"),
                     None,
                     None,
@@ -761,13 +760,12 @@ pub(crate) mod integration_testing {
                     &download_info.file_path,
                     &staging,
                     &controller.control.cancel_token,
-                    |ratio| {
-                        let percent = ratio.map(|r| 60.0 + r * 35.0);
+                    |_ratio| {
                         emit_progress_with_bytes_to(
                             &mut on_progress,
                             input.id,
                             "extracting",
-                            percent,
+                            None,
                             Some("Extracting archive…"),
                             None,
                             None,
@@ -829,7 +827,7 @@ pub(crate) mod integration_testing {
                 &mut on_progress,
                 input.id,
                 "extracting",
-                Some(96.0),
+                None,
                 Some("Saving archive…"),
                 None,
                 None,
@@ -1092,9 +1090,15 @@ async fn install_game_inner(
 
     let temp_root = install_temp_root(game.id);
     if temp_root.exists() {
-        fs::remove_dir_all(&temp_root).map_err(|err| err.to_string())?;
+        fs::remove_dir_all(&temp_root).map_err(|err| {
+            log_io_failure("remove stale install temp directory", &temp_root, &err);
+            err.to_string()
+        })?;
     }
-    fs::create_dir_all(&temp_root).map_err(|err| err.to_string())?;
+    fs::create_dir_all(&temp_root).map_err(|err| {
+        log_io_failure("create install temp directory", &temp_root, &err);
+        err.to_string()
+    })?;
 
     let download_info = download_package(
         app,
@@ -1211,9 +1215,9 @@ where
     emit_progress_with_bytes_to(
         &mut on_progress,
         game_id,
-        "requestingTicket",
+        "requestingManifest",
         Some(0.0),
-        Some("Requesting download"),
+        Some("Preparing download"),
         None,
         None,
         None,
@@ -1221,19 +1225,23 @@ where
 
     let auth_headers =
         authenticated_headers_with(settings, custom_headers, &mut on_logged_out).await?;
-    let mut ticket_response = client
-        .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+    let mut manifest_response = client
+        .get(format!(
+            "{server_url}/api/games/{game_id}/download-files-manifest"
+        ))
         .headers(auth_headers.clone())
         .send()
         .await
         .map_err(|err| err.to_string())?;
 
-    if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
+    if manifest_response.status() == reqwest::StatusCode::UNAUTHORIZED {
         if let Some(refreshed_headers) =
             refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
         {
-            ticket_response = client
-                .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+            manifest_response = client
+                .get(format!(
+                    "{server_url}/api/games/{game_id}/download-files-manifest"
+                ))
                 .headers(refreshed_headers.clone())
                 .send()
                 .await
@@ -1241,25 +1249,20 @@ where
         }
     }
 
-    if !ticket_response.status().is_success() {
+    if !manifest_response.status().is_success() {
         return Err(format!(
-            "Failed to create download ticket: {}",
-            ticket_response.status()
+            "Failed to load download file manifest: {}",
+            manifest_response.status()
         ));
     }
 
-    let ticket_json: serde_json::Value = ticket_response
+    let manifest_json: serde_json::Value = manifest_response
         .json()
         .await
         .map_err(|err| err.to_string())?;
-    let ticket = ticket_json
-        .get("ticket")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
-        .to_owned();
 
     // Check if the server provided a file manifest for individual-file download.
-    let file_manifest: Option<Vec<serde_json::Value>> = ticket_json
+    let file_manifest: Option<Vec<serde_json::Value>> = manifest_json
         .get("files")
         .and_then(|v| v.as_array())
         .cloned();
@@ -1276,7 +1279,6 @@ where
                 control,
                 &mut on_progress,
                 &auth_headers,
-                &ticket,
                 files,
             )
             .await;
@@ -1284,9 +1286,7 @@ where
     }
 
     let mut response = client
-        .get(format!(
-            "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-        ))
+        .get(format!("{server_url}/api/games/{game_id}/download"))
         .headers(auth_headers)
         .send()
         .await
@@ -1297,9 +1297,7 @@ where
             refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
         {
             response = client
-                .get(format!(
-                    "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-                ))
+                .get(format!("{server_url}/api/games/{game_id}/download"))
                 .headers(refreshed_headers)
                 .send()
                 .await
@@ -1420,7 +1418,6 @@ async fn download_files_individually<F>(
     control: &InstallControl,
     on_progress: &mut F,
     auth_headers: &HeaderMap,
-    _ticket: &str,
     files: &[serde_json::Value],
 ) -> Result<DownloadInfo, String>
 where
@@ -1464,7 +1461,7 @@ where
                 .unwrap_or_default()
                 .to_owned();
             let url = format!(
-                "{server_url}/api/games/{game_id}/download-file?path={}",
+                "{server_url}/api/games/{game_id}/download-files?path={}",
                 urlencoding_encode(&rel_path)
             );
             let dest = staging.join(
@@ -1653,9 +1650,15 @@ async fn install_portable(
         };
 
         if extract_root.exists() {
-            fs::remove_dir_all(&extract_root).map_err(|err| err.to_string())?;
+            fs::remove_dir_all(&extract_root).map_err(|err| {
+                log_io_failure("remove existing extract staging directory", &extract_root, &err);
+                err.to_string()
+            })?;
         }
-        fs::create_dir_all(&extract_root).map_err(|err| err.to_string())?;
+        fs::create_dir_all(&extract_root).map_err(|err| {
+            log_io_failure("create extract staging directory", &extract_root, &err);
+            err.to_string()
+        })?;
 
         extract_archive_or_copy(
             &package_path_owned,
@@ -2006,6 +2009,25 @@ fn install_temp_root(game_id: i32) -> PathBuf {
     settings::temp_dir().join(format!("install-{game_id}"))
 }
 
+fn log_io_failure(operation: &str, path: &Path, error: &io::Error) {
+    log::error!(
+        "[installer] {operation} failed for {}: {} (raw_os_error={:?})",
+        path.display(),
+        error,
+        error.raw_os_error()
+    );
+}
+
+fn log_io_failure_pair(operation: &str, source: &Path, destination: &Path, error: &io::Error) {
+    log::error!(
+        "[installer] {operation} failed from {} to {}: {} (raw_os_error={:?})",
+        source.display(),
+        destination.display(),
+        error,
+        error.raw_os_error()
+    );
+}
+
 fn infer_filename(headers: &HeaderMap) -> Option<String> {
     let disposition = headers.get(CONTENT_DISPOSITION)?.to_str().ok()?;
 
@@ -2028,7 +2050,10 @@ async fn extract_archive_subprocess<F>(
 where
     F: FnMut(Option<f64>),
 {
-    fs::create_dir_all(destination).map_err(|err| err.to_string())?;
+    fs::create_dir_all(destination).map_err(|err| {
+        log_io_failure("create extraction destination", destination, &err);
+        err.to_string()
+    })?;
     let lower = source.to_string_lossy().to_lowercase();
 
     let mut command = if lower.ends_with(".zip") {
@@ -2057,7 +2082,10 @@ where
         if cancel_token.load(Ordering::Relaxed) {
             return Err("Install cancelled.".to_string());
         }
-        fs::copy(source, target).map_err(|err| err.to_string())?;
+        fs::copy(source, target.as_path()).map_err(|err| {
+            log_io_failure_pair("copy package into extraction destination", source, &target, &err);
+            err.to_string()
+        })?;
         return Ok(());
     };
 
@@ -2134,8 +2162,14 @@ fn extract_zip<F>(
 where
     F: FnMut(f64),
 {
-    fs::create_dir_all(destination).map_err(|err| err.to_string())?;
-    let file = fs::File::open(source).map_err(|err| err.to_string())?;
+    fs::create_dir_all(destination).map_err(|err| {
+        log_io_failure("create zip extraction destination", destination, &err);
+        err.to_string()
+    })?;
+    let file = fs::File::open(source).map_err(|err| {
+        log_io_failure("open zip archive", source, &err);
+        err.to_string()
+    })?;
     let mut archive = ZipArchive::new(file).map_err(|err| err.to_string())?;
 
     let total = archive.len();
@@ -2155,15 +2189,24 @@ where
         };
 
         if entry.is_dir() {
-            fs::create_dir_all(&path).map_err(|err| err.to_string())?;
+            fs::create_dir_all(&path).map_err(|err| {
+                log_io_failure("create extracted directory", &path, &err);
+                err.to_string()
+            })?;
             continue;
         }
 
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+            fs::create_dir_all(parent).map_err(|err| {
+                log_io_failure("create parent directory for extracted file", parent, &err);
+                err.to_string()
+            })?;
         }
 
-        let mut out = fs::File::create(&path).map_err(|err| err.to_string())?;
+        let mut out = fs::File::create(&path).map_err(|err| {
+            log_io_failure("create extracted file", &path, &err);
+            err.to_string()
+        })?;
         let mut buf = [0u8; 64 * 1024];
         loop {
             if cancel_token.load(Ordering::Relaxed) {
@@ -2173,7 +2216,10 @@ where
             if n == 0 {
                 break;
             }
-            io::Write::write_all(&mut out, &buf[..n]).map_err(|err| err.to_string())?;
+            io::Write::write_all(&mut out, &buf[..n]).map_err(|err| {
+                log_io_failure("write extracted file", &path, &err);
+                err.to_string()
+            })?;
         }
 
         let now = std::time::Instant::now();
@@ -2223,8 +2269,14 @@ fn extract_tar<F>(
 where
     F: FnMut(f64),
 {
-    fs::create_dir_all(destination).map_err(|err| err.to_string())?;
-    let file = fs::File::open(source).map_err(|err| err.to_string())?;
+    fs::create_dir_all(destination).map_err(|err| {
+        log_io_failure("create tar extraction destination", destination, &err);
+        err.to_string()
+    })?;
+    let file = fs::File::open(source).map_err(|err| {
+        log_io_failure("open tar archive", source, &err);
+        err.to_string()
+    })?;
     let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
 
     let reader = ProgressReader {
@@ -2241,6 +2293,12 @@ where
         if cancel_token.load(Ordering::Relaxed) {
             "Install cancelled.".to_string()
         } else {
+            log::error!(
+                "[installer] unpack tar archive failed for {} into {}: {}",
+                source.display(),
+                destination.display(),
+                err
+            );
             err.to_string()
         }
     })?;
@@ -2257,8 +2315,14 @@ fn extract_targz<F>(
 where
     F: FnMut(f64),
 {
-    fs::create_dir_all(destination).map_err(|err| err.to_string())?;
-    let file = fs::File::open(source).map_err(|err| err.to_string())?;
+    fs::create_dir_all(destination).map_err(|err| {
+        log_io_failure("create tar.gz extraction destination", destination, &err);
+        err.to_string()
+    })?;
+    let file = fs::File::open(source).map_err(|err| {
+        log_io_failure("open tar.gz archive", source, &err);
+        err.to_string()
+    })?;
     let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
 
     let reader = ProgressReader {
@@ -2276,6 +2340,12 @@ where
         if cancel_token.load(Ordering::Relaxed) {
             "Install cancelled.".to_string()
         } else {
+            log::error!(
+                "[installer] unpack tar.gz archive failed for {} into {}: {}",
+                source.display(),
+                destination.display(),
+                err
+            );
             err.to_string()
         }
     })?;
@@ -2287,22 +2357,37 @@ fn normalize_into_final_dir(staging_root: &Path, final_dir: &Path) -> Result<(),
     let entries = visible_entries(staging_root)?;
 
     if entries.len() == 1 && entries[0].is_dir() {
-        fs::rename(&entries[0], final_dir).map_err(|err| err.to_string())?;
-        fs::remove_dir_all(staging_root).map_err(|err| err.to_string())?;
+        fs::rename(&entries[0], final_dir).map_err(|err| {
+            log_io_failure_pair("move extracted root directory", &entries[0], final_dir, &err);
+            err.to_string()
+        })?;
+        fs::remove_dir_all(staging_root).map_err(|err| {
+            log_io_failure("remove extraction staging root", staging_root, &err);
+            err.to_string()
+        })?;
         return Ok(());
     }
 
-    fs::create_dir_all(final_dir).map_err(|err| err.to_string())?;
+    fs::create_dir_all(final_dir).map_err(|err| {
+        log_io_failure("create final install directory", final_dir, &err);
+        err.to_string()
+    })?;
     for entry in entries {
         let target = final_dir.join(
             entry
                 .file_name()
                 .ok_or_else(|| "Extracted entry was missing a file name.".to_string())?,
         );
-        fs::rename(&entry, &target).map_err(|err| err.to_string())?;
+        fs::rename(&entry, &target).map_err(|err| {
+            log_io_failure_pair("move extracted entry into final directory", &entry, &target, &err);
+            err.to_string()
+        })?;
     }
 
-    fs::remove_dir_all(staging_root).map_err(|err| err.to_string())
+    fs::remove_dir_all(staging_root).map_err(|err| {
+        log_io_failure("remove extraction staging root", staging_root, &err);
+        err.to_string()
+    })
 }
 
 fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
@@ -3481,6 +3566,22 @@ mod tests {
         archive.finish().expect("zip archive should finish");
     }
 
+    fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut cursor = std::io::Cursor::new(Vec::<u8>::new());
+        {
+            let mut archive = zip::ZipWriter::new(&mut cursor);
+            let options = SimpleFileOptions::default();
+            for (name, contents) in entries {
+                archive
+                    .start_file(name, options)
+                    .expect("zip entry should start");
+                std::io::Write::write_all(&mut archive, contents).expect("zip entry should be written");
+            }
+            archive.finish().expect("zip archive should finish");
+        }
+        cursor.into_inner()
+    }
+
     fn write_tar_gz_archive(path: &Path, entries: &[(&str, &[u8])]) {
         let file = fs::File::create(path).expect("tar.gz file should be created");
         let encoder = GzEncoder::new(file, Compression::default());
@@ -3833,8 +3934,8 @@ mod tests {
     async fn download_package_with_downloads_file_and_uses_filename_header() {
         let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
         let server = TestServer::spawn(|request| match request.path.as_str() {
-            "/api/games/5/download-ticket" => TestResponse::json(200, r#"{"ticket":"abc"}"#),
-            "/api/games/5/download?ticket=abc" => TestResponse {
+            "/api/games/5/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
+            "/api/games/5/download" => TestResponse {
                 status: 200,
                 headers: vec![(
                     "content-disposition".to_string(),
@@ -3873,7 +3974,7 @@ mod tests {
                 "Game",
                 &temp_root,
                 &control,
-                |event| progress.push(event.status),
+                |event| progress.push(event),
                 || Ok(()),
             )
             .await
@@ -3884,14 +3985,27 @@ mod tests {
                 fs::read(&download.file_path).expect("downloaded file should exist"),
                 b"payload"
             );
-            assert!(progress.iter().any(|status| status == "requestingTicket"));
-            assert!(progress.iter().any(|status| status == "downloading"));
+            assert!(
+                progress
+                    .iter()
+                    .any(|event| event.status == "requestingManifest")
+            );
+            assert!(progress.iter().any(|event| event.status == "downloading"));
+            let max_download_percent = progress
+                .iter()
+                .filter(|event| event.status == "downloading")
+                .filter_map(|event| event.percent)
+                .fold(0.0_f64, f64::max);
+            assert_eq!(
+                max_download_percent, 100.0,
+                "download progress should use full 0-100 range"
+            );
         })
         .await;
     }
 
     #[tokio::test]
-    async fn download_package_with_refreshes_when_ticket_and_download_require_reauth() {
+    async fn download_package_with_refreshes_when_manifest_and_download_require_reauth() {
         let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
         let fresh_count = StdArc::new(AtomicUsize::new(0));
         let fresh_count_for_server = fresh_count.clone();
@@ -3902,17 +4016,17 @@ mod tests {
                 .cloned()
                 .unwrap_or_default();
             match request.path.as_str() {
-                "/api/games/7/download-ticket" if auth == "Bearer stale-token" => {
+                "/api/games/7/download-files-manifest" if auth == "Bearer stale-token" => {
                     TestResponse::text(401, "expired")
                 }
-                "/api/games/7/download-ticket" if auth == "Bearer fresh-token" => {
+                "/api/games/7/download-files-manifest" if auth == "Bearer fresh-token" => {
                     fresh_count_for_server.fetch_add(1, Ordering::SeqCst);
-                    TestResponse::json(200, r#"{"ticket":"retry"}"#)
+                    TestResponse::json(200, r#"{"files":null}"#)
                 }
-                "/api/games/7/download?ticket=retry" if auth == "Bearer stale-token" => {
+                "/api/games/7/download" if auth == "Bearer stale-token" => {
                     TestResponse::text(401, "expired")
                 }
-                "/api/games/7/download?ticket=retry" if auth == "Bearer fresh-token" => {
+                "/api/games/7/download" if auth == "Bearer fresh-token" => {
                     fresh_count_for_server.fetch_add(1, Ordering::SeqCst);
                     TestResponse::text(200, "ok")
                 }
@@ -3974,8 +4088,8 @@ mod tests {
     async fn download_package_with_cleans_temp_root_when_cancelled() {
         let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
         let server = TestServer::spawn(|request| match request.path.as_str() {
-            "/api/games/9/download-ticket" => TestResponse::json(200, r#"{"ticket":"cancel"}"#),
-            "/api/games/9/download?ticket=cancel" => TestResponse::text(200, "ok"),
+            "/api/games/9/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
+            "/api/games/9/download" => TestResponse::text(200, "ok"),
             _ => TestResponse::text(404, "missing"),
         });
 
@@ -4026,11 +4140,11 @@ mod tests {
         let payload = vec![b'x'; 512 * 1024];
         let payload_for_server = payload.clone();
         let server = TestServer::spawn(move |request| match request.path.as_str() {
-            "/api/games/11/download-ticket" => TestResponse::json(
+            "/api/games/11/download-files-manifest" => TestResponse::json(
                 200,
-                r#"{"ticket":"small-folder","files":[{"path":"Game/data.bin","size":524288}]}"#,
+                r#"{"files":[{"path":"Game/data.bin","size":524288}]}"#,
             ),
-            "/api/games/11/download-file?path=Game/data.bin" => TestResponse {
+            "/api/games/11/download-files?path=Game/data.bin" => TestResponse {
                 status: 200,
                 headers: vec![(
                     "content-type".to_string(),
@@ -4090,6 +4204,137 @@ mod tests {
                         )
                 }),
                 "expected at least one partial downloading update before completion"
+            );
+        })
+        .await;
+    }
+
+    #[cfg(feature = "integration-tests")]
+    #[tokio::test]
+    async fn download_game_package_extract_archive_keeps_download_progress_full_range() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let archive_payload = zip_bytes(&[("Game/game.exe", b"binary")]);
+        let archive_payload_for_server = archive_payload.clone();
+        let server = TestServer::spawn(move |request| match request.path.as_str() {
+            "/api/games/21/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
+            "/api/games/21/download" => TestResponse {
+                status: 200,
+                headers: vec![(
+                    "content-disposition".to_string(),
+                    "attachment; filename=game-package.zip".to_string(),
+                )],
+                body: archive_payload_for_server.clone(),
+            },
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("extract-archive-progress"), || async {
+            let settings = download_settings(server.url());
+            crate::settings::save(&settings).expect("settings should save");
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let controller = crate::services::game_install::integration_testing::TestInstallController::new();
+            let target_dir = crate::settings::temp_dir().join("extract-archive-target");
+            let mut progress = Vec::new();
+
+            let final_path = crate::services::game_install::integration_testing::download_game_package(
+                DownloadPackageInput {
+                    id: 21,
+                    title: "Archive Game".to_string(),
+                    target_dir: target_dir.to_string_lossy().into_owned(),
+                    extract: true,
+                },
+                &controller,
+                |event| progress.push(event),
+                || Ok(()),
+            )
+            .await
+            .expect("package download should succeed");
+
+            assert_eq!(PathBuf::from(final_path), target_dir);
+            assert!(target_dir.join("game.exe").exists());
+
+            let max_download_percent = progress
+                .iter()
+                .filter(|event| event.status == "downloading")
+                .filter_map(|event| event.percent)
+                .fold(0.0_f64, f64::max);
+            assert_eq!(max_download_percent, 100.0);
+            assert!(
+                progress
+                    .iter()
+                    .filter(|event| event.status == "extracting")
+                    .all(|event| event.percent.is_none()),
+                "extracting events should not lower completed download percent"
+            );
+        })
+        .await;
+    }
+
+    #[cfg(feature = "integration-tests")]
+    #[tokio::test]
+    async fn download_game_package_extract_individual_files_keeps_download_progress_full_range() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let server = TestServer::spawn(|request| match request.path.as_str() {
+            "/api/games/22/download-files-manifest" => {
+                TestResponse::json(200, r#"{"files":[{"path":"Game/data.bin","size":6}]}"#)
+            }
+            "/api/games/22/download-files?path=Game/data.bin" => TestResponse::text(200, "binary"),
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("extract-individual-progress"), || async {
+            let settings = download_settings(server.url());
+            crate::settings::save(&settings).expect("settings should save");
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let controller = crate::services::game_install::integration_testing::TestInstallController::new();
+            let target_dir = crate::settings::temp_dir().join("extract-individual-target");
+            let mut progress = Vec::new();
+
+            let final_path = crate::services::game_install::integration_testing::download_game_package(
+                DownloadPackageInput {
+                    id: 22,
+                    title: "Individual Game".to_string(),
+                    target_dir: target_dir.to_string_lossy().into_owned(),
+                    extract: true,
+                },
+                &controller,
+                |event| progress.push(event),
+                || Ok(()),
+            )
+            .await
+            .expect("package download should succeed");
+
+            assert_eq!(PathBuf::from(final_path), target_dir);
+            assert!(target_dir.join("data.bin").exists());
+
+            let max_download_percent = progress
+                .iter()
+                .filter(|event| event.status == "downloading")
+                .filter_map(|event| event.percent)
+                .fold(0.0_f64, f64::max);
+            assert_eq!(max_download_percent, 100.0);
+            assert!(
+                progress
+                    .iter()
+                    .filter(|event| event.status == "extracting")
+                    .all(|event| event.percent.is_none()),
+                "extracting events should not lower completed download percent"
             );
         })
         .await;

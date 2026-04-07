@@ -25,6 +25,8 @@ public static class GameEndpoints
         group.MapGet("/{id:int}/installer-inspection", InspectInstaller);
         group.MapPost("/{id:int}/download-ticket", CreateDownloadTicket);
         group.MapGet("/{id:int}/download", Download).AllowAnonymous();
+        group.MapGet("/{id:int}/download-files-manifest", GetDownloadFilesManifest);
+        group.MapGet("/{id:int}/download-files", DownloadFile);
         group.MapGet("/{id:int}/download-file", DownloadFile);
         group.MapGet("/{id:int}/browse", BrowseGameFiles);
         group.MapGet("/{id:int}/emulation", GetEmulationInfo);
@@ -109,29 +111,27 @@ public static class GameEndpoints
 
         var ticket = ticketService.CreateTicket(id);
 
-        // For loose folders, include a file manifest so the client can choose its download strategy.
-        // Standalone archives and single-archive folders skip the manifest (tar path is used instead).
-        List<DownloadFileManifestEntry>? files = null;
-        if (!IsStandaloneArchive(game) && Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is null)
-        {
-            files = Directory.GetFiles(game.FolderPath, "*", SearchOption.AllDirectories)
-                .Where(f => !Path.GetRelativePath(game.FolderPath, f)
-                    .Split(Path.DirectorySeparatorChar)
-                    .Any(segment => GameEndpoints.HiddenNames.Contains(segment)))
-                .Select(f =>
-                {
-                    var rel = Path.GetRelativePath(game.FolderPath, f).Replace('\\', '/');
-                    var size = new FileInfo(f).Length;
-                    return new DownloadFileManifestEntry(rel, size);
-                })
-                .OrderBy(e => e.Path, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+        // Legacy browser flow keeps ticket response shape. Desktop should use bearer-auth
+        // /download-files-manifest and /download-files endpoints without tickets.
+        var files = BuildLooseFileManifest(game);
 
         return Results.Ok(new { ticket, files });
     }
 
     public record DownloadFileManifestEntry(string Path, long Size);
+
+    private static async Task<IResult> GetDownloadFilesManifest(int id, AppDbContext db)
+    {
+        var game = await db.Games.FindAsync(id);
+        if (game is null) return Results.NotFound();
+        if (game.IsProcessing) return Results.Conflict("Game is currently being processed.");
+
+        if (!ExistsOnDisk(game))
+            return Results.Problem("Game files not found on disk.", statusCode: 500);
+
+        var files = BuildLooseFileManifest(game);
+        return Results.Ok(new { files });
+    }
 
     private static async Task<IResult> Download(
         int id,
@@ -207,6 +207,26 @@ public static class GameEndpoints
             return Results.NotFound();
 
         return Results.File(fullPath, "application/octet-stream", enableRangeProcessing: true);
+    }
+
+    private static List<DownloadFileManifestEntry>? BuildLooseFileManifest(Game game)
+    {
+        // Standalone archives and single-archive folders are served through /download.
+        if (IsStandaloneArchive(game) || !Directory.Exists(game.FolderPath) || FindSingleArchive(game.FolderPath) is not null)
+            return null;
+
+        return Directory.GetFiles(game.FolderPath, "*", SearchOption.AllDirectories)
+            .Where(f => !Path.GetRelativePath(game.FolderPath, f)
+                .Split(Path.DirectorySeparatorChar)
+                .Any(segment => HiddenNames.Contains(segment)))
+            .Select(f =>
+            {
+                var rel = Path.GetRelativePath(game.FolderPath, f).Replace('\\', '/');
+                var size = new FileInfo(f).Length;
+                return new DownloadFileManifestEntry(rel, size);
+            })
+            .OrderBy(e => e.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public static GameDto ToDto(Game game) => new()

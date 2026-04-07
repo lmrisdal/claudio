@@ -349,7 +349,7 @@ public class GameEndpointTests : IAsyncDisposable
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
         var client = await CreateAuthenticatedClientAsync();
 
-        var response = await client.GetAsync("/api/games/1/download-file?path=game.exe");
+        var response = await client.GetAsync("/api/games/1/download-files?path=game.exe");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
@@ -362,7 +362,7 @@ public class GameEndpointTests : IAsyncDisposable
         await SeedGameAsync("Doom", "pc", "Doom");
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/games/1/download-file?path=game.exe");
+        var response = await client.GetAsync("/api/games/1/download-files?path=game.exe");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -377,7 +377,7 @@ public class GameEndpointTests : IAsyncDisposable
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
         var client = await CreateAuthenticatedClientAsync();
 
-        var response = await client.GetAsync("/api/games/1/download-file?path=../../etc/passwd");
+        var response = await client.GetAsync("/api/games/1/download-files?path=../../etc/passwd");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -391,9 +391,40 @@ public class GameEndpointTests : IAsyncDisposable
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
         var client = await CreateAuthenticatedClientAsync();
 
-        var response = await client.GetAsync("/api/games/1/download-file?path=nonexistent.exe");
+        var response = await client.GetAsync("/api/games/1/download-files?path=nonexistent.exe");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task DownloadFilesManifest_LooseFolder_WithAuth_ReturnsFiles()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "ManifestGame");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "game.exe"), "binary-content");
+        File.WriteAllText(Path.Combine(gameDir, "readme.txt"), "hello");
+
+        await SeedGameAsync("ManifestGame", "pc", "ManifestGame", gameDir);
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/games/1/download-files-manifest");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.TryGetProperty("files", out var files).Should().BeTrue();
+        files.ValueKind.Should().Be(JsonValueKind.Array);
+        files.GetArrayLength().Should().Be(2);
+    }
+
+    [Test]
+    public async Task DownloadFilesManifest_WithoutAuth_Returns401()
+    {
+        await SeedGameAsync("Doom", "pc", "Doom");
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/games/1/download-files-manifest");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     public async ValueTask DisposeAsync()
