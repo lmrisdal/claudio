@@ -1867,7 +1867,7 @@ async fn install_installer(
 
     let app_handle = app.clone();
     let gid = game.id;
-    let staging_dir = target_dir.with_extension("installing");
+    let staging_dir = installer_staging_dir(game.id);
     let target_dir_owned = target_dir.to_path_buf();
     let package_path_owned = package_path.to_path_buf();
     let installer_exe_hint = game.installer_exe.clone();
@@ -1896,7 +1896,13 @@ async fn install_installer(
                 );
             }
         }
-        fs::create_dir_all(&staging_dir).map_err(|err| err.to_string())?;
+        fs::create_dir_all(&staging_dir).map_err(|err| {
+            log_io_failure("create installer staging directory", &staging_dir, &err);
+            format!(
+                "Failed to create installer staging directory {}: {err}",
+                staging_dir.display()
+            )
+        })?;
         let install_result = (|| -> Result<Option<String>, String> {
             extract_archive_or_copy(
                 &package_path_owned,
@@ -2139,6 +2145,14 @@ fn download_temp_root(game_id: i32) -> PathBuf {
 
 fn install_temp_root(game_id: i32) -> PathBuf {
     settings::temp_dir().join(format!("install-{game_id}"))
+}
+
+fn installer_staging_dir(game_id: i32) -> PathBuf {
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    install_temp_root(game_id).join(format!("installer-staging-{now_ms}"))
 }
 
 fn log_io_failure(operation: &str, path: &Path, error: &io::Error) {
@@ -3072,18 +3086,26 @@ fn cleanup_directory(path: &Path, label: &str) -> Result<(), String> {
                         Ok(()) => return Ok(()),
                         Err(_file_error) if !path.exists() => return Ok(()),
                         Err(file_error) => {
-                            last_error = Some(file_error.to_string());
-                            log::info!(
-                                "[installer] {label} file cleanup attempt {attempt} failed for {}",
-                                path.display()
+                            let detail = format!(
+                                "{} (raw_os_error={:?})",
+                                file_error,
+                                file_error.raw_os_error()
+                            );
+                            last_error = Some(detail.clone());
+                            log::warn!(
+                                "[installer] {label} file cleanup attempt {attempt} failed for {}: {}",
+                                path.display(),
+                                detail
                             );
                         }
                     }
                 } else {
-                    last_error = Some(error.to_string());
-                    log::info!(
-                        "[installer] {label} cleanup attempt {attempt} failed for {}",
-                        path.display()
+                    let detail = format!("{} (raw_os_error={:?})", error, error.raw_os_error());
+                    last_error = Some(detail.clone());
+                    log::warn!(
+                        "[installer] {label} cleanup attempt {attempt} failed for {}: {}",
+                        path.display(),
+                        detail
                     );
                 }
 
@@ -3094,7 +3116,8 @@ fn cleanup_directory(path: &Path, label: &str) -> Result<(), String> {
     }
 
     Err(format!(
-        "Failed to remove {label}: {}",
+        "Failed to remove {label} {}: {}",
+        path.display(),
         last_error.unwrap_or_else(|| "unknown error".to_string())
     ))
 }
