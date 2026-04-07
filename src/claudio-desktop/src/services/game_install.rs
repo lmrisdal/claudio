@@ -3699,20 +3699,23 @@ mod tests {
     }
 
     #[cfg(feature = "integration-tests")]
-    fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
-        let mut cursor = std::io::Cursor::new(Vec::<u8>::new());
+    fn tar_gz_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut buffer = Vec::new();
         {
-            let mut archive = zip::ZipWriter::new(&mut cursor);
-            let options = SimpleFileOptions::default();
+            let encoder = GzEncoder::new(&mut buffer, Compression::default());
+            let mut archive = tar::Builder::new(encoder);
             for (name, contents) in entries {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(contents.len() as u64);
+                header.set_mode(0o644);
+                header.set_cksum();
                 archive
-                    .start_file(name, options)
-                    .expect("zip entry should start");
-                std::io::Write::write_all(&mut archive, contents).expect("zip entry should be written");
+                    .append_data(&mut header, name, std::io::Cursor::new(*contents))
+                    .expect("tar entry should be written");
             }
-            archive.finish().expect("zip archive should finish");
+            archive.finish().expect("tar archive should finish");
         }
-        cursor.into_inner()
+        buffer
     }
 
     fn write_tar_gz_archive(path: &Path, entries: &[(&str, &[u8])]) {
@@ -4463,7 +4466,7 @@ mod tests {
     #[tokio::test]
     async fn download_game_package_extract_archive_keeps_download_progress_full_range() {
         let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
-        let archive_payload = zip_bytes(&[("Game/game.exe", b"binary")]);
+        let archive_payload = tar_gz_bytes(&[("Game/game.exe", b"binary")]);
         let archive_payload_for_server = archive_payload.clone();
         let server = TestServer::spawn(move |request| match request.path.as_str() {
             "/api/games/21/download-files-manifest" => TestResponse::json(200, r#"{"files":null}"#),
@@ -4471,7 +4474,7 @@ mod tests {
                 status: 200,
                 headers: vec![(
                     "content-disposition".to_string(),
-                    "attachment; filename=game-package.zip".to_string(),
+                    "attachment; filename=game-package.tar.gz".to_string(),
                 )],
                 body: archive_payload_for_server.clone(),
             },
