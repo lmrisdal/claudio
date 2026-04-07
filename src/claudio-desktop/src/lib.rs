@@ -1,5 +1,6 @@
 mod auth;
 mod commands;
+mod http_client;
 #[cfg(feature = "integration-tests")]
 pub mod integration_test_api;
 mod models;

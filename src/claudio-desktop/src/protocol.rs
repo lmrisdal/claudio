@@ -1,3 +1,4 @@
+use crate::http_client::desktop_http_client;
 use crate::{auth, refresh_auth_state_ui, settings};
 use reqwest::Method;
 use std::borrow::Cow;
@@ -58,7 +59,7 @@ where
     let target = target_url(&origin, request.uri())?;
     let method = Method::from_bytes(request.method().as_str().as_bytes())
         .map_err(|error| error.to_string())?;
-    let client = reqwest::Client::new();
+    let client = desktop_http_client()?;
     let mut attached_auth = false;
 
     let mut builder = client.request(method.clone(), &target);
@@ -204,7 +205,11 @@ fn log_proxy_response(target: &str, status: reqwest::StatusCode, is_retry: bool)
         "desktop proxy response"
     };
 
-    if status.is_server_error() {
+    if status.as_u16() == 526 {
+        log::warn!(
+            "{label} {target} {status} (origin TLS/certificate issue while using upstream proxy)"
+        );
+    } else if status.is_server_error() {
         log::warn!("{label} {target} {status}");
     } else if status.is_client_error() {
         log::info!("{label} {target} {status}");
@@ -246,9 +251,13 @@ mod tests {
     use crate::auth::{StoredTokens, TestAuthGuard, store_tokens};
     use crate::settings::{DesktopSettings, with_test_data_dir_async};
     use crate::test_support::{TestResponse, TestServer};
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::thread;
+    use std::time::Duration;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_test_dir(name: &str) -> PathBuf {
@@ -525,5 +534,89 @@ mod tests {
             );
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn forward_request_passes_through_unknown_5xx_statuses() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let server = TestServer::spawn(|request| match request.path.as_str() {
+            "/api/games" => TestResponse::text(526, "invalid certificate"),
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        with_test_data_dir_async(unique_test_dir("proxy-526"), || async {
+            let settings = test_settings(server.url());
+            crate::settings::save(&settings).expect("settings should save");
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let request = http::Request::builder()
+                .method(http::Method::GET)
+                .uri("claudio://api/games")
+                .body(Vec::new())
+                .expect("request should build");
+
+            let response = forward_request_with(request, || Ok(()))
+                .await
+                .expect("proxy request should complete");
+
+            assert_eq!(response.status().as_u16(), 526);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn forward_request_times_out_when_origin_stalls() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let listener = TcpListener::bind("127.0.0.1:0").expect("stall server should bind");
+        let address = listener
+            .local_addr()
+            .expect("stall server should have an address");
+        let handle = thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buffer = [0_u8; 1024];
+                let _ = stream.read(&mut buffer);
+                thread::sleep(Duration::from_secs(8));
+                let _ = stream.write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                );
+            }
+        });
+
+        with_test_data_dir_async(unique_test_dir("proxy-timeout"), || async move {
+            let settings = test_settings(&format!("http://{address}"));
+            crate::settings::save(&settings).expect("settings should save");
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let request = http::Request::builder()
+                .method(http::Method::GET)
+                .uri("claudio://api/games")
+                .body(Vec::new())
+                .expect("request should build");
+
+            let forwarded = tokio::time::timeout(
+                Duration::from_secs(5),
+                forward_request_with(request, || Ok(())),
+            )
+            .await;
+
+            assert!(forwarded.is_ok(), "proxy request should fail fast when origin stalls");
+        })
+        .await;
+
+        let _ = handle.join();
     }
 }

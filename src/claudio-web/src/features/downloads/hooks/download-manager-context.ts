@@ -13,6 +13,12 @@ export interface ActiveDownload {
   speedBps: number | null;
   /** "install" produces an installed game; "package" only downloads files. */
   kind: "install" | "package";
+  /** Original package input for package retry flows. */
+  packageInput?: DownloadPackageInput;
+  /** Last non-cancel failure message. */
+  errorMessage?: string;
+  /** Last failure timestamp in ms since epoch. */
+  failedAt?: number;
 }
 
 export interface DownloadManagerContextValue {
@@ -26,6 +32,8 @@ export interface DownloadManagerContextValue {
   getProgress: (gameId: number) => InstallProgress | null;
   cancelDownload: (gameId: number) => Promise<void>;
   restartDownloadInteractive: (gameId: number) => Promise<void>;
+  retryDownload: (gameId: number) => Promise<void>;
+  dismissDownload: (gameId: number) => void;
 }
 
 export const DownloadManagerContext = createContext<DownloadManagerContextValue | null>(null);

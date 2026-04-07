@@ -12,7 +12,13 @@ function formatSpeed(bytesPerSecond: number): string {
 
 export default function Downloads() {
   const queryClient = useQueryClient();
-  const { activeDownloads, cancelDownload, restartDownloadInteractive } = useDownloadManager();
+  const {
+    activeDownloads,
+    cancelDownload,
+    restartDownloadInteractive,
+    retryDownload,
+    dismissDownload,
+  } = useDownloadManager();
 
   const games = queryClient.getQueryData<Game[]>(["games"]);
 
@@ -20,11 +26,14 @@ export default function Downloads() {
     return games?.find((g) => g.id === remoteGameId)?.coverUrl;
   }
 
-  const activeList = [...activeDownloads.values()];
+  const allDownloads = [...activeDownloads.values()];
+  const activeList = allDownloads.filter((entry) => entry.progress.status !== "failed");
+  const failedList = allDownloads.filter((entry) => entry.progress.status === "failed");
+  const isEmpty = allDownloads.length === 0;
 
   return (
     <main className="max-w-7xl mx-auto px-6 py-8 flex-1 flex flex-col w-full">
-      {activeList.length === 0 ? (
+      {isEmpty ? (
         <div className="flex-1 flex flex-col items-center justify-center py-16">
           <svg
             className="w-12 h-12 mx-auto text-text-muted/40 mb-3"
@@ -45,92 +54,146 @@ export default function Downloads() {
           </p>
         </div>
       ) : (
-        <section>
-          <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3">
-            Active
-          </h2>
-          <div className="space-y-2">
-            {activeList.map(({ game, progress, speedBps }) => {
-              const isIndeterminate = progress.indeterminate === true;
-              const hasPercent = typeof progress.percent === "number";
-              const canRestartInteractive =
-                game.installType === "installer" &&
-                progress.status === "installing" &&
-                game.forceInteractive !== true;
-              const isStopping = progress.status === "stopping";
+        <div className="space-y-8">
+          {activeList.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3">
+                Active
+              </h2>
+              <div className="space-y-2">
+                {activeList.map(({ game, progress, speedBps }) => {
+                  const isIndeterminate = progress.indeterminate === true;
+                  const hasPercent = typeof progress.percent === "number";
+                  const canRestartInteractive =
+                    game.installType === "installer" &&
+                    progress.status === "installing" &&
+                    game.forceInteractive !== true;
+                  const isStopping = progress.status === "stopping";
 
-              return (
-                <div
-                  key={game.id}
-                  className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-border"
-                >
-                  <CoverThumb coverUrl={getCover(game.id)} title={game.title} size="lg" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{game.title}</div>
-                    <div className="text-sm text-text-muted mt-0.5">
-                      <span>
-                        {progress.detail ??
-                          progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
-                      </span>
-                      {speedBps != null && (
-                        <span className="ml-2 font-mono tabular-nums">{formatSpeed(speedBps)}</span>
-                      )}
-                    </div>
-                    {(isIndeterminate || hasPercent) && (
-                      <div className="mt-2.5 h-2 rounded-full bg-surface-raised overflow-hidden">
-                        {isIndeterminate ? (
-                          <div className="h-full bg-accent rounded-full progress-indeterminate-bar" />
-                        ) : (
-                          <div
-                            className="h-full bg-accent rounded-full transition-[width] duration-300"
-                            style={{ width: `${Math.min(100, progress.percent ?? 0)}%` }}
-                          />
+                  return (
+                    <div
+                      key={game.id}
+                      className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-border"
+                    >
+                      <CoverThumb coverUrl={getCover(game.id)} title={game.title} size="lg" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{game.title}</div>
+                        <div className="text-sm text-text-muted mt-0.5">
+                          <span>
+                            {progress.detail ??
+                              progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
+                          </span>
+                          {speedBps != null && (
+                            <span className="ml-2 font-mono tabular-nums">
+                              {formatSpeed(speedBps)}
+                            </span>
+                          )}
+                        </div>
+                        {(isIndeterminate || hasPercent) && (
+                          <div className="mt-2.5 h-2 rounded-full bg-surface-raised overflow-hidden">
+                            {isIndeterminate ? (
+                              <div className="h-full bg-accent rounded-full progress-indeterminate-bar" />
+                            ) : (
+                              <div
+                                className="h-full bg-accent rounded-full transition-[width] duration-300"
+                                style={{ width: `${Math.min(100, progress.percent ?? 0)}%` }}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                  {!isIndeterminate && hasPercent && (
-                    <span className="text-sm text-text-muted font-mono tabular-nums shrink-0">
-                      {Math.round(progress.percent ?? 0)}%
-                    </span>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {canRestartInteractive && (
+                      {!isIndeterminate && hasPercent && (
+                        <span className="text-sm text-text-muted font-mono tabular-nums shrink-0">
+                          {Math.round(progress.percent ?? 0)}%
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {canRestartInteractive && (
+                          <button
+                            onClick={() => void restartDownloadInteractive(game.id)}
+                            disabled={isStopping}
+                            className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Restart installer interactively"
+                          >
+                            Run interactively
+                          </button>
+                        )}
+                        <button
+                          onClick={() => void cancelDownload(game.id)}
+                          disabled={isStopping}
+                          className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                          title="Cancel download"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {failedList.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3">
+                Failed
+              </h2>
+              <div className="space-y-2">
+                {failedList.map(({ game, progress, errorMessage }) => (
+                  <div
+                    key={game.id}
+                    className="flex items-center gap-4 bg-surface rounded-lg p-4 ring-1 ring-red-500/40"
+                  >
+                    <CoverThumb coverUrl={getCover(game.id)} title={game.title} size="lg" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{game.title}</div>
+                      <div className="mt-0.5 text-sm text-red-400" role="alert">
+                        {errorMessage ?? progress.detail ?? "Install failed."}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => void restartDownloadInteractive(game.id)}
-                        disabled={isStopping}
-                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Restart installer interactively"
+                        onClick={() => void retryDownload(game.id)}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition hover:border-accent hover:text-text-primary"
+                        title="Retry download"
                       >
-                        Run interactively
+                        Retry
                       </button>
-                    )}
-                    <button
-                      onClick={() => void cancelDownload(game.id)}
-                      disabled={isStopping}
-                      className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
-                      title="Cancel download"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                      <button
+                        onClick={() => dismissDownload(game.id)}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                        title="Dismiss failed download"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
     </main>
   );

@@ -209,7 +209,19 @@ pub async fn install_game(
 ) -> Result<InstalledGame, String> {
     let control = state.start(game.id)?;
     let game_id = game.id;
+    let game_title = game.title.clone();
     let result = install_game_inner(&app, game, &control).await;
+    if let Err(error) = &result {
+        if !control.is_cancelled() {
+            emit_progress(
+                &app,
+                game_id,
+                "failed",
+                None,
+                Some(&format!("Install failed for {game_title}: {error}")),
+            );
+        }
+    }
     state.finish(game_id);
     if control.is_cancelled() {
         return Err("Install cancelled.".to_string());
@@ -224,9 +236,21 @@ pub async fn download_game_package(
 ) -> Result<String, String> {
     let control = state.start(input.id)?;
     let game_id = input.id;
+    let game_title = input.title.clone();
     let target_dir = PathBuf::from(&input.target_dir);
     let target_existed = target_dir.exists();
     let result = download_game_package_inner(&app, &input, &control).await;
+    if let Err(error) = &result {
+        if !control.is_cancelled() {
+            emit_progress(
+                &app,
+                game_id,
+                "failed",
+                None,
+                Some(&format!("Download failed for {game_title}: {error}")),
+            );
+        }
+    }
     state.finish(game_id);
     let temp_root = download_temp_root(input.id);
     let _ = fs::remove_dir_all(&temp_root);
@@ -1404,6 +1428,7 @@ where
 {
     use futures_util::stream::{self, StreamExt as _};
     use std::sync::atomic::AtomicU64;
+    use tokio::io::AsyncWriteExt;
 
     let staging = temp_root.join("files");
     fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
@@ -1413,6 +1438,7 @@ where
         .filter_map(|f| f.get("size").and_then(|s| s.as_u64()))
         .sum();
     let downloaded_bytes = Arc::new(AtomicU64::new(0));
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     let file_count = files.len();
 
     emit_progress_with_bytes_to(
@@ -1431,8 +1457,7 @@ where
 
     let tasks: Vec<_> = files
         .iter()
-        .enumerate()
-        .map(|(i, file)| {
+        .map(|file| {
             let rel_path = file
                 .get("path")
                 .and_then(|p| p.as_str())
@@ -1449,6 +1474,7 @@ where
             );
             let headers = auth_headers.clone();
             let dl_bytes = Arc::clone(&downloaded_bytes);
+            let progress = progress_tx.clone();
             let cancel_token = control.cancel_token.clone();
             async move {
                 if cancel_token.load(Ordering::Relaxed) {
@@ -1469,20 +1495,30 @@ where
                     ));
                 }
 
-                let bytes = response
-                    .bytes()
-                    .await
-                    .map_err(|e| format!("Failed to read {rel_path}: {e}"))?;
-
                 if let Some(parent) = dest.parent() {
-                    fs::create_dir_all(parent)
+                    tokio::fs::create_dir_all(parent)
+                        .await
                         .map_err(|e| format!("Failed to create directory for {rel_path}: {e}"))?;
                 }
-                fs::write(&dest, &bytes)
-                    .map_err(|e| format!("Failed to write {rel_path}: {e}"))?;
-
-                dl_bytes.fetch_add(bytes.len() as u64, Ordering::Relaxed);
-                Ok::<usize, String>(i)
+                let mut file = tokio::fs::File::create(&dest)
+                    .await
+                    .map_err(|e| format!("Failed to create {rel_path}: {e}"))?;
+                let mut stream = response.bytes_stream();
+                while let Some(chunk) = stream.next().await {
+                    if cancel_token.load(Ordering::Relaxed) {
+                        return Err("Install cancelled.".to_string());
+                    }
+                    let chunk = chunk.map_err(|e| format!("Failed to read {rel_path}: {e}"))?;
+                    file.write_all(&chunk)
+                        .await
+                        .map_err(|e| format!("Failed to write {rel_path}: {e}"))?;
+                    dl_bytes.fetch_add(chunk.len() as u64, Ordering::Relaxed);
+                    let _ = progress.send(());
+                }
+                file.flush()
+                    .await
+                    .map_err(|e| format!("Failed to flush {rel_path}: {e}"))?;
+                Ok::<(), String>(())
             }
         })
         .collect();
@@ -1494,36 +1530,69 @@ where
         .unwrap_or_else(std::time::Instant::now);
 
     let mut stream = stream::iter(tasks).buffer_unordered(8);
-    while let Some(result) = stream.next().await {
-        if control.is_cancelled() {
-            return Err("Install cancelled.".to_string());
-        }
-        result?;
-        completed += 1;
-
-        let now = std::time::Instant::now();
-        if now.duration_since(last_progress_emit).as_millis() >= 200 {
-            last_progress_emit = now;
-            let dl = downloaded_bytes.load(Ordering::Relaxed);
-            let percent = if total_bytes > 0 {
-                Some((dl as f64 / total_bytes as f64) * progress_scale)
-            } else if file_count > 0 {
-                Some((completed as f64 / file_count as f64) * progress_scale)
-            } else {
-                None
-            };
-            emit_progress_with_bytes_to(
-                on_progress,
-                game_id,
-                "downloading",
-                percent,
-                Some(&format!("Downloading {game_title} ({completed}/{file_count})")),
-                Some(dl),
-                Some(total_bytes),
-                None,
-            );
+    drop(progress_tx);
+    let mut progress_channel_closed = false;
+    loop {
+        tokio::select! {
+            update = progress_rx.recv(), if !progress_channel_closed => {
+                if update.is_none() {
+                    progress_channel_closed = true;
+                    continue;
+                }
+                let now = std::time::Instant::now();
+                if now.duration_since(last_progress_emit).as_millis() >= 200 {
+                    last_progress_emit = now;
+                    let dl = downloaded_bytes.load(Ordering::Relaxed);
+                    let percent = if total_bytes > 0 {
+                        Some((dl as f64 / total_bytes as f64) * progress_scale)
+                    } else if file_count > 0 {
+                        Some((completed as f64 / file_count as f64) * progress_scale)
+                    } else {
+                        None
+                    };
+                    emit_progress_with_bytes_to(
+                        on_progress,
+                        game_id,
+                        "downloading",
+                        percent,
+                        Some(&format!("Downloading {game_title} ({completed}/{file_count})")),
+                        Some(dl),
+                        Some(total_bytes),
+                        None,
+                    );
+                }
+            }
+            result = stream.next() => match result {
+                Some(result) => {
+                    if control.is_cancelled() {
+                        return Err("Install cancelled.".to_string());
+                    }
+                    result?;
+                    completed += 1;
+                }
+                None => break,
+            }
         }
     }
+
+    let dl = downloaded_bytes.load(Ordering::Relaxed);
+    let percent = if total_bytes > 0 {
+        Some((dl as f64 / total_bytes as f64) * progress_scale)
+    } else if file_count > 0 {
+        Some((completed as f64 / file_count as f64) * progress_scale)
+    } else {
+        None
+    };
+    emit_progress_with_bytes_to(
+        on_progress,
+        game_id,
+        "downloading",
+        percent,
+        Some(&format!("Downloading {game_title} ({completed}/{file_count})")),
+        Some(dl),
+        Some(total_bytes),
+        None,
+    );
 
     Ok(DownloadInfo {
         file_path: staging,
@@ -1684,7 +1753,13 @@ async fn install_installer(
         };
 
         if staging_dir.exists() {
-            cleanup_directory(&staging_dir, "installer staging directory")?;
+            if let Err(error) = cleanup_directory(&staging_dir, "installer staging directory") {
+                log::warn!(
+                    "[installer {gid}] failed to clean stale staging directory {}: {}",
+                    staging_dir.display(),
+                    error
+                );
+            }
         }
         fs::create_dir_all(&staging_dir).map_err(|err| err.to_string())?;
         let install_result = (|| -> Result<Option<String>, String> {
@@ -2770,17 +2845,33 @@ fn cleanup_directory(path: &Path, label: &str) -> Result<(), String> {
     log::info!("[installer] removing {label} {}", path.display());
 
     let mut last_error = None;
-    for attempt in 1..=10 {
+    for attempt in 1..=20 {
         match fs::remove_dir_all(path) {
             Ok(()) => return Ok(()),
             Err(_error) if !path.exists() => return Ok(()),
             Err(error) => {
-                last_error = Some(error.to_string());
-                log::info!(
-                    "[installer] {label} cleanup attempt {attempt} failed for {}",
-                    path.display()
-                );
-                std::thread::sleep(std::time::Duration::from_millis(200));
+                if path.is_file() {
+                    match fs::remove_file(path) {
+                        Ok(()) => return Ok(()),
+                        Err(_file_error) if !path.exists() => return Ok(()),
+                        Err(file_error) => {
+                            last_error = Some(file_error.to_string());
+                            log::info!(
+                                "[installer] {label} file cleanup attempt {attempt} failed for {}",
+                                path.display()
+                            );
+                        }
+                    }
+                } else {
+                    last_error = Some(error.to_string());
+                    log::info!(
+                        "[installer] {label} cleanup attempt {attempt} failed for {}",
+                        path.display()
+                    );
+                }
+
+                let backoff_ms = (attempt as u64).saturating_mul(200).min(2_000);
+                std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
             }
         }
     }
@@ -2796,21 +2887,25 @@ fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
 }
 
 fn cleanup_failed_installer_state(target_dir: &Path, staging_dir: &Path) -> Result<(), String> {
-    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
 
     if let Err(error) = cleanup_partial_install_dir(target_dir) {
-        errors.push(error);
+        warnings.push(error);
     }
 
     if let Err(error) = cleanup_directory(staging_dir, "installer staging directory") {
-        errors.push(error);
+        warnings.push(error);
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join(" "))
+    if warnings.is_empty() {
+        return Ok(());
     }
+
+    log::warn!(
+        "[installer] cleanup after failed install was incomplete: {}",
+        warnings.join(" ")
+    );
+    Ok(())
 }
 
 #[cfg(target_os = "windows")]
@@ -3923,5 +4018,94 @@ mod tests {
             assert!(!temp_root.exists());
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn download_package_with_individual_mode_reports_partial_byte_progress() {
+        let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+        let payload = vec![b'x'; 512 * 1024];
+        let payload_for_server = payload.clone();
+        let server = TestServer::spawn(move |request| match request.path.as_str() {
+            "/api/games/11/download-ticket" => TestResponse::json(
+                200,
+                r#"{"ticket":"small-folder","files":[{"path":"Game/data.bin","size":524288}]}"#,
+            ),
+            "/api/games/11/download-file?path=Game/data.bin" => TestResponse {
+                status: 200,
+                headers: vec![(
+                    "content-type".to_string(),
+                    "application/octet-stream".to_string(),
+                )],
+                body: payload_for_server.clone(),
+            },
+            _ => TestResponse::text(404, "missing"),
+        });
+
+        crate::settings::with_test_data_dir_async(unique_test_dir("download-individual-progress"), || async {
+            let settings = download_settings(server.url());
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                },
+            )
+            .expect("tokens should store");
+
+            let control = InstallControl::new();
+            let temp_root = crate::settings::temp_dir().join("download-individual-progress");
+            fs::create_dir_all(&temp_root).expect("temp root should exist");
+            let mut progress = Vec::new();
+
+            let download = download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: None,
+                    progress_scale: 100.0,
+                },
+                11,
+                "Game",
+                &temp_root,
+                &control,
+                |event| progress.push(event),
+                || Ok(()),
+            )
+            .await
+            .expect("download should succeed");
+
+            let downloaded_file = download.file_path.join("Game").join("data.bin");
+            assert_eq!(
+                fs::read(downloaded_file).expect("downloaded file should exist"),
+                payload
+            );
+            assert!(
+                progress.iter().any(|event| {
+                    event.status == "downloading"
+                        && matches!(
+                            (event.bytes_downloaded, event.total_bytes),
+                            (Some(downloaded), Some(total))
+                                if downloaded > 0 && downloaded < total
+                        )
+                }),
+                "expected at least one partial downloading update before completion"
+            );
+        })
+        .await;
+    }
+
+    #[test]
+    fn cleanup_failed_installer_state_is_non_fatal_when_staging_cleanup_fails() {
+        let root = unique_test_dir("cleanup-non-fatal");
+        let staging_file = root.join("Hades II.installing");
+        fs::create_dir_all(&root).expect("root should be created");
+        fs::write(&staging_file, b"locked").expect("staging file should be created");
+
+        let result = cleanup_failed_installer_state(&root.join("missing-target"), &staging_file);
+
+        assert!(result.is_ok(), "cleanup failure should be non-fatal");
+        let _ = fs::remove_file(&staging_file);
+        let _ = fs::remove_dir_all(&root);
     }
 }

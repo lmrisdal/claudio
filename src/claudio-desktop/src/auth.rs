@@ -1,4 +1,5 @@
 use crate::settings::DesktopSettings;
+use crate::http_client::desktop_http_client;
 use base64::Engine as _;
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -586,7 +587,7 @@ fn server_origin(settings: &DesktopSettings) -> Result<String, String> {
 
 async fn request_proxy_nonce(settings: &DesktopSettings) -> Result<String, String> {
     let origin = server_origin(settings)?;
-    let client = reqwest::Client::new();
+    let client = desktop_http_client()?;
     let response = apply_custom_headers(
         client.post(format!("{origin}/api/auth/remote")),
         &settings.custom_headers,
@@ -618,7 +619,7 @@ async fn derive_session(
     }
 
     let origin = server_origin(settings)?;
-    let client = reqwest::Client::new();
+    let client = desktop_http_client()?;
     let response = apply_custom_headers(
         client
             .get(format!("{origin}/api/auth/me"))
@@ -677,7 +678,7 @@ async fn exchange_tokens(
     let origin = server_origin(settings).map_err(ExchangeError::Transport)?;
     parameters.push(("client_id", CLIENT_ID.to_string()));
 
-    let client = reqwest::Client::new();
+    let client = desktop_http_client().map_err(ExchangeError::Transport)?;
     let response = apply_custom_headers(
         client
             .post(format!("{origin}/connect/token"))

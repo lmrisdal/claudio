@@ -25,6 +25,22 @@ interface SpeedState {
   sampleCount: number;
 }
 
+interface FailureToast {
+  id: number;
+  title: string;
+  message: string;
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  if (typeof error === "string") return error;
+  if (error instanceof Error && error.message.trim().length > 0) return error.message;
+  return fallback;
+}
+
+function isCancellationError(message: string): boolean {
+  return message.toLowerCase().includes("cancel");
+}
+
 function updateActionProgress(
   previous: Map<number, ActiveDownload>,
   gameId: number,
@@ -39,7 +55,10 @@ function updateActionProgress(
 export function DownloadManagerProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [activeDownloads, setActiveDownloads] = useState<Map<number, ActiveDownload>>(new Map());
+  const [failureToasts, setFailureToasts] = useState<FailureToast[]>([]);
   const speedState = useRef<Map<number, SpeedState>>(new Map());
+  const seenFailures = useRef<Map<number, string>>(new Map());
+  const toastIdCounter = useRef(0);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -98,8 +117,17 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
         if (!existing) return previous;
 
         const next = new Map(previous);
-        if (progress.status === "completed" || progress.status === "failed") {
+        if (progress.status === "completed") {
           next.delete(progress.gameId);
+          speedState.current.delete(progress.gameId);
+        } else if (progress.status === "failed") {
+          next.set(progress.gameId, {
+            ...existing,
+            progress,
+            speedBps: null,
+            errorMessage: progress.detail ?? existing.errorMessage ?? "Install failed.",
+            failedAt: existing.failedAt ?? Date.now(),
+          });
           speedState.current.delete(progress.gameId);
         } else {
           next.set(progress.gameId, { ...existing, progress, speedBps });
@@ -124,6 +152,33 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     };
   }, [queryClient]);
 
+  useEffect(() => {
+    for (const [gameId, entry] of activeDownloads) {
+      if (entry.progress.status !== "failed") {
+        continue;
+      }
+      const failureKey = `${entry.failedAt ?? 0}:${entry.errorMessage ?? entry.progress.detail ?? "Install failed."}`;
+      if (seenFailures.current.get(gameId) === failureKey) {
+        continue;
+      }
+      seenFailures.current.set(gameId, failureKey);
+
+      const id = ++toastIdCounter.current;
+      setFailureToasts((previous) => [
+        ...previous,
+        {
+          id,
+          title: `${entry.game.title} failed`,
+          message: entry.errorMessage ?? entry.progress.detail ?? "Install failed.",
+        },
+      ]);
+
+      globalThis.setTimeout(() => {
+        setFailureToasts((previous) => previous.filter((toast) => toast.id !== id));
+      }, 6000);
+    }
+  }, [activeDownloads]);
+
   const startDownload = useCallback(
     async (game: DesktopInstallGameInput): Promise<InstalledGame> => {
       setActiveDownloads((previous) => {
@@ -136,6 +191,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
               progress: { gameId: game.id, status: "starting", percent: 0 },
               speedBps: null,
               kind: "install",
+              errorMessage: undefined,
+              failedAt: undefined,
             },
           ],
         ]);
@@ -152,11 +209,33 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
         speedState.current.delete(game.id);
         return result;
       } catch (error) {
-        setActiveDownloads((previous) => {
-          const next = new Map(previous);
-          next.delete(game.id);
-          return next;
-        });
+        const message = messageFromError(error, "Installation failed unexpectedly.");
+        if (isCancellationError(message)) {
+          setActiveDownloads((previous) => {
+            const next = new Map(previous);
+            next.delete(game.id);
+            return next;
+          });
+        } else {
+          setActiveDownloads((previous) => {
+            const existing = previous.get(game.id);
+            if (!existing) return previous;
+            const next = new Map(previous);
+            next.set(game.id, {
+              ...existing,
+              progress: {
+                gameId: game.id,
+                status: "failed",
+                detail: message,
+                indeterminate: false,
+              },
+              speedBps: null,
+              errorMessage: message,
+              failedAt: Date.now(),
+            });
+            return next;
+          });
+        }
         speedState.current.delete(game.id);
         throw error;
       }
@@ -185,6 +264,9 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
               progress: { gameId: input.id, status: "starting", percent: 0 },
               speedBps: null,
               kind: "package",
+              packageInput: input,
+              errorMessage: undefined,
+              failedAt: undefined,
             },
           ],
         ]);
@@ -201,11 +283,33 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
         speedState.current.delete(input.id);
         return result;
       } catch (error) {
-        setActiveDownloads((previous) => {
-          const next = new Map(previous);
-          next.delete(input.id);
-          return next;
-        });
+        const message = messageFromError(error, "Download failed unexpectedly.");
+        if (isCancellationError(message)) {
+          setActiveDownloads((previous) => {
+            const next = new Map(previous);
+            next.delete(input.id);
+            return next;
+          });
+        } else {
+          setActiveDownloads((previous) => {
+            const existing = previous.get(input.id);
+            if (!existing) return previous;
+            const next = new Map(previous);
+            next.set(input.id, {
+              ...existing,
+              progress: {
+                gameId: input.id,
+                status: "failed",
+                detail: message,
+                indeterminate: false,
+              },
+              speedBps: null,
+              errorMessage: message,
+              failedAt: Date.now(),
+            });
+            return next;
+          });
+        }
         speedState.current.delete(input.id);
         throw error;
       }
@@ -264,6 +368,92 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     }
   }, []);
 
+  const dismissDownload = useCallback((gameId: number) => {
+    setActiveDownloads((previous) => {
+      const next = new Map(previous);
+      next.delete(gameId);
+      return next;
+    });
+    seenFailures.current.delete(gameId);
+    speedState.current.delete(gameId);
+  }, []);
+
+  const retryDownload = useCallback(
+    async (gameId: number) => {
+      const existing = activeDownloads.get(gameId);
+      if (!existing) {
+        return;
+      }
+
+      setActiveDownloads((previous) =>
+        updateActionProgress(previous, gameId, {
+          gameId,
+          status: "starting",
+          percent: 0,
+          detail: "Retrying...",
+        }),
+      );
+
+      try {
+        if (existing.kind === "install") {
+          await installGame(existing.game);
+          setActiveDownloads((previous) => {
+            const next = new Map(previous);
+            next.delete(gameId);
+            return next;
+          });
+          speedState.current.delete(gameId);
+          void queryClient.invalidateQueries({ queryKey: ["installedGames"] });
+          return;
+        }
+
+        if (!existing.packageInput) {
+          throw new Error("Missing package download settings for retry.");
+        }
+
+        await downloadGamePackage(existing.packageInput);
+        setActiveDownloads((previous) => {
+          const next = new Map(previous);
+          next.delete(gameId);
+          return next;
+        });
+        speedState.current.delete(gameId);
+      } catch (error) {
+        const message = messageFromError(error, "Retry failed.");
+        if (isCancellationError(message)) {
+          setActiveDownloads((previous) => {
+            const next = new Map(previous);
+            next.delete(gameId);
+            return next;
+          });
+          speedState.current.delete(gameId);
+          throw error;
+        }
+        setActiveDownloads((previous) => {
+          const entry = previous.get(gameId);
+          if (!entry) return previous;
+          const next = new Map(previous);
+          next.set(gameId, {
+            ...entry,
+            progress: {
+              gameId,
+              status: "failed",
+              detail: message,
+              indeterminate: false,
+            },
+            speedBps: null,
+            errorMessage: message,
+            failedAt: Date.now(),
+          });
+          return next;
+        });
+        speedState.current.delete(gameId);
+        throw error;
+      }
+    },
+    [activeDownloads, queryClient],
+  );
+
   const value: DownloadManagerContextValue = {
     activeDownloads,
     activeCount: activeDownloads.size,
@@ -272,9 +462,28 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     getProgress,
     cancelDownload,
     restartDownloadInteractive,
+    retryDownload,
+    dismissDownload,
   };
 
   return (
-    <DownloadManagerContext.Provider value={value}>{children}</DownloadManagerContext.Provider>
+    <DownloadManagerContext.Provider value={value}>
+      {children}
+      {failureToasts.length > 0 && (
+        <div className="fixed right-4 bottom-4 z-[120] flex w-[min(420px,calc(100vw-2rem))] flex-col gap-2 pointer-events-none">
+          {failureToasts.map((toast) => (
+            <div
+              key={toast.id}
+              className="rounded-lg border border-red-500/40 bg-surface p-3 shadow-xl"
+              role="alert"
+              aria-live="assertive"
+            >
+              <h3 className="text-sm font-semibold text-red-400">{toast.title}</h3>
+              <p className="mt-1 text-sm text-text-secondary">{toast.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </DownloadManagerContext.Provider>
   );
 }
