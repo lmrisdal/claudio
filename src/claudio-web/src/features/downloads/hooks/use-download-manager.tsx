@@ -52,6 +52,17 @@ function updateActionProgress(
   return new Map([...previous, [gameId, { ...existing, progress, speedBps: null }]]);
 }
 
+function updateDownloadEntry(
+  previous: Map<number, ActiveDownload>,
+  gameId: number,
+  update: (existing: ActiveDownload) => ActiveDownload,
+) {
+  const existing = previous.get(gameId);
+  if (!existing) return previous;
+
+  return new Map([...previous, [gameId, update(existing)]]);
+}
+
 export function DownloadManagerProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [activeDownloads, setActiveDownloads] = useState<Map<number, ActiveDownload>>(new Map());
@@ -217,11 +228,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
             return next;
           });
         } else {
-          setActiveDownloads((previous) => {
-            const existing = previous.get(game.id);
-            if (!existing) return previous;
-            const next = new Map(previous);
-            next.set(game.id, {
+          setActiveDownloads((previous) =>
+            updateDownloadEntry(previous, game.id, (existing) => ({
               ...existing,
               progress: {
                 gameId: game.id,
@@ -232,9 +240,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
               speedBps: null,
               errorMessage: message,
               failedAt: Date.now(),
-            });
-            return next;
-          });
+            })),
+          );
         }
         speedState.current.delete(game.id);
         throw error;
@@ -291,11 +298,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
             return next;
           });
         } else {
-          setActiveDownloads((previous) => {
-            const existing = previous.get(input.id);
-            if (!existing) return previous;
-            const next = new Map(previous);
-            next.set(input.id, {
+          setActiveDownloads((previous) =>
+            updateDownloadEntry(previous, input.id, (existing) => ({
               ...existing,
               progress: {
                 gameId: input.id,
@@ -306,9 +310,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
               speedBps: null,
               errorMessage: message,
               failedAt: Date.now(),
-            });
-            return next;
-          });
+            })),
+          );
         }
         speedState.current.delete(input.id);
         throw error;
@@ -429,11 +432,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
           speedState.current.delete(gameId);
           throw error;
         }
-        setActiveDownloads((previous) => {
-          const entry = previous.get(gameId);
-          if (!entry) return previous;
-          const next = new Map(previous);
-          next.set(gameId, {
+        setActiveDownloads((previous) =>
+          updateDownloadEntry(previous, gameId, (entry) => ({
             ...entry,
             progress: {
               gameId,
@@ -444,9 +444,8 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
             speedBps: null,
             errorMessage: message,
             failedAt: Date.now(),
-          });
-          return next;
-        });
+          })),
+        );
         speedState.current.delete(gameId);
         throw error;
       }

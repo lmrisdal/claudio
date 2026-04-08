@@ -39,6 +39,28 @@ function TestHarness() {
   );
 }
 
+async function flushFormLoad() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function setInputValue(input: HTMLInputElement, value: string) {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function createDeferredPromise<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
 const baseSettings = {
   serverUrl: "https://example.com",
   logLevel: "info" as const,
@@ -73,9 +95,7 @@ describe("useAppSettingsForm", () => {
   it("loads defaultDownloadPath into form state", async () => {
     const view = renderInDom(<TestHarness />);
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flushFormLoad();
 
     const input = view.container.querySelector<HTMLInputElement>('[data-testid="download-path"]');
     expect(input?.value).toBe("C:/Games/downloads");
@@ -90,9 +110,7 @@ describe("useAppSettingsForm", () => {
 
     const view = renderInDom(<TestHarness />);
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flushFormLoad();
 
     const input = view.container.querySelector<HTMLInputElement>('[data-testid="download-path"]');
     expect(input?.value).toBe(appDefaultDownloads);
@@ -108,10 +126,7 @@ describe("useAppSettingsForm", () => {
 
     const view = renderInDom(<TestHarness />);
 
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await flushFormLoad();
 
     const input = view.container.querySelector<HTMLInputElement>('[data-testid="download-path"]');
     expect(input?.value).toBe(appDefaultDownloads);
@@ -120,22 +135,55 @@ describe("useAppSettingsForm", () => {
   it("persists defaultDownloadPath when saving settings", async () => {
     const view = renderInDom(<TestHarness />);
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flushFormLoad();
 
     const input = view.container.querySelector<HTMLInputElement>('[data-testid="download-path"]');
     expect(input).not.toBeNull();
 
     await act(async () => {
       if (input) {
-        input.value = "D:/Custom/Downloads";
-        input.dispatchEvent(new Event("input", { bubbles: true }));
+        setInputValue(input, "D:/Custom/Downloads");
       }
     });
 
     const saveButton = view.container.querySelector<HTMLButtonElement>('[data-testid="save"]');
     expect(saveButton).not.toBeNull();
+
+    await act(async () => {
+      saveButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(updateSettingsMock).toHaveBeenCalledTimes(1);
+    const saved = updateSettingsMock.mock.calls[0]?.[0];
+    expect(saved.defaultDownloadPath).toBe("D:/Custom/Downloads");
+  });
+
+  it("does not overwrite a typed download path when async initialization finishes later", async () => {
+    const deferredDownloadRoot = createDeferredPromise<string>();
+    resolveDefaultDownloadRootMock.mockReturnValue(deferredDownloadRoot.promise);
+
+    const view = renderInDom(<TestHarness />);
+
+    const input = view.container.querySelector<HTMLInputElement>('[data-testid="download-path"]');
+    expect(input).not.toBeNull();
+
+    await act(async () => {
+      if (input) {
+        setInputValue(input, "D:/Custom/Downloads");
+      }
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      deferredDownloadRoot.resolve(appDefaultDownloads);
+      await deferredDownloadRoot.promise;
+      await Promise.resolve();
+    });
+
+    expect(input?.value).toBe("D:/Custom/Downloads");
+
+    const saveButton = view.container.querySelector<HTMLButtonElement>('[data-testid="save"]');
 
     await act(async () => {
       saveButton?.click();

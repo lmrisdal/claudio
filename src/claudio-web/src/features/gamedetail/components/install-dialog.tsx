@@ -8,7 +8,7 @@ import { isWindows } from "../../core/utils/os";
 import ExeListbox from "./exe-listbox";
 
 /** Must match `INDIVIDUAL_FILE_THRESHOLD` in `game_install/download.rs`. */
-const INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD = 100;
+export const INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD = 100;
 
 interface InstallerInspection {
   installerType: "exe" | "msi" | "unknown";

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getSettings,
   resolveDefaultDownloadRoot,
@@ -46,8 +46,8 @@ export interface AppSettingsFormState {
 export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
   const [serverUrl, setServerUrl] = useState("");
-  const [installPath, setInstallPath] = useState("");
-  const [downloadPath, setDownloadPath] = useState("");
+  const [installPath, setInstallPathState] = useState("");
+  const [downloadPath, setDownloadPathState] = useState("");
   const [resolvedDefaultDownloadRoot, setResolvedDefaultDownloadRoot] = useState("");
   const [closeToTray, setCloseToTray] = useState(false);
   const [hideDockIcon, setHideDockIcon] = useState(false);
@@ -58,25 +58,34 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [testing, setTesting] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const installPathEditedRef = useRef(false);
+  const downloadPathEditedRef = useRef(false);
 
   useEffect(() => {
     if (!active) return;
 
     let cancelled = false;
+    installPathEditedRef.current = false;
+    downloadPathEditedRef.current = false;
 
     void getSettings().then(async (loadedSettings) => {
       if (cancelled) return;
 
-      setSettings(loadedSettings);
-      setServerUrl(loadedSettings.serverUrl ?? "");
       const loadedInstallPath = loadedSettings.defaultInstallPath ?? "";
       const effectiveDefaultDownloadRoot = await resolveDefaultDownloadRoot().catch(() => "");
       const fallbackDownloadPath =
         effectiveDefaultDownloadRoot || deriveDownloadPathFromInstallPath(loadedInstallPath);
       if (cancelled) return;
-      setInstallPath(loadedInstallPath);
+
+      setSettings(loadedSettings);
+      setServerUrl(loadedSettings.serverUrl ?? "");
+      if (!installPathEditedRef.current) {
+        setInstallPathState(loadedInstallPath);
+      }
       setResolvedDefaultDownloadRoot(effectiveDefaultDownloadRoot);
-      setDownloadPath(loadedSettings.defaultDownloadPath ?? fallbackDownloadPath);
+      if (!downloadPathEditedRef.current) {
+        setDownloadPathState(loadedSettings.defaultDownloadPath ?? fallbackDownloadPath);
+      }
       setCloseToTray(loadedSettings.closeToTray ?? false);
       setHideDockIcon(loadedSettings.hideDockIcon ?? false);
       setSpeedLimit(
@@ -99,6 +108,16 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       cancelled = true;
     };
   }, [active]);
+
+  function setInstallPath(value: string) {
+    installPathEditedRef.current = true;
+    setInstallPathState(value);
+  }
+
+  function setDownloadPath(value: string) {
+    downloadPathEditedRef.current = true;
+    setDownloadPathState(value);
+  }
 
   function buildCustomHeaders() {
     return buildDesktopCustomHeaders(headers);

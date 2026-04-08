@@ -7,8 +7,11 @@ mod portable;
 
 pub(crate) use download::download_game_package;
 #[cfg(target_os = "windows")]
-pub(crate) use installer::{
+pub use installer::{
     TestInstallerAttempt, TestInstallerLaunchKind, TestInstallerOutcome, TestInstallerSimulation,
+};
+#[cfg(target_os = "windows")]
+pub(crate) use installer::{
     cleanup_failed_installer_state, run_innoextract_with_binary, simulate_installer_session,
 };
 pub(crate) use portable::install_portable_game;
