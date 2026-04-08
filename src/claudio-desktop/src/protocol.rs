@@ -613,7 +613,10 @@ mod tests {
             )
             .await;
 
-            assert!(forwarded.is_ok(), "proxy request should fail fast when origin stalls");
+            assert!(
+                forwarded.is_ok(),
+                "proxy request should fail fast when origin stalls"
+            );
         })
         .await;
 

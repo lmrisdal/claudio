@@ -296,10 +296,12 @@ mod tests {
             .ensure_not_running(8)
             .expect("stale process should be removed");
 
-        assert!(state
-            .remove(8)
-            .expect("state lookup should succeed")
-            .is_none());
+        assert!(
+            state
+                .remove(8)
+                .expect("state lookup should succeed")
+                .is_none()
+        );
     }
 
     #[test]
@@ -316,10 +318,12 @@ mod tests {
 
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].game_id, 1);
-        assert!(state
-            .remove(2)
-            .expect("state lookup should succeed")
-            .is_none());
+        assert!(
+            state
+                .remove(2)
+                .expect("state lookup should succeed")
+                .is_none()
+        );
     }
 
     #[test]
@@ -337,9 +341,11 @@ mod tests {
 
         let _ = waiter.join().expect("waiter thread should join");
         assert!(!is_process_running(pid));
-        assert!(state
-            .remove(99)
-            .expect("state lookup should succeed")
-            .is_none());
+        assert!(
+            state
+                .remove(99)
+                .expect("state lookup should succeed")
+                .is_none()
+        );
     }
 }

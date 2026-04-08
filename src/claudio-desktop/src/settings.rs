@@ -333,7 +333,10 @@ mod tests {
 
             assert_eq!(loaded.server_url.as_deref(), Some("https://example.com"));
             assert_eq!(loaded.default_install_path.as_deref(), Some("/tmp/games"));
-            assert_eq!(loaded.default_download_path.as_deref(), Some("/tmp/downloads"));
+            assert_eq!(
+                loaded.default_download_path.as_deref(),
+                Some("/tmp/downloads")
+            );
             assert_eq!(
                 loaded.custom_headers.get("X-Test").map(String::as_str),
                 Some("ok")

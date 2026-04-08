@@ -1,5 +1,5 @@
-use crate::settings::DesktopSettings;
 use crate::http_client::desktop_http_client;
+use crate::settings::DesktopSettings;
 use base64::Engine as _;
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -89,8 +89,7 @@ impl TestAuthGuard {
         clear_secure_storage_dialog_state();
         *TEST_STORAGE_BACKEND_OVERRIDE
             .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-            Some(AuthStorageBackend::PlainFile);
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(AuthStorageBackend::PlainFile);
         *TEST_PROBE_SECURE_STORAGE_OVERRIDE
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) =

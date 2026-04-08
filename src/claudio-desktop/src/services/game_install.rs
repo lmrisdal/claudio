@@ -292,15 +292,27 @@ async fn download_game_package_inner(
         .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
 
     let target_dir = PathBuf::from(&input.target_dir);
-    fs::create_dir_all(&target_dir)
-        .map_err(|err| format!("Failed to create target folder: {err}"))?;
+    fs::create_dir_all(&target_dir).map_err(|err| {
+        log_io_failure(
+            "create target folder for package download",
+            &target_dir,
+            &err,
+        );
+        format_install_io_error("create the target folder", &target_dir, &err)
+    })?;
 
     let downloads_root = settings::resolve_download_root(&settings)?;
     let temp_root = download_workspace_root(&downloads_root, input.id, &input.title);
     if temp_root.exists() {
-        fs::remove_dir_all(&temp_root).map_err(|err| err.to_string())?;
+        fs::remove_dir_all(&temp_root).map_err(|err| {
+            log_io_failure("remove stale package download workspace", &temp_root, &err);
+            format_install_io_error("clean the package download workspace", &temp_root, &err)
+        })?;
     }
-    fs::create_dir_all(&temp_root).map_err(|err| err.to_string())?;
+    fs::create_dir_all(&temp_root).map_err(|err| {
+        log_io_failure("create package download workspace", &temp_root, &err);
+        format_install_io_error("create the package download workspace", &temp_root, &err)
+    })?;
 
     let download_info = download_package(
         app,
@@ -333,9 +345,31 @@ async fn download_game_package_inner(
             );
             let staging = temp_root.join("extract");
             if staging.exists() {
-                fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
+                fs::remove_dir_all(&staging).map_err(|err| {
+                    log_io_failure(
+                        "remove package extraction staging directory",
+                        &staging,
+                        &err,
+                    );
+                    format_install_io_error(
+                        "clean the package extraction staging directory",
+                        &staging,
+                        &err,
+                    )
+                })?;
             }
-            fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
+            fs::create_dir_all(&staging).map_err(|err| {
+                log_io_failure(
+                    "create package extraction staging directory",
+                    &staging,
+                    &err,
+                );
+                format_install_io_error(
+                    "create the package extraction staging directory",
+                    &staging,
+                    &err,
+                )
+            })?;
             let extract_app = app.clone();
             let extract_gid = input.id;
             extract_archive_subprocess(
@@ -359,30 +393,7 @@ async fn download_game_package_inner(
         let dest = target_dir.clone();
         let staging_for_move = staging.clone();
         let moved_entries = tokio::task::spawn_blocking(move || -> Result<Vec<PathBuf>, String> {
-            let entries = visible_entries(&staging_for_move)?;
-            let move_source = if entries.len() == 1 && entries[0].is_dir() {
-                entries[0].clone()
-            } else {
-                staging_for_move.clone()
-            };
-            let mut moved = Vec::new();
-            for entry in visible_entries(&move_source)? {
-                let target = dest.join(
-                    entry
-                        .file_name()
-                        .ok_or_else(|| "Extracted entry was missing a file name.".to_string())?,
-                );
-                if target.exists() {
-                    if target.is_dir() {
-                        fs::remove_dir_all(&target).map_err(|err| err.to_string())?;
-                    } else {
-                        fs::remove_file(&target).map_err(|err| err.to_string())?;
-                    }
-                }
-                fs::rename(&entry, &target).map_err(|err| err.to_string())?;
-                moved.push(target);
-            }
-            Ok(moved)
+            move_visible_entries_into_dir(&staging_for_move, &dest)
         })
         .await
         .map_err(|err| format!("Move task failed: {err}"))??;
@@ -406,10 +417,23 @@ async fn download_game_package_inner(
             .ok_or_else(|| "Downloaded package had no file name.".to_string())?;
         let dest_path = target_dir.join(filename);
         if dest_path.exists() {
-            fs::remove_file(&dest_path).map_err(|err| err.to_string())?;
+            clear_existing_path(&dest_path)?;
         }
         if fs::rename(&download_info.file_path, &dest_path).is_err() {
-            fs::copy(&download_info.file_path, &dest_path).map_err(|err| err.to_string())?;
+            fs::copy(&download_info.file_path, &dest_path).map_err(|err| {
+                log_io_failure_pair(
+                    "copy downloaded package into target directory",
+                    &download_info.file_path,
+                    &dest_path,
+                    &err,
+                );
+                format_install_io_error_pair(
+                    "copy the downloaded package into the target directory",
+                    &download_info.file_path,
+                    &dest_path,
+                    &err,
+                )
+            })?;
         }
         dest_path
     };
@@ -1899,12 +1923,12 @@ async fn install_portable(
                     &extract_root,
                     &err,
                 );
-                err.to_string()
+                format_install_io_error("clean the extract staging directory", &extract_root, &err)
             })?;
         }
         fs::create_dir_all(&extract_root).map_err(|err| {
             log_io_failure("create extract staging directory", &extract_root, &err);
-            err.to_string()
+            format_install_io_error("create the extract staging directory", &extract_root, &err)
         })?;
 
         extract_archive_or_copy(
@@ -2806,10 +2830,75 @@ fn normalize_into_final_dir(staging_root: &Path, final_dir: &Path) -> Result<(),
     })
 }
 
+fn clear_existing_path(path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    if path.is_dir() {
+        fs::remove_dir_all(path).map_err(|err| {
+            log_io_failure("remove existing directory before replacement", path, &err);
+            format_install_io_error("remove the existing destination directory", path, &err)
+        })?;
+    } else {
+        fs::remove_file(path).map_err(|err| {
+            log_io_failure("remove existing file before replacement", path, &err);
+            format_install_io_error("remove the existing destination file", path, &err)
+        })?;
+    }
+
+    Ok(())
+}
+
+fn move_visible_entries_into_dir(
+    source_root: &Path,
+    destination_dir: &Path,
+) -> Result<Vec<PathBuf>, String> {
+    let entries = visible_entries(source_root)?;
+    let move_source = if entries.len() == 1 && entries[0].is_dir() {
+        entries[0].clone()
+    } else {
+        source_root.to_path_buf()
+    };
+
+    let mut moved = Vec::new();
+    for entry in visible_entries(&move_source)? {
+        let target = destination_dir.join(
+            entry
+                .file_name()
+                .ok_or_else(|| "Extracted entry was missing a file name.".to_string())?,
+        );
+        clear_existing_path(&target)?;
+        fs::rename(&entry, &target).map_err(|err| {
+            log_io_failure_pair(
+                "move extracted entry into destination directory",
+                &entry,
+                &target,
+                &err,
+            );
+            format_install_io_error_pair(
+                "move the extracted entry into the destination directory",
+                &entry,
+                &target,
+                &err,
+            )
+        })?;
+        moved.push(target);
+    }
+
+    Ok(moved)
+}
+
 fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
     let mut entries = Vec::new();
-    for entry in fs::read_dir(root).map_err(|err| err.to_string())? {
-        let entry = entry.map_err(|err| err.to_string())?;
+    for entry in fs::read_dir(root).map_err(|err| {
+        log_io_failure("read directory entries", root, &err);
+        format_install_io_error("read the directory entries", root, &err)
+    })? {
+        let entry = entry.map_err(|err| {
+            log_io_failure("read directory entry", root, &err);
+            format_install_io_error("read the directory entries", root, &err)
+        })?;
         let path = entry.path();
         let hidden = path
             .file_name()
@@ -4104,6 +4193,40 @@ mod tests {
 
         assert!(final_dir.join("game.exe").exists());
         assert!(!staging_root.exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn move_visible_entries_into_dir_moves_entries_and_flattens_single_root() {
+        let root = unique_test_dir("move-visible-entries");
+        let source_root = root.join("extract");
+        let nested_root = source_root.join("Game");
+        let destination = root.join("target");
+
+        fs::create_dir_all(&nested_root).expect("nested root should be created");
+        fs::create_dir_all(&destination).expect("destination should be created");
+        fs::write(nested_root.join("game.exe"), b"binary").expect("game file should be written");
+
+        let moved =
+            move_visible_entries_into_dir(&source_root, &destination).expect("entries should move");
+
+        assert_eq!(moved, vec![destination.join("game.exe")]);
+        assert!(destination.join("game.exe").exists());
+        assert!(!nested_root.join("game.exe").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn clear_existing_path_removes_existing_file() {
+        let root = unique_test_dir("clear-existing-path");
+        let file = root.join("existing.bin");
+
+        fs::create_dir_all(&root).expect("root should be created");
+        fs::write(&file, b"binary").expect("file should be written");
+
+        clear_existing_path(&file).expect("existing file should be removed");
+
+        assert!(!file.exists());
         let _ = fs::remove_dir_all(root);
     }
 
