@@ -861,7 +861,7 @@ export default function Library() {
                     return next;
                   })
                 }
-                className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4 hover:text-accent transition-colors outline-none focus:text-accent focus:ring-2 focus:ring-focus-ring/50 focus:ring-offset-4 focus:ring-offset-surface rounded px-1 -ml-1"
+                className="flex items-center gap-2 text-lg font-semibold text-text-primary mb-4 hover:text-accent transition-colors outline-none focus-visible:text-accent focus-visible:ring-2 focus-visible:ring-focus-ring/50 focus-visible:ring-offset-4 focus-visible:ring-offset-surface rounded px-1 -ml-1"
               >
                 <svg
                   className={`w-4 h-4 transition-transform ${collapsedGroups.has(p) ? "-rotate-90" : ""}`}

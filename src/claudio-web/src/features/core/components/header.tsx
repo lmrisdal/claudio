@@ -1,13 +1,18 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
+import {
+  COLLAPSED_KEY,
+  HEADER_HEIGHT,
+  TOGGLE_SIDEBAR_EVENT,
+} from "../../desktop/components/desktop-sidebar";
 import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
-import { useGamepadDirectionalKeyBridge } from "../hooks/use-gamepad-directional-key-bridge";
 import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
-import { useServerStatus } from "../hooks/use-server-status";
+import { useGamepadDirectionalKeyBridge } from "../hooks/use-gamepad-directional-key-bridge";
 import { useNavigation } from "../hooks/use-navigation";
+import { useServerStatus } from "../hooks/use-server-status";
 import { isMac } from "../utils/os";
 import Logo from "./logo";
 import SearchDialog from "./search-dialog";
@@ -20,32 +25,86 @@ export default function Header() {
   const navigate = useNavigate();
   const { isLoggedIn, isAdmin, user, logout } = useAuth();
   const { isConnected } = useServerStatus();
-  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => isDesktop && localStorage.getItem(COLLAPSED_KEY) === "true",
+  );
+  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } =
+    useNavigation();
   const settingsDialog = useSettingsDialog();
   const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
+  const desktopHeaderRowHeight = isDesktop
+    ? { height: HEADER_HEIGHT }
+    : undefined;
+
+  useEffect(() => {
+    if (!isDesktop) {
+      return;
+    }
+
+    function syncCollapsedState() {
+      setIsSidebarCollapsed(localStorage.getItem(COLLAPSED_KEY) === "true");
+    }
+
+    globalThis.addEventListener("sidebar-collapse-changed", syncCollapsedState);
+    return () => globalThis.removeEventListener("sidebar-collapse-changed", syncCollapsedState);
+  }, []);
 
   return (
     <>
       <header
         data-tauri-drag-region={isDesktop || undefined}
-        className={`app-blur-surface border-b border-border z-50 backdrop-blur-xl bg-bg-blur ${isDesktop ? "fixed top-0 inset-x-0" : "sticky top-0"}`}
+        className={`app-blur-surface border-b ${isDesktop ? "border-border/50" : "border-border"} z-50 backdrop-blur-xl bg-bg-blur ${isDesktop ? "fixed top-0 inset-x-0" : "sticky top-0"}`}
       >
         <div
           data-tauri-drag-region={isDesktop || undefined}
-          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-6") : "max-w-7xl mx-auto px-6"} h-14 flex items-center justify-between gap-4`}
+          style={desktopHeaderRowHeight}
+          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-6") : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} flex items-center justify-between gap-4`}
         >
           {isDesktop ? (
             <div
-              className={`desktop-no-drag flex items-center gap-0.5 min-w-0 ${isMac ? "ml-20" : "ml-2"}`}
+              className={`desktop-no-drag mt-0.5 flex items-center gap-0.5 min-w-0 ${isMac ? "ml-18" : "ml-2"}`}
             >
+              <button
+                onClick={() => globalThis.dispatchEvent(new CustomEvent(TOGGLE_SIDEBAR_EVENT))}
+                className="rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text-primary transition-colors flex items-center justify-center"
+                title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-pressed={!isSidebarCollapsed}
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${isSidebarCollapsed ? "scale-x-[-1]" : ""}`}
+                  fill="none"
+                  viewBox="0 0 16 16"
+                  stroke="currentColor"
+                  strokeWidth={1.25}
+                  aria-hidden="true"
+                >
+                  <rect x="1.75" y="2.25" width="12.5" height="11.5" rx="1.75" />
+                  <path
+                    d="M5.75 3.35v9.3"
+                    strokeLinecap="round"
+                    opacity="0.55"
+                  />
+                  <rect
+                    x="2.75"
+                    y="3.35"
+                    width="2"
+                    height="9.3"
+                    rx="0.8"
+                    fill="currentColor"
+                    stroke="none"
+                    opacity="0.8"
+                  />
+                </svg>
+              </button>
               <button
                 onClick={() => navigate(-1)}
                 disabled={!canGoBack}
-                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-md text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Go back"
               >
                 <svg
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -61,11 +120,11 @@ export default function Header() {
               <button
                 onClick={() => navigate(1)}
                 disabled={!canGoForward}
-                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-md text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Go forward"
               >
                 <svg
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -133,8 +192,13 @@ export default function Header() {
                   </>
                 )}
                 {user && (
-                  <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
-                    <Menu as="div" className="relative h-full flex items-center">
+                  <div
+                    className={`flex items-center gap-2 ml-2 pl-3 border-l ${isDesktop ? "border-border/50" : "border-border"}`}
+                  >
+                    <Menu
+                      as="div"
+                      className="relative h-full flex items-center"
+                    >
                       <MenuButton
                         data-gamepad-nav-bridge={userMenuBridgeId}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-focus-ring"
@@ -226,7 +290,10 @@ export default function Header() {
               </Link>
             )}
             {appWindow && (
-              <div className="flex h-14 ml-2 border-l border-border">
+              <div
+                style={desktopHeaderRowHeight}
+                className="flex ml-2 border-l border-border/50"
+              >
                 <button
                   onClick={() => appWindow.minimize()}
                   className="w-12 h-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-raised transition"

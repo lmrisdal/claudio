@@ -278,6 +278,10 @@ html[data-desktop] body {
   cursor: default;
 }
 
+html[data-desktop] {
+  font-size: 0.875rem;
+}
+
 html[data-desktop] button,
 html[data-desktop] a,
 html[data-desktop] [role="button"] {

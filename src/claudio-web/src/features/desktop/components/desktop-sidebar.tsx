@@ -20,7 +20,8 @@ export const COLLAPSED_KEY = "claudio_sidebar_collapsed";
 export const WIDTH_KEY = "claudio_sidebar_width";
 export const COLLAPSED_WIDTH = 56;
 export const DEFAULT_WIDTH = 220;
-export const HEADER_HEIGHT = 56;
+export const HEADER_HEIGHT = 36;
+export const TOGGLE_SIDEBAR_EVENT = "claudio:toggle-desktop-sidebar";
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 400;
 
@@ -79,6 +80,15 @@ export default function DesktopSidebar({
       }),
     );
   }, [width, dragging]);
+
+  useEffect(() => {
+    function onToggleSidebar() {
+      setCollapsed((current) => !current);
+    }
+
+    globalThis.addEventListener(TOGGLE_SIDEBAR_EVENT, onToggleSidebar);
+    return () => globalThis.removeEventListener(TOGGLE_SIDEBAR_EVENT, onToggleSidebar);
+  }, []);
 
   const navItems = [
     { to: "/", icon: LibraryIcon, label: "Library" },
@@ -212,7 +222,7 @@ export default function DesktopSidebar({
         top: sidebarTop,
         height: `calc(100dvh - ${sidebarTop}px)`,
       }}
-      className={`app-blur-surface desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border bg-sidebar-blur backdrop-blur-xl select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
+      className={`app-blur-surface desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border/50 bg-sidebar-blur backdrop-blur-xl select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
       aria-label="Desktop navigation"
     >
       {/* Navigation items */}
@@ -261,7 +271,7 @@ export default function DesktopSidebar({
       </div>
 
       {/* Divider */}
-      <div className="mx-3 my-2 border-t border-border" />
+      <div className="mx-3 my-2 border-t border-border/50" />
 
       {/* Installed games */}
       <div className="flex-1 min-h-0 flex flex-col">
@@ -422,35 +432,6 @@ export default function DesktopSidebar({
             </>
           )}
         </div>
-      </div>
-
-      {/* Collapse toggle */}
-      <div className="px-2 py-2 border-t border-border shrink-0">
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          onKeyDown={handleSelectKeyDown}
-          data-desktop-sidebar-nav
-          className={`flex items-center gap-3 rounded-lg transition text-sm text-text-muted hover:text-text-primary hover:bg-sidebar-hover w-full ${
-            collapsed ? "justify-center p-2.5" : "px-3 py-2"
-          } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <svg
-            className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5"
-            />
-          </svg>
-          {!collapsed && <span>Collapse</span>}
-        </button>
       </div>
 
       {/* Context menu for installed / installing games */}
