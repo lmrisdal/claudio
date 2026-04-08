@@ -64,7 +64,12 @@ async fn download_package_flow_saves_archive_when_extract_is_false() {
             target_dir.join("game-package.zip").to_string_lossy()
         );
         assert!(target_dir.join("game-package.zip").exists());
-        assert!(!data_dir().join("downloads").join("Archive Download-10").exists());
+        assert!(
+            !data_dir()
+                .join("downloads")
+                .join("Archive Download-10")
+                .exists()
+        );
     })
     .await;
 }

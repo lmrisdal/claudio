@@ -60,7 +60,12 @@ async fn portable_install_cleans_temp_and_target_when_cancelled() {
 
         assert_eq!(error, "Install cancelled.");
         assert!(!install_path.exists());
-        assert!(!data_dir().join("downloads").join("Cancelled Install-12").exists());
+        assert!(
+            !data_dir()
+                .join("downloads")
+                .join("Cancelled Install-12")
+                .exists()
+        );
         assert!(
             get_installed_game(12)
                 .expect("installed game should load")

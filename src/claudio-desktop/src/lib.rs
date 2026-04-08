@@ -142,7 +142,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(settings::log_level_filter(&initial_settings))
-                .max_file_size(10 * 1024 * 1024) // 10 MB
+                .max_file_size(10 * 1024 * 1024)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),

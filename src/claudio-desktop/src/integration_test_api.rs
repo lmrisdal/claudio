@@ -1,5 +1,3 @@
-//! Narrow, feature-gated helpers for the external desktop integration test crate.
-
 use std::borrow::Cow;
 use std::future::Future;
 #[cfg(target_os = "windows")]

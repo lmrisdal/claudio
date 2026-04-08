@@ -75,7 +75,12 @@ async fn portable_install_from_zip_persists_registry_and_detects_executable() {
                 .len(),
             1
         );
-        assert!(!data_dir().join("downloads").join("Portable Install-1").exists());
+        assert!(
+            !data_dir()
+                .join("downloads")
+                .join("Portable Install-1")
+                .exists()
+        );
         assert!(statuses.iter().any(|status| status == "downloading"));
         assert!(statuses.iter().any(|status| status == "extracting"));
         assert_eq!(statuses.last().map(String::as_str), Some("completed"));
