@@ -30,7 +30,8 @@ vi.mock("../../desktop/hooks/use-desktop", () => ({
   installGame: (...arguments_: unknown[]) => installGameMock(...arguments_),
   downloadGamePackage: (...arguments_: unknown[]) => downloadGamePackageMock(...arguments_),
   cancelInstall: (...arguments_: unknown[]) => cancelInstallMock(...arguments_),
-  restartInstallInteractive: (...arguments_: unknown[]) => restartInstallInteractiveMock(...arguments_),
+  restartInstallInteractive: (...arguments_: unknown[]) =>
+    restartInstallInteractiveMock(...arguments_),
   listenToInstallProgress: async (handler: ProgressHandler) => {
     progressHandler = handler;
     return () => {
@@ -77,8 +78,11 @@ function TestHarness() {
       </button>
       <div data-testid="download-count">{manager.activeDownloads.size}</div>
       <div data-testid="failed-count">
-        {[...manager.activeDownloads.values()].filter((entry) => entry.progress.status === "failed")
-          .length}
+        {
+          [...manager.activeDownloads.values()].filter(
+            (entry) => entry.progress.status === "failed",
+          ).length
+        }
       </div>
       <div data-testid="failed-message">
         {[...manager.activeDownloads.values()].find((entry) => entry.progress.status === "failed")
@@ -114,7 +118,9 @@ describe("DownloadManagerProvider", () => {
     installGameMock.mockRejectedValue(new Error("Install failed: access denied"));
 
     const view = renderDownloadManager(<TestHarness />);
-    const startButton = view.container.querySelector<HTMLButtonElement>('[data-testid="start-install"]');
+    const startButton = view.container.querySelector<HTMLButtonElement>(
+      '[data-testid="start-install"]',
+    );
     expect(startButton).not.toBeNull();
 
     await act(async () => {
@@ -124,7 +130,9 @@ describe("DownloadManagerProvider", () => {
 
     const count = view.container.querySelector('[data-testid="download-count"]')?.textContent;
     const failedCount = view.container.querySelector('[data-testid="failed-count"]')?.textContent;
-    const failedMessage = view.container.querySelector('[data-testid="failed-message"]')?.textContent;
+    const failedMessage = view.container.querySelector(
+      '[data-testid="failed-message"]',
+    )?.textContent;
 
     expect(count).toBe("1");
     expect(failedCount).toBe("1");
@@ -136,7 +144,9 @@ describe("DownloadManagerProvider", () => {
     installGameMock.mockRejectedValue(new Error("Install cancelled."));
 
     const view = renderDownloadManager(<TestHarness />);
-    const startButton = view.container.querySelector<HTMLButtonElement>('[data-testid="start-install"]');
+    const startButton = view.container.querySelector<HTMLButtonElement>(
+      '[data-testid="start-install"]',
+    );
     expect(startButton).not.toBeNull();
 
     await act(async () => {
@@ -152,12 +162,12 @@ describe("DownloadManagerProvider", () => {
   });
 
   it("shows one toast per failed transition key", async () => {
-    installGameMock.mockImplementation(
-      () => new Promise<never>(() => {}),
-    );
+    installGameMock.mockImplementation(() => new Promise<never>(() => {}));
 
     const view = renderDownloadManager(<TestHarness />);
-    const startButton = view.container.querySelector<HTMLButtonElement>('[data-testid="start-install"]');
+    const startButton = view.container.querySelector<HTMLButtonElement>(
+      '[data-testid="start-install"]',
+    );
     expect(startButton).not.toBeNull();
 
     await act(async () => {
@@ -198,7 +208,9 @@ describe("DownloadManagerProvider", () => {
         <Downloads />
       </>,
     );
-    const startButton = view.container.querySelector<HTMLButtonElement>('[data-testid="start-install"]');
+    const startButton = view.container.querySelector<HTMLButtonElement>(
+      '[data-testid="start-install"]',
+    );
     expect(startButton).not.toBeNull();
 
     await act(async () => {

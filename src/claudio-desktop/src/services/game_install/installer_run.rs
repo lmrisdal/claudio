@@ -1,5 +1,9 @@
 #[cfg(target_os = "windows")]
 use super::installer_detect::{InstallerType, detect_installer_type};
+#[cfg(target_os = "windows")]
+use super::installer_elevated::spawn_mute_wait;
+#[cfg(target_os = "windows")]
+use super::installer_innoextract::run_innoextract;
 use super::*;
 
 pub(super) fn run_installer_with_retries<F, G, H>(

@@ -380,7 +380,7 @@ fn open_path_command(path: &Path) -> std::process::Command {
     #[cfg(target_os = "linux")]
     let mut command = std::process::Command::new("xdg-open");
     #[cfg(target_os = "windows")]
-    let mut command = {
+    let command = {
         let mut cmd = std::process::Command::new("explorer");
         cmd.arg(path);
         cmd

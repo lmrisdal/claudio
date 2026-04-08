@@ -1,3 +1,5 @@
+use super::installer_run::RunInstallerError;
+use super::state::terminate_external_installer;
 use super::*;
 
 pub(super) struct ElevatedInstallerProcess {

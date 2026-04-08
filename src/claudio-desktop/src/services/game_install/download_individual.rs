@@ -205,7 +205,7 @@ where
                         game_id,
                         "downloading",
                         percent,
-                        Some(&format!("Downloading {game_title} ({completed}/{file_count})")),
+                        Some(&format!("Downloading {game_title}")),
                         Some(dl),
                         Some(total_bytes),
                         None,
@@ -249,9 +249,7 @@ where
         game_id,
         "downloading",
         percent,
-        Some(&format!(
-            "Downloading {game_title} ({completed}/{file_count})"
-        )),
+        Some(&format!("Downloading {game_title}")),
         Some(dl),
         Some(total_bytes),
         None,

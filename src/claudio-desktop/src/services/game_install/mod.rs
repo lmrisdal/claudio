@@ -82,19 +82,10 @@ use installer_detect::{
     file_requests_elevation, installer_attempt_config, installer_launch_kind,
     resolve_installer_path,
 };
-#[cfg(target_os = "windows")]
-use installer_elevated::{
-    ElevatedInstallerProcess, launch_elevated_command, spawn_mute_wait, wait_for_elevated_installer,
-};
-#[cfg(target_os = "windows")]
-use installer_innoextract::{
-    download_innoextract, ensure_innoextract, innoextract_cache_path, run_innoextract,
-    run_innoextract_with_binary,
-};
+#[cfg(all(feature = "integration-tests", target_os = "windows"))]
+use installer_innoextract::run_innoextract_with_binary;
 use installer_install::install_installer;
 #[cfg(all(test, not(target_os = "windows")))]
-use installer_run::RunInstallerError;
-#[cfg(all(feature = "integration-tests", target_os = "windows"))]
 use installer_run::RunInstallerError;
 use installer_run::{confirm_installer_elevation, run_installer, run_installer_with_retries};
 use paths::{

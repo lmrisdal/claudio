@@ -1,3 +1,4 @@
+use super::shell_dirs::{desktop_shortcut_path, start_menu_shortcut_path};
 use super::*;
 
 pub(super) fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {

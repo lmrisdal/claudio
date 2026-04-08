@@ -6,8 +6,8 @@ TARGET="${1:-x86_64-pc-windows-msvc}"
 RUSTUP_HOME_DIR="${RUSTUP_HOME:-$(rustup show home)}"
 TOOLCHAIN="${RUSTUP_TOOLCHAIN:-$(rustup show active-toolchain | awk '{print $1}')}"
 UNINSTALLER_DIR="$ROOT_DIR/src/claudio-uninstaller"
-UNINSTALLER_TARGET_DIR="$UNINSTALLER_DIR/target/$TARGET/release"
-UNINSTALLER_BUNDLE_DIR="$UNINSTALLER_DIR/target/release"
+UNINSTALLER_TARGET_DIR="$ROOT_DIR/target/$TARGET/release"
+UNINSTALLER_BUNDLE_DIR="$ROOT_DIR/target/release"
 
 if ! command -v llvm-lib >/dev/null 2>&1 || ! command -v clang-cl >/dev/null 2>&1; then
   if command -v brew >/dev/null 2>&1; then

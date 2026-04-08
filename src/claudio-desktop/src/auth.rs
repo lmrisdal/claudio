@@ -17,10 +17,10 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use network::{ExchangeError, derive_session, exchange_tokens, request_proxy_nonce};
-#[cfg(any(test, feature = "integration-tests"))]
-use storage::{cache_tokens, clear_secure_storage_dialog_state};
 #[cfg(test)]
 use storage::fallback_tokens_path;
+#[cfg(any(test, feature = "integration-tests"))]
+use storage::{cache_tokens, clear_secure_storage_dialog_state};
 use storage::{
     clear_plain_file_tokens, clear_secure_tokens,
     invalidate_plaintext_fallback_if_secure_storage_available, load_plain_file_tokens,

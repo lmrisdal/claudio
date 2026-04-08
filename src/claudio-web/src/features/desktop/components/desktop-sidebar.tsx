@@ -281,6 +281,8 @@ export default function DesktopSidebar({
                 const isIndeterminate = progress.indeterminate === true;
                 const percent = typeof progress.percent === "number" ? progress.percent : null;
                 const active = location.pathname === `/games/${game.id}`;
+                const installingLabel =
+                  progress.status === "failed" ? "Download failed" : `Downloading ${game.title}`;
                 return (
                   <Link
                     key={`installing-${game.id}`}
@@ -304,7 +306,7 @@ export default function DesktopSidebar({
                         ? "bg-surface-raised text-text-primary"
                         : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
                     } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
-                    title={game.title}
+                    title={installingLabel}
                   >
                     {/* Progress bar spanning the full entry width */}
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/30">
@@ -349,17 +351,7 @@ export default function DesktopSidebar({
                       )}
                     </div>
                     {!collapsed && (
-                      <div className="min-w-0">
-                        <span className="text-xs truncate block">{game.title}</span>
-                        <span className="text-[10px] text-text-muted leading-tight">
-                          {progress.detail ??
-                            (isIndeterminate
-                              ? "Installing\u2026"
-                              : percent === null
-                                ? "Preparing\u2026"
-                                : `${Math.round(percent)}%`)}
-                        </span>
-                      </div>
+                      <span className="text-xs truncate block min-w-0">{installingLabel}</span>
                     )}
                   </Link>
                 );

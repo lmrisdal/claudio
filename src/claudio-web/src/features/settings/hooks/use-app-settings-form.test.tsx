@@ -147,4 +147,3 @@ describe("useAppSettingsForm", () => {
     expect(saved.defaultDownloadPath).toBe("D:/Custom/Downloads");
   });
 });
-

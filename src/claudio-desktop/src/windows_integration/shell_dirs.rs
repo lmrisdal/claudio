@@ -47,6 +47,7 @@ impl Drop for TestShellDirsGuard {
     }
 }
 
+#[cfg(any(test, feature = "integration-tests"))]
 pub(crate) fn with_test_shell_dirs<T>(
     start_menu_dir: PathBuf,
     desktop_dir: PathBuf,

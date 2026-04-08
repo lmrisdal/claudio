@@ -108,6 +108,9 @@ fn default_download_root_prefers_configured_path() {
 
 #[test]
 fn default_download_root_falls_back_to_app_data_downloads_subdir() {
+    let _lock = TEST_DATA_DIR_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let settings = DesktopSettings {
         default_install_path: Some("/tmp/claudio-games".to_string()),
         default_download_path: None,

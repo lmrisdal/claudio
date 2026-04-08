@@ -1,3 +1,4 @@
+use super::super::installer_run::RunInstallerError;
 use super::super::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
