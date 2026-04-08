@@ -457,8 +457,17 @@ export default function SettingsDialog({
     ? "h-full w-full"
     : "fixed inset-0 z-[100] flex items-end justify-center sm:items-center";
   const panelClassName = embedded
-    ? "relative flex h-full w-full flex-col overflow-hidden bg-surface sm:flex-row"
+    ? "app-desktop-settings-panel relative flex h-full w-full flex-col overflow-hidden border border-border/50 sm:flex-row"
     : "relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl";
+  const sidebarClassName = embedded
+    ? "app-desktop-settings-sidebar flex flex-col border-border/60 sm:w-56 sm:shrink-0 sm:border-r"
+    : "flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r";
+  const sidebarActiveClassName = embedded
+    ? "bg-(--desktop-settings-sidebar-active-bg) text-text-primary font-medium"
+    : "bg-(--settings-sidebar-active-bg) text-text-primary font-medium";
+  const sidebarHoverClassName = embedded
+    ? "text-text-secondary hover:bg-(--desktop-settings-sidebar-hover-bg) hover:text-text-primary"
+    : "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary";
 
   return (
     <div className={containerClassName} onClick={embedded ? undefined : onClose}>
@@ -471,7 +480,7 @@ export default function SettingsDialog({
         role="dialog"
         aria-label="Settings"
       >
-        <nav className="flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r">
+        <nav className={sidebarClassName}>
           <div className="flex items-start justify-between border-b border-border p-4 sm:border-b-0 sm:p-5 sm:pb-0">
             <div>
               <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
@@ -486,7 +495,7 @@ export default function SettingsDialog({
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-text-muted transition hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden"
+              className={`rounded-lg p-1.5 text-text-muted transition ${embedded ? "hover:bg-(--desktop-settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden`}
               aria-label="Close"
             >
               {closeIcon}
@@ -511,9 +520,7 @@ export default function SettingsDialog({
                       selectTab(tab.id);
                     }}
                     className={`w-full rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors ${
-                      activeTab === tab.id
-                        ? "bg-(--settings-sidebar-active-bg) text-text-primary font-medium"
-                        : "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary"
+                      activeTab === tab.id ? sidebarActiveClassName : sidebarHoverClassName
                     } ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
                   >
                     {tab.label}
@@ -542,7 +549,7 @@ export default function SettingsDialog({
 
                   checkForUpdates();
                 }}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors ${embedded ? "hover:bg-(--desktop-settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
               >
                 <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
                   {checkForUpdatesLabel}
@@ -562,7 +569,7 @@ export default function SettingsDialog({
                 onClose();
                 void logout();
               }}
-              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"} sm:block`}
+              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors ${embedded ? "hover:bg-(--desktop-settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"} sm:block`}
             >
               Sign out
             </button>

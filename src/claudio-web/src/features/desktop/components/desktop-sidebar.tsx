@@ -222,7 +222,7 @@ export default function DesktopSidebar({
         top: sidebarTop,
         height: `calc(100dvh - ${sidebarTop}px)`,
       }}
-      className={`app-blur-surface desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border/50 bg-sidebar-blur backdrop-blur-xl select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
+      className={`app-blur-surface desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border/50 bg-sidebar-blur select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
       aria-label="Desktop navigation"
     >
       {/* Navigation items */}
@@ -238,7 +238,7 @@ export default function DesktopSidebar({
               collapsed ? "justify-center p-2.5" : "px-3 py-2"
             } ${
               isActive(item.to)
-                ? "bg-surface-raised text-text-primary"
+                ? "bg-(--sidebar-active-bg) text-text-primary"
                 : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
             } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
             title={collapsed ? item.label : undefined}
@@ -313,7 +313,7 @@ export default function DesktopSidebar({
                       collapsed ? "justify-center p-1.5" : "px-2 py-1.5"
                     } ${
                       active
-                        ? "bg-surface-raised text-text-primary"
+                        ? "bg-(--sidebar-active-bg) text-text-primary"
                         : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
                     } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
                     title={installingLabel}
@@ -391,7 +391,7 @@ export default function DesktopSidebar({
                         collapsed ? "justify-center p-1.5" : "px-2 py-1.5"
                       } ${
                         active
-                          ? "bg-surface-raised text-text-primary"
+                          ? "bg-(--sidebar-active-bg) text-text-primary"
                           : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
                       } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
                       title={installed.title}

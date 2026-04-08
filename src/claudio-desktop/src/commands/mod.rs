@@ -1,7 +1,7 @@
 pub mod games;
 pub mod ping;
 
-use crate::{auth, refresh_auth_state_ui, settings};
+use crate::{auth, refresh_auth_state_ui, settings, window_material};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[tauri::command]
@@ -116,9 +116,17 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         .min_inner_size(640.0, 620.0)
         .center()
         .resizable(true)
+        .transparent(true)
         .visible(false)
         .build()
-        .map(|_| ());
+        .map(|window| {
+            let material_window = window.clone();
+            if let Err(error) = window.run_on_main_thread(move || {
+                window_material::apply_window_material(&material_window);
+            }) {
+                log::warn!("Failed to apply native material to settings window: {error}");
+            }
+        });
 
     match result {
         Ok(()) => Ok(()),

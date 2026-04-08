@@ -29,7 +29,7 @@ export default function SettingsWindow() {
 
   return (
     <SettingsWindowErrorBoundary>
-      <div className="h-full w-full bg-surface">
+      <div className="h-full w-full">
         <SettingsDialog embedded open initialTab={initialTab} onClose={closeSettingsWindow} />
         <UpdateToast />
       </div>

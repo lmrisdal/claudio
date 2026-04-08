@@ -26,8 +26,13 @@
 /* Dark theme tokens (default) */
 :root {
   --bg: #0a0a0f;
-  --bg-blur: rgba(10, 10, 15, 0.74);
-  --sidebar-blur: rgba(10, 10, 15, 0.68);
+  --bg-blur: rgba(10, 10, 15, 0.8);
+  --sidebar-blur: rgba(10, 10, 15, 0.72);
+  --desktop-main-panel-bg: rgba(10, 10, 15, 0.8);
+  --desktop-settings-panel-bg: rgba(17, 17, 24, 0.64);
+  --desktop-settings-sidebar-bg: rgba(17, 17, 24, 0.48);
+  --desktop-settings-sidebar-active-bg: rgba(34, 34, 46, 0.58);
+  --desktop-settings-sidebar-hover-bg: rgba(34, 34, 46, 0.5);
   --hero-glass-bg: rgba(0, 0, 0, 0.3);
   --hero-glass-bg-hover: rgba(0, 0, 0, 0.4);
   --hero-glass-border: rgba(255, 255, 255, 0.1);
@@ -52,6 +57,7 @@
   --accent-foreground: #0a0a0f;
 
   --sidebar-hover: rgba(255, 255, 255, 0.12);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.08);
 
   --settings-sidebar-bg: var(--surface-raised);
   --settings-sidebar-active-bg: var(--surface);
@@ -61,8 +67,13 @@
 /* Light theme tokens */
 .light {
   --bg: #f8f8fa;
-  --bg-blur: rgba(248, 248, 250, 0.78);
-  --sidebar-blur: rgba(248, 248, 250, 0.9);
+  --bg-blur: rgba(248, 248, 250, 0.8);
+  --sidebar-blur: rgba(248, 248, 250, 0.58);
+  --desktop-main-panel-bg: rgba(248, 248, 250, 0.8);
+  --desktop-settings-panel-bg: rgba(255, 255, 255, 0.68);
+  --desktop-settings-sidebar-bg: rgba(255, 255, 255, 0.5);
+  --desktop-settings-sidebar-active-bg: rgba(233, 234, 239, 0.64);
+  --desktop-settings-sidebar-hover-bg: rgba(233, 234, 239, 0.56);
   --hero-glass-bg: rgba(255, 255, 255, 0.45);
   --hero-glass-bg-hover: rgba(255, 255, 255, 0.56);
   --hero-glass-border: rgba(255, 255, 255, 0.35);
@@ -87,6 +98,7 @@
   --accent-foreground: #ffffff;
 
   --sidebar-hover: rgba(0, 0, 0, 0.1);
+  --sidebar-active-bg: rgba(26, 26, 46, 0.08);
 
   --settings-sidebar-bg: var(--surface);
   --settings-sidebar-active-bg: var(--surface-raised);
@@ -135,6 +147,11 @@ body {
   }
 }
 
+html[data-desktop],
+html[data-desktop] body {
+  background-color: transparent;
+}
+
 .hero-glass-chip {
   background-color: var(--hero-glass-bg);
   border-color: var(--hero-glass-border);
@@ -177,6 +194,37 @@ body {
   -webkit-backdrop-filter: blur(24px);
 }
 
+.app-desktop-panel {
+  background-color: var(--desktop-main-panel-bg);
+}
+
+.app-desktop-settings-panel {
+  background-color: var(--desktop-settings-panel-bg);
+}
+
+.app-desktop-settings-sidebar {
+  background-color: var(--desktop-settings-sidebar-bg);
+}
+
+.game-hero-backdrop {
+  mask-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0.95) 0%,
+    rgb(0 0 0 / 0.82) 58%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0.95) 0%,
+    rgb(0 0 0 / 0.82) 58%,
+    transparent 100%
+  );
+}
+
+.game-hero-overlay {
+  background: linear-gradient(to top, var(--desktop-main-panel-bg) 0%, transparent 58%);
+}
+
 .guide-reduced-hover-surface,
 .guide-reduced-active-surface,
 .guide-reduced-muted-surface,
@@ -185,10 +233,52 @@ body {
   /* no-op outside reduced-transparency mode */
 }
 
+:root.reduce-transparency {
+  --bg-blur: var(--bg);
+  --sidebar-blur: var(--surface);
+  --desktop-main-panel-bg: var(--surface);
+  --desktop-settings-panel-bg: var(--surface);
+  --desktop-settings-sidebar-bg: var(--surface-raised);
+  --desktop-settings-sidebar-active-bg: var(--surface-overlay);
+  --desktop-settings-sidebar-hover-bg: var(--surface-overlay);
+  --hero-glass-bg: var(--surface-raised);
+  --hero-glass-bg-hover: var(--surface-overlay);
+  --hero-glass-border: var(--border-color);
+  --modal-backdrop: var(--bg);
+  --guide-backdrop: var(--bg);
+  --overlay-scrim: var(--surface);
+  --overlay-scrim-strong: var(--surface);
+  --glass-panel-bg: var(--surface-raised);
+  --guide-panel-bg: var(--surface);
+}
+
+:root.reduce-transparency .app-blur-surface,
+:root.reduce-transparency .hero-glass-chip,
+:root.reduce-transparency .app-modal-backdrop-blur,
+:root.reduce-transparency .app-glass-panel,
+:root.reduce-transparency .app-guide-panel,
+:root.reduce-transparency .app-desktop-panel,
+:root.reduce-transparency .app-desktop-settings-panel,
+:root.reduce-transparency .app-desktop-settings-sidebar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root.reduce-transparency .hero-glass-chip,
+:root.reduce-transparency .app-glass-panel,
+:root.reduce-transparency .app-guide-panel {
+  box-shadow: none;
+}
+
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --bg-blur: var(--bg);
     --sidebar-blur: var(--surface);
+    --desktop-main-panel-bg: var(--surface);
+    --desktop-settings-panel-bg: var(--surface);
+    --desktop-settings-sidebar-bg: var(--surface-raised);
+    --desktop-settings-sidebar-active-bg: var(--surface-overlay);
+    --desktop-settings-sidebar-hover-bg: var(--surface-overlay);
     --hero-glass-bg: var(--surface-raised);
     --hero-glass-bg-hover: var(--surface-overlay);
     --hero-glass-border: var(--border-color);
@@ -218,7 +308,10 @@ body {
   .hero-glass-chip,
   .app-modal-backdrop-blur,
   .app-glass-panel,
-  .app-guide-panel {
+  .app-guide-panel,
+  .app-desktop-panel,
+  .app-desktop-settings-panel,
+  .app-desktop-settings-sidebar {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }

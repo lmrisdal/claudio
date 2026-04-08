@@ -18,7 +18,8 @@ integration-tests = []
 
 [dependencies]
 base64 = "0.22"
-tauri = { version = "2", features = ["image-png", "tray-icon"] }
+tauri = { version = "2", features = ["image-png", "macos-private-api", "tray-icon"] }
+window-vibrancy = "0.6"
 tauri-plugin-log = "2"
 tauri-plugin-updater = "2"
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
@@ -72,4 +73,3 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
-

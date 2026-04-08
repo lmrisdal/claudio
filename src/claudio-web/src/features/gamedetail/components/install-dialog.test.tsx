@@ -3,20 +3,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { act } from "react";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 import { api } from "../../core/api/client";
 import { InputScopeProvider } from "../../core/hooks/use-input-scope";
-import InstallDialog, {
-  INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD,
-} from "./install-dialog";
+import InstallDialog, { INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD } from "./install-dialog";
 
 vi.mock("../../core/api/client", () => ({
   api: {
@@ -89,12 +80,10 @@ describe("InstallDialog download mode", () => {
 
     await flushQueries();
 
-    expect(dialogSurface().textContent).not.toContain(
-      "Extract downloaded archive",
-    );
+    expect(dialogSurface().textContent).not.toContain("Extract downloaded archive");
 
-    const downloadButton = [...dialogSurface().querySelectorAll("button")].find(
-      (b) => b.textContent?.includes("Download"),
+    const downloadButton = [...dialogSurface().querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Download"),
     );
     expect(downloadButton).toBeDefined();
     await act(async () => {
@@ -135,13 +124,10 @@ describe("InstallDialog download mode", () => {
   });
 
   it(`shows extract option when manifest has at least ${INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD} files`, async () => {
-    const manyFiles = Array.from(
-      { length: INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD },
-      (_, index) => ({
-        path: `f${index}.bin`,
-        size: 1,
-      }),
-    );
+    const manyFiles = Array.from({ length: INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD }, (_, index) => ({
+      path: `f${index}.bin`,
+      size: 1,
+    }));
     apiGet.mockImplementation((path: string) => {
       if (path.includes("download-files-manifest")) {
         return Promise.resolve({ files: manyFiles });

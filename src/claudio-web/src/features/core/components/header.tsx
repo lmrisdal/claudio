@@ -28,13 +28,10 @@ export default function Header() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     () => isDesktop && localStorage.getItem(COLLAPSED_KEY) === "true",
   );
-  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } =
-    useNavigation();
+  const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
   const settingsDialog = useSettingsDialog();
   const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
-  const desktopHeaderRowHeight = isDesktop
-    ? { height: HEADER_HEIGHT }
-    : undefined;
+  const desktopHeaderRowHeight = isDesktop ? { height: HEADER_HEIGHT } : undefined;
 
   useEffect(() => {
     if (!isDesktop) {
@@ -53,7 +50,7 @@ export default function Header() {
     <>
       <header
         data-tauri-drag-region={isDesktop || undefined}
-        className={`app-blur-surface border-b ${isDesktop ? "border-border/50" : "border-border"} z-50 backdrop-blur-xl bg-bg-blur ${isDesktop ? "fixed top-0 inset-x-0" : "sticky top-0"}`}
+        className={`app-blur-surface border-b ${isDesktop ? "border-border/50" : "border-border"} z-50 bg-bg-blur ${isDesktop ? "fixed top-0 inset-x-0" : "sticky top-0"}`}
       >
         <div
           data-tauri-drag-region={isDesktop || undefined}
@@ -80,11 +77,7 @@ export default function Header() {
                   aria-hidden="true"
                 >
                   <rect x="1.75" y="2.25" width="12.5" height="11.5" rx="1.75" />
-                  <path
-                    d="M5.75 3.35v9.3"
-                    strokeLinecap="round"
-                    opacity="0.55"
-                  />
+                  <path d="M5.75 3.35v9.3" strokeLinecap="round" opacity="0.55" />
                   <rect
                     x="2.75"
                     y="3.35"
@@ -195,10 +188,7 @@ export default function Header() {
                   <div
                     className={`flex items-center gap-2 ml-2 pl-3 border-l ${isDesktop ? "border-border/50" : "border-border"}`}
                   >
-                    <Menu
-                      as="div"
-                      className="relative h-full flex items-center"
-                    >
+                    <Menu as="div" className="relative h-full flex items-center">
                       <MenuButton
                         data-gamepad-nav-bridge={userMenuBridgeId}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-focus-ring"
@@ -290,10 +280,7 @@ export default function Header() {
               </Link>
             )}
             {appWindow && (
-              <div
-                style={desktopHeaderRowHeight}
-                className="flex ml-2 border-l border-border/50"
-              >
+              <div style={desktopHeaderRowHeight} className="flex ml-2 border-l border-border/50">
                 <button
                   onClick={() => appWindow.minimize()}
                   className="w-12 h-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-raised transition"

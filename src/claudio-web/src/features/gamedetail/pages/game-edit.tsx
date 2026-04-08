@@ -298,11 +298,11 @@ export default function GameEdit() {
     <div className="relative flex-1 w-full">
       {heroUrl && (
         <div
-          className="pointer-events-none fixed inset-x-0 top-0 h-72 overflow-hidden"
+          className="game-hero-backdrop pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden"
           aria-hidden="true"
         >
           <img src={heroUrl} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-linear-to-t from-(--bg) via-(--bg)/60 to-transparent" />
+          <div className="game-hero-overlay absolute inset-0" />
         </div>
       )}
 

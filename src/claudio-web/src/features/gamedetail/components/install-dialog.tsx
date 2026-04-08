@@ -68,8 +68,9 @@ export default function InstallDialog({
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
   const [desktopShortcut, setDesktopShortcut] = useState(true);
-  const [runAsAdministratorOverrides, setRunAsAdministratorOverrides] =
-    useState<Record<string, boolean>>({});
+  const [runAsAdministratorOverrides, setRunAsAdministratorOverrides] = useState<
+    Record<string, boolean>
+  >({});
   const [forceInteractive, setForceInteractive] = useState(false);
   const [extract, setExtract] = useState(true);
 
@@ -102,18 +103,12 @@ export default function InstallDialog({
   } = useQuery({
     queryKey: ["downloadFilesManifest", gameId],
     queryFn: () =>
-      api.get<DownloadFilesManifestResponse>(
-        `/games/${gameId}/download-files-manifest`,
-      ),
+      api.get<DownloadFilesManifestResponse>(`/games/${gameId}/download-files-manifest`),
     enabled: open && downloadMode,
   });
 
   const showExtractOption = useMemo(() => {
-    if (
-      downloadManifestPending ||
-      downloadManifestError ||
-      downloadManifest === undefined
-    ) {
+    if (downloadManifestPending || downloadManifestError || downloadManifest === undefined) {
       return true;
     }
     const files = downloadManifest.files;
@@ -133,10 +128,8 @@ export default function InstallDialog({
   }, [open, downloadMode, showExtractOption]);
   const effectiveInstallerKey = effectiveInstallerPath ?? "";
   const requiresAdministrator =
-    installerInspection?.installerType === "exe" &&
-    installerInspection.requestsElevation;
-  const canToggleRunAsAdministrator =
-    effectiveInstallerKey !== "" && !requiresAdministrator;
+    installerInspection?.installerType === "exe" && installerInspection.requestsElevation;
+  const canToggleRunAsAdministrator = effectiveInstallerKey !== "" && !requiresAdministrator;
   const runAsAdministrator = requiresAdministrator
     ? true
     : (runAsAdministratorOverrides[effectiveInstallerKey] ??
@@ -240,12 +233,7 @@ export default function InstallDialog({
 
               {showExePicker && !downloadMode && (
                 <div className="mt-4">
-                  <ExeListbox
-                    label={exeLabel}
-                    value={exe}
-                    onChange={setExe}
-                    options={exeOptions}
-                  />
+                  <ExeListbox label={exeLabel} value={exe} onChange={setExe} options={exeOptions} />
                 </div>
               )}
 
@@ -258,12 +246,9 @@ export default function InstallDialog({
                     className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
                   />
                   <div>
-                    <span className="text-sm text-text-primary">
-                      Extract downloaded archive
-                    </span>
+                    <span className="text-sm text-text-primary">Extract downloaded archive</span>
                     <p className="text-xs text-text-muted mt-0.5">
-                      Unpack the archive into the chosen folder after
-                      downloading.
+                      Unpack the archive into the chosen folder after downloading.
                     </p>
                   </div>
                 </label>
@@ -277,9 +262,7 @@ export default function InstallDialog({
                     onChange={(e) => setDesktopShortcut(e.target.checked)}
                     className="w-4 h-4 rounded accent-accent cursor-pointer"
                   />
-                  <span className="text-sm text-text-primary">
-                    Add shortcut to desktop
-                  </span>
+                  <span className="text-sm text-text-primary">Add shortcut to desktop</span>
                 </label>
               )}
 
@@ -290,9 +273,7 @@ export default function InstallDialog({
                       type="checkbox"
                       checked={runAsAdministrator}
                       disabled={!canToggleRunAsAdministrator}
-                      onChange={(e) =>
-                        handleRunAsAdministratorChange(e.target.checked)
-                      }
+                      onChange={(e) => handleRunAsAdministratorChange(e.target.checked)}
                       className="sr-only"
                     />
                     <span
@@ -346,12 +327,9 @@ export default function InstallDialog({
                       className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
                     />
                     <div>
-                      <span className="text-sm text-text-primary">
-                        Run installer interactively
-                      </span>
+                      <span className="text-sm text-text-primary">Run installer interactively</span>
                       <p className="text-xs text-text-muted mt-0.5">
-                        Show the installer&apos;s setup wizard instead of
-                        installing silently.
+                        Show the installer&apos;s setup wizard instead of installing silently.
                       </p>
                     </div>
                   </label>
@@ -375,11 +353,7 @@ export default function InstallDialog({
                   downloadMode || !isPortable ? undefined : desktopShortcut,
                   downloadMode || isPortable ? undefined : runAsAdministrator,
                   downloadMode || isPortable ? undefined : forceInteractive,
-                  downloadMode
-                    ? showExtractOption
-                      ? extract
-                      : false
-                    : undefined,
+                  downloadMode ? (showExtractOption ? extract : false) : undefined,
                 )
               }
               disabled={downloadMode ? false : !canInstall}
