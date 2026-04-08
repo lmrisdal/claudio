@@ -51,6 +51,7 @@ pub(super) fn detect_windows_executable(root: &Path) -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "windows")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum InstallerType {
     Msi,
     GogInnoSetup,
