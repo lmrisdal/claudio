@@ -76,7 +76,7 @@ use installer_cleanup::{
 #[cfg(test)]
 use installer_detect::detect_installer;
 #[cfg(all(test, target_os = "windows"))]
-use installer_detect::stream_requests_elevation;
+use installer_detect::{InstallerType, detect_installer_type, stream_requests_elevation};
 use installer_detect::{
     InstallerAttemptConfig, InstallerLaunchKind, detect_windows_executable,
     file_requests_elevation, installer_attempt_config, installer_launch_kind,
