@@ -1,16 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "../../core/api/client";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isWindows } from "../../core/utils/os";
 import ExeListbox from "./exe-listbox";
 
+/** Must match `INDIVIDUAL_FILE_THRESHOLD` in `game_install/download.rs`. */
+const INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD = 50;
+
 interface InstallerInspection {
   installerType: "exe" | "msi" | "unknown";
   requestsElevation: boolean;
   canPatchCopyForNonAdmin: boolean;
+}
+
+interface DownloadFilesManifestResponse {
+  files: { path: string; size: number }[] | null;
 }
 
 interface InstallDialogProperties {
@@ -88,6 +95,37 @@ export default function InstallDialog({
       ),
     enabled: open && !downloadMode && !isPortable && !!effectiveInstallerPath,
   });
+
+  const {
+    data: downloadManifest,
+    isPending: downloadManifestPending,
+    isError: downloadManifestError,
+  } = useQuery({
+    queryKey: ["downloadFilesManifest", gameId],
+    queryFn: () =>
+      api.get<DownloadFilesManifestResponse>(`/games/${gameId}/download-files-manifest`),
+    enabled: open && downloadMode,
+  });
+
+  const showExtractOption = useMemo(() => {
+    if (downloadManifestPending || downloadManifestError || downloadManifest === undefined) {
+      return true;
+    }
+    const files = downloadManifest.files;
+    if (files === null) {
+      return true;
+    }
+    if (!Array.isArray(files)) {
+      return true;
+    }
+    return files.length >= INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD;
+  }, [downloadManifest, downloadManifestPending, downloadManifestError]);
+
+  useEffect(() => {
+    if (open && downloadMode && !showExtractOption) {
+      setExtract(false);
+    }
+  }, [open, downloadMode, showExtractOption]);
   const effectiveInstallerKey = effectiveInstallerPath ?? "";
   const requiresAdministrator =
     installerInspection?.installerType === "exe" && installerInspection.requestsElevation;
@@ -199,7 +237,7 @@ export default function InstallDialog({
                 </div>
               )}
 
-              {downloadMode && (
+              {downloadMode && showExtractOption && (
                 <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
                   <input
                     type="checkbox"
@@ -315,7 +353,7 @@ export default function InstallDialog({
                   downloadMode || !isPortable ? undefined : desktopShortcut,
                   downloadMode || isPortable ? undefined : runAsAdministrator,
                   downloadMode || isPortable ? undefined : forceInteractive,
-                  downloadMode ? extract : undefined,
+                  downloadMode ? (showExtractOption ? extract : false) : undefined,
                 )
               }
               disabled={downloadMode ? false : !canInstall}
