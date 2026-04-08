@@ -89,7 +89,10 @@ pub(super) fn detect_installer_type(path: &Path) -> InstallerType {
         let n = file.read(&mut buf).unwrap_or(0);
         let slice = &buf[..n];
         let is_inno = slice.windows(10).any(|w| w == b"Inno Setup");
-        let is_gog = slice.windows(7).any(|w| w == b"GOG.com");
+        let is_gog = contains_any_pattern(
+            slice,
+            &[b"GOG.com".as_slice(), b"G\0O\0G\0.\0c\0o\0m\0".as_slice()],
+        );
         if is_inno && is_gog {
             return InstallerType::GogInnoSetup;
         }
@@ -101,6 +104,15 @@ pub(super) fn detect_installer_type(path: &Path) -> InstallerType {
         }
     }
     InstallerType::Unknown
+}
+
+#[cfg(target_os = "windows")]
+fn contains_any_pattern(haystack: &[u8], patterns: &[&[u8]]) -> bool {
+    patterns.iter().any(|pattern| {
+        haystack
+            .windows(pattern.len())
+            .any(|window| window == *pattern)
+    })
 }
 
 #[cfg(target_os = "windows")]

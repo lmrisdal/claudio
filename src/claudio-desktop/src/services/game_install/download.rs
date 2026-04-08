@@ -113,7 +113,7 @@ where
             .cloned()
     };
 
-    const INDIVIDUAL_FILE_THRESHOLD: usize = 50;
+    const INDIVIDUAL_FILE_THRESHOLD: usize = 100;
     if let Some(ref files) = file_manifest {
         if files.len() < INDIVIDUAL_FILE_THRESHOLD {
             return download_files_individually(

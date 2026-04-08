@@ -16,6 +16,15 @@ fn detect_installer_and_windows_executable_find_sorted_matches() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(target_os = "windows")]
+fn write_installer_fixture(name: &str, contents: &[u8]) -> PathBuf {
+    let root = unique_test_dir(name);
+    fs::create_dir_all(&root).expect("root should be created");
+    let installer = root.join("setup.exe");
+    fs::write(&installer, contents).expect("installer should exist");
+    installer
+}
+
 #[test]
 fn resolve_installer_path_uses_hint_when_present() {
     let root = unique_test_dir("installer-hint");
@@ -58,6 +67,62 @@ fn installer_launch_kind_detects_common_extensions() {
             InstallerLaunchKind::Unknown
         );
     }
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn detect_installer_type_identifies_gog_inno_setup_from_ascii_marker() {
+    let installer = write_installer_fixture(
+        "installer-type-gog-ascii",
+        b"prefix Inno Setup middle GOG.com suffix",
+    );
+
+    assert_eq!(
+        detect_installer_type(&installer),
+        InstallerType::GogInnoSetup
+    );
+
+    let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn detect_installer_type_identifies_gog_inno_setup_from_utf16_marker() {
+    let installer = write_installer_fixture(
+        "installer-type-gog-utf16",
+        b"prefix Inno Setup middle G\0O\0G\0.\0c\0o\0m\0 suffix",
+    );
+
+    assert_eq!(
+        detect_installer_type(&installer),
+        InstallerType::GogInnoSetup
+    );
+
+    let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn detect_installer_type_falls_back_to_plain_inno_without_gog_marker() {
+    let installer =
+        write_installer_fixture("installer-type-inno-only", b"prefix Inno Setup suffix");
+
+    assert_eq!(detect_installer_type(&installer), InstallerType::InnoSetup);
+
+    let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn detect_installer_type_requires_inno_marker_for_gog_classification() {
+    let installer = write_installer_fixture(
+        "installer-type-gog-without-inno",
+        b"prefix G\0O\0G\0.\0c\0o\0m\0 suffix",
+    );
+
+    assert_eq!(detect_installer_type(&installer), InstallerType::Unknown);
+
+    let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
 }
 
 #[cfg(not(target_os = "windows"))]
