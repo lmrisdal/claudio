@@ -2421,7 +2421,7 @@ where
 {
     fs::create_dir_all(destination).map_err(|err| {
         log_io_failure("create extraction destination", destination, &err);
-        err.to_string()
+        format_install_io_error("create the extraction destination", destination, &err)
     })?;
     let lower = source.to_string_lossy().to_lowercase();
 
@@ -2458,7 +2458,12 @@ where
                 &target,
                 &err,
             );
-            err.to_string()
+            format_install_io_error_pair(
+                "copy package into the extraction destination",
+                source,
+                &target,
+                &err,
+            )
         })?;
         return Ok(());
     };
@@ -2511,16 +2516,39 @@ where
     } else if lower.ends_with(".tar") {
         extract_tar(source, destination, cancel_token, progress)
     } else {
-        fs::create_dir_all(destination).map_err(|err| err.to_string())?;
-        let target = destination.join(
-            source
-                .file_name()
-                .ok_or_else(|| "Downloaded package had no file name.".to_string())?,
-        );
         if cancel_token.load(Ordering::Relaxed) {
             return Err("Install cancelled.".to_string());
         }
-        fs::copy(source, target).map_err(|err| err.to_string())?;
+
+        fs::create_dir_all(destination).map_err(|err| {
+            log_io_failure("create extraction destination", destination, &err);
+            format_install_io_error("create the extraction destination", destination, &err)
+        })?;
+
+        if source.is_dir() {
+            copy_dir_contents(source, destination)?;
+        } else {
+            let target = destination.join(
+                source
+                    .file_name()
+                    .ok_or_else(|| "Downloaded package had no file name.".to_string())?,
+            );
+            fs::copy(source, &target).map_err(|err| {
+                log_io_failure_pair(
+                    "copy package into extraction destination",
+                    source,
+                    &target,
+                    &err,
+                );
+                format_install_io_error_pair(
+                    "copy package into the extraction destination",
+                    source,
+                    &target,
+                    &err,
+                )
+            })?;
+        }
+
         let mut progress = progress;
         progress(1.0);
         Ok(())
@@ -2538,7 +2566,7 @@ where
 {
     fs::create_dir_all(destination).map_err(|err| {
         log_io_failure("create zip extraction destination", destination, &err);
-        err.to_string()
+        format_install_io_error("create the zip extraction destination", destination, &err)
     })?;
     let file = fs::File::open(source).map_err(|err| {
         log_io_failure("open zip archive", source, &err);
@@ -2565,7 +2593,7 @@ where
         if entry.is_dir() {
             fs::create_dir_all(&path).map_err(|err| {
                 log_io_failure("create extracted directory", &path, &err);
-                err.to_string()
+                format_install_io_error("create the extracted directory", &path, &err)
             })?;
             continue;
         }
@@ -2573,13 +2601,13 @@ where
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|err| {
                 log_io_failure("create parent directory for extracted file", parent, &err);
-                err.to_string()
+                format_install_io_error("create the extracted file parent directory", parent, &err)
             })?;
         }
 
         let mut out = fs::File::create(&path).map_err(|err| {
             log_io_failure("create extracted file", &path, &err);
-            err.to_string()
+            format_install_io_error("create the extracted file", &path, &err)
         })?;
         let mut buf = [0u8; 64 * 1024];
         loop {
@@ -2592,7 +2620,7 @@ where
             }
             io::Write::write_all(&mut out, &buf[..n]).map_err(|err| {
                 log_io_failure("write extracted file", &path, &err);
-                err.to_string()
+                format_install_io_error("write the extracted file", &path, &err)
             })?;
         }
 
@@ -2645,7 +2673,7 @@ where
 {
     fs::create_dir_all(destination).map_err(|err| {
         log_io_failure("create tar extraction destination", destination, &err);
-        err.to_string()
+        format_install_io_error("create the tar extraction destination", destination, &err)
     })?;
     let file = fs::File::open(source).map_err(|err| {
         log_io_failure("open tar archive", source, &err);
@@ -2673,7 +2701,7 @@ where
                 destination.display(),
                 err
             );
-            err.to_string()
+            format_install_io_error_pair("unpack the tar archive", source, destination, &err)
         }
     })?;
     progress(1.0);
@@ -2691,7 +2719,11 @@ where
 {
     fs::create_dir_all(destination).map_err(|err| {
         log_io_failure("create tar.gz extraction destination", destination, &err);
-        err.to_string()
+        format_install_io_error(
+            "create the tar.gz extraction destination",
+            destination,
+            &err,
+        )
     })?;
     let file = fs::File::open(source).map_err(|err| {
         log_io_failure("open tar.gz archive", source, &err);
@@ -2720,7 +2752,7 @@ where
                 destination.display(),
                 err
             );
-            err.to_string()
+            format_install_io_error_pair("unpack the tar.gz archive", source, destination, &err)
         }
     })?;
     progress(1.0);
@@ -2845,16 +2877,36 @@ fn apply_scene_overrides(source_dir: &Path, target_dir: &Path) -> Result<(), Str
 }
 
 fn copy_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
-    for entry in fs::read_dir(src).map_err(|e| e.to_string())?.flatten() {
+    let entries = fs::read_dir(src).map_err(|error| {
+        log_io_failure("read directory contents for copy", src, &error);
+        format_install_io_error("read the source directory", src, &error)
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| {
+            log_io_failure("read directory entry for copy", src, &error);
+            format_install_io_error("read the source directory", src, &error)
+        })?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
         if src_path.is_dir() {
             fs::create_dir_all(&dst_path).map_err(|error| {
+                log_io_failure(
+                    "create destination directory during copy",
+                    &dst_path,
+                    &error,
+                );
                 format_install_io_error("create the install folder", &dst_path, &error)
             })?;
             copy_dir_contents(&src_path, &dst_path)?;
         } else {
             fs::copy(&src_path, &dst_path).map_err(|error| {
+                log_io_failure_pair(
+                    "copy file into destination directory",
+                    &src_path,
+                    &dst_path,
+                    &error,
+                );
                 format_install_io_error_pair("copy extracted files", &src_path, &dst_path, &error)
             })?;
         }
@@ -4100,6 +4152,26 @@ mod tests {
     }
 
     #[test]
+    fn format_install_io_error_pair_maps_access_denied_to_friendly_message() {
+        let error = io::Error::from_raw_os_error(5);
+        let source =
+            Path::new("C:\\Users\\Lars\\AppData\\Local\\Claudio\\downloads\\Hades II-365\\files");
+        let destination = Path::new(
+            "C:\\Users\\Lars\\AppData\\Local\\Claudio\\downloads\\Hades II-365\\installer-staging",
+        );
+        let message = format_install_io_error_pair(
+            "copy package into the extraction destination",
+            source,
+            destination,
+            &error,
+        );
+
+        assert!(message.contains("couldn't move files from"));
+        assert!(message.contains(source.to_string_lossy().as_ref()));
+        assert!(message.contains(destination.to_string_lossy().as_ref()));
+    }
+
+    #[test]
     fn sanitize_segment_replaces_invalid_path_characters() {
         assert_eq!(
             sanitize_segment(" Halo: Reach / GOTY?* "),
@@ -4342,6 +4414,29 @@ mod tests {
     }
 
     #[test]
+    fn extract_archive_or_copy_copies_directory_sources_into_destination() {
+        let root = unique_test_dir("extract-directory");
+        let source = root.join("files");
+        let destination = root.join("out");
+        fs::create_dir_all(source.join("Game")).expect("source directory should be created");
+        fs::write(source.join("setup.exe"), b"installer").expect("installer should exist");
+        fs::write(source.join("Game").join("data.bin"), b"payload").expect("payload should exist");
+
+        extract_archive_or_copy(
+            &source,
+            &destination,
+            &Arc::new(AtomicBool::new(false)),
+            |_| {},
+        )
+        .expect("directory source should copy into destination");
+
+        assert!(destination.join("setup.exe").exists());
+        assert!(destination.join("Game").join("data.bin").exists());
+        assert!(!destination.join("files").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn extract_archive_or_copy_respects_pre_cancelled_copy_requests() {
         let root = unique_test_dir("extract-copy-cancelled");
         let source = root.join("game.bin");
@@ -4358,7 +4453,7 @@ mod tests {
         .expect_err("pre-cancelled copy should fail");
 
         assert_eq!(error, "Install cancelled.");
-        assert!(destination.exists());
+        assert!(!destination.exists());
         assert!(!destination.join("game.bin").exists());
         let _ = fs::remove_dir_all(root);
     }
