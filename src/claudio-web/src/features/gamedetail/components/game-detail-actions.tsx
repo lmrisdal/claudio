@@ -12,6 +12,7 @@ import {
   setGameExe,
   stopGame,
   uninstallGame,
+  validateInstallTarget,
   type InstalledGame,
   type RunningGame,
 } from "../../desktop/hooks/use-desktop";
@@ -569,14 +570,21 @@ export default function GameDetailActions({
           displayGame.installType === "installer" ? displayGame.installerExe : undefined
         }
         downloadMode={isDesktopPcDownload || installerDownloadOverride}
+        errorMessage={installError}
+        onPathChange={() => setInstallError(null)}
         onClose={() => {
           setShowInstallConfirm(false);
           setInstallerDownloadOverride(false);
         }}
-        onConfirm={(path, exe, desktopShortcut, runAsAdministrator, forceInteractive, extract) => {
+        onConfirm={async (
+          path,
+          exe,
+          desktopShortcut,
+          runAsAdministrator,
+          forceInteractive,
+          extract,
+        ) => {
           const isDownloadFlow = isDesktopPcDownload || installerDownloadOverride;
-          setShowInstallConfirm(false);
-          setInstallerDownloadOverride(false);
 
           if (isDownloadFlow) {
             if (!path) {
@@ -584,6 +592,8 @@ export default function GameDetailActions({
               return;
             }
 
+            setShowInstallConfirm(false);
+            setInstallerDownloadOverride(false);
             packageDownloadMutation.mutate({ targetDir: path, extract: extract ?? true });
             return;
           }
@@ -593,6 +603,18 @@ export default function GameDetailActions({
             return;
           }
 
+          const installTarget = path ?? defaultInstallPath;
+          try {
+            await validateInstallTarget(installTarget);
+          } catch (error) {
+            setInstallError(
+              error instanceof Error ? error.message : "Could not validate the install location.",
+            );
+            return;
+          }
+
+          setShowInstallConfirm(false);
+          setInstallerDownloadOverride(false);
           installMutation.mutate({
             ...game,
             installPath: path,

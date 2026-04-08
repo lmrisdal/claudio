@@ -321,13 +321,7 @@ async fn download_game_package_inner(
     let final_path = if input.extract {
         let staging = if download_info.is_individual {
             // Files already downloaded individually into the staging dir — skip extraction.
-            emit_progress(
-                app,
-                input.id,
-                "extracting",
-                None,
-                Some("Moving files…"),
-            );
+            emit_progress(app, input.id, "extracting", None, Some("Moving files…"));
             download_info.file_path.clone()
         } else {
             emit_progress(
@@ -405,13 +399,7 @@ async fn download_game_package_inner(
         }
         target_dir.clone()
     } else {
-        emit_progress(
-            app,
-            input.id,
-            "extracting",
-            None,
-            Some("Saving archive…"),
-        );
+        emit_progress(app, input.id, "extracting", None, Some("Saving archive…"));
         let filename = download_info
             .file_path
             .file_name()
@@ -450,6 +438,15 @@ pub fn resolve_install_path(game_title: &str) -> String {
     root.join(sanitize_segment(game_title))
         .to_string_lossy()
         .into_owned()
+}
+
+pub fn validate_install_target(target_path: &str) -> Result<(), String> {
+    let trimmed = target_path.trim();
+    if trimmed.is_empty() {
+        return Err("Please choose an install location.".to_string());
+    }
+
+    validate_install_target_path(Path::new(trimmed))
 }
 
 /// Returns the resolved default downloads root without appending a game title.
@@ -1112,17 +1109,19 @@ async fn install_game_inner(
         ));
     }
 
+    validate_install_target_path(&target_dir)?;
+
     let downloads_root = settings::resolve_download_root(&settings)?;
     let temp_root = install_download_root(&downloads_root, &game);
     if temp_root.exists() {
         fs::remove_dir_all(&temp_root).map_err(|err| {
             log_io_failure("remove stale install download directory", &temp_root, &err);
-            err.to_string()
+            format_install_io_error("clean the temporary download directory", &temp_root, &err)
         })?;
     }
     fs::create_dir_all(&temp_root).map_err(|err| {
         log_io_failure("create install download directory", &temp_root, &err);
-        err.to_string()
+        format_install_io_error("create the temporary download directory", &temp_root, &err)
     })?;
 
     let download_info = download_package(
@@ -1280,16 +1279,19 @@ where
         // Prefer legacy ticket flow in this case to match older server behavior.
         None
     } else if !manifest_response.status().is_success() {
-            return Err(format!(
-                "Failed to load download file manifest: {}",
-                manifest_response.status()
-            ));
+        return Err(format!(
+            "Failed to load download file manifest: {}",
+            manifest_response.status()
+        ));
     } else {
         let manifest_json: serde_json::Value = manifest_response
             .json()
             .await
             .map_err(|err| err.to_string())?;
-        manifest_json.get("files").and_then(|v| v.as_array()).cloned()
+        manifest_json
+            .get("files")
+            .and_then(|v| v.as_array())
+            .cloned()
     };
 
     // Check if the server provided a file manifest for individual-file download.
@@ -1617,10 +1619,7 @@ where
             }
         })
     };
-    let throttle_window = Arc::new(tokio::sync::Mutex::new((
-        std::time::Instant::now(),
-        0_u64,
-    )));
+    let throttle_window = Arc::new(tokio::sync::Mutex::new((std::time::Instant::now(), 0_u64)));
     let downloaded_bytes = Arc::new(AtomicU64::new(0));
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     let file_count = files.len();
@@ -1727,7 +1726,8 @@ where
                             let Some(delay) = delay else {
                                 break;
                             };
-                            tokio::time::sleep(delay.min(std::time::Duration::from_millis(200))).await;
+                            tokio::time::sleep(delay.min(std::time::Duration::from_millis(200)))
+                                .await;
                         }
                     }
                     dl_bytes.fetch_add(chunk.len() as u64, Ordering::Relaxed);
@@ -1818,7 +1818,9 @@ where
         game_id,
         "downloading",
         percent,
-        Some(&format!("Downloading {game_title} ({completed}/{file_count})")),
+        Some(&format!(
+            "Downloading {game_title} ({completed}/{file_count})"
+        )),
         Some(dl),
         Some(total_bytes),
         None,
@@ -1840,8 +1842,16 @@ fn urlencoding_encode(input: &str) -> String {
             b'/' => encoded.push('/'),
             other => {
                 encoded.push('%');
-                encoded.push(char::from_digit((other >> 4) as u32, 16).unwrap().to_ascii_uppercase());
-                encoded.push(char::from_digit((other & 0xf) as u32, 16).unwrap().to_ascii_uppercase());
+                encoded.push(
+                    char::from_digit((other >> 4) as u32, 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
+                encoded.push(
+                    char::from_digit((other & 0xf) as u32, 16)
+                        .unwrap()
+                        .to_ascii_uppercase(),
+                );
             }
         }
     }
@@ -1884,7 +1894,11 @@ async fn install_portable(
 
         if extract_root.exists() {
             fs::remove_dir_all(&extract_root).map_err(|err| {
-                log_io_failure("remove existing extract staging directory", &extract_root, &err);
+                log_io_failure(
+                    "remove existing extract staging directory",
+                    &extract_root,
+                    &err,
+                );
                 err.to_string()
             })?;
         }
@@ -2003,10 +2017,7 @@ async fn install_installer(
         }
         fs::create_dir_all(&staging_dir).map_err(|err| {
             log_io_failure("create installer staging directory", &staging_dir, &err);
-            format!(
-                "Failed to create installer staging directory {}: {err}",
-                staging_dir.display()
-            )
+            format_install_io_error("create the installer staging folder", &staging_dir, &err)
         })?;
         let install_result = (|| -> Result<Option<String>, String> {
             extract_archive_or_copy(
@@ -2260,6 +2271,71 @@ fn installer_staging_dir(base_dir: &Path) -> PathBuf {
     base_dir.join(format!("installer-staging-{now_ms}"))
 }
 
+fn install_probe_dir(base_dir: &Path) -> PathBuf {
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    base_dir.join(format!(".claudio-install-probe-{now_ms}"))
+}
+
+fn validate_install_target_path(target_dir: &Path) -> Result<(), String> {
+    if target_dir.exists() {
+        return Err(format!(
+            "Install target already exists: {}",
+            target_dir.display()
+        ));
+    }
+
+    let parent = target_dir.parent().unwrap_or(target_dir);
+    fs::create_dir_all(parent).map_err(|err| {
+        log_io_failure("create install target parent directory", parent, &err);
+        format_install_io_error("create the install folder", parent, &err)
+    })?;
+
+    let probe_dir = install_probe_dir(parent);
+    fs::create_dir(&probe_dir).map_err(|err| {
+        log_io_failure(
+            "create install permission probe directory",
+            &probe_dir,
+            &err,
+        );
+        format_install_io_error("create the install folder", &probe_dir, &err)
+    })?;
+
+    let validation = (|| -> Result<(), String> {
+        let probe_file = probe_dir.join(".write-test");
+        let mut file = fs::File::create(&probe_file).map_err(|err| {
+            log_io_failure("create install permission probe file", &probe_file, &err);
+            format_install_io_error("write to the install folder", &probe_file, &err)
+        })?;
+        std::io::Write::write_all(&mut file, b"claudio").map_err(|err| {
+            log_io_failure("write install permission probe file", &probe_file, &err);
+            format_install_io_error("write to the install folder", &probe_file, &err)
+        })?;
+        file.sync_all().map_err(|err| {
+            log_io_failure("flush install permission probe file", &probe_file, &err);
+            format_install_io_error("write to the install folder", &probe_file, &err)
+        })?;
+        Ok(())
+    })();
+
+    if let Err(error) = fs::remove_dir_all(&probe_dir) {
+        log_io_failure(
+            "remove install permission probe directory",
+            &probe_dir,
+            &error,
+        );
+        return Err(format_install_io_error(
+            "finish checking the install folder",
+            &probe_dir,
+            &error,
+        ));
+    }
+
+    validation
+}
+
 fn log_io_failure(operation: &str, path: &Path, error: &io::Error) {
     log::error!(
         "[installer] {operation} failed for {}: {} (raw_os_error={:?})",
@@ -2277,6 +2353,48 @@ fn log_io_failure_pair(operation: &str, source: &Path, destination: &Path, error
         error,
         error.raw_os_error()
     );
+}
+
+fn format_install_io_error(operation: &str, path: &Path, error: &io::Error) -> String {
+    if matches!(error.raw_os_error(), Some(740)) {
+        return format!(
+            "Windows requires administrator privileges to {operation} at {}. Run Claudio as administrator or choose a different install folder.",
+            path.display()
+        );
+    }
+
+    if error.kind() == io::ErrorKind::PermissionDenied || matches!(error.raw_os_error(), Some(5)) {
+        return format!(
+            "Claudio couldn't write to {} while trying to {operation}. Choose a folder you can write to or run Claudio as administrator.",
+            path.display()
+        );
+    }
+
+    error.to_string()
+}
+
+fn format_install_io_error_pair(
+    operation: &str,
+    source: &Path,
+    destination: &Path,
+    error: &io::Error,
+) -> String {
+    if matches!(error.raw_os_error(), Some(740)) {
+        return format!(
+            "Windows requires administrator privileges to {operation} at {}. Run Claudio as administrator or choose a different install folder.",
+            destination.display()
+        );
+    }
+
+    if error.kind() == io::ErrorKind::PermissionDenied || matches!(error.raw_os_error(), Some(5)) {
+        return format!(
+            "Claudio couldn't move files from {} to {} while trying to {operation}. Choose a folder you can write to or run Claudio as administrator.",
+            source.display(),
+            destination.display()
+        );
+    }
+
+    error.to_string()
 }
 
 fn infer_filename(headers: &HeaderMap) -> Option<String> {
@@ -2334,7 +2452,12 @@ where
             return Err("Install cancelled.".to_string());
         }
         fs::copy(source, target.as_path()).map_err(|err| {
-            log_io_failure_pair("copy package into extraction destination", source, &target, &err);
+            log_io_failure_pair(
+                "copy package into extraction destination",
+                source,
+                &target,
+                &err,
+            );
             err.to_string()
         })?;
         return Ok(());
@@ -2609,19 +2732,24 @@ fn normalize_into_final_dir(staging_root: &Path, final_dir: &Path) -> Result<(),
 
     if entries.len() == 1 && entries[0].is_dir() {
         fs::rename(&entries[0], final_dir).map_err(|err| {
-            log_io_failure_pair("move extracted root directory", &entries[0], final_dir, &err);
-            err.to_string()
+            log_io_failure_pair(
+                "move extracted root directory",
+                &entries[0],
+                final_dir,
+                &err,
+            );
+            format_install_io_error_pair("move extracted files", &entries[0], final_dir, &err)
         })?;
         fs::remove_dir_all(staging_root).map_err(|err| {
             log_io_failure("remove extraction staging root", staging_root, &err);
-            err.to_string()
+            format_install_io_error("clean the extraction staging folder", staging_root, &err)
         })?;
         return Ok(());
     }
 
     fs::create_dir_all(final_dir).map_err(|err| {
         log_io_failure("create final install directory", final_dir, &err);
-        err.to_string()
+        format_install_io_error("create the install folder", final_dir, &err)
     })?;
     for entry in entries {
         let target = final_dir.join(
@@ -2630,14 +2758,19 @@ fn normalize_into_final_dir(staging_root: &Path, final_dir: &Path) -> Result<(),
                 .ok_or_else(|| "Extracted entry was missing a file name.".to_string())?,
         );
         fs::rename(&entry, &target).map_err(|err| {
-            log_io_failure_pair("move extracted entry into final directory", &entry, &target, &err);
-            err.to_string()
+            log_io_failure_pair(
+                "move extracted entry into final directory",
+                &entry,
+                &target,
+                &err,
+            );
+            format_install_io_error_pair("move extracted files", &entry, &target, &err)
         })?;
     }
 
     fs::remove_dir_all(staging_root).map_err(|err| {
         log_io_failure("remove extraction staging root", staging_root, &err);
-        err.to_string()
+        format_install_io_error("clean the extraction staging folder", staging_root, &err)
     })
 }
 
@@ -2716,10 +2849,14 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
         if src_path.is_dir() {
-            fs::create_dir_all(&dst_path).map_err(|e| e.to_string())?;
+            fs::create_dir_all(&dst_path).map_err(|error| {
+                format_install_io_error("create the install folder", &dst_path, &error)
+            })?;
             copy_dir_contents(&src_path, &dst_path)?;
         } else {
-            fs::copy(&src_path, &dst_path).map_err(|e| e.to_string())?;
+            fs::copy(&src_path, &dst_path).map_err(|error| {
+                format_install_io_error_pair("copy extracted files", &src_path, &dst_path, &error)
+            })?;
         }
     }
     Ok(())
@@ -3535,7 +3672,10 @@ fn run_innoextract_with_binary(
         for entry in fs::read_dir(&app_dir).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let dest = target_dir.join(entry.file_name());
-            fs::rename(entry.path(), dest).map_err(|e| e.to_string())?;
+            let src = entry.path();
+            fs::rename(&src, &dest).map_err(|error| {
+                format_install_io_error_pair("move extracted files", &src, &dest, &error)
+            })?;
         }
         let _ = fs::remove_dir_all(&app_dir);
     }
@@ -3916,6 +4056,50 @@ mod tests {
     }
 
     #[test]
+    fn validate_install_target_path_allows_writable_parent() {
+        let root = unique_test_dir("validate-install-target");
+        let target = root.join("Game");
+
+        fs::create_dir_all(&root).expect("root directory should be created");
+
+        validate_install_target_path(&target).expect("writable target should validate");
+
+        assert!(
+            !target.exists(),
+            "validation should not create the target directory"
+        );
+        assert!(
+            fs::read_dir(&root)
+                .expect("validation root should still be readable")
+                .next()
+                .is_none(),
+            "validation should clean up probe files"
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn format_install_io_error_maps_access_denied_to_friendly_message() {
+        let error = io::Error::from_raw_os_error(5);
+        let message =
+            format_install_io_error("create the install folder", Path::new("D:\\Games"), &error);
+
+        assert!(message.contains("Claudio couldn't write to"));
+        assert!(message.contains("run Claudio as administrator"));
+    }
+
+    #[test]
+    fn format_install_io_error_maps_elevation_required_to_friendly_message() {
+        let error = io::Error::from_raw_os_error(740);
+        let message =
+            format_install_io_error("create the install folder", Path::new("D:\\Games"), &error);
+
+        assert!(message.contains("requires administrator privileges"));
+        assert!(message.contains("choose a different install folder"));
+    }
+
+    #[test]
     fn sanitize_segment_replaces_invalid_path_characters() {
         assert_eq!(
             sanitize_segment(" Halo: Reach / GOTY?* "),
@@ -3991,7 +4175,7 @@ mod tests {
     }
 
     #[test]
-    fn install_download_root_uses_default_download_root_and_sanitized_title() {
+    fn install_download_root_uses_configured_download_root_and_sanitized_title() {
         let game = RemoteGame {
             id: 9,
             title: "Max Payne: GOTY".to_string(),
@@ -4015,13 +4199,7 @@ mod tests {
             franchise: None,
             game_engine: None,
         };
-        let settings = settings::DesktopSettings {
-            default_install_path: Some("/games".to_string()),
-            default_download_path: None,
-            ..settings::DesktopSettings::default()
-        };
-
-        let path = install_download_root(&settings::default_download_root(&settings), &game);
+        let path = install_download_root(Path::new("/games/downloads"), &game);
 
         assert_eq!(path, PathBuf::from("/games/downloads/Max Payne_ GOTY-9"));
     }
@@ -4437,44 +4615,47 @@ mod tests {
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("download-manifest-fallback"), || async {
-            let settings = download_settings(server.url());
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("download-manifest-fallback"),
+            || async {
+                let settings = download_settings(server.url());
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let control = InstallControl::new();
-            let temp_root = crate::settings::data_dir().join("download-manifest-fallback");
-            fs::create_dir_all(&temp_root).expect("temp root should exist");
-            let download = download_package_with(
-                &DownloadOptions {
-                    settings: &settings,
-                    server_url: server.url(),
-                    custom_headers: &settings.custom_headers,
-                    speed_limit_kbs: None,
-                    progress_scale: 100.0,
-                },
-                12,
-                "Fallback",
-                &temp_root,
-                &control,
-                |_| {},
-                || Ok(()),
-            )
-            .await
-            .expect("download should succeed using legacy ticket fallback");
+                let control = InstallControl::new();
+                let temp_root = crate::settings::data_dir().join("download-manifest-fallback");
+                fs::create_dir_all(&temp_root).expect("temp root should exist");
+                let download = download_package_with(
+                    &DownloadOptions {
+                        settings: &settings,
+                        server_url: server.url(),
+                        custom_headers: &settings.custom_headers,
+                        speed_limit_kbs: None,
+                        progress_scale: 100.0,
+                    },
+                    12,
+                    "Fallback",
+                    &temp_root,
+                    &control,
+                    |_| {},
+                    || Ok(()),
+                )
+                .await
+                .expect("download should succeed using legacy ticket fallback");
 
-            assert_eq!(download.file_path, temp_root.join("fallback.tar"));
-            assert_eq!(
-                fs::read(&download.file_path).expect("downloaded file should exist"),
-                b"fallback-payload"
-            );
-        })
+                assert_eq!(download.file_path, temp_root.join("fallback.tar"));
+                assert_eq!(
+                    fs::read(&download.file_path).expect("downloaded file should exist"),
+                    b"fallback-payload"
+                );
+            },
+        )
         .await;
     }
 
@@ -4496,44 +4677,47 @@ mod tests {
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("download-legacy-fallback"), || async {
-            let settings = download_settings(server.url());
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("download-legacy-fallback"),
+            || async {
+                let settings = download_settings(server.url());
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let control = InstallControl::new();
-            let temp_root = crate::settings::data_dir().join("download-legacy-fallback");
-            fs::create_dir_all(&temp_root).expect("temp root should exist");
-            let download = download_package_with(
-                &DownloadOptions {
-                    settings: &settings,
-                    server_url: server.url(),
-                    custom_headers: &settings.custom_headers,
-                    speed_limit_kbs: None,
-                    progress_scale: 100.0,
-                },
-                13,
-                "LegacyFallback",
-                &temp_root,
-                &control,
-                |_| {},
-                || Ok(()),
-            )
-            .await
-            .expect("download should succeed through legacy ticket fallback");
+                let control = InstallControl::new();
+                let temp_root = crate::settings::data_dir().join("download-legacy-fallback");
+                fs::create_dir_all(&temp_root).expect("temp root should exist");
+                let download = download_package_with(
+                    &DownloadOptions {
+                        settings: &settings,
+                        server_url: server.url(),
+                        custom_headers: &settings.custom_headers,
+                        speed_limit_kbs: None,
+                        progress_scale: 100.0,
+                    },
+                    13,
+                    "LegacyFallback",
+                    &temp_root,
+                    &control,
+                    |_| {},
+                    || Ok(()),
+                )
+                .await
+                .expect("download should succeed through legacy ticket fallback");
 
-            assert_eq!(download.file_path, temp_root.join("legacy.tar"));
-            assert_eq!(
-                fs::read(&download.file_path).expect("downloaded file should exist"),
-                b"legacy-payload"
-            );
-        })
+                assert_eq!(download.file_path, temp_root.join("legacy.tar"));
+                assert_eq!(
+                    fs::read(&download.file_path).expect("downloaded file should exist"),
+                    b"legacy-payload"
+                );
+            },
+        )
         .await;
     }
 
@@ -4543,10 +4727,9 @@ mod tests {
         let payload = vec![b'x'; 512 * 1024];
         let payload_for_server = payload.clone();
         let server = TestServer::spawn(move |request| match request.path.as_str() {
-            "/api/games/11/download-files-manifest" => TestResponse::json(
-                200,
-                r#"{"files":[{"path":"Game/data.bin","size":524288}]}"#,
-            ),
+            "/api/games/11/download-files-manifest" => {
+                TestResponse::json(200, r#"{"files":[{"path":"Game/data.bin","size":524288}]}"#)
+            }
             "/api/games/11/download-files?path=Game/data.bin" => TestResponse {
                 status: 200,
                 headers: vec![(
@@ -4558,57 +4741,60 @@ mod tests {
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("download-individual-progress"), || async {
-            let settings = download_settings(server.url());
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("download-individual-progress"),
+            || async {
+                let settings = download_settings(server.url());
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let control = InstallControl::new();
-            let temp_root = crate::settings::data_dir().join("download-individual-progress");
-            fs::create_dir_all(&temp_root).expect("temp root should exist");
-            let mut progress = Vec::new();
+                let control = InstallControl::new();
+                let temp_root = crate::settings::data_dir().join("download-individual-progress");
+                fs::create_dir_all(&temp_root).expect("temp root should exist");
+                let mut progress = Vec::new();
 
-            let download = download_package_with(
-                &DownloadOptions {
-                    settings: &settings,
-                    server_url: server.url(),
-                    custom_headers: &settings.custom_headers,
-                    speed_limit_kbs: None,
-                    progress_scale: 100.0,
-                },
-                11,
-                "Game",
-                &temp_root,
-                &control,
-                |event| progress.push(event),
-                || Ok(()),
-            )
-            .await
-            .expect("download should succeed");
+                let download = download_package_with(
+                    &DownloadOptions {
+                        settings: &settings,
+                        server_url: server.url(),
+                        custom_headers: &settings.custom_headers,
+                        speed_limit_kbs: None,
+                        progress_scale: 100.0,
+                    },
+                    11,
+                    "Game",
+                    &temp_root,
+                    &control,
+                    |event| progress.push(event),
+                    || Ok(()),
+                )
+                .await
+                .expect("download should succeed");
 
-            let downloaded_file = download.file_path.join("Game").join("data.bin");
-            assert_eq!(
-                fs::read(downloaded_file).expect("downloaded file should exist"),
-                payload
-            );
-            assert!(
-                progress.iter().any(|event| {
-                    event.status == "downloading"
-                        && matches!(
-                            (event.bytes_downloaded, event.total_bytes),
-                            (Some(downloaded), Some(total))
-                                if downloaded > 0 && downloaded < total
-                        )
-                }),
-                "expected at least one partial downloading update before completion"
-            );
-        })
+                let downloaded_file = download.file_path.join("Game").join("data.bin");
+                assert_eq!(
+                    fs::read(downloaded_file).expect("downloaded file should exist"),
+                    payload
+                );
+                assert!(
+                    progress.iter().any(|event| {
+                        event.status == "downloading"
+                            && matches!(
+                                (event.bytes_downloaded, event.total_bytes),
+                                (Some(downloaded), Some(total))
+                                    if downloaded > 0 && downloaded < total
+                            )
+                    }),
+                    "expected at least one partial downloading update before completion"
+                );
+            },
+        )
         .await;
     }
 
@@ -4622,59 +4808,64 @@ mod tests {
             "/api/games/16/download-files-manifest" => {
                 TestResponse::json(200, r#"{"files":[{"path":"Game/data.bin","size":1024}]}"#)
             }
-            "/api/games/16/download-files?path=Game/data.bin" => TestResponse::text(200, &payload_for_server),
+            "/api/games/16/download-files?path=Game/data.bin" => {
+                TestResponse::text(200, &payload_for_server)
+            }
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("download-individual-speed-limit"), || async {
-            let settings = download_settings(server.url());
-            crate::settings::save(&settings).expect("settings should save");
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("download-individual-speed-limit"),
+            || async {
+                let settings = download_settings(server.url());
+                crate::settings::save(&settings).expect("settings should save");
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let temp_root = crate::settings::data_dir().join("speed-limit-test");
-            fs::create_dir_all(&temp_root).expect("temp root should be created");
-            let controller = InstallControl::new();
-            let mut progress = Vec::new();
-            let started = std::time::Instant::now();
-            let download = download_package_with(
-                &DownloadOptions {
-                    settings: &settings,
-                    server_url: server.url(),
-                    custom_headers: &settings.custom_headers,
-                    speed_limit_kbs: Some(0.5),
-                    progress_scale: 100.0,
-                },
-                16,
-                "Rate Limited Individual Download",
-                &temp_root,
-                &controller,
-                |event| progress.push(event),
-                || Ok(()),
-            )
-            .await
-            .expect("individual download should succeed");
-            let elapsed = started.elapsed();
+                let temp_root = crate::settings::data_dir().join("speed-limit-test");
+                fs::create_dir_all(&temp_root).expect("temp root should be created");
+                let controller = InstallControl::new();
+                let mut progress = Vec::new();
+                let started = std::time::Instant::now();
+                let download = download_package_with(
+                    &DownloadOptions {
+                        settings: &settings,
+                        server_url: server.url(),
+                        custom_headers: &settings.custom_headers,
+                        speed_limit_kbs: Some(0.5),
+                        progress_scale: 100.0,
+                    },
+                    16,
+                    "Rate Limited Individual Download",
+                    &temp_root,
+                    &controller,
+                    |event| progress.push(event),
+                    || Ok(()),
+                )
+                .await
+                .expect("individual download should succeed");
+                let elapsed = started.elapsed();
 
-            assert!(download.file_path.exists());
-            assert!(
-                elapsed >= std::time::Duration::from_millis(900),
-                "speed limit should delay individual-file downloads; elapsed={elapsed:?}"
-            );
-            assert!(
-                progress
-                    .iter()
-                    .filter(|event| event.status == "downloading")
-                    .any(|event| event.bytes_downloaded.unwrap_or(0) > 0),
-                "should report downloading bytes while throttled"
-            );
-        })
+                assert!(download.file_path.exists());
+                assert!(
+                    elapsed >= std::time::Duration::from_millis(900),
+                    "speed limit should delay individual-file downloads; elapsed={elapsed:?}"
+                );
+                assert!(
+                    progress
+                        .iter()
+                        .filter(|event| event.status == "downloading")
+                        .any(|event| event.bytes_downloaded.unwrap_or(0) > 0),
+                    "should report downloading bytes while throttled"
+                );
+            },
+        )
         .await;
     }
 
@@ -4688,7 +4879,9 @@ mod tests {
             "/api/games/17/download-files-manifest" => {
                 TestResponse::json(200, r#"{"files":[{"path":"Game/data.bin","size":2048}]}"#)
             }
-            "/api/games/17/download-files?path=Game/data.bin" => TestResponse::text(200, &payload_for_server),
+            "/api/games/17/download-files?path=Game/data.bin" => {
+                TestResponse::text(200, &payload_for_server)
+            }
             _ => TestResponse::text(404, "missing"),
         });
 
@@ -4773,53 +4966,59 @@ mod tests {
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("extract-archive-progress"), || async {
-            let settings = download_settings(server.url());
-            crate::settings::save(&settings).expect("settings should save");
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("extract-archive-progress"),
+            || async {
+                let settings = download_settings(server.url());
+                crate::settings::save(&settings).expect("settings should save");
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let controller = crate::services::game_install::integration_testing::TestInstallController::new();
-            let target_dir = crate::settings::data_dir().join("extract-archive-target");
-            let mut progress = Vec::new();
+                let controller =
+                    crate::services::game_install::integration_testing::TestInstallController::new(
+                    );
+                let target_dir = crate::settings::data_dir().join("extract-archive-target");
+                let mut progress = Vec::new();
 
-            let final_path = crate::services::game_install::integration_testing::download_game_package(
-                DownloadPackageInput {
-                    id: 21,
-                    title: "Archive Game".to_string(),
-                    target_dir: target_dir.to_string_lossy().into_owned(),
-                    extract: true,
-                },
-                &controller,
-                |event| progress.push(event),
-                || Ok(()),
-            )
-            .await
-            .expect("package download should succeed");
+                let final_path =
+                    crate::services::game_install::integration_testing::download_game_package(
+                        DownloadPackageInput {
+                            id: 21,
+                            title: "Archive Game".to_string(),
+                            target_dir: target_dir.to_string_lossy().into_owned(),
+                            extract: true,
+                        },
+                        &controller,
+                        |event| progress.push(event),
+                        || Ok(()),
+                    )
+                    .await
+                    .expect("package download should succeed");
 
-            assert_eq!(PathBuf::from(final_path), target_dir);
-            assert!(target_dir.join("game.exe").exists());
+                assert_eq!(PathBuf::from(final_path), target_dir);
+                assert!(target_dir.join("game.exe").exists());
 
-            let max_download_percent = progress
-                .iter()
-                .filter(|event| event.status == "downloading")
-                .filter_map(|event| event.percent)
-                .fold(0.0_f64, f64::max);
-            assert_eq!(max_download_percent, 100.0);
-            assert!(
-                progress
+                let max_download_percent = progress
                     .iter()
-                    .filter(|event| event.status == "extracting")
-                    .all(|event| event.percent.is_none()),
-                "extracting events should not lower completed download percent"
-            );
-        })
+                    .filter(|event| event.status == "downloading")
+                    .filter_map(|event| event.percent)
+                    .fold(0.0_f64, f64::max);
+                assert_eq!(max_download_percent, 100.0);
+                assert!(
+                    progress
+                        .iter()
+                        .filter(|event| event.status == "extracting")
+                        .all(|event| event.percent.is_none()),
+                    "extracting events should not lower completed download percent"
+                );
+            },
+        )
         .await;
     }
 
@@ -4835,53 +5034,59 @@ mod tests {
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("extract-individual-progress"), || async {
-            let settings = download_settings(server.url());
-            crate::settings::save(&settings).expect("settings should save");
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("extract-individual-progress"),
+            || async {
+                let settings = download_settings(server.url());
+                crate::settings::save(&settings).expect("settings should save");
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let controller = crate::services::game_install::integration_testing::TestInstallController::new();
-            let target_dir = crate::settings::data_dir().join("extract-individual-target");
-            let mut progress = Vec::new();
+                let controller =
+                    crate::services::game_install::integration_testing::TestInstallController::new(
+                    );
+                let target_dir = crate::settings::data_dir().join("extract-individual-target");
+                let mut progress = Vec::new();
 
-            let final_path = crate::services::game_install::integration_testing::download_game_package(
-                DownloadPackageInput {
-                    id: 22,
-                    title: "Individual Game".to_string(),
-                    target_dir: target_dir.to_string_lossy().into_owned(),
-                    extract: true,
-                },
-                &controller,
-                |event| progress.push(event),
-                || Ok(()),
-            )
-            .await
-            .expect("package download should succeed");
+                let final_path =
+                    crate::services::game_install::integration_testing::download_game_package(
+                        DownloadPackageInput {
+                            id: 22,
+                            title: "Individual Game".to_string(),
+                            target_dir: target_dir.to_string_lossy().into_owned(),
+                            extract: true,
+                        },
+                        &controller,
+                        |event| progress.push(event),
+                        || Ok(()),
+                    )
+                    .await
+                    .expect("package download should succeed");
 
-            assert_eq!(PathBuf::from(final_path), target_dir);
-            assert!(target_dir.join("data.bin").exists());
+                assert_eq!(PathBuf::from(final_path), target_dir);
+                assert!(target_dir.join("data.bin").exists());
 
-            let max_download_percent = progress
-                .iter()
-                .filter(|event| event.status == "downloading")
-                .filter_map(|event| event.percent)
-                .fold(0.0_f64, f64::max);
-            assert_eq!(max_download_percent, 100.0);
-            assert!(
-                progress
+                let max_download_percent = progress
                     .iter()
-                    .filter(|event| event.status == "extracting")
-                    .all(|event| event.percent.is_none()),
-                "extracting events should not lower completed download percent"
-            );
-        })
+                    .filter(|event| event.status == "downloading")
+                    .filter_map(|event| event.percent)
+                    .fold(0.0_f64, f64::max);
+                assert_eq!(max_download_percent, 100.0);
+                assert!(
+                    progress
+                        .iter()
+                        .filter(|event| event.status == "extracting")
+                        .all(|event| event.percent.is_none()),
+                    "extracting events should not lower completed download percent"
+                );
+            },
+        )
         .await;
     }
 
@@ -4904,70 +5109,79 @@ mod tests {
             _ => TestResponse::text(404, "missing"),
         });
 
-        crate::settings::with_test_data_dir_async(unique_test_dir("portable-download-root"), || async {
-            let install_root = crate::settings::data_dir().join("install-root");
-            let download_root = crate::settings::data_dir().join("custom-downloads");
-            let settings = settings::DesktopSettings {
-                server_url: Some(server.url().to_string()),
-                default_install_path: Some(install_root.to_string_lossy().into_owned()),
-                default_download_path: Some(download_root.to_string_lossy().into_owned()),
-                allow_insecure_auth_storage: true,
-                ..settings::DesktopSettings::default()
-            };
-            crate::settings::save(&settings).expect("settings should save");
-            store_tokens(
-                &settings,
-                &StoredTokens {
-                    access_token: "access-token".to_string(),
-                    refresh_token: Some("refresh-token".to_string()),
-                },
-            )
-            .expect("tokens should store");
+        crate::settings::with_test_data_dir_async(
+            unique_test_dir("portable-download-root"),
+            || async {
+                let install_root = crate::settings::data_dir().join("install-root");
+                let download_root = crate::settings::data_dir().join("custom-downloads");
+                let settings = settings::DesktopSettings {
+                    server_url: Some(server.url().to_string()),
+                    default_install_path: Some(install_root.to_string_lossy().into_owned()),
+                    default_download_path: Some(download_root.to_string_lossy().into_owned()),
+                    allow_insecure_auth_storage: true,
+                    ..settings::DesktopSettings::default()
+                };
+                crate::settings::save(&settings).expect("settings should save");
+                store_tokens(
+                    &settings,
+                    &StoredTokens {
+                        access_token: "access-token".to_string(),
+                        refresh_token: Some("refresh-token".to_string()),
+                    },
+                )
+                .expect("tokens should store");
 
-            let controller = crate::services::game_install::integration_testing::TestInstallController::new();
-            let game = RemoteGame {
-                id: 31,
-                title: "Portable Download Root Game".to_string(),
-                platform: "windows".to_string(),
-                install_type: InstallType::Portable,
-                installer_exe: None,
-                game_exe: Some("game.exe".to_string()),
-                install_path: None,
-                desktop_shortcut: None,
-                run_as_administrator: None,
-                force_interactive: None,
-                summary: None,
-                genre: None,
-                release_year: None,
-                cover_url: None,
-                hero_url: None,
-                developer: None,
-                publisher: None,
-                game_mode: None,
-                series: None,
-                franchise: None,
-                game_engine: None,
-            };
-            let expected_install_dir = install_root.join("Portable Download Root Game");
-            let legacy_install_temp_root = crate::settings::data_dir().join("install-31");
+                let controller =
+                    crate::services::game_install::integration_testing::TestInstallController::new(
+                    );
+                let game = RemoteGame {
+                    id: 31,
+                    title: "Portable Download Root Game".to_string(),
+                    platform: "windows".to_string(),
+                    install_type: InstallType::Portable,
+                    installer_exe: None,
+                    game_exe: Some("game.exe".to_string()),
+                    install_path: None,
+                    desktop_shortcut: None,
+                    run_as_administrator: None,
+                    force_interactive: None,
+                    summary: None,
+                    genre: None,
+                    release_year: None,
+                    cover_url: None,
+                    hero_url: None,
+                    developer: None,
+                    publisher: None,
+                    game_mode: None,
+                    series: None,
+                    franchise: None,
+                    game_engine: None,
+                };
+                let expected_install_dir = install_root.join("Portable Download Root Game");
+                let legacy_install_temp_root = crate::settings::data_dir().join("install-31");
 
-            let installed = crate::services::game_install::integration_testing::install_portable_game(
-                game,
-                &controller,
-                |_| {},
-                || Ok(()),
-            )
-            .await
-            .expect("portable install should succeed");
+                let installed =
+                    crate::services::game_install::integration_testing::install_portable_game(
+                        game,
+                        &controller,
+                        |_| {},
+                        || Ok(()),
+                    )
+                    .await
+                    .expect("portable install should succeed");
 
-            assert_eq!(PathBuf::from(installed.install_path), expected_install_dir);
-            assert!(expected_install_dir.join("game.exe").exists());
-            assert!(download_root.exists(), "configured downloads root should be used");
-            assert!(
-                !legacy_install_temp_root.exists(),
-                "legacy temp install root should not be used for downloaded artifacts"
-            );
-        })
+                assert_eq!(PathBuf::from(installed.install_path), expected_install_dir);
+                assert!(expected_install_dir.join("game.exe").exists());
+                assert!(
+                    download_root.exists(),
+                    "configured downloads root should be used"
+                );
+                assert!(
+                    !legacy_install_temp_root.exists(),
+                    "legacy temp install root should not be used for downloaded artifacts"
+                );
+            },
+        )
         .await;
     }
 

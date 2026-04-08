@@ -23,6 +23,8 @@ interface InstallDialogProperties {
   exeOptions?: string[];
   installerPath?: string;
   downloadMode?: boolean;
+  errorMessage?: string | null;
+  onPathChange?: () => void;
   onClose: () => void;
   onConfirm: (
     path: string | undefined,
@@ -31,7 +33,7 @@ interface InstallDialogProperties {
     runAsAdministrator?: boolean,
     forceInteractive?: boolean,
     extract?: boolean,
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 export default function InstallDialog({
@@ -44,6 +46,8 @@ export default function InstallDialog({
   exeOptions = [],
   installerPath,
   downloadMode = false,
+  errorMessage,
+  onPathChange,
   onClose,
   onConfirm,
 }: InstallDialogProperties) {
@@ -110,6 +114,7 @@ export default function InstallDialog({
 
       if (selected !== null) {
         setInstallPath(Array.isArray(selected) ? selected[0] : selected);
+        onPathChange?.();
       }
     } catch (error) {
       console.error("Failed to open dialog", error);
@@ -166,7 +171,10 @@ export default function InstallDialog({
                   <input
                     type="text"
                     value={installPath}
-                    onChange={(e) => setInstallPath(e.target.value)}
+                    onChange={(e) => {
+                      setInstallPath(e.target.value);
+                      onPathChange?.();
+                    }}
                     placeholder="e.g. C:\Games\My Game"
                     className="flex-1 rounded-lg bg-surface-raised border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-focus-ring transition"
                   />
@@ -178,6 +186,11 @@ export default function InstallDialog({
                     Browse…
                   </button>
                 </div>
+                {errorMessage && (
+                  <p className="mt-2 text-sm text-red-400" role="alert">
+                    {errorMessage}
+                  </p>
+                )}
               </div>
 
               {showExePicker && !downloadMode && (
@@ -296,7 +309,7 @@ export default function InstallDialog({
             </button>
             <button
               onClick={() =>
-                onConfirm(
+                void onConfirm(
                   installPath || undefined,
                   exe || undefined,
                   downloadMode || !isPortable ? undefined : desktopShortcut,

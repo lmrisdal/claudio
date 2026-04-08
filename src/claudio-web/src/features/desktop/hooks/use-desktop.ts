@@ -156,6 +156,10 @@ export async function resolveInstallPath(gameTitle: string): Promise<string> {
   return invoke<string>("resolve_install_path", { gameTitle });
 }
 
+export async function validateInstallTarget(targetPath: string): Promise<void> {
+  return invoke<void>("validate_install_target", { targetPath });
+}
+
 export async function resolveDefaultDownloadRoot(): Promise<string> {
   return invoke<string>("resolve_default_download_root");
 }
@@ -229,6 +233,7 @@ export function useDesktop() {
     updateSettings,
     openSettingsWindow,
     installGame,
+    validateInstallTarget,
     getInstalledGame,
     listInstalledGames,
     openInstallFolder,
