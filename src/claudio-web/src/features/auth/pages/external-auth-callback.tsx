@@ -40,9 +40,9 @@ export default function ExternalAuthCallback() {
   }, [completeExternalLogin, location.search, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-grid">
+    <div className="auth-shell min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="card bg-surface rounded-xl p-6 ring-1 ring-border text-center">
+        <div className="card auth-card bg-surface rounded-xl p-6 ring-1 ring-border text-center">
           <p className="text-sm text-text-secondary">Completing sign-in…</p>
         </div>
       </div>
