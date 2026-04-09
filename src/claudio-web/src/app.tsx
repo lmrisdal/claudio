@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
+import { useApplyAppTint } from "./features/core/hooks/use-app-tint";
 import { useReducedTransparency } from "./features/core/hooks/use-reduced-transparency";
 import { useTheme } from "./features/core/hooks/use-theme";
 
@@ -27,8 +28,13 @@ const Register = lazy(() => import("./features/auth/pages/register"));
 const DesktopSetup = lazy(() => import("./features/desktop/pages/desktop-setup"));
 
 export default function App() {
-  useTheme(); // keeps OS colour-scheme subscription alive for the lifetime of the app
-  useReducedTransparency();
+  const { resolvedTheme } = useTheme();
+  const reducedTransparency = useReducedTransparency();
+  useApplyAppTint({
+    enabled: isDesktop,
+    theme: resolvedTheme,
+    reducedTransparency,
+  });
 
   const isDesktopSettingsWindow =
     isDesktop &&

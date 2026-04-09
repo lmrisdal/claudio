@@ -1,5 +1,9 @@
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Header from "../../core/components/header";
+import { useNavigate } from "react-router";
+import SearchDialog from "../../core/components/search-dialog";
+import { useNavigation } from "../../core/hooks/use-navigation";
+import { isMac } from "../../core/utils/os";
 import { sounds } from "../../core/utils/sounds";
 import {
   DesktopShellNavigationContext,
@@ -9,9 +13,9 @@ import DesktopSidebar, {
   COLLAPSED_KEY,
   COLLAPSED_WIDTH,
   DEFAULT_WIDTH,
-  HEADER_HEIGHT,
   WIDTH_KEY,
 } from "./desktop-sidebar";
+import DesktopWindowControls from "./desktop-window-controls";
 
 function isVisibleFocusableElement(element: HTMLElement) {
   if (element.hasAttribute("disabled")) {
@@ -26,6 +30,17 @@ function isVisibleFocusableElement(element: HTMLElement) {
 }
 
 export default function DesktopLayoutInner({ children }: { children: React.ReactNode }) {
+  const { searchOpen, closeSearch } = useNavigation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unlisten = listen<string>("navigate", (event) => {
+      void navigate(event.payload);
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [navigate]);
   const [marginLeft, setMarginLeft] = useState(() => {
     const collapsed = localStorage.getItem(COLLAPSED_KEY) === "true";
     if (collapsed) return COLLAPSED_WIDTH;
@@ -106,18 +121,27 @@ export default function DesktopLayoutInner({ children }: { children: React.React
   return (
     <DesktopShellNavigationContext.Provider value={navigationValue}>
       <DesktopSidebar navigationReference={sidebarReference} />
-      <Header />
+      <DesktopWindowControls />
+      <div
+        data-tauri-drag-region
+        className="fixed top-0 z-45"
+        style={{
+          left: isMac ? 220 : 140,
+          right: 0,
+          height: 30,
+        }}
+      />
       <div
         ref={contentReference}
         style={{
           marginLeft,
-          marginTop: HEADER_HEIGHT,
-          height: `calc(100dvh - ${HEADER_HEIGHT}px)`,
+          height: "100dvh",
         }}
-        className={`app-desktop-panel flex flex-col min-h-0 overflow-y-auto overflow-x-hidden ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
+        className={`app-desktop-panel flex flex-col min-h-0 overflow-hidden ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
       >
         {children}
       </div>
+      <SearchDialog open={searchOpen} onClose={closeSearch} />
     </DesktopShellNavigationContext.Provider>
   );
 }

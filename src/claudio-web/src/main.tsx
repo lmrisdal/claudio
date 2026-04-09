@@ -8,7 +8,10 @@ import GuideProvider from "./features/core/components/guide-provider";
 import NavigationProvider from "./features/core/components/navigation-provider";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
+import { resolveThemePreference, type ThemePreference } from "./features/core/hooks/use-theme";
+import { applyAppTintVariables } from "./features/core/utils/app-tint";
 import { isReducedTransparencyEnabled } from "./features/core/utils/preferences";
+import { getAppTint } from "./features/core/utils/preferences";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import "./index.css";
@@ -30,6 +33,20 @@ async function attachDesktopLogBridgeWithTimeout() {
 if (isDesktop) {
   document.documentElement.dataset.desktop = "";
   document.documentElement.classList.toggle("reduce-transparency", isReducedTransparencyEnabled());
+  const storedTheme = localStorage.getItem("theme") as ThemePreference | null;
+  const themePreference =
+    storedTheme === "dark" || storedTheme === "light" || storedTheme === "system"
+      ? storedTheme
+      : "system";
+  applyAppTintVariables(
+    document.documentElement,
+    resolveThemePreference(
+      themePreference,
+      globalThis.matchMedia("(prefers-color-scheme: light)").matches,
+    ),
+    getAppTint(),
+    isReducedTransparencyEnabled(),
+  );
   document.addEventListener("contextmenu", (event) => {
     event.preventDefault();
   });

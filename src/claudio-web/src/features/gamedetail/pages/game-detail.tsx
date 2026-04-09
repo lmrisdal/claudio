@@ -9,8 +9,8 @@ import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { isMac } from "../../core/utils/os";
 import { sounds } from "../../core/utils/sounds";
-import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import { useDesktop, type InstalledGame } from "../../desktop/hooks/use-desktop";
+import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import BrowseFilesDialog from "../components/browse-files-dialog";
 import GameDetailActions from "../components/game-detail-actions";
 import GameDetailOverview from "../components/game-detail-overview";
@@ -129,7 +129,11 @@ export default function GameDetail() {
   }
 
   return (
-    <div className="relative flex-1 w-full">
+    <div
+      className={
+        isDesktop ? "relative flex min-h-0 w-full flex-1 flex-col" : "relative flex-1 w-full"
+      }
+    >
       {displayGame.heroUrl && (
         <div
           className="game-hero-backdrop pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden"
@@ -143,7 +147,11 @@ export default function GameDetail() {
       <main
         ref={mainReference}
         onKeyDown={handleMainKeyDown}
-        className="relative z-10 max-w-5xl mx-auto px-6 py-12 flex-1 w-full"
+        className={
+          isDesktop
+            ? "relative z-10 mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col overflow-y-auto px-6 py-12 pb-16"
+            : "relative z-10 max-w-5xl mx-auto px-6 py-12 flex-1 w-full"
+        }
       >
         <div
           ref={focusAnchorReference}
@@ -171,7 +179,7 @@ export default function GameDetail() {
               void sounds.back();
             }
           }}
-          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
+          className={`mb-8 inline-flex self-start items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
             displayGame.heroUrl
               ? "hero-glass-chip bg-black/30 dark:text-white/85 text-black/80 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 dark:hover:text-white hover:text-black shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
               : "text-text-muted hover:text-text-primary"
@@ -189,7 +197,7 @@ export default function GameDetail() {
           Library
         </Link>
 
-        <div className="flex flex-col md:flex-row gap-10">
+        <div className="flex flex-col gap-10 md:flex-row">
           <div className="w-72 shrink-0 mx-auto md:mx-0">
             <div className="aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border">
               {displayGame.coverUrl ? (

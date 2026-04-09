@@ -1,21 +1,11 @@
 import { Suspense, useEffect, useState } from "react";
 import { getSettings, isDesktop } from "../hooks/use-desktop";
-import { HEADER_HEIGHT } from "./desktop-sidebar";
 import DesktopSetup from "../pages/desktop-setup";
 
 export function DesktopGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<"loading" | "setup" | "ready">(
     isDesktop ? "loading" : "ready",
   );
-  const dragRegion = isDesktop ? (
-    <div
-      aria-hidden="true"
-      data-tauri-drag-region
-      className="fixed inset-x-0 top-0 z-40"
-      style={{ height: HEADER_HEIGHT }}
-    />
-  ) : null;
-
   useEffect(() => {
     if (!isDesktop) return;
     let cancelled = false;
@@ -47,7 +37,6 @@ export function DesktopGate({ children }: { children: React.ReactNode }) {
   if (state === "setup") {
     return (
       <>
-        {dragRegion}
         <Suspense>
           <DesktopSetup
             onConnected={(serverUrl) => {
@@ -60,10 +49,5 @@ export function DesktopGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (
-    <>
-      {dragRegion}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

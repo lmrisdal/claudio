@@ -93,6 +93,38 @@ fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
         .select_all()
         .build()?;
 
+    let nav_library_item = MenuItemBuilder::with_id("nav-library", "Library")
+        .accelerator("CmdOrCtrl+1")
+        .build(app)?;
+    let nav_downloads_item = MenuItemBuilder::with_id("nav-downloads", "Downloads")
+        .accelerator("CmdOrCtrl+2")
+        .build(app)?;
+    let nav_admin_item = MenuItemBuilder::with_id("nav-admin", "Admin")
+        .accelerator("CmdOrCtrl+3")
+        .build(app)?;
+    let nav_settings_item = MenuItemBuilder::with_id("nav-settings", "Settings")
+        .accelerator("CmdOrCtrl+4")
+        .build(app)?;
+
+    let view_grid_item = MenuItemBuilder::with_id("view-grid", "Grid").build(app)?;
+    let view_grouped_item = MenuItemBuilder::with_id("view-grouped", "Grouped").build(app)?;
+    let view_list_item = MenuItemBuilder::with_id("view-list", "List").build(app)?;
+
+    let library_view_submenu = SubmenuBuilder::new(app, "Library view")
+        .item(&view_grid_item)
+        .item(&view_grouped_item)
+        .item(&view_list_item)
+        .build()?;
+
+    let view_submenu = SubmenuBuilder::new(app, "View")
+        .item(&nav_library_item)
+        .item(&nav_downloads_item)
+        .item(&nav_admin_item)
+        .item(&nav_settings_item)
+        .separator()
+        .item(&library_view_submenu)
+        .build()?;
+
     let window_submenu = SubmenuBuilder::new(app, "Window")
         .minimize()
         .maximize()
@@ -104,6 +136,7 @@ fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
         .item(&app_submenu)
         .item(&edit_submenu)
+        .item(&view_submenu)
         .item(&window_submenu)
         .build()?;
 
@@ -271,6 +304,22 @@ pub fn run() {
             }
             "check-updates" | "tray-check-updates" => {
                 let _ = app.emit("check-for-updates", ());
+            }
+            "nav-library" => {
+                let _ = app.emit("navigate", "/");
+            }
+            "nav-downloads" => {
+                let _ = app.emit("navigate", "/downloads");
+            }
+            "nav-admin" => {
+                let _ = app.emit("navigate", "/admin");
+            }
+            "nav-settings" => {
+                tauri::async_runtime::spawn(commands::open_settings_window(app.clone()));
+            }
+            "view-grid" | "view-grouped" | "view-list" => {
+                let mode = event.id().as_ref().strip_prefix("view-").unwrap_or("grouped");
+                let _ = app.emit("library-set-view", mode);
             }
             "tray-show" => {
                 restore_main_window(app);

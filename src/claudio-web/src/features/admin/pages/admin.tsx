@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router";
+import { isDesktop } from "../../desktop/hooks/use-desktop";
 import GamesTab from "../components/games-tab";
 import ScanTab from "../components/scan-tab";
 import SettingsTab from "../components/settings-tab";
@@ -20,7 +21,7 @@ export default function Admin() {
   ];
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8 flex-1 w-full">
+    <main className="max-w-4xl mx-auto px-6 py-12 flex-1 min-h-0 flex flex-col w-full">
       <h1 className="font-display text-3xl font-bold text-heading text-text-primary mb-8">
         Admin Panel
       </h1>
@@ -42,10 +43,12 @@ export default function Admin() {
         ))}
       </div>
 
-      {activeTab === "users" && <UsersTab />}
-      {activeTab === "games" && <GamesTab />}
-      {activeTab === "scan" && <ScanTab />}
-      {activeTab === "settings" && <SettingsTab />}
+      <div className={isDesktop ? "flex-1 min-h-0 overflow-y-auto pb-8 pr-2" : ""}>
+        {activeTab === "users" && <UsersTab />}
+        {activeTab === "games" && <GamesTab />}
+        {activeTab === "scan" && <ScanTab />}
+        {activeTab === "settings" && <SettingsTab />}
+      </div>
     </main>
   );
 }

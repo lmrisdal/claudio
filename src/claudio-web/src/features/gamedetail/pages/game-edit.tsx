@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { api } from "../../core/api/client";
+import { isDesktop } from "../../desktop/hooks/use-desktop";
 import GameEditForm from "../components/game-edit-form";
 import IgdbMatchDialog from "../components/igdb-match-dialog";
 import SteamGridDbDialog from "../components/steamgriddb-dialog";
@@ -295,7 +296,11 @@ export default function GameEdit() {
   const coverUrl = editForm.coverUrl || game.coverUrl;
 
   return (
-    <div className="relative flex-1 w-full">
+    <div
+      className={
+        isDesktop ? "relative flex min-h-0 w-full flex-1 flex-col" : "relative flex-1 w-full"
+      }
+    >
       {heroUrl && (
         <div
           className="game-hero-backdrop pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden"
@@ -306,95 +311,202 @@ export default function GameEdit() {
         </div>
       )}
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 py-12 flex-1 w-full">
-        <Link
-          to={`/games/${game.id}`}
-          className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
-            heroUrl
-              ? "hero-glass-chip bg-black/30 text-white/85 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 hover:text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
-              : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Back to game
-        </Link>
-
-        <div className="flex flex-col md:flex-row gap-10">
-          <div className="w-72 shrink-0 mx-auto md:mx-0">
-            <button
-              type="button"
-              onClick={() => void openSgdbDialog("covers")}
-              className="w-full aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border hover:ring-accent transition"
+      <main
+        className={
+          isDesktop
+            ? "relative z-10 mx-auto grid w-full max-w-5xl flex-1 min-h-0 grid-cols-[18rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-x-10 gap-y-8 px-6 py-12"
+            : "relative z-10 max-w-5xl mx-auto px-6 py-12 flex-1 w-full"
+        }
+      >
+        {isDesktop ? (
+          <>
+            <Link
+              to={`/games/${game.id}`}
+              className={`col-start-1 row-start-1 inline-flex w-fit justify-self-start self-start items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
+                heroUrl
+                  ? "hero-glass-chip bg-black/30 text-white/85 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 hover:text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
             >
-              {coverUrl ? (
-                <img src={coverUrl} alt={game.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
-                  <svg
-                    className="w-12 h-12"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
-                    />
-                  </svg>
-                  <span className="text-xs">Choose cover</span>
-                </div>
-              )}
-            </button>
-          </div>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 19.5L8.25 12l7.5-7.5"
+                />
+              </svg>
+              Back to game
+            </Link>
 
-          <div className="flex-1 min-w-0">
-            <GameEditForm
-              game={game}
-              hasHeroImage={!!heroUrl}
-              editForm={editForm}
-              exeOptions={exeList}
-              coverFileReference={coverFileReference}
-              heroFileReference={heroFileReference}
-              savePending={updateMutation.isPending}
-              saveError={
-                updateMutation.error instanceof Error
-                  ? updateMutation.error.message
-                  : updateMutation.isError
-                    ? "Update failed"
-                    : null
-              }
-              compressPending={compressMutation.isPending}
-              compressError={
-                compressMutation.error instanceof Error
-                  ? compressMutation.error.message
-                  : compressMutation.isError
-                    ? "Compression failed"
-                    : null
-              }
-              tagFolderPending={tagFolderMutation.isPending}
-              onChange={(patch) =>
-                setEditForm((current) => (current ? { ...current, ...patch } : current))
-              }
-              onSubmit={() => void handleSubmit()}
-              onCancel={() => void navigate(`/games/${game.id}`)}
-              onOpenIgdbSearch={openIgdbSearch}
-              onOpenSgdb={(mode) => void openSgdbDialog(mode)}
-              onImageSelect={handleImageSelect}
-              onTagFolder={() => tagFolderMutation.mutate()}
-              onCompress={(format) => compressMutation.mutate(format)}
-            />
-          </div>
-        </div>
+            <div className="col-start-1 row-start-2 flex w-72 shrink-0 flex-col self-start">
+              <button
+                type="button"
+                onClick={() => void openSgdbDialog("covers")}
+                className="aspect-2/3 w-full overflow-hidden rounded-xl bg-surface-raised ring-1 ring-border transition hover:ring-accent"
+              >
+                {coverUrl ? (
+                  <img src={coverUrl} alt={game.title} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-text-muted">
+                    <svg
+                      className="w-12 h-12"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
+                      />
+                    </svg>
+                    <span className="text-xs">Choose cover</span>
+                  </div>
+                )}
+              </button>
+            </div>
+
+            <div className="col-start-2 row-start-2 min-h-0 min-w-0 overflow-y-auto pb-16 pr-2">
+              <GameEditForm
+                game={game}
+                hasHeroImage={!!heroUrl}
+                editForm={editForm}
+                exeOptions={exeList}
+                coverFileReference={coverFileReference}
+                heroFileReference={heroFileReference}
+                savePending={updateMutation.isPending}
+                saveError={
+                  updateMutation.error instanceof Error
+                    ? updateMutation.error.message
+                    : updateMutation.isError
+                      ? "Update failed"
+                      : null
+                }
+                compressPending={compressMutation.isPending}
+                compressError={
+                  compressMutation.error instanceof Error
+                    ? compressMutation.error.message
+                    : compressMutation.isError
+                      ? "Compression failed"
+                      : null
+                }
+                tagFolderPending={tagFolderMutation.isPending}
+                onChange={(patch) =>
+                  setEditForm((current) => (current ? { ...current, ...patch } : current))
+                }
+                onSubmit={() => void handleSubmit()}
+                onCancel={() => void navigate(`/games/${game.id}`)}
+                onOpenIgdbSearch={openIgdbSearch}
+                onOpenSgdb={(mode) => void openSgdbDialog(mode)}
+                onImageSelect={handleImageSelect}
+                onTagFolder={() => tagFolderMutation.mutate()}
+                onCompress={(format) => compressMutation.mutate(format)}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <Link
+              to={`/games/${game.id}`}
+              className={`mb-8 inline-flex self-start items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
+                heroUrl
+                  ? "hero-glass-chip bg-black/30 text-white/85 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 hover:text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 19.5L8.25 12l7.5-7.5"
+                />
+              </svg>
+              Back to game
+            </Link>
+
+            <div className="flex flex-col gap-10 md:flex-row">
+              <div className="w-72 shrink-0 mx-auto md:mx-0">
+                <button
+                  type="button"
+                  onClick={() => void openSgdbDialog("covers")}
+                  className="w-full aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border hover:ring-accent transition"
+                >
+                  {coverUrl ? (
+                    <img src={coverUrl} alt={game.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
+                      <svg
+                        className="w-12 h-12"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
+                        />
+                      </svg>
+                      <span className="text-xs">Choose cover</span>
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <GameEditForm
+                  game={game}
+                  hasHeroImage={!!heroUrl}
+                  editForm={editForm}
+                  exeOptions={exeList}
+                  coverFileReference={coverFileReference}
+                  heroFileReference={heroFileReference}
+                  savePending={updateMutation.isPending}
+                  saveError={
+                    updateMutation.error instanceof Error
+                      ? updateMutation.error.message
+                      : updateMutation.isError
+                        ? "Update failed"
+                        : null
+                  }
+                  compressPending={compressMutation.isPending}
+                  compressError={
+                    compressMutation.error instanceof Error
+                      ? compressMutation.error.message
+                      : compressMutation.isError
+                        ? "Compression failed"
+                        : null
+                  }
+                  tagFolderPending={tagFolderMutation.isPending}
+                  onChange={(patch) =>
+                    setEditForm((current) => (current ? { ...current, ...patch } : current))
+                  }
+                  onSubmit={() => void handleSubmit()}
+                  onCancel={() => void navigate(`/games/${game.id}`)}
+                  onOpenIgdbSearch={openIgdbSearch}
+                  onOpenSgdb={(mode) => void openSgdbDialog(mode)}
+                  onImageSelect={handleImageSelect}
+                  onTagFolder={() => tagFolderMutation.mutate()}
+                  onCompress={(format) => compressMutation.mutate(format)}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       <SteamGridDbDialog

@@ -1,9 +1,22 @@
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ButtonHTMLAttributes } from "react";
 import { api } from "../api/client";
 import type { TasksStatus } from "../types/models";
 
-export default function TasksPopover() {
+interface TasksPopoverProps {
+  buttonClassName?: string;
+  buttonTitle?: string;
+  buttonProps?: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "title"> & {
+    [key: `data-${string}`]: string | boolean | undefined;
+  };
+}
+
+export default function TasksPopover({
+  buttonClassName,
+  buttonTitle = "Tasks",
+  buttonProps,
+}: TasksPopoverProps = {}) {
   const queryClient = useQueryClient();
 
   const { data: tasks } = useQuery({
@@ -41,7 +54,11 @@ export default function TasksPopover() {
 
   return (
     <Popover className="relative">
-      <PopoverButton className="relative p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition outline-none">
+      <PopoverButton
+        {...buttonProps}
+        title={buttonTitle}
+        className={`relative p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition outline-none ${buttonClassName ?? ""}`}
+      >
         <svg
           className="w-4 h-4"
           fill="none"

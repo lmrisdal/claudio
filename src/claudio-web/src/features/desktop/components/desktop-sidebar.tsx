@@ -1,16 +1,21 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { useAuth } from "../../auth/hooks/use-auth";
+import TasksPopover from "../../core/components/tasks-popover";
 import UninstallDialog from "../../core/components/uninstall-dialog";
+import { useNavigation } from "../../core/hooks/use-navigation";
+import { isMac } from "../../core/utils/os";
 import { sounds } from "../../core/utils/sounds";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
-import { useDesktopShellNavigation } from "../hooks/use-desktop-shell-navigation";
 import {
   isDesktop,
   listInstalledGames,
   openInstallFolder,
   uninstallGame,
 } from "../hooks/use-desktop";
+import { useDesktopShellNavigation } from "../hooks/use-desktop-shell-navigation";
+import DesktopSidebarFooter from "./desktop-sidebar-footer";
 import DownloadsIcon from "./downloads-icon";
 import LibraryIcon from "./library-icon";
 import SettingsIcon from "./settings-icon";
@@ -20,7 +25,7 @@ export const COLLAPSED_KEY = "claudio_sidebar_collapsed";
 export const WIDTH_KEY = "claudio_sidebar_width";
 export const COLLAPSED_WIDTH = 56;
 export const DEFAULT_WIDTH = 220;
-export const HEADER_HEIGHT = 36;
+export const HEADER_HEIGHT = 32;
 export const TOGGLE_SIDEBAR_EVENT = "claudio:toggle-desktop-sidebar";
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 400;
@@ -52,6 +57,8 @@ export default function DesktopSidebar({
     title: string;
   } | null>(null);
   const { focusPage } = useDesktopShellNavigation();
+  const { toggleSearch, canGoBack, canGoForward } = useNavigation();
+  const { isAdmin } = useAuth();
 
   const { data: installedGames = [] } = useQuery({
     queryKey: ["installedGames"],
@@ -209,82 +216,229 @@ export default function DesktopSidebar({
   );
 
   const sidebarWidth = collapsed ? COLLAPSED_WIDTH : width;
-  const sidebarTop = HEADER_HEIGHT;
+  const sidebarTop = 0;
 
   if (!isDesktop) return null;
 
   return (
     <nav
       ref={navigationReference}
+      data-tauri-drag-region
       onKeyDown={handleSidebarKeyDown}
       style={{
         width: sidebarWidth,
         top: sidebarTop,
-        height: `calc(100dvh - ${sidebarTop}px)`,
+        height: "100dvh",
       }}
-      className={`app-blur-surface desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border/50 bg-sidebar-blur select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
+      className={`desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border/50 bg-sidebar-blur select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
       aria-label="Desktop navigation"
     >
-      {/* Navigation items */}
-      <div className="flex flex-col gap-1.5 px-2 pt-2">
-        {navItems.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
+      <div data-tauri-drag-region className="pt-0">
+        <div
+          data-tauri-drag-region
+          className={`flex items-center gap-0.5 min-w-0 px-2 pt-1 ${isMac ? "pl-23" : ""}`}
+          style={{ height: HEADER_HEIGHT }}
+        >
+          <button
+            onClick={() => setCollapsed((current) => !current)}
             onKeyDown={handleSelectKeyDown}
             data-desktop-sidebar-nav
-            data-desktop-sidebar-active={isActive(item.to) ? "true" : undefined}
-            className={`flex items-center gap-3 rounded-lg transition text-sm font-medium ${
-              collapsed ? "justify-center p-2.5" : "px-3 py-2"
-            } ${
-              isActive(item.to)
-                ? "bg-(--sidebar-active-bg) text-text-primary"
-                : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
-            } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
-            title={collapsed ? item.label : undefined}
+            className="desktop-no-drag rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text-primary transition-colors flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-pressed={!collapsed}
           >
-            <span className="relative shrink-0">
-              <item.icon className="w-4.5 h-4.5" />
-              {item.badge != undefined && (
-                <span className="absolute -top-1.5 -right-2 min-w-4 h-4 flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold px-1">
-                  {item.badge}
-                </span>
-              )}
-            </span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </Link>
-        ))}
+            <svg
+              className={`w-4 h-4 transition-transform ${collapsed ? "scale-x-[-1]" : ""}`}
+              fill="none"
+              viewBox="0 0 16 16"
+              stroke="currentColor"
+              strokeWidth={1.25}
+              aria-hidden="true"
+            >
+              <rect x="1.75" y="2.25" width="12.5" height="11.5" rx="1.75" />
+              <path d="M5.75 3.35v9.3" strokeLinecap="round" opacity="0.55" />
+              <rect
+                x="2.75"
+                y="3.35"
+                width="2"
+                height="9.3"
+                rx="0.8"
+                fill="currentColor"
+                stroke="none"
+                opacity="0.8"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={toggleSearch}
+            onKeyDown={handleSelectKeyDown}
+            data-desktop-sidebar-nav
+            className="desktop-no-drag p-1.5 rounded-md text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            title="Search games (Ctrl+K)"
+            aria-label="Search games"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+              />
+            </svg>
+          </button>
+          {isAdmin && (
+            <TasksPopover
+              buttonTitle="Tasks"
+              buttonProps={{ "data-desktop-sidebar-nav": true }}
+              buttonClassName="desktop-no-drag p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition-colors flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            />
+          )}
+          <button
+            onClick={() => navigate(-1)}
+            onKeyDown={handleSelectKeyDown}
+            data-desktop-sidebar-nav
+            disabled={!canGoBack}
+            className="desktop-no-drag p-1.5 rounded-md text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            title="Go back"
+            aria-label="Go back"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+          <button
+            onClick={() => navigate(1)}
+            onKeyDown={handleSelectKeyDown}
+            data-desktop-sidebar-nav
+            disabled={!canGoForward}
+            className="desktop-no-drag p-1.5 rounded-md text-text-muted hover:text-text-primary enabled:hover:bg-surface-raised transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            title="Go forward"
+            aria-label="Go forward"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        </div>
 
-        {/* Settings button */}
-        <button
-          onClick={() => globalThis.dispatchEvent(new CustomEvent("claudio:open-desktop-settings"))}
-          onKeyDown={handleSelectKeyDown}
-          data-desktop-sidebar-nav
-          className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-hover ${
-            collapsed ? "justify-center p-2.5" : "px-3 py-2"
-          } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
-          title={collapsed ? "Settings" : undefined}
-        >
-          <SettingsIcon className="w-4.5 h-4.5 shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </button>
+        <div data-tauri-drag-region className="flex flex-col gap-1.5 px-2 pt-2">
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onKeyDown={handleSelectKeyDown}
+              data-desktop-sidebar-nav
+              data-desktop-sidebar-active={isActive(item.to) ? "true" : undefined}
+              className={`flex items-center gap-3 rounded-lg transition text-sm font-medium ${
+                collapsed ? "justify-center p-2.5" : "px-3 py-2"
+              } ${
+                isActive(item.to)
+                  ? "bg-(--sidebar-active-bg) text-text-primary"
+                  : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
+              } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
+              title={collapsed ? item.label : undefined}
+            >
+              <span className="relative shrink-0">
+                <item.icon className="w-4.5 h-4.5" />
+                {item.badge != undefined && (
+                  <span className="absolute -top-1.5 -right-2 min-w-4 h-4 flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold px-1">
+                    {item.badge}
+                  </span>
+                )}
+              </span>
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </Link>
+          ))}
+
+          {isAdmin && (
+            <Link
+              to="/admin"
+              onKeyDown={handleSelectKeyDown}
+              data-desktop-sidebar-nav
+              data-desktop-sidebar-active={isActive("/admin") ? "true" : undefined}
+              className={`flex items-center gap-3 rounded-lg transition text-sm font-medium ${
+                collapsed ? "justify-center p-2.5" : "px-3 py-2"
+              } ${
+                isActive("/admin")
+                  ? "bg-(--sidebar-active-bg) text-text-primary"
+                  : "text-text-secondary hover:text-text-primary hover:bg-sidebar-hover"
+              } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
+              title={collapsed ? "Admin" : undefined}
+            >
+              <svg
+                className="w-4.5 h-4.5 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75 11.25 15 15 9.75m6 2.25a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                />
+              </svg>
+              {!collapsed && <span className="truncate">Admin</span>}
+            </Link>
+          )}
+
+          <button
+            onClick={() =>
+              globalThis.dispatchEvent(new CustomEvent("claudio:open-desktop-settings"))
+            }
+            onKeyDown={handleSelectKeyDown}
+            data-desktop-sidebar-nav
+            className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-hover ${
+              collapsed ? "justify-center p-2.5" : "px-3 py-2"
+            } outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
+            title={collapsed ? "Settings" : undefined}
+          >
+            <SettingsIcon className="w-4.5 h-4.5 shrink-0" />
+            {!collapsed && <span>Settings</span>}
+          </button>
+        </div>
       </div>
 
       {/* Divider */}
-      <div className="mx-3 my-2 border-t border-border/50" />
+      <div data-tauri-drag-region className="mx-3 my-2 border-t border-border/50" />
 
       {/* Installed games */}
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div data-tauri-drag-region className="flex-1 min-h-0 flex flex-col">
         {!collapsed && (
-          <div className="px-4 mb-1.5">
+          <div data-tauri-drag-region className="px-4 mb-1.5">
             <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
               Installed
             </span>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 space-y-1.5 scrollbar-thin">
+        <div
+          data-tauri-drag-region
+          className="flex-1 overflow-y-auto overflow-x-hidden px-2 space-y-1.5 scrollbar-thin"
+        >
           {installedGames.length === 0 && activeDownloads.size === 0 ? (
-            !collapsed && <p className="px-2 text-xs text-text-muted italic">No games installed</p>
+            !collapsed && (
+              <p data-tauri-drag-region className="px-2 text-xs text-text-muted italic">
+                No games installed
+              </p>
+            )
           ) : (
             <>
               {[...activeDownloads.values()].map(({ game, progress }) => {
@@ -433,6 +587,8 @@ export default function DesktopSidebar({
           )}
         </div>
       </div>
+
+      <DesktopSidebarFooter collapsed={collapsed} />
 
       {/* Context menu for installed / installing games */}
       {contextMenu && (
