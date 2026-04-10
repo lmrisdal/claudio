@@ -120,7 +120,7 @@ export default function DesktopSetup({
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
+    <div className="min-h-screen bg-grid app-overlay-scrim app-modal-backdrop-blur flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Logo className="text-3xl mx-auto mb-4" />

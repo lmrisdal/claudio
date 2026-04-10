@@ -133,23 +133,25 @@ pub(super) fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 const SCENE_GROUP_FOLDERS: &[&str] = &[
-    "SKIDROW",
-    "CODEX",
-    "CPY",
-    "PLAZA",
-    "RELOADED",
-    "RUNE",
-    "EMPRESS",
-    "VOKSI",
-    "FLT",
-    "BAT",
-    "PROPHET",
-    "DARKSIDERS",
-    "DODI",
-    "HOODLUM",
-    "RAZOR1911",
-    "FAIRLIGHT",
+    "skidrow",
+    "codex",
+    "cpy",
+    "plaza",
+    "reloaded",
+    "rune",
+    "empress",
+    "voksi",
+    "flt",
+    "bat",
+    "prophet",
+    "darksiders",
+    "dodi",
+    "hoodlum",
+    "razor1911",
+    "fairlight",
     "voices38",
+    "crack",
+    "kirigiri"
 ];
 
 pub(super) fn apply_scene_overrides(source_dir: &Path, target_dir: &Path) -> Result<(), String> {

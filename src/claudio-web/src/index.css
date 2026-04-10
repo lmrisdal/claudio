@@ -10,7 +10,6 @@
   --color-surface-raised: var(--surface-raised);
   --color-surface-overlay: var(--surface-overlay);
   --color-border: var(--border-color);
-  --color-border-subtle: var(--border-subtle);
   --color-bg: var(--bg);
   --color-bg-blur: var(--bg-blur);
   --color-sidebar-blur: var(--sidebar-blur);
@@ -27,7 +26,7 @@
 :root {
   --bg: #0a0a0f;
   --bg-blur: rgba(10, 10, 15, 0.8);
-  --sidebar-blur: rgba(10, 10, 15, 0.72);
+  --sidebar-blur: rgba(10, 10, 15, 0.6);
   --desktop-main-panel-bg: rgba(10, 10, 15, 0.8);
   --desktop-settings-panel-bg: rgba(17, 17, 24, 0.64);
   --desktop-settings-sidebar-bg: rgba(17, 17, 24, 0.48);
@@ -68,7 +67,7 @@
 .light {
   --bg: #f8f8fa;
   --bg-blur: rgba(248, 248, 250, 0.8);
-  --sidebar-blur: rgba(248, 248, 250, 0.58);
+  --sidebar-blur: rgba(248, 248, 250, 0.4);
   --desktop-main-panel-bg: rgba(248, 248, 250, 0.8);
   --desktop-settings-panel-bg: rgba(255, 255, 255, 0.68);
   --desktop-settings-sidebar-bg: rgba(255, 255, 255, 0.5);
@@ -227,7 +226,6 @@ html[data-desktop] body {
 
 .guide-reduced-hover-surface,
 .guide-reduced-active-surface,
-.guide-reduced-muted-surface,
 .guide-reduced-divider,
 .overlay-reduced-active-surface {
   /* no-op outside reduced-transparency mode */
@@ -267,6 +265,22 @@ html[data-desktop] body {
 :root.reduce-transparency .hero-glass-chip,
 :root.reduce-transparency .app-glass-panel,
 :root.reduce-transparency .app-guide-panel {
+  box-shadow: none;
+}
+
+html[data-desktop].reduce-transparency .auth-shell::before {
+  background-color: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-desktop].reduce-transparency .auth-shell::after {
+  opacity: 0.2;
+}
+
+html[data-desktop].reduce-transparency .auth-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: none;
 }
 
@@ -322,6 +336,22 @@ html[data-desktop] body {
     box-shadow: none;
   }
 
+  html[data-desktop] .auth-shell::before {
+    background-color: var(--bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  html[data-desktop] .auth-shell::after {
+    opacity: 0.2;
+  }
+
+  html[data-desktop] .auth-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
   .guide-reduced-hover-surface:hover,
   .guide-reduced-hover-surface:focus-visible {
     background-color: var(--surface-raised) !important;
@@ -332,10 +362,6 @@ html[data-desktop] body {
     background-color: var(--surface-overlay) !important;
     color: var(--text-primary) !important;
     box-shadow: none !important;
-  }
-
-  .guide-reduced-muted-surface {
-    background-color: var(--surface-raised) !important;
   }
 
   .guide-reduced-divider {
@@ -393,6 +419,51 @@ html[data-desktop] [role="button"] {
   background-size: 28px 28px;
 }
 
+html[data-desktop] .bg-grid {
+  background-image: none;
+}
+
+html[data-desktop] .auth-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+html[data-desktop] .auth-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--overlay-scrim-strong);
+  backdrop-filter: blur(14px) saturate(115%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
+}
+
+html[data-desktop] .auth-shell::after {
+  content: "";
+  position: absolute;
+  inset: -24%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 32%, var(--accent-dim) 0%, transparent 48%),
+    radial-gradient(circle at 84% 68%, var(--accent-dim) 0%, transparent 54%);
+  opacity: 0.42;
+}
+
+html[data-desktop] .auth-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-desktop] .auth-card {
+  background-color: var(--glass-panel-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 24px 52px rgb(0 0 0 / 0.42);
+}
+
 /* Sidebar scrollbar */
 .desktop-sidebar ::-webkit-scrollbar {
   width: 4px;
@@ -444,17 +515,6 @@ html[data-desktop] [role="button"] {
   }
   to {
     opacity: 1;
-  }
-}
-
-@keyframes slideFromTopLeft {
-  from {
-    opacity: 0;
-    transform: translate(-100%, -100%);
-  }
-  to {
-    opacity: 1;
-    transform: translate(0, 0);
   }
 }
 

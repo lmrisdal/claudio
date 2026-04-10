@@ -106,7 +106,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-grid">
+    <div className="auth-shell min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className={`text-center ${isDesktop ? "mb-2" : "mb-10"}`}>
           <Logo className="text-5xl" />
@@ -125,7 +125,7 @@ export default function Login() {
           )}
         </div>
 
-        <div className="card bg-surface rounded-xl p-6 ring-1 ring-border">
+        <div className="card auth-card bg-surface rounded-xl p-6 ring-1 ring-border">
           {displayedError && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5 mb-4">
               <p className="text-red-400 text-sm">{displayedError}</p>
