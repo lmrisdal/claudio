@@ -1,17 +1,14 @@
-import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, resolveServerUrl } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { useGamepadDirectionalKeyBridge } from "../../core/hooks/use-gamepad-directional-key-bridge";
-import { useGuide } from "../../core/hooks/use-guide";
 import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
-import { matchKey, useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
+import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 import { isEmulatorFullscreenEnabled } from "../../core/utils/preferences";
-import { getShortcuts } from "../../core/utils/shortcuts";
 import { sounds } from "../../core/utils/sounds";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 
@@ -29,26 +26,16 @@ interface EmulationSession {
   gameUrl: string;
 }
 
-interface SaveStateDto {
-  id: number;
-  gameId: number;
-  screenshotUrl: string;
-  createdAt: string;
-}
-
 export default function GameEmulator() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const guide = useGuide();
   const { isActionBlocked } = useInputScopeState();
   const { focusSidebar } = useDesktopShellNavigation();
-  const loadStateMenuBridgeId = useId();
   const candidateSelectBridgeId = useId();
   const [selectedPath, setSelectedPath] = useState("");
   const [activePath, setActivePath] = useState("");
 
   useInputScope({ id: "game-emulator-page", kind: "page" });
-  useGamepadDirectionalKeyBridge(loadStateMenuBridgeId);
   useGamepadDirectionalKeyBridge(candidateSelectBridgeId);
 
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
@@ -97,70 +84,7 @@ export default function GameEmulator() {
     },
   });
 
-  // ── Save states (non-fullscreen toolbar) ──
-  const queryClient = useQueryClient();
   const gameId = game?.id;
-
-  const { data: saveStates } = useQuery({
-    queryKey: ["saveStates", gameId],
-    queryFn: () => api.get<SaveStateDto[]>(`/games/${gameId}/save-states`),
-    enabled: Boolean(frameUrl) && gameId !== undefined,
-  });
-
-  const [savingState, setSavingState] = useState(false);
-
-  useEffect(() => {
-    if (!savingState || !gameId) return;
-
-    function handleMessage(event: MessageEvent) {
-      if (event.data?.type !== "claudio:stateData") return;
-
-      const stateBlob = new Blob([new Uint8Array(event.data.state)], {
-        type: "application/octet-stream",
-      });
-      const screenshotBlob = new Blob([new Uint8Array(event.data.screenshot)], {
-        type: "image/png",
-      });
-
-      void api
-        .uploadBinary<SaveStateDto>(`/games/${gameId}/save-states`, {
-          state: stateBlob,
-          screenshot: screenshotBlob,
-        })
-        .then(() => {
-          void queryClient.invalidateQueries({
-            queryKey: ["saveStates", gameId],
-          });
-        })
-        .finally(() => {
-          setSavingState(false);
-        });
-    }
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [savingState, gameId, queryClient]);
-
-  const handleSaveState = useCallback(() => {
-    setSavingState(true);
-    iframeReference.current?.contentWindow?.postMessage({ type: "claudio:requestSaveState" }, "*");
-  }, []);
-
-  const handleLoadState = useCallback(
-    async (saveId: number) => {
-      if (!gameId) return;
-      const stateData = await api.getBinary(`/games/${gameId}/save-states/${saveId}/state`);
-      iframeReference.current?.contentWindow?.postMessage(
-        {
-          type: "claudio:loadState",
-          state: [...new Uint8Array(stateData)],
-        },
-        "*",
-      );
-      iframeReference.current?.focus();
-    },
-    [gameId],
-  );
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -186,79 +110,12 @@ export default function GameEmulator() {
   );
 
   useEffect(() => {
-    if (!frameUrl || guide.isOpen) return;
+    if (!frameUrl) return;
     document.body.dataset.emulatorActive = "true";
     return () => {
       delete document.body.dataset.emulatorActive;
     };
-  }, [frameUrl, guide.isOpen]);
-
-  // Forward the guide keyboard shortcut from the iframe's contentWindow
-  // (keyboard events inside a focused iframe don't reach the parent window)
-  useEffect(() => {
-    const iframe = iframeReference.current;
-    if (!frameUrl || !iframe) return;
-
-    function attach() {
-      const win = iframe!.contentWindow;
-      if (!win) return;
-
-      function onKeyDown(e: KeyboardEvent) {
-        if (matchKey(getShortcuts().guide, e)) {
-          e.preventDefault();
-          guide.toggle();
-        }
-      }
-
-      win.addEventListener("keydown", onKeyDown, true);
-      return () => win.removeEventListener("keydown", onKeyDown, true);
-    }
-
-    // Attach after iframe loads (contentWindow may not be ready yet)
-    let cleanup = attach();
-    function onLoad() {
-      cleanup?.();
-      cleanup = attach();
-    }
-    iframe.addEventListener("load", onLoad);
-    return () => {
-      cleanup?.();
-      iframe.removeEventListener("load", onLoad);
-    };
-  }, [frameUrl, guide]);
-
-  useEffect(() => {
-    if (!game || !frameUrl) return;
-    return guide.register({
-      gameId: game.id,
-      gameName: game.title,
-      coverUrl: game.coverUrl,
-      onResume: () => iframeReference.current?.focus(),
-      onQuitGame: () => {
-        setFrameUrl(null);
-        setActivePath("");
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        }
-      },
-      onRequestSaveState: () => {
-        iframeReference.current?.contentWindow?.postMessage(
-          { type: "claudio:requestSaveState" },
-          "*",
-        );
-      },
-      onLoadState: (stateData: ArrayBuffer) => {
-        iframeReference.current?.contentWindow?.postMessage(
-          {
-            type: "claudio:loadState",
-            state: [...new Uint8Array(stateData)],
-          },
-          "*",
-        );
-        iframeReference.current?.focus();
-      },
-    });
-  }, [game, frameUrl, guide]);
+  }, [frameUrl]);
 
   const focusNav = useCallback((index: number) => {
     const items = [
@@ -372,80 +229,6 @@ export default function GameEmulator() {
           </div>
 
           <div className="ml-auto flex items-end gap-3">
-            {frameUrl && (
-              <div className="flex items-center gap-2">
-                {saveStates && saveStates.length > 0 && (
-                  <Menu as="div" className="relative">
-                    <MenuButton
-                      data-gamepad-nav-bridge={loadStateMenuBridgeId}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus-ring"
-                    >
-                      Load state…
-                      <svg
-                        className="h-4 w-4 text-white/40"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="m19.5 8.25-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </MenuButton>
-                    <MenuItems
-                      anchor="bottom end"
-                      data-gamepad-nav-bridge={loadStateMenuBridgeId}
-                      className="z-50 mt-1 w-64 origin-top-right rounded-xl border border-border bg-surface-raised p-1 shadow-xl transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
-                    >
-                      {saveStates.map((s) => (
-                        <MenuItem key={s.id}>
-                          <button
-                            type="button"
-                            data-gamepad-nav-bridge={loadStateMenuBridgeId}
-                            onClick={() => handleLoadState(s.id)}
-                            className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary transition data-[focus]:bg-white/8"
-                          >
-                            <img
-                              src={`${resolveServerUrl(s.screenshotUrl)}?v=${new Date(s.createdAt).getTime()}`}
-                              alt=""
-                              className="h-9 w-16 shrink-0 rounded object-cover bg-white/5"
-                            />
-                            <span className="text-xs text-white/60">
-                              {new Date(s.createdAt).toLocaleString()}
-                            </span>
-                          </button>
-                        </MenuItem>
-                      ))}
-                    </MenuItems>
-                  </Menu>
-                )}
-                <button
-                  data-nav
-                  type="button"
-                  disabled={savingState}
-                  onClick={handleSaveState}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-text-primary transition outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
-                    />
-                  </svg>
-                  {savingState ? "Saving…" : "Save state"}
-                </button>
-              </div>
-            )}
             {emulation.supported && emulation.candidates.length > 1 && (
               <div className="flex items-center gap-3">
                 <label className="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">

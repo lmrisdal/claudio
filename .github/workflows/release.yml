@@ -18,16 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-dotnet@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
         with:
-          dotnet-version: "10.0.x"
+          workspaces: . -> target
 
-      - run: dotnet restore tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj
-
-      - run: dotnet build tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj --no-restore
-
-      - name: Run tests
-        run: dotnet run --project tests/Claudio.Api.Tests --no-build
+      - name: Run API Rust tests
+        run: cargo test -p claudio-api-tests
 
       - uses: docker/setup-qemu-action@v3
 
@@ -41,6 +39,8 @@ jobs:
           load: true
           platforms: linux/amd64
           tags: claudio:smoke
+          cache-from: type=gha,scope=claudio-web-image
+          cache-to: type=gha,mode=max,scope=claudio-web-image
 
       - name: Smoke test container startup
         run: |
@@ -92,6 +92,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=claudio-web-image
+          cache-to: type=gha,mode=max,scope=claudio-web-image
 
   desktop-tests:
     strategy:

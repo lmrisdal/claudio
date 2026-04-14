@@ -2,19 +2,15 @@ import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode }
 import { useLocation } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { useGamepad } from "../hooks/use-gamepad";
-import { useGuide } from "../hooks/use-guide";
 import { useInputScopeState } from "../hooks/use-input-scope";
 import { NavigationContext } from "../hooks/use-navigation";
 import { useGamepadEvent, useShortcut } from "../hooks/use-shortcut";
-import { getShortcuts } from "../utils/shortcuts";
 
 export default function NavigationProvider({ children }: { children: ReactNode }) {
-  // Gamepad polling (converts gamepad input to keyboard/custom events)
   useGamepad();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const { isLoggedIn } = useAuth();
-  const guide = useGuide();
   const { isActionBlocked } = useInputScopeState();
   const location = useLocation();
 
@@ -38,7 +34,6 @@ export default function NavigationProvider({ children }: { children: ReactNode }
     { stack: [], index: -1 },
   );
 
-  // Track history entries for back/forward state
   useEffect(() => {
     dispatch({ type: "push", key: location.key || "default" });
   }, [location.key]);
@@ -50,7 +45,6 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   const closeSearch = useCallback(() => setSearchOpen(false), []);
   const toggleSearch = useCallback(() => setSearchOpen((v) => !v), []);
 
-  // Ctrl+K / Cmd+K toggles search (only when logged in)
   useShortcut("mod+k", (e) => {
     if (!isLoggedIn) return;
     if (isActionBlocked("search")) return;
@@ -58,37 +52,11 @@ export default function NavigationProvider({ children }: { children: ReactNode }
     toggleSearch();
   });
 
-  // Gamepad Y button toggles search (unless emulator is active)
   useGamepadEvent("gamepad-search", () => {
     if (!isLoggedIn) return;
     if (document.body.dataset.emulatorActive) return;
     if (isActionBlocked("search")) return;
     toggleSearch();
-  });
-
-  // Configurable keyboard shortcut for guide overlay
-  const [guideKey, setGuideKey] = useState(() => getShortcuts().guide);
-
-  useEffect(() => {
-    function onChanged() {
-      setGuideKey(getShortcuts().guide);
-    }
-    globalThis.addEventListener("claudio:shortcuts-changed", onChanged);
-    return () => globalThis.removeEventListener("claudio:shortcuts-changed", onChanged);
-  }, []);
-
-  useShortcut(guideKey, (e) => {
-    if (!isLoggedIn) return;
-    if (isActionBlocked("guide")) return;
-    e.preventDefault();
-    guide.toggle();
-  });
-
-  // Gamepad guide button toggles the guide overlay (only when logged in)
-  useGamepadEvent("gamepad-guide", () => {
-    if (!isLoggedIn) return;
-    if (isActionBlocked("guide")) return;
-    guide.toggle();
   });
 
   const value = useMemo(

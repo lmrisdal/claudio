@@ -214,24 +214,24 @@ Games are organized by platform in your library directories:
 
 ### Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Rust toolchain](https://www.rust-lang.org/tools/install)
 - [Node.js 22+](https://nodejs.org/)
 
 ### Backend
 
 ```bash
-dotnet run --project src/claudio-api
+cargo run -p claudio-api
 ```
 
 ### Frontend
 
 ```bash
 cd src/claudio-web
-npm install
-npm run dev
+vp install
+vp dev
 ```
 
-The Vite dev server runs on port 5173 and proxies API requests to the backend on port 5118.
+The Vite dev server runs on port 5173 and proxies API requests to the backend on port 8080.
 
 ### Desktop Windows Cross-Check From macOS/Linux
 
@@ -262,7 +262,7 @@ This updates `src/claudio-desktop/tauri.conf.json`, `src/claudio-desktop/Cargo.t
 
 ## Tech Stack
 
-- **Backend:** ASP.NET minimal APIs, Entity Framework Core, SQLite/PostgreSQL
+- **Backend:** Rust, Axum, SeaORM, SQLite/PostgreSQL
 - **Frontend:** React 19, Vite, TanStack Query, Tailwind CSS v4, Headless UI
-- **Auth:** OpenIddict (OAuth 2.0 / OpenID Connect), ASP.NET Core Identity
+- **Auth:** JWT, OAuth 2.0 / OpenID Connect
 - **Metadata:** IGDB API via Twitch OAuth

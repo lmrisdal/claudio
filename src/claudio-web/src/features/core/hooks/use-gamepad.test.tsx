@@ -49,11 +49,11 @@ afterEach(() => {
 });
 
 describe("useGamepad", () => {
-  it("suppresses directional events while the emulator is active but still allows the guide button", () => {
+  it("suppresses directional events while the emulator is active but still allows search events", () => {
     const navListener = vi.fn();
-    const guideListener = vi.fn();
+    const searchListener = vi.fn();
     globalThis.addEventListener("gamepad-nav-up", navListener);
-    globalThis.addEventListener("gamepad-guide", guideListener);
+    globalThis.addEventListener("gamepad-search", searchListener);
     Object.defineProperty(navigator, "getGamepads", {
       configurable: true,
       value: () => [createGamepad({ 12: { pressed: true }, 16: { pressed: true } })],
@@ -67,10 +67,10 @@ describe("useGamepad", () => {
     });
 
     expect(navListener).not.toHaveBeenCalled();
-    expect(guideListener).toHaveBeenCalledTimes(1);
+    expect(searchListener).toHaveBeenCalledTimes(1);
 
     globalThis.removeEventListener("gamepad-nav-up", navListener);
-    globalThis.removeEventListener("gamepad-guide", guideListener);
+    globalThis.removeEventListener("gamepad-search", searchListener);
     view.unmount();
   });
 

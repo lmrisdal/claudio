@@ -6,11 +6,11 @@ import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 
 function ScopeStateHarness({
   settingsOpen,
-  guideOpen,
+  overlayOpen,
   recordingOpen,
 }: {
   settingsOpen: boolean;
-  guideOpen: boolean;
+  overlayOpen: boolean;
   recordingOpen: boolean;
 }) {
   useInputScope({ id: "page", kind: "page" });
@@ -21,10 +21,10 @@ function ScopeStateHarness({
     enabled: settingsOpen,
   });
   useInputScope({
-    id: "guide-overlay",
+    id: "overlay",
     kind: "overlay",
     blocks: ["page-nav", "search"],
-    enabled: guideOpen,
+    enabled: overlayOpen,
   });
   useInputScope({
     id: "settings-shortcut-recording",
@@ -47,7 +47,11 @@ function ScopeStateHarness({
 function renderHarness(settingsOpen: boolean, guideOpen: boolean) {
   return renderInDom(
     <InputScopeProvider>
-      <ScopeStateHarness settingsOpen={settingsOpen} guideOpen={guideOpen} recordingOpen={false} />
+      <ScopeStateHarness
+        settingsOpen={settingsOpen}
+        overlayOpen={guideOpen}
+        recordingOpen={false}
+      />
     </InputScopeProvider>,
   );
 }
@@ -72,13 +76,13 @@ describe("InputScopeProvider", () => {
     view.unmount();
   });
 
-  it("lets the guide overlay outrank page scopes while still blocking page navigation", () => {
+  it("lets the overlay outrank page scopes while still blocking page navigation", () => {
     const view = renderHarness(false, true);
     const state = getState(view);
 
     expect(state.dataset.guideBlocked).toBe("false");
     expect(state.dataset.pageBlocked).toBe("true");
-    expect(state.dataset.topScope).toBe("guide-overlay");
+    expect(state.dataset.topScope).toBe("overlay");
     view.unmount();
   });
 
@@ -87,7 +91,7 @@ describe("InputScopeProvider", () => {
 
     view.rerender(
       <InputScopeProvider>
-        <ScopeStateHarness settingsOpen={false} guideOpen={false} recordingOpen={false} />
+        <ScopeStateHarness settingsOpen={false} overlayOpen={false} recordingOpen={false} />
       </InputScopeProvider>,
     );
 
@@ -101,7 +105,7 @@ describe("InputScopeProvider", () => {
   it("lets recording scopes override lower-priority settings and page scopes", () => {
     const view = renderInDom(
       <InputScopeProvider>
-        <ScopeStateHarness settingsOpen guideOpen={false} recordingOpen />
+        <ScopeStateHarness settingsOpen overlayOpen={false} recordingOpen />
       </InputScopeProvider>,
     );
 

@@ -133,6 +133,25 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return body || fallback;
 }
 
+async function readSuccess<T>(response: Response): Promise<T> {
+  if (response.status === 204 || response.status === 202) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = await response.text();
+
+  if (!body.trim()) {
+    return undefined as T;
+  }
+
+  if (contentType.includes("application/json")) {
+    return JSON.parse(body) as T;
+  }
+
+  return body as T;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const headers = buildRequestHeaders(init, isFormData);
@@ -150,8 +169,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         };
         const retryRes = await fetch(`${getApiBase()}${path}`, { ...init, headers: retryHeaders });
         if (retryRes.ok) {
-          if (retryRes.status === 204 || retryRes.status === 202) return undefined as T;
-          return retryRes.json();
+          return readSuccess<T>(retryRes);
         }
       }
 
@@ -171,8 +189,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(await readError(res, res.statusText));
   }
 
-  if (res.status === 204 || res.status === 202) return undefined as T;
-  return res.json();
+  return readSuccess<T>(res);
 }
 
 async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {

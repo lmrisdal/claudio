@@ -2,41 +2,69 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build",
-      "command": "dotnet",
+      "label": "build api",
+      "command": "cargo",
       "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/src/claudio-api/Claudio.Api.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
+      "args": ["build", "-p", "claudio-api"],
+      "problemMatcher": []
     },
     {
-      "label": "publish",
-      "command": "dotnet",
+      "label": "build frontend",
+      "command": "vp",
       "type": "process",
-      "args": [
-        "publish",
-        "${workspaceFolder}/src/claudio-api/Claudio.Api.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
+      "args": ["build"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/claudio-web"
+      },
+      "problemMatcher": []
     },
     {
-      "label": "watch",
-      "command": "dotnet",
+      "label": "prepare api app",
+      "dependsOn": ["build frontend", "build api"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "check api",
+      "command": "cargo",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "${workspaceFolder}/src/claudio-api/Claudio.Api.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
+      "args": ["check", "-p", "claudio-api"],
+      "problemMatcher": []
+    },
+    {
+      "label": "test api",
+      "command": "cargo",
+      "type": "process",
+      "args": ["test", "-p", "claudio-api-tests"],
+      "problemMatcher": []
+    },
+    {
+      "label": "build workspace",
+      "command": "cargo",
+      "type": "process",
+      "args": ["build", "--workspace"],
+      "problemMatcher": []
+    },
+    {
+      "label": "run api",
+      "command": "cargo",
+      "type": "process",
+      "args": ["run", "-p", "claudio-api"],
+      "problemMatcher": []
+    },
+    {
+      "label": "run api (release)",
+      "command": "cargo",
+      "type": "process",
+      "args": ["run", "--release", "-p", "claudio-api"],
+      "problemMatcher": []
+    },
+    {
+      "label": "watch api",
+      "command": "cargo",
+      "type": "process",
+      "args": ["run", "-p", "claudio-api"],
+      "problemMatcher": []
     },
     {
       "label": "tauri dev",
@@ -54,7 +82,7 @@
     {
       "label": "API + Tauri",
       "dependsOn": [
-        "watch",
+        "watch api",
         "tauri dev"
       ],
       "dependsOrder": "parallel"

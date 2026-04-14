@@ -9,8 +9,8 @@ export default function ExternalAuthCallback() {
 
   useEffect(() => {
     const parameters = new URLSearchParams(location.search);
-    const externalNonce = parameters.get("external_nonce");
-    const providerName = parameters.get("provider");
+    const externalNonce = parameters.get("external_nonce") ?? parameters.get("nonce");
+    const providerName = parameters.get("provider") ?? "external";
     const authError = parameters.get("error");
 
     if (authError) {
@@ -20,7 +20,7 @@ export default function ExternalAuthCallback() {
       return;
     }
 
-    if (!externalNonce || !providerName) {
+    if (!externalNonce) {
       void navigate("/login", { replace: true });
       return;
     }

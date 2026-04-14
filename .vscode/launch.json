@@ -1,45 +1,35 @@
 {
-  // Use IntelliSense to find out which attributes exist for C# debugging
-  // Use hover for the description of the existing attributes
-  // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Claudio API",
-      "type": "coreclr",
+      "name": "Debug Claudio API",
+      "type": "lldb",
       "request": "launch",
-      "preLaunchTask": "build",
-      // If you have changed target frameworks, make sure to update the program path.
-      "program": "${workspaceFolder}/src/claudio-api/bin/Debug/net10.0/Claudio.Api.dll",
+      "cargo": {
+        "args": ["build", "--bin", "claudio-api", "--package", "claudio-api"],
+        "filter": {
+          "name": "claudio-api",
+          "kind": "bin"
+        }
+      },
       "args": [],
       "cwd": "${workspaceFolder}",
-      "stopAtEntry": false,
-      // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
-      // "serverReadyAction": {
-      //     "action": "openExternally",
-      //     "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-      // },
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:8080",
         "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml"
       },
-      "sourceFileMap": {
-        "/Views": "${workspaceFolder}/Views"
-      }
+      "preLaunchTask": "prepare api app"
     },
     {
-      "name": "Claudio API (No Debug)",
+      "name": "Run Claudio API",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/claudio-api/Claudio.Api.csproj"],
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "-p", "claudio-api"],
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:8080",
         "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml"
       },
+      "preLaunchTask": "prepare api app",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
     },
@@ -56,7 +46,7 @@
   "compounds": [
     {
       "name": "API + Tauri",
-      "configurations": ["Claudio API (No Debug)", "Tauri Dev"]
+      "configurations": ["Run Claudio API", "Tauri Dev"]
     }
   ]
 }
