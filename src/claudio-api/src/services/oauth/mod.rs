@@ -24,6 +24,8 @@ pub enum OAuthError {
     Provider(String),
     #[error("missing required field: {0}")]
     MissingField(&'static str),
+    #[error("user creation is disabled")]
+    UserCreationDisabled,
 }
 
 pub struct ExternalUserInfo {
@@ -37,6 +39,7 @@ pub async fn find_or_create_user(
     db: &sea_orm::DatabaseConnection,
     provider: &str,
     info: &ExternalUserInfo,
+    disable_user_creation: bool,
 ) -> Result<i32, OAuthError> {
     let existing_login = user_external_login::Entity::find()
         .filter(user_external_login::Column::Provider.eq(provider))
@@ -67,6 +70,10 @@ pub async fn find_or_create_user(
                 return Ok(u.id);
             }
         }
+    }
+
+    if disable_user_creation {
+        return Err(OAuthError::UserCreationDisabled);
     }
 
     let count = user::Entity::find().count(db).await?;

@@ -188,7 +188,7 @@ async fn remote(
 
     let user_id = if let Some(u) = existing {
         u.id
-    } else if state.config.auth.proxy_auth_auto_create {
+    } else if state.config.auth.proxy_auth_auto_create && !state.config.auth.disable_user_creation {
         let count = user::Entity::find()
             .count(&state.db)
             .await

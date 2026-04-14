@@ -11,9 +11,17 @@ use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Deserialize;
 
 use crate::{
-    services::oauth::{self, find_or_create_user},
+    services::oauth::{self, find_or_create_user, OAuthError},
     state::AppState,
 };
+
+fn sanitize_return_to(value: Option<String>) -> String {
+    match value {
+        // Must start with "/" but not "//" (protocol-relative URL)
+        Some(v) if v.starts_with('/') && !v.starts_with("//") => v,
+        _ => "/".to_string(),
+    }
+}
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -46,7 +54,7 @@ async fn github_start(
         return Err((StatusCode::NOT_FOUND, "not found".to_string()));
     }
 
-    let return_to = query.return_to.unwrap_or_else(|| "/".to_string());
+    let return_to = sanitize_return_to(query.return_to);
     let csrf = state.github_state_store.create(&return_to);
     let url = oauth::github::build_auth_url(&state.config.auth.github, &csrf);
 
@@ -85,9 +93,17 @@ async fn github_callback(
                 (StatusCode::BAD_GATEWAY, "OAuth error".to_string())
             })?;
 
-    let user_id = find_or_create_user(&state.db, "GitHub", &user_info)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let user_id = find_or_create_user(
+        &state.db,
+        "GitHub",
+        &user_info,
+        state.config.auth.disable_user_creation,
+    )
+    .await
+    .map_err(|e| match e {
+        OAuthError::UserCreationDisabled => (StatusCode::FORBIDDEN, e.to_string()),
+        _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    })?;
 
     let nonce = state.external_login_nonce_store.create(user_id);
     let encoded_nonce = utf8_percent_encode(&nonce, NON_ALPHANUMERIC).to_string();
@@ -103,7 +119,7 @@ async fn google_start(
         return Err((StatusCode::NOT_FOUND, "not found".to_string()));
     }
 
-    let return_to = query.return_to.unwrap_or_else(|| "/".to_string());
+    let return_to = sanitize_return_to(query.return_to);
     let csrf = state.google_state_store.create(&return_to);
     let url = oauth::google::build_auth_url(&state.config.auth.google, &csrf);
 
@@ -142,9 +158,17 @@ async fn google_callback(
                 (StatusCode::BAD_GATEWAY, "OAuth error".to_string())
             })?;
 
-    let user_id = find_or_create_user(&state.db, "Google", &user_info)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let user_id = find_or_create_user(
+        &state.db,
+        "Google",
+        &user_info,
+        state.config.auth.disable_user_creation,
+    )
+    .await
+    .map_err(|e| match e {
+        OAuthError::UserCreationDisabled => (StatusCode::FORBIDDEN, e.to_string()),
+        _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    })?;
 
     let nonce = state.external_login_nonce_store.create(user_id);
     let encoded_nonce = utf8_percent_encode(&nonce, NON_ALPHANUMERIC).to_string();
@@ -161,7 +185,7 @@ async fn oidc_start(
         return Err((StatusCode::NOT_FOUND, "not found".to_string()));
     };
 
-    let return_to = query.return_to.unwrap_or_else(|| "/".to_string());
+    let return_to = sanitize_return_to(query.return_to);
     let csrf = state.oidc_state_store.create(&return_to);
 
     let url = oauth::oidc::build_auth_url(oidc_config, &state.http_client, &csrf)
@@ -213,9 +237,17 @@ async fn oidc_callback(
             (StatusCode::BAD_GATEWAY, "OAuth error".to_string())
         })?;
 
-    let user_id = find_or_create_user(&state.db, &slug, &user_info)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let user_id = find_or_create_user(
+        &state.db,
+        &slug,
+        &user_info,
+        state.config.auth.disable_user_creation,
+    )
+    .await
+    .map_err(|e| match e {
+        OAuthError::UserCreationDisabled => (StatusCode::FORBIDDEN, e.to_string()),
+        _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    })?;
 
     let nonce = state.external_login_nonce_store.create(user_id);
     let encoded_nonce = utf8_percent_encode(&nonce, NON_ALPHANUMERIC).to_string();
