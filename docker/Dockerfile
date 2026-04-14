@@ -48,12 +48,14 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 # Stage 4: Runtime
 FROM alpine:3.23 AS runtime
-RUN apk add --no-cache ca-certificates libavif-apps sqlite-libs
+RUN apk add --no-cache ca-certificates libavif-apps sqlite-libs su-exec
 WORKDIR /app
 COPY --from=backend /app ./
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && mkdir -p /config
 VOLUME /config
 VOLUME /games
 ENV CLAUDIO_CONFIG_PATH=/config/config.toml
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
-ENTRYPOINT ["/app/claudio-api"]
+ENTRYPOINT ["/entrypoint.sh"]

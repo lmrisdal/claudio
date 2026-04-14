@@ -7,6 +7,13 @@ import { Badge } from '@astrojs/starlight/components';
 
 All settings can be configured via environment variables. These take precedence over values in `config.toml`.
 
+## Container
+
+| Variable | Description | Default |
+|---|---|---|
+| `PUID` | User ID to run the process as | `0` (root) |
+| `PGID` | Group ID to run the process as | `0` (root) |
+
 ## Server
 
 | Variable | Description | Default |
