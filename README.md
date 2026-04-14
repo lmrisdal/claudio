@@ -40,7 +40,7 @@ services:
     image: ghcr.io/lmrisdal/claudio:latest
     container_name: claudio
     ports:
-      - "8080:8080"  # host:container
+      - "8080:8080" # host:container
     volumes:
       - claudio-data:/config
       - /path/to/games:/games
@@ -63,37 +63,38 @@ volumes:
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `PUID` | User ID to run the process as | `0` (root) |
-| `PGID` | Group ID to run the process as | `0` (root) |
-| `CLAUDIO_PORT` | HTTP port | `8080` |
-| `CLAUDIO_LIBRARY_PATHS` | Comma-separated game library paths | `/games` |
-| `CLAUDIO_IGDB_CLIENT_ID` | IGDB/Twitch client ID | |
-| `CLAUDIO_IGDB_CLIENT_SECRET` | IGDB/Twitch client secret | |
-| `CLAUDIO_STEAMGRIDDB_API_KEY` | SteamGridDB API key (for cover art search) | |
-| `CLAUDIO_DB_PROVIDER` | `sqlite` or `postgres` | `sqlite` |
-| `CLAUDIO_DB_SQLITE_PATH` | SQLite database file path | `/config/claudio.db` |
-| `CLAUDIO_DB_POSTGRES` | PostgreSQL connection string | |
-| `CLAUDIO_DISABLE_AUTH` | Disable authentication entirely (open access, everyone is admin) | `false` |
-| `CLAUDIO_DISABLE_LOCAL_LOGIN` | Disable username/password login and registration | `false` |
-| `CLAUDIO_DISABLE_USER_CREATION` | Prevent creation of new local and external users | `false` |
-| `CLAUDIO_PROXY_AUTH_HEADER` | HTTP header for proxy authentication (e.g. `Remote-User`) | |
-| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header | `false` |
-| `CLAUDIO_GITHUB_CLIENT_ID` | GitHub OAuth app client ID | |
-| `CLAUDIO_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret | |
-| `CLAUDIO_GITHUB_REDIRECT_URI` | GitHub OAuth callback URL | |
-| `CLAUDIO_GOOGLE_CLIENT_ID` | Google OAuth client ID | |
-| `CLAUDIO_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | |
-| `CLAUDIO_GOOGLE_REDIRECT_URI` | Google OAuth callback URL | |
-| `CLAUDIO_OIDC_SLUG` | OIDC provider identifier (used in callback URLs) | |
-| `CLAUDIO_OIDC_DISPLAY_NAME` | OIDC provider button label | |
-| `CLAUDIO_OIDC_LOGO_URL` | OIDC provider button image | |
-| `CLAUDIO_OIDC_DISCOVERY_URL` | OIDC discovery document URL | |
-| `CLAUDIO_OIDC_CLIENT_ID` | OIDC client ID | |
-| `CLAUDIO_OIDC_CLIENT_SECRET` | OIDC client secret | |
-| `CLAUDIO_OIDC_REDIRECT_URI` | OIDC callback URL | |
-| `CLAUDIO_OIDC_SCOPE` | OIDC scopes | `openid profile email` |
+| Variable                         | Description                                                      | Default                |
+| -------------------------------- | ---------------------------------------------------------------- | ---------------------- |
+| `PUID`                           | User ID to run the process as                                    | `0` (root)             |
+| `PGID`                           | Group ID to run the process as                                   | `0` (root)             |
+| `CLAUDIO_PORT`                   | HTTP port                                                        | `8080`                 |
+| `CLAUDIO_LOG_LEVEL`              | Log level: `error`, `warn`, `info`, `debug`, `trace`             | `warn`                 |
+| `CLAUDIO_LIBRARY_PATHS`          | Comma-separated game library paths                               | `/games`               |
+| `CLAUDIO_IGDB_CLIENT_ID`         | IGDB/Twitch client ID                                            |                        |
+| `CLAUDIO_IGDB_CLIENT_SECRET`     | IGDB/Twitch client secret                                        |                        |
+| `CLAUDIO_STEAMGRIDDB_API_KEY`    | SteamGridDB API key (for cover art search)                       |                        |
+| `CLAUDIO_DB_PROVIDER`            | `sqlite` or `postgres`                                           | `sqlite`               |
+| `CLAUDIO_DB_SQLITE_PATH`         | SQLite database file path                                        | `/config/claudio.db`   |
+| `CLAUDIO_DB_POSTGRES`            | PostgreSQL connection string                                     |                        |
+| `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin) | `false`                |
+| `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                 | `false`                |
+| `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                 | `false`                |
+| `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)        |                        |
+| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                         | `false`                |
+| `CLAUDIO_GITHUB_CLIENT_ID`       | GitHub OAuth app client ID                                       |                        |
+| `CLAUDIO_GITHUB_CLIENT_SECRET`   | GitHub OAuth app client secret                                   |                        |
+| `CLAUDIO_GITHUB_REDIRECT_URI`    | GitHub OAuth callback URL                                        |                        |
+| `CLAUDIO_GOOGLE_CLIENT_ID`       | Google OAuth client ID                                           |                        |
+| `CLAUDIO_GOOGLE_CLIENT_SECRET`   | Google OAuth client secret                                       |                        |
+| `CLAUDIO_GOOGLE_REDIRECT_URI`    | Google OAuth callback URL                                        |                        |
+| `CLAUDIO_OIDC_SLUG`              | OIDC provider identifier (used in callback URLs)                 |                        |
+| `CLAUDIO_OIDC_DISPLAY_NAME`      | OIDC provider button label                                       |                        |
+| `CLAUDIO_OIDC_LOGO_URL`          | OIDC provider button image                                       |                        |
+| `CLAUDIO_OIDC_DISCOVERY_URL`     | OIDC discovery document URL                                      |                        |
+| `CLAUDIO_OIDC_CLIENT_ID`         | OIDC client ID                                                   |                        |
+| `CLAUDIO_OIDC_CLIENT_SECRET`     | OIDC client secret                                               |                        |
+| `CLAUDIO_OIDC_REDIRECT_URI`      | OIDC callback URL                                                |                        |
+| `CLAUDIO_OIDC_SCOPE`             | OIDC scopes                                                      | `openid profile email` |
 
 Alternatively, create a `config.toml` file — see [config.example.toml](config.example.toml) for the schema.
 
@@ -218,7 +219,7 @@ Games are organized by platform in your library directories:
 ### Prerequisites
 
 - [Rust toolchain](https://www.rust-lang.org/tools/install)
-- [Node.js 22+](https://nodejs.org/)
+- [Node.js 24+](https://nodejs.org/)
 
 ### Backend
 

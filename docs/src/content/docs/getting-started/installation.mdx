@@ -55,7 +55,7 @@ services:
       - PUID=1000
       - PGID=1000
       - CLAUDIO_DB_PROVIDER=postgres
-      - CLAUDIO_DB_POSTGRES=Host=db;Database=claudio;Username=claudio;Password=secret
+      - CLAUDIO_DB_POSTGRES=postgres://claudio:secret@db/claudio
     depends_on:
       - db
 

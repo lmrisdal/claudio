@@ -56,6 +56,10 @@ impl ClaudioConfig {
     }
 
     fn apply_env_overrides(&mut self) {
+        if let Ok(value) = std::env::var("CLAUDIO_LOG_LEVEL") {
+            self.server.log_level = value;
+        }
+
         if let Ok(value) = std::env::var("CLAUDIO_LIBRARY_PATHS") {
             self.library.library_paths = split_csv(&value);
         }
@@ -183,11 +187,15 @@ fn split_csv(value: &str) -> Vec<String> {
 #[serde(default)]
 pub struct ServerConfig {
     pub port: u16,
+    pub log_level: String,
 }
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { port: 8080 }
+        Self {
+            port: 8080,
+            log_level: "warn".to_string(),
+        }
     }
 }
 
@@ -390,7 +398,7 @@ port = 9090
 
 [database]
 provider = "postgres"
-postgres_connection = "Host=db;Database=claudio"
+postgres_connection = "postgres://claudio@db/claudio"
 
 [library]
 library_paths = ["/mnt/games", "/mnt/roms"]
@@ -405,7 +413,7 @@ exclude_platforms = ["ps", "gba"]
         assert_eq!(config.database.provider, "postgres");
         assert_eq!(
             config.database.postgres_connection.as_deref(),
-            Some("Host=db;Database=claudio")
+            Some("postgres://claudio@db/claudio")
         );
         assert_eq!(
             config.library.library_paths,

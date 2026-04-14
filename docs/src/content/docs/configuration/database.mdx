@@ -29,14 +29,14 @@ For larger deployments, you can use PostgreSQL:
 ```toml
 [database]
 provider = "postgres"
-postgres_connection = "Host=localhost;Database=claudio;Username=claudio;Password=secret"
+postgres_connection = "postgres://claudio:secret@localhost/claudio"
 ```
 
 Or via environment variables:
 
 ```bash
 CLAUDIO_DB_PROVIDER=postgres
-CLAUDIO_DB_POSTGRES="Host=localhost;Database=claudio;Username=claudio;Password=secret"
+CLAUDIO_DB_POSTGRES="postgres://claudio:secret@localhost/claudio"
 ```
 
 See the [Installation page](/claudio/getting-started/installation/#docker-compose-with-postgresql) for a full Docker Compose example with PostgreSQL.

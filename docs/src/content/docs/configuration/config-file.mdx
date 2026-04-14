@@ -12,11 +12,12 @@ Environment variables take precedence over config file values.
 ```toml
 [server]
 port = 8080
+# log_level = "warn"   # error | warn | info | debug | trace
 
 [database]
 provider = "sqlite"             # "sqlite" or "postgres"
 sqlite_path = "/config/claudio.db"
-# postgres_connection = "Host=localhost;Database=claudio;Username=claudio;Password=secret"
+# postgres_connection = "postgres://claudio:secret@localhost/claudio"
 
 [auth]
 jwt_secret = "CHANGE-ME-TO-A-RANDOM-SECRET"
@@ -36,7 +37,10 @@ library_paths = ["/games"]
 ## Sections
 
 ### `[server]`
-Server configuration including the HTTP port.
+Server configuration including the HTTP port and log level.
+
+- `port` — HTTP port to listen on (default: `8080`)
+- `log_level` — controls log verbosity. Accepts `error`, `warn`, `info`, `debug`, or `trace` (default: `warn`). Also accepts the full filter syntax, e.g. `warn,claudio_api=debug`.
 
 ### `[database]`
 Database provider selection (`sqlite` or `postgres`) and connection details.
