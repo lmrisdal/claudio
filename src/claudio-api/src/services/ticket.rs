@@ -144,13 +144,13 @@ mod tests {
 
     #[test]
     fn is_valid_renews_active_ticket() {
-        let store = TicketStore::new(Duration::from_millis(40));
+        let store = TicketStore::new(Duration::from_millis(200));
         let token = store.create(7);
 
-        thread::sleep(Duration::from_millis(25));
+        thread::sleep(Duration::from_millis(100));
         assert!(store.is_valid(&token, 7));
 
-        thread::sleep(Duration::from_millis(25));
+        thread::sleep(Duration::from_millis(150));
         assert!(store.is_valid(&token, 7));
     }
 
