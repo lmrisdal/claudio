@@ -6,7 +6,6 @@ import {
   GAMEPAD_NAV_RIGHT_EVENT,
   GAMEPAD_NAV_UP_EVENT,
 } from "../../core/hooks/use-gamepad";
-import { useGuide } from "../../core/hooks/use-guide";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import { sounds } from "../../core/utils/sounds";
@@ -47,12 +46,11 @@ export default function SettingsDialog({
   useInputScope({
     id: embedded ? "settings-window" : "settings-dialog",
     kind: "dialog",
-    blocks: ["guide", "page-nav", "search"],
+    blocks: ["page-nav", "search"],
     enabled: open,
   });
 
   const { user, logout } = useAuth();
-  const { isOpen: guideOpen } = useGuide();
   const previousFocusReference = useRef<HTMLElement | null>(null);
   const checkingStartedAtReference = useRef<number | null>(null);
   const delayedStatusTimeoutReference = useRef<number | null>(null);
@@ -350,7 +348,7 @@ export default function SettingsDialog({
       e.stopPropagation();
       onClose();
     },
-    { enabled: open && !guideOpen, capture: true },
+    { enabled: open, capture: true },
   );
 
   useShortcut(
@@ -359,7 +357,7 @@ export default function SettingsDialog({
       e.preventDefault();
       handleArrowUp();
     },
-    { enabled: open && !guideOpen, capture: true },
+    { enabled: open, capture: true },
   );
 
   useShortcut(
@@ -368,7 +366,7 @@ export default function SettingsDialog({
       e.preventDefault();
       handleArrowDown();
     },
-    { enabled: open && !guideOpen, capture: true },
+    { enabled: open, capture: true },
   );
 
   useShortcut(
@@ -377,7 +375,7 @@ export default function SettingsDialog({
       e.preventDefault();
       handleArrowRight();
     },
-    { enabled: open && !guideOpen, capture: true },
+    { enabled: open, capture: true },
   );
 
   useShortcut(
@@ -386,13 +384,13 @@ export default function SettingsDialog({
       e.preventDefault();
       handleArrowLeft();
     },
-    { enabled: open && !guideOpen, capture: true },
+    { enabled: open, capture: true },
   );
 
-  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, handleArrowUp, open && !guideOpen);
-  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, handleArrowDown, open && !guideOpen);
-  useGamepadEvent(GAMEPAD_NAV_RIGHT_EVENT, handleArrowRight, open && !guideOpen);
-  useGamepadEvent(GAMEPAD_NAV_LEFT_EVENT, handleArrowLeft, open && !guideOpen);
+  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, handleArrowUp, open);
+  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, handleArrowDown, open);
+  useGamepadEvent(GAMEPAD_NAV_RIGHT_EVENT, handleArrowRight, open);
+  useGamepadEvent(GAMEPAD_NAV_LEFT_EVENT, handleArrowLeft, open);
 
   useShortcut(
     "enter",
@@ -422,7 +420,7 @@ export default function SettingsDialog({
         contentReferences.current[contentIndex]?.click();
       }
     },
-    { enabled: open && !guideOpen, capture: true },
+    { enabled: open, capture: true },
   );
 
   // Gamepad bumpers cycle tabs
@@ -439,8 +437,8 @@ export default function SettingsDialog({
     [visibleTabs, activeTab],
   );
 
-  useGamepadEvent("gamepad-rb", () => handleBumper(1), open && !guideOpen);
-  useGamepadEvent("gamepad-lb", () => handleBumper(-1), open && !guideOpen);
+  useGamepadEvent("gamepad-rb", () => handleBumper(1), open);
+  useGamepadEvent("gamepad-lb", () => handleBumper(-1), open);
 
   if (!open) return null;
 

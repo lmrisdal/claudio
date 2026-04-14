@@ -22,9 +22,17 @@ interface TokenResponse {
 
 interface AuthProvidersResponse {
   providers: AuthProvider[];
+  authDisabled: boolean;
   localLoginEnabled: boolean;
   userCreationEnabled: boolean;
 }
+
+const AUTH_DISABLED_USER: User = {
+  id: 0,
+  username: "admin",
+  role: "admin",
+  createdAt: "",
+};
 
 function parseToken(token: string): User | null {
   try {
@@ -91,6 +99,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [authDisabled, setAuthDisabled] = useState(false);
   const [providers, setProviders] = useState<AuthProviders>({
     providers: [],
+    authDisabled: false,
     localLoginEnabled: true,
     userCreationEnabled: true,
   });
@@ -144,7 +153,18 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       .then((response) => {
         if (cancelled) return;
         setProviders(response);
+
+        if (response.authDisabled) {
+          clearWebAuthState();
+          setUser(AUTH_DISABLED_USER);
+          setAuthDisabled(true);
+          return;
+        }
+
         setAuthDisabled(false);
+        if (!token) {
+          setUser(null);
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -154,7 +174,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isConnected]);
+  }, [clearWebAuthState, isConnected, token]);
 
   useEffect(() => {
     if (!isDesktop) return;

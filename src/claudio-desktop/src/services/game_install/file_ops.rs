@@ -151,7 +151,7 @@ const SCENE_GROUP_FOLDERS: &[&str] = &[
     "fairlight",
     "voices38",
     "crack",
-    "kirigiri"
+    "kirigiri",
 ];
 
 pub(super) fn apply_scene_overrides(source_dir: &Path, target_dir: &Path) -> Result<(), String> {

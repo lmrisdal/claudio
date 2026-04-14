@@ -2,6 +2,9 @@
 members = [
   "src/claudio-desktop",
   "src/claudio-uninstaller",
+  "src/claudio-api",
+  "src/claudio-api/migration",
   "tests/claudio-desktop",
+  "tests/claudio-api-rs",
 ]
 resolver = "3"

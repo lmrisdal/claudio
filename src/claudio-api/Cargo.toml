@@ -1,0 +1,47 @@
+[package]
+name = "claudio-api"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "claudio_api"
+path = "src/lib.rs"
+
+[[bin]]
+name = "claudio-api"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.8", features = ["multipart"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+sea-orm = { version = "1", features = ["sqlx-sqlite", "sqlx-postgres", "runtime-tokio-rustls", "macros"] }
+claudio-migration = { path = "migration" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+jsonwebtoken = "9"
+argon2 = "0.5"
+rsa = "0.9"
+rand = "0.9"
+rand_core = { version = "0.6", features = ["getrandom"] }
+oauth2 = "5"
+openidconnect = "4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+dashmap = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+zip = "2"
+tar = "0.4"
+flate2 = "1"
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+sha2 = "0.10"
+thiserror = "2"
+anyhow = "1"
+percent-encoding = "2"
+tower = { version = "0.5", features = ["util"] }
+iso9660_simple = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

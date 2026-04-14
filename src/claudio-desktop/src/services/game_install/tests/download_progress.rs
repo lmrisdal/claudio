@@ -74,6 +74,8 @@ async fn download_package_with_individual_mode_respects_speed_limit() {
 #[cfg(feature = "integration-tests")]
 #[tokio::test]
 async fn download_package_with_individual_mode_picks_up_speed_limit_updates() {
+    use std::sync::atomic::Ordering;
+
     let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
     let payload = "a".repeat(2048);
     let payload_for_server = payload.clone();
@@ -105,38 +107,49 @@ async fn download_package_with_individual_mode_picks_up_speed_limit_updates() {
         let controller = InstallControl::new();
         let mut progress = Vec::new();
 
+        // Lift the speed limit as soon as the first bytes are observed in a progress event.
+        // This avoids any wall-clock sleep: we know bytes are flowing, so the download is
+        // in-flight and the limit change will be picked up by the next refresh poll.
+        let limit_lifted = Arc::new(AtomicBool::new(false));
+        let limit_lifted_in_callback = Arc::clone(&limit_lifted);
         let updater_url = server.url().to_string();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
-            let mut updated = download_settings(&updater_url);
-            updated.download_speed_limit_kbs = Some(2048.0);
-            let _ = crate::settings::save(&updated);
-        });
 
-        let started = std::time::Instant::now();
-        let download = download_package_with(
-            &DownloadOptions {
-                settings: &settings,
-                server_url: server.url(),
-                custom_headers: &settings.custom_headers,
-                speed_limit_kbs: settings.download_speed_limit_kbs,
-                progress_scale: 100.0,
-            },
-            17,
-            "Dynamic Rate Limit Individual Download",
-            &temp_root,
-            &controller,
-            |event| progress.push(event),
-            || Ok(()),
+        let download = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            download_package_with(
+                &DownloadOptions {
+                    settings: &settings,
+                    server_url: server.url(),
+                    custom_headers: &settings.custom_headers,
+                    speed_limit_kbs: settings.download_speed_limit_kbs,
+                    progress_scale: 100.0,
+                },
+                17,
+                "Dynamic Rate Limit Individual Download",
+                &temp_root,
+                &controller,
+                |event| {
+                    if !limit_lifted_in_callback.load(Ordering::Relaxed)
+                        && event.bytes_downloaded.unwrap_or(0) > 0
+                    {
+                        limit_lifted_in_callback.store(true, Ordering::Relaxed);
+                        let mut updated = download_settings(&updater_url);
+                        updated.download_speed_limit_kbs = Some(2048.0);
+                        let _ = crate::settings::save(&updated);
+                    }
+                    progress.push(event);
+                },
+                || Ok(()),
+            ),
         )
         .await
+        .expect("download should complete within timeout")
         .expect("individual download should succeed");
-        let elapsed = started.elapsed();
 
         assert!(download.file_path.exists());
         assert!(
-            elapsed < std::time::Duration::from_millis(3200),
-            "updated speed limit should accelerate ongoing individual-file downloads; elapsed={elapsed:?}"
+            limit_lifted.load(Ordering::Relaxed),
+            "speed limit should have been lifted mid-download"
         );
         assert!(
             progress

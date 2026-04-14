@@ -2,24 +2,23 @@ This file provides guidance to Claude Code (claude.ai/code) and other AI agents 
 
 ## Build & Run Commands
 
-### Backend (.NET 10)
+### Backend (Rust)
 
 ```bash
-dotnet build src/claudio-api                        # build API
-dotnet run --project src/claudio-api                # run API (serves on port 5118)
-dotnet test                                         # run all tests
-dotnet test --project tests/Claudio.Api.Tests       # run API tests only
+cargo build -p claudio-api                          # build API
+cargo run -p claudio-api                            # run API (serves on port 8080)
+cargo test -p claudio-api-tests                     # run API tests only
 ```
 
 ### Frontend (React + Vite)
 
 ```bash
 cd src/claudio-web
-npm install                               # install deps
-npm run dev                               # dev server with HMR (port 5173, proxies /api to :5118)
-npm run build                             # production build → src/claudio-api/wwwroot/
+vp install                                # install deps
+vp dev                                    # dev server with HMR (port 5173, proxies /api to :8080)
+vp build                                  # production build → src/claudio-api/wwwroot/
 npx tsc --noEmit                          # type-check without emitting
-npm run lint                              # ESLint
+vp lint .                                 # ESLint
 ```
 
 ### Desktop (Tauri)
@@ -27,13 +26,6 @@ npm run lint                              # ESLint
 ```bash
 ./scripts/check-windows-xwin.sh           # cross-check Windows desktop + uninstaller via cargo-xwin
 ./scripts/build-windows-xwin.sh           # cross-build Windows desktop + uninstaller via cargo-xwin
-```
-
-### EF Core Migrations
-
-```bash
-dotnet ef migrations add <Name> --project src/claudio-api
-dotnet ef database update --project src/claudio-api
 ```
 
 ### Docker
@@ -44,16 +36,16 @@ docker compose -f docker/docker-compose.yml up --build
 
 ## Architecture
 
-Monorepo with two .NET projects and a React frontend:
+Monorepo with a Rust API, Tauri desktop client, and a React frontend:
 
-- **`src/claudio-api`** — ASP.NET minimal API. Serves the SPA as static files and provides REST endpoints. Uses **minimal APIs with route groups**, not controllers.
+- **`src/claudio-api`** — Axum-based Rust API. Serves the SPA as static files and provides REST endpoints.
 - **`src/claudio-desktop`** — Tauri desktop client.
 - **`src/claudio-web/`** — React 19 SPA built with Vite. Output goes to `src/claudio-api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
-- **`tests/Claudio.Api.Tests/`** — TUnit + AwesomeAssertions test project.
+- **`tests/claudio-api-rs/`** — Rust integration test crate for API behavior.
 
 ### Backend structure
 
-Endpoints are in `src/claudio-api/Endpoints/` as static classes with extension methods. Services are singletons registered in `Program.cs`. Database is EF Core with `AppDbContext` containing `Users` and `Games` tables, supporting SQLite and PostgreSQL.
+Routes live under `src/claudio-api/src/routes/`, database entities are under `src/claudio-api/src/entity/`, and the app uses SeaORM with SQLite and PostgreSQL support.
 
 ### Configuration
 
@@ -61,7 +53,6 @@ TOML config loaded from `CLAUDIO_CONFIG_PATH` env var or `/config/config.toml`. 
 
 ### Code style
 
-- C# uses `PascalCase` for types and methods, `camelCase` for parameters and local variables.
 - React components are `PascalCase`, hooks are `useCamelCase`.
 - Tailwind classes are used for styling in JSX, with semantic tokens for colors and spacing.
 - Only one React component per file.
@@ -174,10 +165,6 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 - Dialogs trap focus and can be dismissed with Escape key or gamepad B button. When more dialogs are added, ensure they stack properly and manage focus correctly.
 - Navigating with a controller or keyboard should play navigation sounds and provide haptic feedback (if supported) for a responsive, console-like experience if enabled with the global user preferences toggle. Navigating with a mouse should not play navigation sounds.
 
-### Package management
-
-NuGet versions are centralized in `Directory.Packages.props` — add versions there, not in individual `.csproj` files.
-
 ## Git Conventions
 
 - All changes must be made in a feature branch, never directly on `main`.
@@ -186,16 +173,12 @@ NuGet versions are centralized in `Directory.Packages.props` — add versions th
 
 ## Key Conventions
 
-- **Minimal APIs only** — never use MVC controllers.
-- JSON serialization uses `JsonStringEnumConverter` with camelCase — enums serialize as lowercase strings.
-- The SPA is served via `UseStaticFiles` + `MapFallbackToFile("index.html")`.
+- The SPA is served by the Rust API from `wwwroot` with an `index.html` fallback.
 - Game downloads use streaming with `enableRangeProcessing` for resume support.
 - IGDB integration authenticates via Twitch OAuth (client credentials flow).
 
 ## Testing
 
-- **New features must include tests.** Write unit tests for isolated logic (services, stores) and integration tests using `WebApplicationFactory<Program>` for endpoint behavior.
-- **Changes to existing code must run relevant tests** (`dotnet test`). If changes break existing tests, update the tests to match the new behavior — do not delete tests without replacement.
-- Tests use **TUnit** (`[Test]` attribute) and **AwesomeAssertions** (`.Should()` fluent API).
-- Use `[NotInParallel]` for tests that mutate process-global state (e.g. environment variables, shared `WebApplicationFactory` instances).
-- Integration tests use `ClaudioWebApplicationFactory` (in the test project) which provides an isolated SQLite DB and test config per factory instance.
+- **New features must include tests.** Add or update Rust tests for isolated logic and endpoint behavior.
+- **Changes to existing code must run relevant tests** (`cargo test`). If behavior changes, update the tests to match.
+- API integration tests live in `tests/claudio-api-rs/`.

@@ -47,8 +47,7 @@ export function useGamepad() {
     function dispatchKey(key: string) {
       // Custom gamepad actions fire as window events
       if (key.startsWith("gamepad-")) {
-        // When the emulator is active, only the guide button breaks through
-        if (document.body.dataset.emulatorActive && key !== "gamepad-guide") {
+        if (document.body.dataset.emulatorActive && key !== "gamepad-search") {
           return;
         }
         globalThis.dispatchEvent(new CustomEvent(key));
@@ -157,8 +156,7 @@ export function useGamepad() {
         // Start / Options / Menu button (button 9)
         handleInput("btn-start", "gamepad-start", gp.buttons[9]?.pressed ?? false, false);
 
-        // Guide / Xbox / PS button (button 16)
-        handleInput("btn-guide", "gamepad-guide", gp.buttons[16]?.pressed ?? false, false);
+        handleInput("btn-guide", "gamepad-search", gp.buttons[16]?.pressed ?? false, false);
 
         // Only handle first connected gamepad
         break;

@@ -4,7 +4,6 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import App from "./app";
 import AuthProvider from "./features/auth/components/auth-provider";
-import GuideProvider from "./features/core/components/guide-provider";
 import NavigationProvider from "./features/core/components/navigation-provider";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
@@ -60,15 +59,13 @@ createRoot(document.querySelector("#root")!).render(
         <ServerStatusProvider>
           <AuthProvider>
             <InputScopeProvider>
-              <GuideProvider>
-                <SettingsDialogProvider>
-                  <NavigationProvider>
-                    <main data-ui-scroll-container>
-                      <App />
-                    </main>
-                  </NavigationProvider>
-                </SettingsDialogProvider>
-              </GuideProvider>
+              <SettingsDialogProvider>
+                <NavigationProvider>
+                  <main data-ui-scroll-container>
+                    <App />
+                  </main>
+                </NavigationProvider>
+              </SettingsDialogProvider>
             </InputScopeProvider>
           </AuthProvider>
         </ServerStatusProvider>
