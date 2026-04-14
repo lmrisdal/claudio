@@ -230,7 +230,7 @@ export default function DesktopSidebar({
         top: sidebarTop,
         height: "100dvh",
       }}
-      className={`desktop-sidebar fixed left-0 z-40 flex flex-col border-r border-border/50 bg-sidebar-blur select-none ${dragging ? "" : "transition-[width] duration-200 ease-in-out"}`}
+      className={`desktop-sidebar fixed left-0 z-40 flex flex-col bg-sidebar-blur select-none${dragging ? "" : " transition-[width] duration-200 ease-in-out"}`}
       aria-label="Desktop navigation"
     >
       <div data-tauri-drag-region className="pt-0">

@@ -47,18 +47,42 @@ export default function GameDetailOverview({
     };
   }, [game.summary, isAboutExpanded]);
 
+  const glassChip = game.heroUrl
+    ? "hero-glass-chip bg-black/30 dark:text-white/85 text-black/80 ring-1 ring-white/10 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
+    : "";
+
   return (
     <>
-      <div className="flex items-start gap-3 mb-3">
-        <h1 className="font-display text-4xl font-bold text-text-primary">{game.title}</h1>
-        {isAdmin && (
-          <Link
-            to={`/games/${game.id}/edit`}
-            className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
-            title="Edit game"
-          >
+      <div className={`mb-8 w-fit rounded-xl ${game.heroUrl ? `${glassChip} px-4 py-3` : ""}`}>
+        <div className="flex items-start gap-3 mb-3">
+          <h1 className="font-display text-4xl font-bold text-text-primary">{game.title}</h1>
+          {isAdmin && (
+            <Link
+              to={`/games/${game.id}/edit`}
+              className="mt-2 shrink-0 p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
+              title="Edit game"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                />
+              </svg>
+            </Link>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
             <svg
-              className="w-4 h-4"
+              className="w-3 h-3 text-text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -67,80 +91,60 @@ export default function GameDetailOverview({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"
               />
             </svg>
-          </Link>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-6">
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-          <svg
-            className="w-3 h-3 text-text-muted"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"
-            />
-          </svg>
-          {formatPlatform(game.platform)}
-        </span>
-        {game.releaseYear && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-            {game.releaseYear}
+            {formatPlatform(game.platform)}
           </span>
-        )}
-        {game.genre && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
-            {game.genre}
+          {game.releaseYear && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
+              {game.releaseYear}
+            </span>
+          )}
+          {game.genre && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-medium text-text-secondary">
+              {game.genre}
+            </span>
+          )}
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-secondary">
+            {formatSize(game.sizeBytes)}
           </span>
-        )}
-        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-surface-raised ring-1 ring-border text-xs font-mono text-text-secondary">
-          {formatSize(game.sizeBytes)}
-        </span>
-        {isPcPlatform(game.platform) && (
-          <span
-            className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ${
-              game.installType === "installer"
-                ? "bg-blue-500/10 ring-blue-500/20 text-blue-400"
-                : "bg-accent-dim ring-accent/20 text-accent"
-            }`}
-          >
-            {game.installType === "installer" ? "Installer" : "Portable"}
-          </span>
-        )}
-        {game.igdbSlug && (
-          <a
-            href={`https://www.igdb.com/games/${game.igdbSlug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-500/10 ring-1 ring-purple-500/20 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition"
-          >
-            IGDB
-            <svg
-              className="w-3 h-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          {isPcPlatform(game.platform) && (
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ${
+                game.installType === "installer"
+                  ? "bg-blue-500/10 ring-blue-500/20 text-blue-400"
+                  : "bg-accent-dim ring-accent/20 text-accent"
+              }`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-              />
-            </svg>
-          </a>
-        )}
-      </div>
+              {game.installType === "installer" ? "Installer" : "Portable"}
+            </span>
+          )}
+          {game.igdbSlug && (
+            <a
+              href={`https://www.igdb.com/games/${game.igdbSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-500/10 ring-1 ring-purple-500/20 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition"
+            >
+              IGDB
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                />
+              </svg>
+            </a>
+          )}
+        </div>
 
-      <div className="mb-8 -mt-4">
         <p className="text-xs text-text-muted font-mono">
           /{game.platform}/{game.folderName}
         </p>

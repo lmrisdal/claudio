@@ -125,7 +125,7 @@ export default function Login() {
           )}
         </div>
 
-        <div className="card auth-card bg-surface rounded-xl p-6 ring-1 ring-border">
+        <div>
           {displayedError && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5 mb-4">
               <p className="text-red-400 text-sm">{displayedError}</p>

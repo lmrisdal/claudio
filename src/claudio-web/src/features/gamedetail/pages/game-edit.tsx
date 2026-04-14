@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { api } from "../../core/api/client";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
-import { api } from "../../core/api/client";
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 import GameEditForm from "../components/game-edit-form";
 import IgdbMatchDialog from "../components/igdb-match-dialog";
@@ -31,15 +31,18 @@ export default function GameEdit() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [igdbQuery, setIgdbQuery] = useState("");
-  const [sgdbDialog, setSgdbDialog] = useState<{ open: boolean; mode: SgdbMode }>({
+  const [sgdbDialog, setSgdbDialog] = useState<{
+    open: boolean;
+    mode: SgdbMode;
+  }>({
     open: false,
     mode: "covers",
   });
   const [sgdbQuery, setSgdbQuery] = useState("");
   const [sgdbSearching, setSgdbSearching] = useState(false);
-  const [sgdbGames, setSgdbGames] = useState<{ id: number; name: string; year?: number }[] | null>(
-    null,
-  );
+  const [sgdbGames, setSgdbGames] = useState<
+    { id: number; name: string; year?: number }[] | null
+  >(null);
   const [sgdbImages, setSgdbImages] = useState<string[] | null>(null);
   const [sgdbLoadingImages, setSgdbLoadingImages] = useState(false);
 
@@ -80,7 +83,8 @@ export default function GameEdit() {
   }, [game]);
 
   const applyMutation = useMutation({
-    mutationFn: (igdbId: number) => api.post<Game>(`/admin/games/${id}/igdb/apply`, { igdbId }),
+    mutationFn: (igdbId: number) =>
+      api.post<Game>(`/admin/games/${id}/igdb/apply`, { igdbId }),
     onSuccess: (data) => {
       queryClient.setQueryData(["game", id], data);
       void queryClient.invalidateQueries({ queryKey: ["games"] });
@@ -102,7 +106,8 @@ export default function GameEdit() {
   });
 
   const compressMutation = useMutation({
-    mutationFn: (format: string) => api.post(`/admin/games/${id}/compress?format=${format}`),
+    mutationFn: (format: string) =>
+      api.post(`/admin/games/${id}/compress?format=${format}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["game", id] });
       void queryClient.invalidateQueries({ queryKey: ["tasksStatus"] });
@@ -124,7 +129,9 @@ export default function GameEdit() {
 
     try {
       const results = customQuery
-        ? await api.post<IgdbCandidate[]>("/admin/igdb/search", { query: customQuery })
+        ? await api.post<IgdbCandidate[]>("/admin/igdb/search", {
+            query: customQuery,
+          })
         : await api.post<IgdbCandidate[]>(`/admin/games/${id}/igdb/search`);
 
       const gamePlatformSlug = game?.platform;
@@ -159,9 +166,9 @@ export default function GameEdit() {
     setSgdbSearching(true);
 
     try {
-      const games = await api.get<{ id: number; name: string; year?: number }[]>(
-        `/admin/steamgriddb/search?query=${encodeURIComponent(query)}`,
-      );
+      const games = await api.get<
+        { id: number; name: string; year?: number }[]
+      >(`/admin/steamgriddb/search?query=${encodeURIComponent(query)}`);
 
       if (sgdbRequestReference.current !== requestId) {
         return;
@@ -191,12 +198,17 @@ export default function GameEdit() {
     await runSteamGridDbSearch(query, mode);
   }
 
-  async function selectSgdbGame(sgdbGameId: number, mode: SgdbMode = sgdbDialog.mode) {
+  async function selectSgdbGame(
+    sgdbGameId: number,
+    mode: SgdbMode = sgdbDialog.mode,
+  ) {
     setSgdbImages(null);
     setSgdbLoadingImages(true);
 
     try {
-      const urls = await api.get<string[]>(`/admin/steamgriddb/${sgdbGameId}/${mode}`);
+      const urls = await api.get<string[]>(
+        `/admin/steamgriddb/${sgdbGameId}/${mode}`,
+      );
       setSgdbImages(urls);
     } catch {
       setSgdbImages([]);
@@ -214,7 +226,9 @@ export default function GameEdit() {
   function handleImageSelect(type: "cover" | "hero", file: File) {
     const field = type === "cover" ? "coverUrl" : "heroUrl";
     const blobUrl = URL.createObjectURL(file);
-    setEditForm((current) => (current ? { ...current, [field]: blobUrl } : current));
+    setEditForm((current) =>
+      current ? { ...current, [field]: blobUrl } : current,
+    );
     setPendingFiles((current) => ({ ...current, [type]: file }));
   }
 
@@ -248,7 +262,9 @@ export default function GameEdit() {
         title: editForm.title,
         summary: editForm.summary || null,
         genre: editForm.genre || null,
-        releaseYear: editForm.releaseYear ? Number.parseInt(editForm.releaseYear, 10) : null,
+        releaseYear: editForm.releaseYear
+          ? Number.parseInt(editForm.releaseYear, 10)
+          : null,
         coverUrl,
         heroUrl,
         installType: editForm.installType,
@@ -285,7 +301,10 @@ export default function GameEdit() {
     return (
       <main className="max-w-5xl mx-auto px-6 py-24 text-center flex-1 w-full">
         <p className="text-text-muted">Game not found</p>
-        <Link to="/" className="text-accent hover:underline text-sm mt-2 inline-block">
+        <Link
+          to="/"
+          className="text-accent hover:underline text-sm mt-2 inline-block"
+        >
           Back to library
         </Link>
       </main>
@@ -298,7 +317,9 @@ export default function GameEdit() {
   return (
     <div
       className={
-        isDesktop ? "relative flex min-h-0 w-full flex-1 flex-col" : "relative flex-1 w-full"
+        isDesktop
+          ? "relative flex min-h-0 w-full flex-1 flex-col"
+          : "relative flex-1 w-full"
       }
     >
       {heroUrl && (
@@ -351,7 +372,11 @@ export default function GameEdit() {
                 className="aspect-2/3 w-full overflow-hidden rounded-xl bg-surface-raised ring-1 ring-border transition hover:ring-accent"
               >
                 {coverUrl ? (
-                  <img src={coverUrl} alt={game.title} className="h-full w-full object-cover" />
+                  <img
+                    src={coverUrl}
+                    alt={game.title}
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-text-muted">
                     <svg
@@ -399,7 +424,9 @@ export default function GameEdit() {
                 }
                 tagFolderPending={tagFolderMutation.isPending}
                 onChange={(patch) =>
-                  setEditForm((current) => (current ? { ...current, ...patch } : current))
+                  setEditForm((current) =>
+                    current ? { ...current, ...patch } : current,
+                  )
                 }
                 onSubmit={() => void handleSubmit()}
                 onCancel={() => void navigate(`/games/${game.id}`)}
@@ -445,7 +472,11 @@ export default function GameEdit() {
                   className="w-full aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border hover:ring-accent transition"
                 >
                   {coverUrl ? (
-                    <img src={coverUrl} alt={game.title} className="w-full h-full object-cover" />
+                    <img
+                      src={coverUrl}
+                      alt={game.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
                       <svg
@@ -493,7 +524,9 @@ export default function GameEdit() {
                   }
                   tagFolderPending={tagFolderMutation.isPending}
                   onChange={(patch) =>
-                    setEditForm((current) => (current ? { ...current, ...patch } : current))
+                    setEditForm((current) =>
+                      current ? { ...current, ...patch } : current,
+                    )
                   }
                   onSubmit={() => void handleSubmit()}
                   onCancel={() => void navigate(`/games/${game.id}`)}
@@ -517,8 +550,12 @@ export default function GameEdit() {
         games={sgdbGames}
         images={sgdbImages}
         loadingImages={sgdbLoadingImages}
-        selectedImageUrl={sgdbDialog.mode === "covers" ? editForm.coverUrl : editForm.heroUrl}
-        onClose={() => setSgdbDialog((current) => ({ ...current, open: false }))}
+        selectedImageUrl={
+          sgdbDialog.mode === "covers" ? editForm.coverUrl : editForm.heroUrl
+        }
+        onClose={() =>
+          setSgdbDialog((current) => ({ ...current, open: false }))
+        }
         onQueryChange={setSgdbQuery}
         onSearch={(event) => {
           event.preventDefault();
