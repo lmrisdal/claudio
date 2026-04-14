@@ -47,19 +47,12 @@ impl ClaudioConfig {
     }
 
     pub fn config_dir(&self, config_path: &str) -> PathBuf {
-        if self.database.provider == "postgres" {
-            Path::new(config_path)
-                .canonicalize()
-                .unwrap_or_else(|_| PathBuf::from(config_path))
-                .parent()
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| PathBuf::from("config"))
-        } else {
-            Path::new(&self.database.sqlite_path)
-                .parent()
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| PathBuf::from("config"))
-        }
+        Path::new(config_path)
+            .canonicalize()
+            .unwrap_or_else(|_| PathBuf::from(config_path))
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("config"))
     }
 
     fn apply_env_overrides(&mut self) {
@@ -210,7 +203,7 @@ impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
             provider: "sqlite".to_string(),
-            sqlite_path: "config/claudio.db".to_string(),
+            sqlite_path: "/config/claudio.db".to_string(),
             postgres_connection: None,
         }
     }
