@@ -1,10 +1,22 @@
 use std::{
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use dashmap::DashMap;
+
+trait Clock: Send + Sync {
+    fn now(&self) -> Instant;
+}
+
+struct SystemClock;
+
+impl Clock for SystemClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+}
 
 struct TicketEntry {
     game_id: i32,
@@ -15,15 +27,18 @@ pub struct TicketStore {
     tickets: DashMap<String, TicketEntry>,
     ttl: Duration,
     last_purge: Mutex<Instant>,
+    clock: Arc<dyn Clock>,
 }
 
 impl TicketStore {
     #[must_use]
     pub fn new(ttl: Duration) -> Self {
+        let clock = Arc::new(SystemClock);
         Self {
             tickets: DashMap::new(),
             ttl,
-            last_purge: Mutex::new(Instant::now()),
+            last_purge: Mutex::new(clock.now()),
+            clock,
         }
     }
 
@@ -38,7 +53,7 @@ impl TicketStore {
             token.clone(),
             TicketEntry {
                 game_id,
-                expires_at: Instant::now() + self.ttl,
+                expires_at: self.clock.now() + self.ttl,
             },
         );
 
@@ -50,7 +65,7 @@ impl TicketStore {
             return false;
         };
 
-        let now = Instant::now();
+        let now = self.clock.now();
         if ticket.expires_at <= now {
             drop(ticket);
             self.tickets.remove(token);
@@ -70,7 +85,7 @@ impl TicketStore {
             return false;
         };
 
-        ticket.game_id == game_id && ticket.expires_at > Instant::now()
+        ticket.game_id == game_id && ticket.expires_at > self.clock.now()
     }
 
     fn maybe_purge(&self) {
@@ -78,14 +93,14 @@ impl TicketStore {
             .last_purge
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if last_purge.elapsed() < Duration::from_secs(60) {
+        if self.clock.now().duration_since(*last_purge) < Duration::from_secs(60) {
             return;
         }
 
-        *last_purge = Instant::now();
+        *last_purge = self.clock.now();
         drop(last_purge);
 
-        let now = Instant::now();
+        let now = self.clock.now();
         self.tickets.retain(|_, ticket| ticket.expires_at > now);
     }
 }
@@ -138,28 +153,102 @@ impl DownloadTicketStore {
 
 #[cfg(test)]
 mod tests {
-    use std::{thread, time::Duration};
+    use std::{
+        sync::{Arc, Mutex},
+        time::{Duration, Instant},
+    };
 
-    use super::{EmulationTicketStore, TicketStore};
+    use super::{Clock, EmulationTicketStore, TicketStore};
+
+    struct FakeClock(Mutex<Instant>);
+
+    impl FakeClock {
+        fn new() -> Arc<Self> {
+            Arc::new(Self(Mutex::new(Instant::now())))
+        }
+
+        fn advance(&self, duration: Duration) {
+            *self.0.lock().unwrap() += duration;
+        }
+    }
+
+    impl Clock for FakeClock {
+        fn now(&self) -> Instant {
+            *self.0.lock().unwrap()
+        }
+    }
+
+    fn store_with_clock(ttl: Duration, clock: Arc<FakeClock>) -> TicketStore {
+        let clock_now = clock.now();
+        TicketStore {
+            tickets: dashmap::DashMap::new(),
+            ttl,
+            last_purge: Mutex::new(clock_now),
+            clock: clock as Arc<dyn Clock>,
+        }
+    }
 
     #[test]
-    fn is_valid_renews_active_ticket() {
-        let store = TicketStore::new(Duration::from_millis(200));
+    fn is_valid_accepts_active_ticket() {
+        let clock = FakeClock::new();
+        let store = store_with_clock(Duration::from_secs(60), Arc::clone(&clock));
         let token = store.create(7);
 
-        thread::sleep(Duration::from_millis(100));
-        assert!(store.is_valid(&token, 7));
-
-        thread::sleep(Duration::from_millis(150));
+        clock.advance(Duration::from_secs(30));
         assert!(store.is_valid(&token, 7));
     }
 
     #[test]
+    fn is_valid_rejects_expired_ticket() {
+        let clock = FakeClock::new();
+        let store = store_with_clock(Duration::from_secs(60), Arc::clone(&clock));
+        let token = store.create(7);
+
+        clock.advance(Duration::from_secs(61));
+        assert!(!store.is_valid(&token, 7));
+    }
+
+    #[test]
+    fn is_valid_renews_active_ticket() {
+        let clock = FakeClock::new();
+        let store = store_with_clock(Duration::from_secs(60), Arc::clone(&clock));
+        let token = store.create(7);
+
+        // advance to just before expiry, renew
+        clock.advance(Duration::from_secs(50));
+        assert!(store.is_valid(&token, 7));
+
+        // advance past the original TTL — ticket was renewed so it must still be valid
+        clock.advance(Duration::from_secs(50));
+        assert!(store.is_valid(&token, 7));
+    }
+
+    #[test]
+    fn is_valid_rejects_wrong_game_id() {
+        let clock = FakeClock::new();
+        let store = store_with_clock(Duration::from_secs(60), Arc::clone(&clock));
+        let token = store.create(7);
+
+        assert!(!store.is_valid(&token, 99));
+    }
+
+    #[test]
     fn redeem_keeps_single_use_behavior() {
-        let store = TicketStore::new(Duration::from_secs(1));
+        let clock = FakeClock::new();
+        let store = store_with_clock(Duration::from_secs(60), Arc::clone(&clock));
         let token = store.create(7);
 
         assert!(store.redeem(&token, 7));
+        assert!(!store.redeem(&token, 7));
+    }
+
+    #[test]
+    fn redeem_rejects_expired_ticket() {
+        let clock = FakeClock::new();
+        let store = store_with_clock(Duration::from_secs(60), Arc::clone(&clock));
+        let token = store.create(7);
+
+        clock.advance(Duration::from_secs(61));
         assert!(!store.redeem(&token, 7));
     }
 
