@@ -51,6 +51,7 @@ FROM alpine:3.23 AS runtime
 RUN apk add --no-cache ca-certificates libavif-apps sqlite-libs su-exec
 WORKDIR /app
 COPY --from=backend /app ./
+COPY --from=frontend /build/src/claudio-api/wwwroot/ wwwroot/
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && mkdir -p /config
 VOLUME /config
