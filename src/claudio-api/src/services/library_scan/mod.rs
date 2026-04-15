@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use tokio::time::MissedTickBehavior;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     config::{ClaudioConfig, ConfigStore},
@@ -69,16 +69,26 @@ impl LibraryScanService {
     }
 
     pub async fn scan(&self) -> Result<ScanResult, LibraryScanError> {
+        debug!("TEMP_SCAN_DEBUG: scan() called, waiting for scan_lock");
         let _guard = self.scan_lock.lock().await;
+        debug!("TEMP_SCAN_DEBUG: scan_lock acquired, starting perform_scan()");
         let result = self.perform_scan().await?;
+        debug!(
+            games_found = result.games_found,
+            games_added = result.games_added,
+            games_missing = result.games_missing,
+            "TEMP_SCAN_DEBUG: perform_scan() returned"
+        );
 
         if result.games_added > 0 && self.igdb_service.is_configured().unwrap_or(false) {
+            debug!("TEMP_SCAN_DEBUG: starting IGDB background scan after library scan");
             let _ = self.igdb_service.start_scan_in_background();
         }
 
         let api_key = self.config_store.credentials()?.steamgriddb_api_key;
         let steamgriddb_worker = self.steamgriddb_worker();
         if !api_key.is_empty() && steamgriddb_worker.try_start() {
+            debug!("TEMP_SCAN_DEBUG: starting SteamGridDB background worker after library scan");
             tokio::spawn(async move {
                 if let Err(error) = steamgriddb_worker.fetch_heroes_streaming(&api_key).await {
                     warn!(error = %error, "SteamGridDB hero fetch failed");
@@ -87,23 +97,29 @@ impl LibraryScanService {
             });
         }
 
+        debug!("TEMP_SCAN_DEBUG: scan() returning result");
         Ok(result)
     }
 
     pub async fn run_scheduler(self: Arc<Self>) {
+        debug!("TEMP_SCAN_DEBUG: run_scheduler() starting startup scan");
         if let Err(error) = self.scan().await {
             warn!(error = %error, "startup library scan failed");
         }
+        debug!("TEMP_SCAN_DEBUG: startup scan finished, scheduler entering interval loop");
 
         let scan_interval = self.config.library.scan_interval_secs.max(30);
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(scan_interval));
         interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         interval.tick().await;
         loop {
+            debug!(scan_interval, "TEMP_SCAN_DEBUG: waiting for next scheduled scan tick");
             interval.tick().await;
+            debug!("TEMP_SCAN_DEBUG: scheduled scan tick fired, starting scan()");
             if let Err(error) = self.scan().await {
                 warn!(error = %error, "scheduled library scan failed");
             }
+            debug!("TEMP_SCAN_DEBUG: scheduled scan finished");
         }
     }
 
