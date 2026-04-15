@@ -173,12 +173,17 @@ impl LibraryScanService {
             let key = (game.platform.clone(), game.folder_name.clone());
 
             if let Some(existing_game) = existing_by_key.get(&key).cloned() {
-                let mut active_model: game::ActiveModel = existing_game.into();
-                active_model.folder_path = Set(game.folder_path);
-                active_model.size_bytes = Set(game.size_bytes);
-                active_model.is_missing = Set(false);
-                active_model.update(&self.db).await?;
-                games_updated += 1;
+                if existing_game.folder_path != game.folder_path
+                    || existing_game.size_bytes != game.size_bytes
+                    || existing_game.is_missing
+                {
+                    let mut active_model: game::ActiveModel = existing_game.into();
+                    active_model.folder_path = Set(game.folder_path);
+                    active_model.size_bytes = Set(game.size_bytes);
+                    active_model.is_missing = Set(false);
+                    active_model.update(&self.db).await?;
+                    games_updated += 1;
+                }
             } else {
                 game::ActiveModel {
                     title: Set(game.folder_name.clone()),
@@ -202,12 +207,18 @@ impl LibraryScanService {
             let key = (archive.platform.clone(), archive.folder_name.clone());
 
             if let Some(existing_game) = existing_by_key.get(&key).cloned() {
-                let mut active_model: game::ActiveModel = existing_game.into();
-                active_model.folder_path = Set(archive.archive_path.to_string_lossy().to_string());
-                active_model.size_bytes = Set(archive.size_bytes);
-                active_model.is_missing = Set(false);
-                active_model.update(&self.db).await?;
-                games_updated += 1;
+                let archive_path = archive.archive_path.to_string_lossy().to_string();
+                if existing_game.folder_path != archive_path
+                    || existing_game.size_bytes != archive.size_bytes
+                    || existing_game.is_missing
+                {
+                    let mut active_model: game::ActiveModel = existing_game.into();
+                    active_model.folder_path = Set(archive_path);
+                    active_model.size_bytes = Set(archive.size_bytes);
+                    active_model.is_missing = Set(false);
+                    active_model.update(&self.db).await?;
+                    games_updated += 1;
+                }
             } else {
                 game::ActiveModel {
                     title: Set(archive.title),
