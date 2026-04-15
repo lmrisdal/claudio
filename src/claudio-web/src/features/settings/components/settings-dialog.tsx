@@ -455,16 +455,16 @@ export default function SettingsDialog({
     ? "h-full w-full"
     : "fixed inset-0 z-[100] flex items-end justify-center sm:items-center";
   const panelClassName = embedded
-    ? "app-desktop-settings-panel relative flex h-full w-full flex-col overflow-hidden border border-border/50 sm:flex-row"
+    ? "relative flex h-full w-full flex-col overflow-hidden border border-border bg-surface sm:flex-row"
     : "relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl";
   const sidebarClassName = embedded
-    ? "app-desktop-settings-sidebar flex flex-col border-border/60 sm:w-56 sm:shrink-0 sm:border-r"
+    ? "flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r"
     : "flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r";
   const sidebarActiveClassName = embedded
-    ? "bg-(--desktop-settings-sidebar-active-bg) text-text-primary font-medium"
+    ? "bg-(--settings-sidebar-active-bg) text-text-primary font-medium"
     : "bg-(--settings-sidebar-active-bg) text-text-primary font-medium";
   const sidebarHoverClassName = embedded
-    ? "text-text-secondary hover:bg-(--desktop-settings-sidebar-hover-bg) hover:text-text-primary"
+    ? "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary"
     : "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary";
 
   return (
@@ -493,7 +493,7 @@ export default function SettingsDialog({
             </div>
             <button
               onClick={onClose}
-              className={`rounded-lg p-1.5 text-text-muted transition ${embedded ? "hover:bg-(--desktop-settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden`}
+              className={`rounded-lg p-1.5 text-text-muted transition ${embedded ? "hover:bg-(--settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden`}
               aria-label="Close"
             >
               {closeIcon}

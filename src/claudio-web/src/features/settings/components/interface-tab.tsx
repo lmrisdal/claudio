@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { useReducedTransparency } from "../../core/hooks/use-reduced-transparency";
 import type { ThemePreference } from "../../core/hooks/use-theme";
 import { useTheme } from "../../core/hooks/use-theme";
 import { setIndexedRef as setIndexedReference } from "../../core/utils/dom";
 import {
   isEmulatorFullscreenEnabled,
   setEmulatorFullscreenEnabled,
-  setReducedTransparencyEnabled,
 } from "../../core/utils/preferences";
 import { isSoundsEnabled, setSoundsEnabled } from "../../core/utils/sounds";
 
@@ -18,7 +16,6 @@ export default function InterfaceTab({
   const [fullscreenOn, setFullscreenOn] = useState(isEmulatorFullscreenEnabled);
   const [soundsOn, setSoundsOn] = useState(isSoundsEnabled);
   const { theme, setTheme } = useTheme();
-  const reducedTransparencyOn = useReducedTransparency();
 
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: "system", label: "System" },
@@ -52,25 +49,9 @@ export default function InterfaceTab({
       </div>
 
       <label className="flex items-center justify-between cursor-pointer">
-        <span className="text-sm text-text-secondary">Reduce transparency</span>
-        <button
-          ref={(element) => setIndexedReference(contentRefs, 3, element)}
-          type="button"
-          role="switch"
-          aria-checked={reducedTransparencyOn}
-          onClick={() => setReducedTransparencyEnabled(!reducedTransparencyOn)}
-          className={`ring-1 relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring ${reducedTransparencyOn ? "bg-surface-raised ring-border" : "bg-bg ring-border"}`}
-        >
-          <span
-            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${reducedTransparencyOn ? "translate-x-5" : "translate-x-0"}`}
-          />
-        </button>
-      </label>
-
-      <label className="flex items-center justify-between cursor-pointer">
         <span className="text-sm text-text-secondary">Navigation sounds</span>
         <button
-          ref={(element) => setIndexedReference(contentRefs, 4, element)}
+          ref={(element) => setIndexedReference(contentRefs, 3, element)}
           type="button"
           role="switch"
           aria-checked={soundsOn}
@@ -90,7 +71,7 @@ export default function InterfaceTab({
       <label className="flex items-center justify-between cursor-pointer">
         <span className="text-sm text-text-secondary">Start emulator in fullscreen</span>
         <button
-          ref={(element) => setIndexedReference(contentRefs, 5, element)}
+          ref={(element) => setIndexedReference(contentRefs, 4, element)}
           type="button"
           role="switch"
           aria-checked={fullscreenOn}

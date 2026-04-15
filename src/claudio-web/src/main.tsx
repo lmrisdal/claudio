@@ -7,7 +7,6 @@ import AuthProvider from "./features/auth/components/auth-provider";
 import NavigationProvider from "./features/core/components/navigation-provider";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
-import { isReducedTransparencyEnabled } from "./features/core/utils/preferences";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import "./index.css";
@@ -28,7 +27,6 @@ async function attachDesktopLogBridgeWithTimeout() {
 
 if (isDesktop) {
   document.documentElement.dataset.desktop = "";
-  document.documentElement.classList.toggle("reduce-transparency", isReducedTransparencyEnabled());
   document.addEventListener("contextmenu", (event) => {
     event.preventDefault();
   });

@@ -12,7 +12,6 @@ mod settings;
 #[cfg(any(test, feature = "integration-tests"))]
 mod test_support;
 mod version;
-mod window_material;
 #[cfg(target_os = "windows")]
 mod windows_integration;
 
@@ -275,11 +274,6 @@ pub fn run() {
                     }
                 }
             });
-
-            #[cfg(not(target_os = "macos"))]
-            window.set_decorations(false)?;
-
-            window_material::apply_window_material(&window);
 
             let logged_in =
                 tauri::async_runtime::block_on(auth::restore_session(&settings::load()))

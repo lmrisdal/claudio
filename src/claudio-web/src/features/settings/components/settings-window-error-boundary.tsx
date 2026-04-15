@@ -31,7 +31,7 @@ export default class SettingsWindowErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div className="flex h-full w-full items-center justify-center p-6">
-          <div className="app-desktop-settings-panel w-full max-w-md rounded-xl border border-border p-5">
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-5">
             <h1 className="text-base font-semibold text-text-primary">Settings failed to load</h1>
             <p className="mt-2 text-sm text-text-secondary">
               Claudio hit an error while opening this window.
