@@ -49,6 +49,9 @@
   --text-primary: #e5e5e5;
   --text-secondary: #a0a0b0;
   --text-muted-color: #6b6b7b;
+  --scrollbar-thumb: #4f545c;
+  --scrollbar-thumb-hover: #5d6269;
+  --scrollbar-thumb-active: #6a7078;
   --focus-ring: #00d9b8;
   --accent: #00d9b8;
   --accent-hover: #00c4a6;
@@ -90,6 +93,9 @@
   --text-primary: #1a1a2e;
   --text-secondary: #555566;
   --text-muted-color: #888899;
+  --scrollbar-thumb: #b7bcc8;
+  --scrollbar-thumb-hover: #9fa6b5;
+  --scrollbar-thumb-active: #8b93a3;
   --focus-ring: #5b3fd6;
   --accent: #5b3fd6;
   --accent-hover: #4c31bf;
@@ -460,27 +466,14 @@ html[data-desktop] .auth-card {
   box-shadow: 0 24px 52px rgb(0 0 0 / 0.42);
 }
 
-/* Sidebar scrollbar */
-.desktop-sidebar ::-webkit-scrollbar {
-  width: 4px;
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
-.desktop-sidebar ::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.desktop-sidebar ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 2px;
-}
-
-.desktop-sidebar ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted-color);
-}
-
-/* Scrollbar */
-/* ::-webkit-scrollbar {
-  width: 6px;
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
 }
 
 ::-webkit-scrollbar-track {
@@ -488,9 +481,30 @@ html[data-desktop] .auth-card {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
-} */
+  min-height: 40px;
+  border: 4px solid transparent;
+  border-radius: 999px;
+  background-color: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-active);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 /* Dialog animations */
 @keyframes slideUpIn {
