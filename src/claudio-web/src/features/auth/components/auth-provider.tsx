@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -290,6 +291,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       globalThis.removeEventListener("storage", handleStorage);
     };
   }, [clearWebAuthState]);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+
+    const unlisten = listen("deep-link-auth-complete", () => {
+      void desktopGetSession().then((session) => {
+        applyDesktopSession(session);
+      });
+    });
+
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [applyDesktopSession]);
 
   const login = useCallback(
     async (username: string, password: string) => {

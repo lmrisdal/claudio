@@ -23,6 +23,7 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_deep_link::DeepLinkExt;
 
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
 #[cfg(target_os = "macos")]
@@ -41,7 +42,7 @@ fn set_dock_visibility(app: &AppHandle, visible: bool) {
 #[cfg(not(target_os = "macos"))]
 fn set_dock_visibility(_app: &AppHandle, _visible: bool) {}
 
-fn restore_main_window(app: &AppHandle) {
+pub(crate) fn restore_main_window(app: &AppHandle) {
     set_dock_visibility(app, true);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -155,6 +156,7 @@ pub fn run() {
                 ])
                 .build(),
         )
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -187,6 +189,7 @@ pub fn run() {
             commands::games::uninstall_game,
             commands::desktop_complete_external_login,
             commands::desktop_get_session,
+            commands::desktop_open_external_login,
             commands::desktop_login,
             commands::desktop_logout,
             commands::desktop_proxy_login,
@@ -261,6 +264,59 @@ pub fn run() {
                 })
                 .icon_as_template(cfg!(target_os = "macos"))
                 .build(app)?;
+
+            let deep_link_handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for parsed in event.urls() {
+                    if parsed.scheme() != "claudio" {
+                        continue;
+                    }
+
+                    let is_auth_callback = parsed.host_str() == Some("auth")
+                        && parsed.path() == "/callback";
+
+                    if !is_auth_callback {
+                        continue;
+                    }
+
+                    let nonce = parsed
+                        .query_pairs()
+                        .find(|(key, _)| key == "nonce")
+                        .map(|(_, value)| value.to_string());
+
+                    let error = parsed
+                        .query_pairs()
+                        .find(|(key, _)| key == "error")
+                        .map(|(_, value)| value.to_string());
+
+                    if let Some(error) = error {
+                        log::warn!("Deep link auth callback returned error: {error}");
+                        let _ = deep_link_handle.emit("deep-link-auth-error", error);
+                        restore_main_window(&deep_link_handle);
+                        return;
+                    }
+
+                    let Some(nonce) = nonce else {
+                        continue;
+                    };
+
+                    let handle = deep_link_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        match auth::complete_external_login(&settings::load(), &nonce).await {
+                            Ok(session) => {
+                                let _ = refresh_auth_state_ui(&handle, session.is_logged_in);
+                                let _ = handle.emit("deep-link-auth-complete", ());
+                            }
+                            Err(message) => {
+                                log::error!("Deep link login failed: {message}");
+                                let _ = handle.emit("deep-link-auth-error", message);
+                            }
+                        }
+                        restore_main_window(&handle);
+                    });
+                    return;
+                }
+            });
 
             let _ = window;
             Ok(())

@@ -1,9 +1,15 @@
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { resolveServerUrl } from "../../core/api/client";
 import Logo from "../../core/components/logo";
 import { useServerStatus } from "../../core/hooks/use-server-status";
-import { getSettings, isDesktop, updateSettings } from "../../desktop/hooks/use-desktop";
+import {
+  desktopOpenExternalLogin,
+  getSettings,
+  isDesktop,
+  updateSettings,
+} from "../../desktop/hooks/use-desktop";
 import { useAuth } from "../hooks/use-auth";
 
 const secureStorageErrorPrefix = "Secure storage unavailable:";
@@ -72,6 +78,23 @@ export default function Login() {
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+
+    const unlistenComplete = listen("deep-link-auth-complete", () => {
+      setProviderLoading(null);
+    });
+    const unlistenError = listen<string>("deep-link-auth-error", (event) => {
+      setProviderLoading(null);
+      setError(event.payload || "External login failed");
+    });
+
+    return () => {
+      void unlistenComplete.then((fn) => fn());
+      void unlistenError.then((fn) => fn());
     };
   }, []);
 
@@ -216,10 +239,20 @@ export default function Login() {
               {providers.providers.map((provider) => (
                 <a
                   key={provider.slug}
-                  href={resolveServerUrl(provider.startUrl)}
+                  href={isDesktop ? "#" : resolveServerUrl(provider.startUrl)}
                   onClick={(event) => {
                     if (connectionMessage) {
                       event.preventDefault();
+                      return;
+                    }
+
+                    if (isDesktop) {
+                      event.preventDefault();
+                      setProviderLoading(provider.displayName);
+                      desktopOpenExternalLogin(provider.startUrl).catch((error) => {
+                        setProviderLoading(null);
+                        setError(error instanceof Error ? error.message : "Failed to open browser");
+                      });
                       return;
                     }
 

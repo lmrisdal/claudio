@@ -17,6 +17,10 @@ use crate::{
 
 fn sanitize_return_to(value: Option<String>) -> String {
     match value {
+        // Allow the desktop deep-link scheme
+        Some(v) if v.starts_with("claudio://") => v,
+        // Allow desktop localhost callback (loopback only)
+        Some(v) if v.starts_with("http://127.0.0.1:") => v,
         // Must start with "/" but not "//" (protocol-relative URL)
         Some(v) if v.starts_with('/') && !v.starts_with("//") => v,
         _ => "/".to_string(),
@@ -253,4 +257,50 @@ async fn oidc_callback(
     let encoded_nonce = utf8_percent_encode(&nonce, NON_ALPHANUMERIC).to_string();
 
     Ok(Redirect::to(&format!("{return_to}?nonce={encoded_nonce}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_return_to_allows_relative_paths() {
+        assert_eq!(sanitize_return_to(Some("/auth/callback".into())), "/auth/callback");
+    }
+
+    #[test]
+    fn sanitize_return_to_allows_claudio_scheme() {
+        assert_eq!(
+            sanitize_return_to(Some("claudio://auth/callback".into())),
+            "claudio://auth/callback"
+        );
+    }
+
+    #[test]
+    fn sanitize_return_to_rejects_protocol_relative() {
+        assert_eq!(sanitize_return_to(Some("//evil.com".into())), "/");
+    }
+
+    #[test]
+    fn sanitize_return_to_allows_loopback() {
+        assert_eq!(
+            sanitize_return_to(Some("http://127.0.0.1:12345/callback".into())),
+            "http://127.0.0.1:12345/callback"
+        );
+    }
+
+    #[test]
+    fn sanitize_return_to_rejects_absolute_http() {
+        assert_eq!(sanitize_return_to(Some("https://evil.com".into())), "/");
+    }
+
+    #[test]
+    fn sanitize_return_to_rejects_non_loopback_http() {
+        assert_eq!(sanitize_return_to(Some("http://evil.com:12345/callback".into())), "/");
+    }
+
+    #[test]
+    fn sanitize_return_to_defaults_on_none() {
+        assert_eq!(sanitize_return_to(None), "/");
+    }
 }

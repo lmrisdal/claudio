@@ -13,6 +13,7 @@
     "core:window:allow-set-title-bar-style",
     "core:window:allow-start-dragging",
     "opener:default",
+    "deep-link:default",
     "dialog:default",
     "updater:default",
     "window-state:default"

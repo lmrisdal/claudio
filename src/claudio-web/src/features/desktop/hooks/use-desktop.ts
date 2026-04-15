@@ -136,6 +136,10 @@ export async function desktopCompleteExternalLogin(nonce: string): Promise<Deskt
   return invoke<DesktopSession>("desktop_complete_external_login", { nonce });
 }
 
+export async function desktopOpenExternalLogin(startUrl: string): Promise<void> {
+  return invoke<void>("desktop_open_external_login", { startUrl });
+}
+
 export async function desktopProxyLogin(): Promise<DesktopSession> {
   return invoke<DesktopSession>("desktop_proxy_login");
 }
