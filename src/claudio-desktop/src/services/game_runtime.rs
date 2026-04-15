@@ -1,6 +1,8 @@
 use crate::models::RunningGameInfo;
 use crate::registry;
 use std::collections::HashMap;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -9,6 +11,13 @@ use std::thread;
 #[cfg(not(target_os = "windows"))]
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(target_os = "windows")]
+use windows::Win32::Foundation::{CloseHandle, WAIT_TIMEOUT};
+#[cfg(target_os = "windows")]
+use windows::Win32::System::Threading::{
+    OpenProcess, WaitForSingleObject, CREATE_NO_WINDOW, PROCESS_QUERY_LIMITED_INFORMATION,
+    SYNCHRONIZE,
+};
 
 pub struct RunningGamesState {
     games_by_id: Mutex<HashMap<i32, RunningGameInfo>>,
@@ -112,11 +121,15 @@ pub fn stop_game(state: &RunningGamesState, remote_game_id: i32) -> Result<(), S
 fn kill_process_tree(pid: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let status = Command::new("taskkill")
+        let mut command = Command::new("taskkill");
+        command
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+        configure_background_command(&mut command);
+
+        let status = command
             .status()
             .map_err(|e| format!("Failed to stop game process: {e}"))?;
 
@@ -183,17 +196,10 @@ fn kill_process_tree(pid: u32) -> Result<(), String> {
 fn is_process_running(pid: u32) -> bool {
     #[cfg(target_os = "windows")]
     {
-        Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .output()
-            .map(|output| {
-                let body = String::from_utf8_lossy(&output.stdout);
-                !body.trim().is_empty() && !body.contains("No tasks are running")
-            })
-            .unwrap_or(false)
+        with_process_handle(pid, |handle| unsafe {
+            matches!(WaitForSingleObject(handle, 0), WAIT_TIMEOUT)
+        })
+        .unwrap_or(false)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -215,6 +221,29 @@ fn is_process_running(pid: u32) -> bool {
                 !state.is_empty() && !state.starts_with('Z')
             })
             .unwrap_or(false)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn configure_background_command(command: &mut Command) {
+    command.creation_flags(CREATE_NO_WINDOW.0);
+}
+
+#[cfg(target_os = "windows")]
+fn with_process_handle<T>(
+    pid: u32,
+    callback: impl FnOnce(windows::Win32::Foundation::HANDLE) -> T,
+) -> Option<T> {
+    unsafe {
+        let handle = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, false, pid)
+        {
+            Ok(handle) if !handle.is_invalid() => handle,
+            _ => return None,
+        };
+
+        let result = callback(handle);
+        let _ = CloseHandle(handle);
+        Some(result)
     }
 }
 
@@ -296,12 +325,10 @@ mod tests {
             .ensure_not_running(8)
             .expect("stale process should be removed");
 
-        assert!(
-            state
-                .remove(8)
-                .expect("state lookup should succeed")
-                .is_none()
-        );
+        assert!(state
+            .remove(8)
+            .expect("state lookup should succeed")
+            .is_none());
     }
 
     #[test]
@@ -318,12 +345,10 @@ mod tests {
 
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].game_id, 1);
-        assert!(
-            state
-                .remove(2)
-                .expect("state lookup should succeed")
-                .is_none()
-        );
+        assert!(state
+            .remove(2)
+            .expect("state lookup should succeed")
+            .is_none());
     }
 
     #[test]
@@ -341,11 +366,9 @@ mod tests {
 
         let _ = waiter.join().expect("waiter thread should join");
         assert!(!is_process_running(pid));
-        assert!(
-            state
-                .remove(99)
-                .expect("state lookup should succeed")
-                .is_none()
-        );
+        assert!(state
+            .remove(99)
+            .expect("state lookup should succeed")
+            .is_none());
     }
 }

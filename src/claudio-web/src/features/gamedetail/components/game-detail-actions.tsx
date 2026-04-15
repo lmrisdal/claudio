@@ -71,6 +71,8 @@ export default function GameDetailActions({
   const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
   const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(null);
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
+  const [launchingGameId, setLaunchingGameId] = useState<number | null>(null);
+  const [stoppingGameId, setStoppingGameId] = useState<number | null>(null);
 
   const { data: exeList } = useQuery({
     queryKey: ["executables", gameId],
@@ -179,6 +181,8 @@ export default function GameDetailActions({
       await stopGame(remoteGameId);
     },
     onMutate: async (remoteGameId) => {
+      setStoppingGameId(remoteGameId);
+      setLaunchingGameId((current) => (current === remoteGameId ? null : current));
       await queryClient.cancelQueries({ queryKey: ["runningGames"] });
       const previous = queryClient.getQueryData<RunningGame[]>(["runningGames"]) ?? [];
       queryClient.setQueryData<RunningGame[]>(
@@ -188,12 +192,14 @@ export default function GameDetailActions({
       return { previous };
     },
     onError: (error, _remoteGameId, context) => {
+      setStoppingGameId(null);
       if (context?.previous) {
         queryClient.setQueryData(["runningGames"], context.previous);
       }
       setInstallError(error instanceof Error ? error.message : "Could not stop game.");
     },
     onSettled: async () => {
+      setStoppingGameId(null);
       await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
     },
   });
@@ -204,8 +210,8 @@ export default function GameDetailActions({
     installProgress.status !== "completed" &&
     installProgress.status !== "failed";
   const isGameRunning = runningGames.some((runningGame) => runningGame.gameId === displayGame.id);
-  const stoppingGameId = stopGameMutation.variables;
-  const isStoppingGame = typeof stoppingGameId === "number" && stoppingGameId === displayGame.id;
+  const isLaunchingGame = launchingGameId === displayGame.id;
+  const isStoppingGame = stoppingGameId === displayGame.id;
   const canRestartInstallerInteractively =
     hasActiveInstallProgress &&
     installProgress?.status === "installing" &&
@@ -250,7 +256,7 @@ export default function GameDetailActions({
   }
 
   async function handlePlayButtonClick() {
-    if (isStoppingGame) {
+    if (isLaunchingGame || isStoppingGame) {
       return;
     }
 
@@ -261,11 +267,16 @@ export default function GameDetailActions({
 
     if (installedGame?.gameExe) {
       try {
+        setLaunchingGameId(displayGame.id);
+        setInstallError(null);
         await launchGame(displayGame.id);
         await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
       } catch (error) {
+        setLaunchingGameId(null);
         setInstallError(error instanceof Error ? error.message : "Could not launch game.");
+        return;
       }
+      setLaunchingGameId(null);
       return;
     }
 
@@ -340,14 +351,14 @@ export default function GameDetailActions({
                     ? "bg-red-500 text-white hover:bg-red-400 focus-visible:ring-red-400"
                     : "bg-accent text-accent-foreground hover:bg-accent-hover focus-visible:ring-focus-ring"
                 }`}
-                disabled={isStoppingGame}
+                disabled={isLaunchingGame || isStoppingGame}
               >
                 <svg
-                  className={`h-4 w-4 ${isStoppingGame ? "animate-spin" : ""}`}
+                  className={`h-4 w-4 ${isLaunchingGame || isStoppingGame ? "animate-spin" : ""}`}
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
-                  {isStoppingGame ? (
+                  {isLaunchingGame || isStoppingGame ? (
                     <path d="M12 2.25a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM12 18.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 .75-.75ZM4.398 4.398a.75.75 0 0 1 1.06 0l1.768 1.768a.75.75 0 1 1-1.06 1.06L4.398 5.46a.75.75 0 0 1 0-1.061ZM16.774 16.774a.75.75 0 0 1 1.06 0l1.768 1.768a.75.75 0 1 1-1.06 1.06l-1.768-1.768a.75.75 0 0 1 0-1.06ZM2.25 12a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75ZM18.5 12a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75ZM6.167 16.774a.75.75 0 0 1 1.06 1.06L5.46 19.602a.75.75 0 1 1-1.06-1.06l1.767-1.768ZM18.542 4.398a.75.75 0 0 1 1.06 1.061l-1.768 1.767a.75.75 0 0 1-1.06-1.06l1.768-1.768Z" />
                   ) : isGameRunning ? (
                     <path d="M7.5 6.75A2.25 2.25 0 0 1 9.75 4.5h4.5a2.25 2.25 0 0 1 2.25 2.25v4.5a2.25 2.25 0 0 1-2.25 2.25h-4.5A2.25 2.25 0 0 1 7.5 11.25v-4.5Z" />
@@ -355,7 +366,13 @@ export default function GameDetailActions({
                     <path d="M5.25 5.653c0-1.427 1.54-2.33 2.79-1.637l10.5 5.847c1.297.722 1.297 2.552 0 3.274l-10.5 5.847c-1.25.693-2.79-.21-2.79-1.637V5.653Z" />
                   )}
                 </svg>
-                {isStoppingGame ? "Stopping..." : isGameRunning ? "Stop" : "Play"}
+                {isLaunchingGame
+                  ? "Launching..."
+                  : isStoppingGame
+                    ? "Stopping..."
+                    : isGameRunning
+                      ? "Stop"
+                      : "Play"}
               </button>
 
               <button
@@ -667,11 +684,16 @@ export default function GameDetailActions({
           try {
             const fullExe = `${installedGame.installPath}\\${exe}`;
             await setGameExe(displayGame.id, fullExe);
+            setLaunchingGameId(displayGame.id);
+            setInstallError(null);
             await launchGame(displayGame.id);
             await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
           } catch (error) {
+            setLaunchingGameId(null);
             setInstallError(error instanceof Error ? error.message : "Could not launch game.");
+            return;
           }
+          setLaunchingGameId(null);
         }}
       />
 

@@ -58,7 +58,7 @@ pub(super) fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), Strin
     cleanup_directory(target_dir, "partial install directory")
 }
 
-#[cfg(any(test, feature = "integration-tests"))]
+#[cfg(any(test, all(feature = "integration-tests", target_os = "windows")))]
 pub(super) fn cleanup_failed_installer_state(
     target_dir: &Path,
     staging_dir: &Path,

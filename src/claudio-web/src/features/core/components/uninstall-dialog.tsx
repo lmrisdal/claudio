@@ -6,7 +6,7 @@ interface UninstallDialogProperties {
   open: boolean;
   title: string;
   onClose: () => void;
-  onConfirm: (deleteFiles: boolean) => void;
+  onConfirm: (deleteFiles: boolean) => Promise<void>;
 }
 
 export default function UninstallDialog({
@@ -27,14 +27,14 @@ export default function UninstallDialog({
   async function handleConfirm(deleteFiles: boolean) {
     setLoading(true);
     try {
-      onConfirm(deleteFiles);
+      await onConfirm(deleteFiles);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Dialog open={open} onClose={onClose} className="relative z-50">
+    <Dialog open={open} onClose={loading ? () => {} : onClose} className="relative z-50">
       <DialogBackdrop className="app-modal-backdrop fixed inset-0" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="bg-surface border border-border rounded-xl shadow-2xl w-full max-w-md p-6 animate-[slideUpIn_150ms_ease-out]">
@@ -69,20 +69,21 @@ export default function UninstallDialog({
               disabled={loading}
               className="w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white transition"
             >
-              Uninstall and delete files
+              {loading ? "Uninstalling..." : "Uninstall and delete files"}
             </button>
             <button
               onClick={() => handleConfirm(false)}
               disabled={loading}
               className="w-full px-4 py-2.5 rounded-lg text-sm font-medium bg-surface-raised hover:bg-surface-overlay disabled:opacity-60 text-text-secondary ring-1 ring-border transition"
             >
-              Uninstall but keep files
+              {loading ? "Uninstalling..." : "Uninstall but keep files"}
             </button>
           </div>
 
           <div className="mt-3 flex justify-end">
             <button
               onClick={onClose}
+              disabled={loading}
               className="px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text-primary transition"
             >
               Cancel
