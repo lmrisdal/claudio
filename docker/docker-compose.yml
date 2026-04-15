@@ -7,6 +7,7 @@ services:
     volumes:
       - claudio-data:/config
       - /path/to/games:/games:ro
+    user: "1000:1000"
     environment:
       - CLAUDIO_IGDB_CLIENT_ID=${IGDB_CLIENT_ID}
       - CLAUDIO_IGDB_CLIENT_SECRET=${IGDB_CLIENT_SECRET}
@@ -14,8 +15,6 @@ services:
       - CLAUDIO_JWT_SECRET=${JWT_SECRET}
       - CLAUDIO_PROXY_AUTH_HEADER=Remote-User
       - CLAUDIO_PORT=8080
-      - PUID=1000
-      - PGID=1000
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s

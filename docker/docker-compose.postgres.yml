@@ -7,9 +7,8 @@ services:
     volumes:
       - claudio-config:/config
       - /path/to/games:/games:ro
+    user: "1000:1000"
     environment:
-      - PUID=1000
-      - PGID=1000
       - CLAUDIO_DB_PROVIDER=postgres
       - CLAUDIO_DB_POSTGRES=postgres://claudio:secret@db/claudio
       # - CLAUDIO_IGDB_CLIENT_ID=
@@ -31,6 +30,7 @@ services:
       - POSTGRES_DB=claudio
       - POSTGRES_USER=claudio
       - POSTGRES_PASSWORD=secret
+    user: "1000:1000"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

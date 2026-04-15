@@ -11,14 +11,39 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
+      - uses: actions/setup-dotnet@v4
         with:
-          workspaces: . -> target
+          dotnet-version: "10.0.x"
 
-      - name: Run API Rust tests
-        run: cargo test -p claudio-api-tests
+      - run: dotnet restore tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj
+
+      - run: dotnet build tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj --no-restore
+
+      - name: Run tests with coverage
+        run: |
+          dotnet test --project tests/Claudio.Api.Tests --no-build \
+            --results-directory $RUNNER_TEMP/TestResults \
+            -- --coverage --coverage-output-format cobertura
+
+      - name: Generate coverage report
+        if: always()
+        uses: danielpalme/ReportGenerator-GitHub-Action@5
+        with:
+          reports: ${{ runner.temp }}/TestResults/*.cobertura.xml
+          targetdir: ${{ runner.temp }}/TestResults/report
+          reporttypes: MarkdownSummaryGithub;Html
+
+      - name: Add coverage to job summary
+        if: always()
+        run: cat $RUNNER_TEMP/TestResults/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ runner.temp }}/TestResults/report
+          retention-days: 30
 
   desktop-tests:
     strategy:

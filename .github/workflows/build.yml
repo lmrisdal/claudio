@@ -11,8 +11,8 @@ on:
       - "tests/**"
       - "src/claudio-web/**"
       - "docker/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
 
 jobs:
   detect-changes:
@@ -35,8 +35,9 @@ jobs:
               - "tests/**"
               - "src/claudio-web/**"
               - "docker/**"
-              - "Cargo.toml"
-              - "Cargo.lock"
+              - "Directory.Build.props"
+              - "Directory.Packages.props"
+              - "Claudio.slnx"
             desktop-tests:
               - "src/claudio-desktop/**"
               - "src/claudio-uninstaller/**"
@@ -77,8 +78,6 @@ jobs:
           load: true
           platforms: linux/amd64
           tags: claudio:smoke
-          cache-from: type=gha,scope=claudio-web-image
-          cache-to: type=gha,mode=max,scope=claudio-web-image
 
       - name: Smoke test container startup
         run: |
@@ -127,8 +126,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=claudio-web-image
-          cache-to: type=gha,mode=max,scope=claudio-web-image
 
   web-tests:
     needs: detect-changes
@@ -140,14 +137,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
+      - uses: actions/setup-dotnet@v4
         with:
-          workspaces: . -> target
+          dotnet-version: "10.0.x"
 
-      - name: Run API Rust tests
-        run: cargo test -p claudio-api-tests
+      - run: dotnet restore tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj
+
+      - run: dotnet build tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj --no-restore
+
+      - name: Run tests
+        run: dotnet run --project tests/Claudio.Api.Tests --no-build
 
   desktop-tests:
     needs: detect-changes

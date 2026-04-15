@@ -34,11 +34,10 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+.tools/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
-# Uncomment if you have tasks that create the project's static files in wwwroot
-#wwwroot/
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
@@ -488,6 +487,7 @@ src/claudio-web/dist/
 # Embedded SPA (built from src/claudio-web/)
 src/claudio-api/wwwroot/*
 !src/claudio-api/wwwroot/.gitkeep
+src/claudio-api-rs/wwwroot/
 
 # Local config (contains secrets)
 config/
