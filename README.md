@@ -1,7 +1,5 @@
 # Claudio
 
-> **Note:** This project was built entirely with [Claude Code](https://claude.ai/code) (Claude Opus 4.6).
-
 A self-hosted game library manager for organizing, browsing, and downloading your game collection.
 
 ## Features
@@ -70,6 +68,7 @@ volumes:
 | `CLAUDIO_PORT`                   | HTTP port                                                        | `8080`                 |
 | `CLAUDIO_LOG_LEVEL`              | Log level: `error`, `warn`, `info`, `debug`, `trace`             | `warn`                 |
 | `CLAUDIO_LIBRARY_PATHS`          | Comma-separated game library paths                               | `/games`               |
+| `CLAUDIO_SCAN_INTERVAL`         | Library scan interval in seconds                                 | `120`                  |
 | `CLAUDIO_IGDB_CLIENT_ID`         | IGDB/Twitch client ID                                            |                        |
 | `CLAUDIO_IGDB_CLIENT_SECRET`     | IGDB/Twitch client secret                                        |                        |
 | `CLAUDIO_STEAMGRIDDB_API_KEY`    | SteamGridDB API key (for cover art search)                       |                        |
@@ -212,7 +211,7 @@ Games are organized by platform in your library directories:
 - Folder names are parsed for title, year, and optional IGDB ID
 - Adding `igdb-NNNNN` to a folder name forces a specific IGDB match (e.g. `Celeste (2018) (igdb-26226)`)
 - Games can be loose files, or a single zip/tar/tar.gz archive
-- Background scanning runs every 2 minutes to pick up changes
+- Background scanning runs every 2 minutes to pick up changes (configurable via `CLAUDIO_SCAN_INTERVAL`)
 
 ## Development
 

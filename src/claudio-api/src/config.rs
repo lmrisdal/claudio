@@ -100,6 +100,12 @@ impl ClaudioConfig {
             self.database.postgres_connection = Some(value);
         }
 
+        if let Ok(value) = std::env::var("CLAUDIO_SCAN_INTERVAL") {
+            if let Ok(secs) = value.parse() {
+                self.library.scan_interval_secs = secs;
+            }
+        }
+
         if let Ok(value) = std::env::var("CLAUDIO_STEAMGRIDDB_API_KEY") {
             self.steamgriddb.api_key = value;
         }
@@ -353,6 +359,7 @@ pub struct SteamGridDbConfig {
 pub struct LibraryConfig {
     pub library_paths: Vec<String>,
     pub exclude_platforms: Vec<String>,
+    pub scan_interval_secs: u64,
 }
 
 impl Default for LibraryConfig {
@@ -360,6 +367,7 @@ impl Default for LibraryConfig {
         Self {
             library_paths: vec!["/games".to_string()],
             exclude_platforms: Vec::new(),
+            scan_interval_secs: 120,
         }
     }
 }

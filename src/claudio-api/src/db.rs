@@ -1,5 +1,5 @@
 use claudio_migration::MigratorTrait;
-use sea_orm::{Database, DatabaseConnection, DbErr};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr};
 use tracing::{debug, info};
 
 use crate::config::ClaudioConfig;
@@ -13,7 +13,9 @@ pub enum DbError {
 }
 
 pub async fn connect(config: &ClaudioConfig) -> Result<DatabaseConnection, DbError> {
-    let url = if config.database.provider == "postgres" {
+    let is_sqlite = config.database.provider != "postgres";
+
+    let url = if !is_sqlite {
         config
             .database
             .postgres_connection
@@ -23,8 +25,14 @@ pub async fn connect(config: &ClaudioConfig) -> Result<DatabaseConnection, DbErr
         format!("sqlite://{}?mode=rwc", config.database.sqlite_path)
     };
 
+    let mut opts = ConnectOptions::new(&url);
+
+    if is_sqlite {
+        opts.max_connections(2);
+    }
+
     debug!("connecting to database");
-    let db = Database::connect(&url).await?;
+    let db = Database::connect(opts).await?;
     info!("database connection established");
     Ok(db)
 }

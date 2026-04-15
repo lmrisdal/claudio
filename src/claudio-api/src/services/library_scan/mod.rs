@@ -9,6 +9,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
 use serde::Serialize;
+use tokio::time::MissedTickBehavior;
 use tracing::warn;
 
 use crate::{
@@ -98,7 +99,10 @@ impl LibraryScanService {
             warn!(error = %error, "startup library scan failed");
         }
 
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
+        let scan_interval = self.config.library.scan_interval_secs.max(30);
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(scan_interval));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         interval.tick().await;
         loop {
             interval.tick().await;

@@ -46,3 +46,4 @@ api_key = ""
 [library]
 library_paths = ["/games"]
 exclude_platforms = []                  # Platform folders to skip during scan, e.g. ["ps", "ngc", "gba"]
+scan_interval_secs = 120               # How often to re-scan the library (in seconds)

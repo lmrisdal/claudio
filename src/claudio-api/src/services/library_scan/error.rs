@@ -8,4 +8,6 @@ pub enum LibraryScanError {
     Credentials(#[from] crate::services::config_file::ConfigFileError),
     #[error("http request failed: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("scan failed: {0}")]
+    Scan(String),
 }
