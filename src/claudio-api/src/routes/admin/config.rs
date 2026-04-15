@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::{auth::middleware::AdminUser, services::config_file::ApiCredentials, state::AppState};
+use crate::{auth::middleware::AdminUser, config::ApiCredentials, state::AppState};
 
 use super::shared::RouteError;
 
@@ -12,7 +12,7 @@ pub(super) async fn get_config(
     _admin_user: AdminUser,
 ) -> Result<Json<ConfigResponse>, RouteError> {
     let credentials = state
-        .config_file_service
+        .config_store
         .credentials()
         .map_err(RouteError::internal)?;
     Ok(Json(ConfigResponse::from(credentials)))
@@ -45,7 +45,7 @@ pub(super) async fn update_config(
     let igdb = request.igdb;
     let steamgriddb = request.steamgriddb;
     let credentials = state
-        .config_file_service
+        .config_store
         .update_api_credentials(
             igdb.as_ref().and_then(|igdb| igdb.client_id.clone()),
             igdb.and_then(|igdb| igdb.client_secret),

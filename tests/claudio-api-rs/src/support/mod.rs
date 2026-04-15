@@ -8,12 +8,11 @@ use axum::{
 use claudio_api::{
     auth::jwt::JwtKeys,
     build_router,
-    config::{ClaudioConfig, DatabaseConfig, LibraryConfig},
+    config::{ClaudioConfig, ConfigStore, DatabaseConfig, LibraryConfig},
     db,
     entity::game,
     services::{
         compression::CompressionService,
-        config_file::ConfigFileService,
         download::DownloadService,
         igdb::IgdbService,
         library_scan::LibraryScanService,
@@ -66,16 +65,17 @@ impl TestApp {
             ..Default::default()
         };
         configure(&mut config);
-        let config = Arc::new(config);
+        let config_path = temp_dir.path().join("config.toml");
+        config
+            .persist(config_path.to_str().expect("valid utf-8 path"))
+            .expect("persist test config");
+        let config_store = Arc::new(ConfigStore::load(&config_path).expect("load config store"));
+        let config = Arc::new(config_store.current().expect("read current config"));
 
         let db = db::connect(&config).await.expect("connect to test db");
         db::run_migrations(&db).await.expect("run migrations");
 
         let jwt = Arc::new(JwtKeys::load_or_generate(temp_dir.path()).expect("generate jwt keys"));
-        let config_file_service = Arc::new(ConfigFileService::new(
-            temp_dir.path().join("config.toml"),
-            &config,
-        ));
         let http_client = reqwest::Client::builder()
             .user_agent("claudio-test")
             .build()
@@ -84,12 +84,12 @@ impl TestApp {
         let igdb_service = Arc::new(IgdbService::new(
             db.clone(),
             http_client.clone(),
-            Arc::clone(&config_file_service),
+            Arc::clone(&config_store),
         ));
         let library_scan_service = Arc::new(LibraryScanService::new(
             db.clone(),
             Arc::clone(&config),
-            Arc::clone(&config_file_service),
+            Arc::clone(&config_store),
             http_client.clone(),
             Arc::clone(&compression_service),
             Arc::clone(&igdb_service),
@@ -106,7 +106,7 @@ impl TestApp {
             config,
             jwt,
             http_client,
-            config_file_service,
+            config_store,
             proxy_nonce_store: Arc::new(ProxyNonceStore::new()),
             external_login_nonce_store: Arc::new(ExternalLoginNonceStore::new()),
             github_state_store: Arc::new(OAuthStateStore::new()),

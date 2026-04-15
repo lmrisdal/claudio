@@ -96,7 +96,7 @@ async fn get_steamgriddb_images(
 
 fn steamgriddb_api_key(state: &Arc<AppState>) -> Result<String, RouteError> {
     let credentials = state
-        .config_file_service
+        .config_store
         .credentials()
         .map_err(RouteError::internal)?;
 

@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::services::config_file::ConfigFileService;
+use crate::config::ConfigStore;
 
 use super::{
     error::IgdbError,
@@ -17,20 +17,20 @@ pub(super) struct TwitchTokenCache {
 
 pub(super) async fn fetch_by_id(
     client: &reqwest::Client,
-    config_file_service: &ConfigFileService,
+    config_store: &ConfigStore,
     token_cache: &tokio::sync::Mutex<Option<TwitchTokenCache>>,
     igdb_id: i64,
 ) -> Result<Option<IgdbCandidate>, IgdbError> {
     let query = format!(
         "where id = {igdb_id}; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name,platforms.slug; limit 1;"
     );
-    let response = post_games_query(client, config_file_service, token_cache, &query).await?;
+    let response = post_games_query(client, config_store, token_cache, &query).await?;
     Ok(response.into_iter().next().map(IgdbGame::into_candidate))
 }
 
 pub(super) async fn search_igdb(
     client: &reqwest::Client,
-    config_file_service: &ConfigFileService,
+    config_store: &ConfigStore,
     token_cache: &tokio::sync::Mutex<Option<TwitchTokenCache>>,
     title: &str,
     year: Option<i32>,
@@ -51,18 +51,18 @@ pub(super) async fn search_igdb(
         "search \"{escaped_title}\"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name,platforms.slug;{where_clause} limit 20;"
     );
 
-    let response = post_games_query(client, config_file_service, token_cache, &query).await?;
+    let response = post_games_query(client, config_store, token_cache, &query).await?;
     Ok(response.into_iter().map(IgdbGame::into_candidate).collect())
 }
 
 async fn post_games_query(
     client: &reqwest::Client,
-    config_file_service: &ConfigFileService,
+    config_store: &ConfigStore,
     token_cache: &tokio::sync::Mutex<Option<TwitchTokenCache>>,
     query: &str,
 ) -> Result<Vec<IgdbGame>, IgdbError> {
-    let token = access_token(client, config_file_service, token_cache).await?;
-    let credentials = config_file_service.credentials()?;
+    let token = access_token(client, config_store, token_cache).await?;
+    let credentials = config_store.credentials()?;
     let response = client
         .post(IGDB_GAMES_URL)
         .header("Client-ID", credentials.igdb_client_id)
@@ -80,7 +80,7 @@ async fn post_games_query(
 
 async fn access_token(
     client: &reqwest::Client,
-    config_file_service: &ConfigFileService,
+    config_store: &ConfigStore,
     token_cache: &tokio::sync::Mutex<Option<TwitchTokenCache>>,
 ) -> Result<String, IgdbError> {
     let mut token_cache = token_cache.lock().await;
@@ -90,7 +90,7 @@ async fn access_token(
         }
     }
 
-    let credentials = config_file_service.credentials()?;
+    let credentials = config_store.credentials()?;
     let response = client
         .post(TWITCH_TOKEN_URL)
         .query(&[

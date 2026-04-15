@@ -4,10 +4,9 @@ use sea_orm::DatabaseConnection;
 
 use crate::{
     auth::jwt::JwtKeys,
-    config::ClaudioConfig,
+    config::{ClaudioConfig, ConfigStore},
     services::{
         compression::CompressionService,
-        config_file::ConfigFileService,
         download::DownloadService,
         igdb::IgdbService,
         library_scan::LibraryScanService,
@@ -23,7 +22,7 @@ pub struct AppState {
     pub config: Arc<ClaudioConfig>,
     pub jwt: Arc<JwtKeys>,
     pub http_client: reqwest::Client,
-    pub config_file_service: Arc<ConfigFileService>,
+    pub config_store: Arc<ConfigStore>,
     pub proxy_nonce_store: Arc<ProxyNonceStore>,
     pub external_login_nonce_store: Arc<ExternalLoginNonceStore>,
     pub github_state_store: Arc<OAuthStateStore>,

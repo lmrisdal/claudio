@@ -117,13 +117,13 @@ fn do_delete(install_path: &str, game_title: &str) {
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     let path = PathBuf::from(install_path);
-    if path.exists() {
-        if let Err(err) = fs::remove_dir_all(&path) {
-            show_error(&format!(
-                "Failed to delete game files: {err}\n\nPlease delete the folder manually:\n{install_path}"
-            ));
-            return;
-        }
+    if path.exists()
+        && let Err(err) = fs::remove_dir_all(&path)
+    {
+        show_error(&format!(
+            "Failed to delete game files: {err}\n\nPlease delete the folder manually:\n{install_path}"
+        ));
+        return;
     }
 
     show_info(&format!("{game_title} has been successfully uninstalled."));

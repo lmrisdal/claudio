@@ -89,76 +89,79 @@ async fn download_package_with_individual_mode_picks_up_speed_limit_updates() {
         _ => TestResponse::text(404, "missing"),
     });
 
-    crate::settings::with_test_data_dir_async(unique_test_dir("download-individual-speed-update"), || async {
-        let mut settings = download_settings(server.url());
-        settings.download_speed_limit_kbs = Some(0.5);
-        crate::settings::save(&settings).expect("settings should save");
-        store_tokens(
-            &settings,
-            &StoredTokens {
-                access_token: "access-token".to_string(),
-                refresh_token: Some("refresh-token".to_string()),
-            },
-        )
-        .expect("tokens should store");
-
-        let temp_root = crate::settings::data_dir().join("speed-limit-update-test");
-        fs::create_dir_all(&temp_root).expect("temp root should be created");
-        let controller = InstallControl::new();
-        let mut progress = Vec::new();
-
-        // Lift the speed limit as soon as the first bytes are observed in a progress event.
-        // This avoids any wall-clock sleep: we know bytes are flowing, so the download is
-        // in-flight and the limit change will be picked up by the next refresh poll.
-        let limit_lifted = Arc::new(AtomicBool::new(false));
-        let limit_lifted_in_callback = Arc::clone(&limit_lifted);
-        let updater_url = server.url().to_string();
-
-        let download = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            download_package_with(
-                &DownloadOptions {
-                    settings: &settings,
-                    server_url: server.url(),
-                    custom_headers: &settings.custom_headers,
-                    speed_limit_kbs: settings.download_speed_limit_kbs,
-                    progress_scale: 100.0,
+    crate::settings::with_test_data_dir_async(
+        unique_test_dir("download-individual-speed-update"),
+        || async {
+            let mut settings = download_settings(server.url());
+            settings.download_speed_limit_kbs = Some(0.5);
+            crate::settings::save(&settings).expect("settings should save");
+            store_tokens(
+                &settings,
+                &StoredTokens {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
                 },
-                17,
-                "Dynamic Rate Limit Individual Download",
-                &temp_root,
-                &controller,
-                |event| {
-                    if !limit_lifted_in_callback.load(Ordering::Relaxed)
-                        && event.bytes_downloaded.unwrap_or(0) > 0
-                    {
-                        limit_lifted_in_callback.store(true, Ordering::Relaxed);
-                        let mut updated = download_settings(&updater_url);
-                        updated.download_speed_limit_kbs = Some(2048.0);
-                        let _ = crate::settings::save(&updated);
-                    }
-                    progress.push(event);
-                },
-                || Ok(()),
-            ),
-        )
-        .await
-        .expect("download should complete within timeout")
-        .expect("individual download should succeed");
+            )
+            .expect("tokens should store");
 
-        assert!(download.file_path.exists());
-        assert!(
-            limit_lifted.load(Ordering::Relaxed),
-            "speed limit should have been lifted mid-download"
-        );
-        assert!(
-            progress
-                .iter()
-                .filter(|event| event.status == "downloading")
-                .any(|event| event.bytes_downloaded.unwrap_or(0) > 0),
-            "should report downloading bytes while speed limit updates are applied"
-        );
-    })
+            let temp_root = crate::settings::data_dir().join("speed-limit-update-test");
+            fs::create_dir_all(&temp_root).expect("temp root should be created");
+            let controller = InstallControl::new();
+            let mut progress = Vec::new();
+
+            // Lift the speed limit as soon as the first bytes are observed in a progress event.
+            // This avoids any wall-clock sleep: we know bytes are flowing, so the download is
+            // in-flight and the limit change will be picked up by the next refresh poll.
+            let limit_lifted = Arc::new(AtomicBool::new(false));
+            let limit_lifted_in_callback = Arc::clone(&limit_lifted);
+            let updater_url = server.url().to_string();
+
+            let download = tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                download_package_with(
+                    &DownloadOptions {
+                        settings: &settings,
+                        server_url: server.url(),
+                        custom_headers: &settings.custom_headers,
+                        speed_limit_kbs: settings.download_speed_limit_kbs,
+                        progress_scale: 100.0,
+                    },
+                    17,
+                    "Dynamic Rate Limit Individual Download",
+                    &temp_root,
+                    &controller,
+                    |event| {
+                        if !limit_lifted_in_callback.load(Ordering::Relaxed)
+                            && event.bytes_downloaded.unwrap_or(0) > 0
+                        {
+                            limit_lifted_in_callback.store(true, Ordering::Relaxed);
+                            let mut updated = download_settings(&updater_url);
+                            updated.download_speed_limit_kbs = Some(2048.0);
+                            let _ = crate::settings::save(&updated);
+                        }
+                        progress.push(event);
+                    },
+                    || Ok(()),
+                ),
+            )
+            .await
+            .expect("download should complete within timeout")
+            .expect("individual download should succeed");
+
+            assert!(download.file_path.exists());
+            assert!(
+                limit_lifted.load(Ordering::Relaxed),
+                "speed limit should have been lifted mid-download"
+            );
+            assert!(
+                progress
+                    .iter()
+                    .filter(|event| event.status == "downloading")
+                    .any(|event| event.bytes_downloaded.unwrap_or(0) > 0),
+                "should report downloading bytes while speed limit updates are applied"
+            );
+        },
+    )
     .await;
 }
 

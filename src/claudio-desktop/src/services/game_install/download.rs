@@ -59,13 +59,15 @@ where
     let client = reqwest::Client::new();
     emit_progress_with_bytes_to(
         &mut on_progress,
-        game_id,
-        "requestingManifest",
-        Some(0.0),
-        Some("Preparing download"),
-        None,
-        None,
-        None,
+        InstallProgress {
+            game_id,
+            status: "requestingManifest".to_string(),
+            percent: Some(0.0),
+            indeterminate: None,
+            detail: Some("Preparing download".to_string()),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
 
     let auth_headers =
@@ -79,19 +81,18 @@ where
         .await
         .map_err(|err| err.to_string())?;
 
-    if manifest_response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        if let Some(refreshed_headers) =
+    if manifest_response.status() == reqwest::StatusCode::UNAUTHORIZED
+        && let Some(refreshed_headers) =
             refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-        {
-            manifest_response = client
-                .get(format!(
-                    "{server_url}/api/games/{game_id}/download-files-manifest"
-                ))
-                .headers(refreshed_headers.clone())
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-        }
+    {
+        manifest_response = client
+            .get(format!(
+                "{server_url}/api/games/{game_id}/download-files-manifest"
+            ))
+            .headers(refreshed_headers.clone())
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
     }
 
     let manifest_missing = manifest_response.status() == reqwest::StatusCode::NOT_FOUND;
@@ -114,20 +115,20 @@ where
     };
 
     const INDIVIDUAL_FILE_THRESHOLD: usize = 100;
-    if let Some(ref files) = file_manifest {
-        if files.len() < INDIVIDUAL_FILE_THRESHOLD {
-            return download_files_individually(
-                opts,
-                game_id,
-                game_title,
-                temp_root,
-                control,
-                &mut on_progress,
-                &auth_headers,
-                files,
-            )
-            .await;
-        }
+    if let Some(ref files) = file_manifest
+        && files.len() < INDIVIDUAL_FILE_THRESHOLD
+    {
+        return download_files_individually(
+            opts,
+            game_id,
+            game_title,
+            temp_root,
+            control,
+            &mut on_progress,
+            &auth_headers,
+            files,
+        )
+        .await;
     }
 
     let mut response = if manifest_missing {
@@ -138,17 +139,16 @@ where
             .await
             .map_err(|err| err.to_string())?;
 
-        if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            if let Some(refreshed_headers) =
+        if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED
+            && let Some(refreshed_headers) =
                 refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-            {
-                ticket_response = client
-                    .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-                    .headers(refreshed_headers.clone())
-                    .send()
-                    .await
-                    .map_err(|err| err.to_string())?;
-            }
+        {
+            ticket_response = client
+                .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+                .headers(refreshed_headers.clone())
+                .send()
+                .await
+                .map_err(|err| err.to_string())?;
         }
 
         if !ticket_response.status().is_success() {
@@ -177,19 +177,18 @@ where
             .await
             .map_err(|err| err.to_string())?;
 
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            if let Some(refreshed_headers) =
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED
+            && let Some(refreshed_headers) =
                 refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-            {
-                response = client
-                    .get(format!(
-                        "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-                    ))
-                    .headers(refreshed_headers)
-                    .send()
-                    .await
-                    .map_err(|err| err.to_string())?;
-            }
+        {
+            response = client
+                .get(format!(
+                    "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+                ))
+                .headers(refreshed_headers)
+                .send()
+                .await
+                .map_err(|err| err.to_string())?;
         }
         response
     } else {
@@ -201,17 +200,16 @@ where
             .map_err(|err| err.to_string())?
     };
 
-    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        if let Some(refreshed_headers) =
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED
+        && let Some(refreshed_headers) =
             refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-        {
-            response = client
-                .get(format!("{server_url}/api/games/{game_id}/download"))
-                .headers(refreshed_headers)
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-        }
+    {
+        response = client
+            .get(format!("{server_url}/api/games/{game_id}/download"))
+            .headers(refreshed_headers)
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
     }
 
     if !response.status().is_success() {
@@ -223,17 +221,16 @@ where
                 .await
                 .map_err(|err| err.to_string())?;
 
-            if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED {
-                if let Some(refreshed_headers) =
+            if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED
+                && let Some(refreshed_headers) =
                     refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-                {
-                    ticket_response = client
-                        .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-                        .headers(refreshed_headers.clone())
-                        .send()
-                        .await
-                        .map_err(|err| err.to_string())?;
-                }
+            {
+                ticket_response = client
+                    .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
+                    .headers(refreshed_headers.clone())
+                    .send()
+                    .await
+                    .map_err(|err| err.to_string())?;
             }
 
             if !ticket_response.status().is_success() {
@@ -262,19 +259,18 @@ where
                 .await
                 .map_err(|err| err.to_string())?;
 
-            if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-                if let Some(refreshed_headers) =
+            if response.status() == reqwest::StatusCode::UNAUTHORIZED
+                && let Some(refreshed_headers) =
                     refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-                {
-                    response = client
-                        .get(format!(
-                            "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-                        ))
-                        .headers(refreshed_headers)
-                        .send()
-                        .await
-                        .map_err(|err| err.to_string())?;
-                }
+            {
+                response = client
+                    .get(format!(
+                        "{server_url}/api/games/{game_id}/download?ticket={ticket}"
+                    ))
+                    .headers(refreshed_headers)
+                    .send()
+                    .await
+                    .map_err(|err| err.to_string())?;
             }
         }
 
@@ -356,13 +352,15 @@ where
                 .map(|total| (downloaded as f64 / total as f64) * progress_scale);
             emit_progress_with_bytes_to(
                 &mut on_progress,
-                game_id,
-                "downloading",
-                percent,
-                Some(&format!("Downloading {}", game_title)),
-                Some(downloaded),
-                total_bytes,
-                None,
+                InstallProgress {
+                    game_id,
+                    status: "downloading".to_string(),
+                    percent,
+                    indeterminate: None,
+                    detail: Some(format!("Downloading {}", game_title)),
+                    bytes_downloaded: Some(downloaded),
+                    total_bytes,
+                },
             );
         }
     }

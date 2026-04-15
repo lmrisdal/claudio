@@ -13,13 +13,15 @@ where
 {
     emit_progress_with_bytes_to(
         &mut on_progress,
-        game.id,
-        "starting",
-        Some(0.0),
-        Some("Preparing install"),
-        None,
-        None,
-        None,
+        InstallProgress {
+            game_id: game.id,
+            status: "starting".to_string(),
+            percent: Some(0.0),
+            indeterminate: None,
+            detail: Some("Preparing install".to_string()),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
 
     let settings = settings::load();
@@ -69,13 +71,15 @@ where
 
     emit_progress_with_bytes_to(
         &mut on_progress,
-        game.id,
-        "extracting",
-        Some(60.0),
-        Some("Extracting game"),
-        None,
-        None,
-        None,
+        InstallProgress {
+            game_id: game.id,
+            status: "extracting".to_string(),
+            percent: Some(60.0),
+            indeterminate: None,
+            detail: Some("Extracting game".to_string()),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
 
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel::<InstallProgress>();
@@ -174,13 +178,15 @@ where
     let _ = fs::remove_dir_all(&temp_root);
     emit_progress_with_bytes_to(
         &mut on_progress,
-        game.id,
-        "completed",
-        Some(100.0),
-        Some("Install complete"),
-        None,
-        None,
-        None,
+        InstallProgress {
+            game_id: game.id,
+            status: "completed".to_string(),
+            percent: Some(100.0),
+            indeterminate: None,
+            detail: Some("Install complete".to_string()),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
     Ok(installed)
 }

@@ -13,13 +13,15 @@ where
 {
     emit_progress_with_bytes_to(
         &mut on_progress,
-        input.id,
-        "starting",
-        Some(0.0),
-        Some("Preparing download"),
-        None,
-        None,
-        None,
+        InstallProgress {
+            game_id: input.id,
+            status: "starting".to_string(),
+            percent: Some(0.0),
+            indeterminate: None,
+            detail: Some("Preparing download".to_string()),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
 
     let settings = settings::load();
@@ -60,25 +62,29 @@ where
         let staging = if download_info.is_individual {
             emit_progress_with_bytes_to(
                 &mut on_progress,
-                input.id,
-                "extracting",
-                None,
-                Some("Moving files…"),
-                None,
-                None,
-                None,
+                InstallProgress {
+                    game_id: input.id,
+                    status: "extracting".to_string(),
+                    percent: None,
+                    indeterminate: None,
+                    detail: Some("Moving files…".to_string()),
+                    bytes_downloaded: None,
+                    total_bytes: None,
+                },
             );
             download_info.file_path.clone()
         } else {
             emit_progress_with_bytes_to(
                 &mut on_progress,
-                input.id,
-                "extracting",
-                None,
-                Some("Extracting archive…"),
-                None,
-                None,
-                None,
+                InstallProgress {
+                    game_id: input.id,
+                    status: "extracting".to_string(),
+                    percent: None,
+                    indeterminate: None,
+                    detail: Some("Extracting archive…".to_string()),
+                    bytes_downloaded: None,
+                    total_bytes: None,
+                },
             );
             let staging = temp_root.join("extract");
             if staging.exists() {
@@ -93,13 +99,15 @@ where
                 |_ratio| {
                     emit_progress_with_bytes_to(
                         &mut on_progress,
-                        input.id,
-                        "extracting",
-                        None,
-                        Some("Extracting archive…"),
-                        None,
-                        None,
-                        None,
+                        InstallProgress {
+                            game_id: input.id,
+                            status: "extracting".to_string(),
+                            percent: None,
+                            indeterminate: None,
+                            detail: Some("Extracting archive…".to_string()),
+                            bytes_downloaded: None,
+                            total_bytes: None,
+                        },
                     );
                 },
             )
@@ -156,13 +164,15 @@ where
     } else {
         emit_progress_with_bytes_to(
             &mut on_progress,
-            input.id,
-            "extracting",
-            None,
-            Some("Saving archive…"),
-            None,
-            None,
-            None,
+            InstallProgress {
+                game_id: input.id,
+                status: "extracting".to_string(),
+                percent: None,
+                indeterminate: None,
+                detail: Some("Saving archive…".to_string()),
+                bytes_downloaded: None,
+                total_bytes: None,
+            },
         );
         let filename = download_info
             .file_path
@@ -181,13 +191,15 @@ where
     let _ = fs::remove_dir_all(&temp_root);
     emit_progress_with_bytes_to(
         &mut on_progress,
-        input.id,
-        "completed",
-        Some(100.0),
-        Some("Download complete"),
-        None,
-        None,
-        None,
+        InstallProgress {
+            game_id: input.id,
+            status: "completed".to_string(),
+            percent: Some(100.0),
+            indeterminate: None,
+            detail: Some("Download complete".to_string()),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
     Ok(final_path.to_string_lossy().into_owned())
 }

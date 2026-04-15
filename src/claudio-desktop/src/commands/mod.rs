@@ -112,10 +112,7 @@ pub async fn desktop_open_external_login(
 
 /// Production: use `claudio://` deep link as returnTo. The OS routes
 /// the callback to the app via the registered URL scheme in Info.plist.
-fn open_external_login_production(
-    app: tauri::AppHandle,
-    full_url: &str,
-) -> Result<(), String> {
+fn open_external_login_production(app: tauri::AppHandle, full_url: &str) -> Result<(), String> {
     let mut parsed = url::Url::parse(full_url).map_err(|e| format!("Invalid URL: {e}"))?;
 
     let existing: Vec<(String, String)> = parsed
@@ -136,10 +133,7 @@ fn open_external_login_production(
 
 /// Dev mode: deep links don't work without a .app bundle, so we start a
 /// one-shot localhost HTTP server to receive the OAuth callback directly.
-async fn open_external_login_dev(
-    app: tauri::AppHandle,
-    full_url: &str,
-) -> Result<(), String> {
+async fn open_external_login_dev(app: tauri::AppHandle, full_url: &str) -> Result<(), String> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(|e| format!("Failed to bind callback listener: {e}"))?;
@@ -226,7 +220,10 @@ async fn open_external_login_dev(
             }
             Ok(Err(e)) => {
                 log::error!("Callback listener error: {e}");
-                let _ = handle.emit("deep-link-auth-error", "Callback listener failed".to_string());
+                let _ = handle.emit(
+                    "deep-link-auth-error",
+                    "Callback listener failed".to_string(),
+                );
             }
             Err(_) => {
                 log::warn!("External login callback timed out after 5 minutes");

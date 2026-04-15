@@ -45,14 +45,14 @@ pub(super) async fn install_installer(
             );
         };
 
-        if staging_dir.exists() {
-            if let Err(error) = cleanup_directory(&staging_dir, "installer staging directory") {
-                log::warn!(
-                    "[installer {gid}] failed to clean stale staging directory {}: {}",
-                    staging_dir.display(),
-                    error
-                );
-            }
+        if staging_dir.exists()
+            && let Err(error) = cleanup_directory(&staging_dir, "installer staging directory")
+        {
+            log::warn!(
+                "[installer {gid}] failed to clean stale staging directory {}: {}",
+                staging_dir.display(),
+                error
+            );
         }
         fs::create_dir_all(&staging_dir).map_err(|err| {
             log_io_failure("create installer staging directory", &staging_dir, &err);

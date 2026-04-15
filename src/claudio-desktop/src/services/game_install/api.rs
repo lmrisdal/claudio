@@ -9,16 +9,16 @@ pub async fn install_game(
     let game_id = game.id;
     let game_title = game.title.clone();
     let result = install_game_inner(&app, game, &control).await;
-    if let Err(error) = &result {
-        if !control.is_cancelled() {
-            emit_progress(
-                &app,
-                game_id,
-                "failed",
-                None,
-                Some(&format!("Install failed for {game_title}: {error}")),
-            );
-        }
+    if let Err(error) = &result
+        && !control.is_cancelled()
+    {
+        emit_progress(
+            &app,
+            game_id,
+            "failed",
+            None,
+            Some(&format!("Install failed for {game_title}: {error}")),
+        );
     }
     state.finish(game_id);
     if control.is_cancelled() {
@@ -38,16 +38,16 @@ pub async fn download_game_package(
     let target_dir = PathBuf::from(&input.target_dir);
     let target_existed = target_dir.exists();
     let result = download_game_package_inner(&app, &input, &control).await;
-    if let Err(error) = &result {
-        if !control.is_cancelled() {
-            emit_progress(
-                &app,
-                game_id,
-                "failed",
-                None,
-                Some(&format!("Download failed for {game_title}: {error}")),
-            );
-        }
+    if let Err(error) = &result
+        && !control.is_cancelled()
+    {
+        emit_progress(
+            &app,
+            game_id,
+            "failed",
+            None,
+            Some(&format!("Download failed for {game_title}: {error}")),
+        );
     }
     state.finish(game_id);
     if let Ok(download_root) = settings::resolve_download_root(&settings::load()) {
@@ -311,13 +311,11 @@ pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), Str
         crate::windows_integration::deregister(game);
     }
 
-    if delete_files {
-        if let Some(installed) = removed {
-            let path = PathBuf::from(&installed.install_path);
-            if path.exists() {
-                fs::remove_dir_all(&path)
-                    .map_err(|err| format!("Failed to delete install folder: {err}"))?;
-            }
+    if delete_files && let Some(installed) = removed {
+        let path = PathBuf::from(&installed.install_path);
+        if path.exists() {
+            fs::remove_dir_all(&path)
+                .map_err(|err| format!("Failed to delete install folder: {err}"))?;
         }
     }
     Ok(())

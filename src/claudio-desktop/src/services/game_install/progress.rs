@@ -7,7 +7,18 @@ pub(super) fn emit_progress(
     percent: Option<f64>,
     detail: Option<&str>,
 ) {
-    emit_progress_with_bytes(app, game_id, status, percent, detail, None, None, None);
+    emit_progress_with_bytes(
+        app,
+        InstallProgress {
+            game_id,
+            status: status.to_string(),
+            percent,
+            indeterminate: None,
+            detail: detail.map(ToString::to_string),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
+    );
 }
 
 pub(super) fn emit_progress_indeterminate(
@@ -20,61 +31,32 @@ pub(super) fn emit_progress_indeterminate(
 ) {
     emit_progress_with_bytes(
         app,
-        game_id,
-        status,
-        percent,
-        detail,
-        None,
-        None,
-        Some(indeterminate),
+        InstallProgress {
+            game_id,
+            status: status.to_string(),
+            percent,
+            indeterminate: Some(indeterminate),
+            detail: detail.map(ToString::to_string),
+            bytes_downloaded: None,
+            total_bytes: None,
+        },
     );
 }
 
-pub(super) fn emit_progress_with_bytes(
-    app: &AppHandle,
-    game_id: i32,
-    status: &str,
-    percent: Option<f64>,
-    detail: Option<&str>,
-    bytes_downloaded: Option<u64>,
-    total_bytes: Option<u64>,
-    indeterminate: Option<bool>,
-) {
+pub(super) fn emit_progress_with_bytes(app: &AppHandle, progress: InstallProgress) {
     emit_progress_with_bytes_to(
         &mut |progress| {
             let _ = app.emit("install-progress", progress);
         },
-        game_id,
-        status,
-        percent,
-        detail,
-        bytes_downloaded,
-        total_bytes,
-        indeterminate,
+        progress,
     );
 }
 
-pub(super) fn emit_progress_with_bytes_to<F>(
-    on_progress: &mut F,
-    game_id: i32,
-    status: &str,
-    percent: Option<f64>,
-    detail: Option<&str>,
-    bytes_downloaded: Option<u64>,
-    total_bytes: Option<u64>,
-    indeterminate: Option<bool>,
-) where
+pub(super) fn emit_progress_with_bytes_to<F>(on_progress: &mut F, progress: InstallProgress)
+where
     F: FnMut(InstallProgress),
 {
-    on_progress(InstallProgress {
-        game_id,
-        status: status.to_string(),
-        percent,
-        indeterminate,
-        detail: detail.map(ToString::to_string),
-        bytes_downloaded,
-        total_bytes,
-    });
+    on_progress(progress);
 }
 
 pub(super) fn current_timestamp() -> String {

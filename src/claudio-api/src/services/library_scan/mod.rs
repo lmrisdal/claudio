@@ -13,11 +13,10 @@ use tokio::time::MissedTickBehavior;
 use tracing::warn;
 
 use crate::{
-    config::ClaudioConfig,
+    config::{ClaudioConfig, ConfigStore},
     entity::game,
     services::{
         compression::CompressionService,
-        config_file::ConfigFileService,
         igdb::{BackgroundTaskStatus, IgdbService},
     },
 };
@@ -35,7 +34,7 @@ pub struct ScanResult {
 pub struct LibraryScanService {
     db: DatabaseConnection,
     config: Arc<ClaudioConfig>,
-    config_file_service: Arc<ConfigFileService>,
+    config_store: Arc<ConfigStore>,
     client: reqwest::Client,
     compression_service: Arc<CompressionService>,
     igdb_service: Arc<IgdbService>,
@@ -47,7 +46,7 @@ impl LibraryScanService {
     pub fn new(
         db: DatabaseConnection,
         config: Arc<ClaudioConfig>,
-        config_file_service: Arc<ConfigFileService>,
+        config_store: Arc<ConfigStore>,
         client: reqwest::Client,
         compression_service: Arc<CompressionService>,
         igdb_service: Arc<IgdbService>,
@@ -55,7 +54,7 @@ impl LibraryScanService {
         Self {
             db,
             config,
-            config_file_service,
+            config_store,
             client,
             compression_service,
             igdb_service,
@@ -80,7 +79,7 @@ impl LibraryScanService {
             let _ = self.igdb_service.start_scan_in_background();
         }
 
-        let api_key = self.config_file_service.credentials()?.steamgriddb_api_key;
+        let api_key = self.config_store.credentials()?.steamgriddb_api_key;
         let steamgriddb_worker = self.steamgriddb_worker();
         if !api_key.is_empty() && steamgriddb_worker.try_start() {
             tokio::spawn(async move {
@@ -100,8 +99,7 @@ impl LibraryScanService {
         }
 
         let scan_interval = self.config.library.scan_interval_secs.max(30);
-        let mut interval =
-            tokio::time::interval(std::time::Duration::from_secs(scan_interval));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(scan_interval));
         interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         interval.tick().await;
         loop {

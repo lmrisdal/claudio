@@ -13,6 +13,12 @@ pub use tauri::http;
 
 pub struct PlaintextAuthGuard(#[allow(dead_code)] crate::auth::TestAuthGuard);
 
+impl Default for PlaintextAuthGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlaintextAuthGuard {
     pub fn new() -> Self {
         Self(crate::auth::TestAuthGuard::plain_file_secure_storage_unavailable())

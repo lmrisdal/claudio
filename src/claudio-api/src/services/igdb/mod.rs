@@ -12,7 +12,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-use crate::{entity::game, services::config_file::ConfigFileService};
+use crate::{config::ConfigStore, entity::game};
 
 pub use error::IgdbError;
 pub use models::{BackgroundTaskStatus, IgdbCandidate};
@@ -22,7 +22,7 @@ const RATE_LIMIT_DELAY: Duration = Duration::from_millis(300);
 pub struct IgdbService {
     db: DatabaseConnection,
     client: reqwest::Client,
-    config_file_service: Arc<ConfigFileService>,
+    config_store: Arc<ConfigStore>,
     status: Mutex<BackgroundTaskStatus>,
     token_cache: tokio::sync::Mutex<Option<client::TwitchTokenCache>>,
 }
@@ -31,12 +31,12 @@ impl IgdbService {
     pub fn new(
         db: DatabaseConnection,
         client: reqwest::Client,
-        config_file_service: Arc<ConfigFileService>,
+        config_store: Arc<ConfigStore>,
     ) -> Self {
         Self {
             db,
             client,
-            config_file_service,
+            config_store,
             status: Mutex::new(BackgroundTaskStatus::default()),
             token_cache: tokio::sync::Mutex::new(None),
         }
@@ -51,7 +51,7 @@ impl IgdbService {
     }
 
     pub fn is_configured(&self) -> Result<bool, IgdbError> {
-        let credentials = self.config_file_service.credentials()?;
+        let credentials = self.config_store.credentials()?;
         Ok(!credentials.igdb_client_id.is_empty() && !credentials.igdb_client_secret.is_empty())
     }
 
@@ -92,7 +92,7 @@ impl IgdbService {
 
         client::search_igdb(
             &self.client,
-            &self.config_file_service,
+            &self.config_store,
             &self.token_cache,
             &title,
             year,
@@ -107,14 +107,10 @@ impl IgdbService {
             .one(&self.db)
             .await?
             .ok_or(IgdbError::GameNotFound)?;
-        let candidate = client::fetch_by_id(
-            &self.client,
-            &self.config_file_service,
-            &self.token_cache,
-            igdb_id,
-        )
-        .await?
-        .ok_or(IgdbError::CandidateNotFound)?;
+        let candidate =
+            client::fetch_by_id(&self.client, &self.config_store, &self.token_cache, igdb_id)
+                .await?
+                .ok_or(IgdbError::CandidateNotFound)?;
 
         let active_model = matcher::apply_candidate(game_model, &candidate);
         let updated = active_model.update(&self.db).await?;
@@ -170,18 +166,13 @@ impl IgdbService {
 
         let Some(candidate) = (match tagged_igdb_id {
             Some(igdb_id) => {
-                client::fetch_by_id(
-                    &self.client,
-                    &self.config_file_service,
-                    &self.token_cache,
-                    igdb_id,
-                )
-                .await?
+                client::fetch_by_id(&self.client, &self.config_store, &self.token_cache, igdb_id)
+                    .await?
             }
             None => {
                 let candidates = client::search_igdb(
                     &self.client,
-                    &self.config_file_service,
+                    &self.config_store,
                     &self.token_cache,
                     &cleaned_title,
                     year,

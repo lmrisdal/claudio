@@ -120,10 +120,8 @@ fn build_app_menu(_app: &AppHandle, _logged_in: bool) -> tauri::Result<()> {
 pub(crate) fn refresh_auth_state_ui(app: &AppHandle, logged_in: bool) -> Result<(), String> {
     build_app_menu(app, logged_in).map_err(|error| error.to_string())?;
 
-    if !logged_in {
-        if let Some(window) = app.get_webview_window("settings") {
-            let _ = window.close();
-        }
+    if !logged_in && let Some(window) = app.get_webview_window("settings") {
+        let _ = window.close();
     }
 
     Ok(())
@@ -212,7 +210,7 @@ pub fn run() {
                         api.prevent_close();
                         let _ = window_for_close.hide();
                         if current_settings.hide_dock_icon {
-                            set_dock_visibility(&window_for_close.app_handle(), false);
+                            set_dock_visibility(window_for_close.app_handle(), false);
                         }
                     }
                 }
@@ -272,8 +270,8 @@ pub fn run() {
                         continue;
                     }
 
-                    let is_auth_callback = parsed.host_str() == Some("auth")
-                        && parsed.path() == "/callback";
+                    let is_auth_callback =
+                        parsed.host_str() == Some("auth") && parsed.path() == "/callback";
 
                     if !is_auth_callback {
                         continue;

@@ -53,6 +53,12 @@ export default function SettingsForm({ initialConfig }: { initialConfig: AdminCo
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Saved settings are written to `config.toml`. Docker environment variables like
+          `CLAUDIO_IGDB_CLIENT_ID`, `CLAUDIO_IGDB_CLIENT_SECRET`, and `CLAUDIO_STEAMGRIDDB_API_KEY`
+          still override those saved values on container startup.
+        </div>
+
         {/* IGDB */}
         <div className="card bg-surface rounded-xl p-6 ring-1 ring-border">
           <div className="flex items-start gap-4">

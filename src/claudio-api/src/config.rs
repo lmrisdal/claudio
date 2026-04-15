@@ -1,16 +1,27 @@
-use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
+use std::{
+    path::{Path, PathBuf},
+    sync::RwLock,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
+    #[error("config state is unavailable")]
+    StateUnavailable,
     #[error("failed to read config file '{0}': {1}")]
     ReadFailed(String, #[source] std::io::Error),
     #[error("failed to parse config: {0}")]
     ParseFailed(#[from] toml::de::Error),
+    #[error("failed to serialize config file: {0}")]
+    SerializeFailed(#[from] toml::ser::Error),
+    #[error("failed to create config directory '{0}': {1}")]
+    CreateDirectoryFailed(String, #[source] std::io::Error),
+    #[error("failed to write config file '{0}': {1}")]
+    WriteFailed(String, #[source] std::io::Error),
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ClaudioConfig {
     pub server: ServerConfig,
@@ -23,27 +34,54 @@ pub struct ClaudioConfig {
 
 impl ClaudioConfig {
     pub fn load(path: &str) -> Result<Self, ConfigError> {
-        let mut config = match std::fs::read_to_string(path) {
-            Ok(contents) => toml::from_str(&contents)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Self::default(),
-            Err(error) => return Err(ConfigError::ReadFailed(path.to_string(), error)),
-        };
+        let mut config = Self::load_persisted(path)?;
 
         config.apply_env_overrides();
+        config.normalize();
 
-        if config.auth.oidc_provider.discovery_url.is_empty()
-            && !config.auth.oidc_provider.authority.is_empty()
-        {
-            config.auth.oidc_provider.discovery_url = config.auth.oidc_provider.authority.clone();
+        Ok(config)
+    }
+
+    pub fn load_and_persist(path: &str) -> Result<Self, ConfigError> {
+        let config = Self::load(path)?;
+        config.persist(path)?;
+        Ok(config)
+    }
+
+    fn load_persisted(path: &str) -> Result<Self, ConfigError> {
+        match std::fs::read_to_string(path) {
+            Ok(contents) => toml::from_str(&contents).map_err(ConfigError::from),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(error) => Err(ConfigError::ReadFailed(path.to_string(), error)),
+        }
+    }
+
+    pub fn persist(&self, path: &str) -> Result<(), ConfigError> {
+        let config_path = Path::new(path);
+
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| {
+                ConfigError::CreateDirectoryFailed(parent.display().to_string(), error)
+            })?;
         }
 
-        for provider in &mut config.auth.oidc_providers {
+        let serialized = toml::to_string_pretty(self)?;
+        std::fs::write(config_path, serialized)
+            .map_err(|error| ConfigError::WriteFailed(path.to_string(), error))
+    }
+
+    fn normalize(&mut self) {
+        if self.auth.oidc_provider.discovery_url.is_empty()
+            && !self.auth.oidc_provider.authority.is_empty()
+        {
+            self.auth.oidc_provider.discovery_url = self.auth.oidc_provider.authority.clone();
+        }
+
+        for provider in &mut self.auth.oidc_providers {
             if provider.discovery_url.is_empty() && !provider.authority.is_empty() {
                 provider.discovery_url = provider.authority.clone();
             }
         }
-
-        Ok(config)
     }
 
     pub fn config_dir(&self, config_path: &str) -> PathBuf {
@@ -56,6 +94,12 @@ impl ClaudioConfig {
     }
 
     fn apply_env_overrides(&mut self) {
+        if let Ok(value) = std::env::var("CLAUDIO_PORT") {
+            if let Ok(port) = value.parse() {
+                self.server.port = port;
+            }
+        }
+
         if let Ok(value) = std::env::var("CLAUDIO_LOG_LEVEL") {
             self.server.log_level = value;
         }
@@ -176,6 +220,85 @@ impl ClaudioConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ApiCredentials {
+    pub igdb_client_id: String,
+    pub igdb_client_secret: String,
+    pub steamgriddb_api_key: String,
+}
+
+pub struct ConfigStore {
+    config_path: PathBuf,
+    config: RwLock<ClaudioConfig>,
+}
+
+impl ConfigStore {
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
+        let config_path = path.as_ref().to_path_buf();
+        let config = ClaudioConfig::load_and_persist(&config_path.display().to_string())?;
+
+        Ok(Self {
+            config_path,
+            config: RwLock::new(config),
+        })
+    }
+
+    pub fn current(&self) -> Result<ClaudioConfig, ConfigError> {
+        self.config
+            .read()
+            .map_err(|_| ConfigError::StateUnavailable)
+            .map(|config| config.clone())
+    }
+
+    pub fn credentials(&self) -> Result<ApiCredentials, ConfigError> {
+        let config = self.current()?;
+
+        Ok(ApiCredentials {
+            igdb_client_id: config.igdb.client_id,
+            igdb_client_secret: config.igdb.client_secret,
+            steamgriddb_api_key: config.steamgriddb.api_key,
+        })
+    }
+
+    pub fn update_api_credentials(
+        &self,
+        igdb_client_id: Option<String>,
+        igdb_client_secret: Option<String>,
+        steamgriddb_api_key: Option<String>,
+    ) -> Result<ApiCredentials, ConfigError> {
+        let config_path = self.config_path.display().to_string();
+        let mut persisted_config = ClaudioConfig::load_persisted(&config_path)?;
+
+        if let Some(value) = igdb_client_id {
+            persisted_config.igdb.client_id = value;
+        }
+
+        if let Some(value) = igdb_client_secret {
+            persisted_config.igdb.client_secret = value;
+        }
+
+        if let Some(value) = steamgriddb_api_key {
+            persisted_config.steamgriddb.api_key = value;
+        }
+
+        persisted_config.persist(&config_path)?;
+
+        let mut effective_config = persisted_config.clone();
+        effective_config.apply_env_overrides();
+        effective_config.normalize();
+
+        {
+            let mut config = self
+                .config
+                .write()
+                .map_err(|_| ConfigError::StateUnavailable)?;
+            *config = effective_config;
+        }
+
+        self.credentials()
+    }
+}
+
 fn parse_bool_env(value: &str) -> bool {
     value.eq_ignore_ascii_case("true")
 }
@@ -189,7 +312,7 @@ fn split_csv(value: &str) -> Vec<String> {
         .collect()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ServerConfig {
     pub port: u16,
@@ -205,7 +328,7 @@ impl Default for ServerConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct DatabaseConfig {
     pub provider: String,
@@ -223,7 +346,7 @@ impl Default for DatabaseConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Serialize)]
 #[serde(default)]
 pub struct AuthConfig {
     pub disable_auth: bool,
@@ -260,7 +383,7 @@ impl AuthConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Serialize)]
 #[serde(default)]
 pub struct GitHubOAuthConfig {
     pub client_id: String,
@@ -276,7 +399,7 @@ impl GitHubOAuthConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Serialize)]
 #[serde(default)]
 pub struct GoogleOAuthConfig {
     pub client_id: String,
@@ -292,7 +415,7 @@ impl GoogleOAuthConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct OidcProviderConfig {
     pub slug: String,
@@ -341,20 +464,20 @@ impl OidcProviderConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Serialize)]
 #[serde(default)]
 pub struct IgdbConfig {
     pub client_id: String,
     pub client_secret: String,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Serialize)]
 #[serde(default)]
 pub struct SteamGridDbConfig {
     pub api_key: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct LibraryConfig {
     pub library_paths: Vec<String>,
@@ -376,7 +499,7 @@ impl Default for LibraryConfig {
 mod tests {
     use std::{fs, sync::Mutex};
 
-    use super::ClaudioConfig;
+    use super::{ClaudioConfig, ConfigStore};
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -390,6 +513,22 @@ mod tests {
         assert_eq!(config.database.provider, "sqlite");
         assert_eq!(config.library.library_paths, vec!["/games"]);
         assert!(config.library.exclude_platforms.is_empty());
+    }
+
+    #[test]
+    fn load_and_persist_missing_file_writes_defaults() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("nested/config.toml");
+
+        let config = ClaudioConfig::load_and_persist(path.to_str().unwrap()).unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(config.server.port, 8080);
+        assert!(persisted.contains("[server]"));
+        assert!(persisted.contains("port = 8080"));
+        assert!(persisted.contains("sqlite_path = \"/config/claudio.db\""));
+        assert!(persisted.contains("library_paths = [\"/games\"]"));
     }
 
     #[test]
@@ -461,6 +600,31 @@ exclude_platforms = ["ps", "gba"]
     }
 
     #[test]
+    fn load_and_persist_writes_env_overrides() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.toml");
+
+        std::env::set_var("CLAUDIO_PORT", "9091");
+        std::env::set_var("CLAUDIO_IGDB_CLIENT_ID", "docker-client");
+        std::env::set_var("CLAUDIO_PROXY_AUTH_HEADER", "Remote-User");
+
+        let config = ClaudioConfig::load_and_persist(path.to_str().unwrap()).unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(config.server.port, 9091);
+        assert_eq!(config.igdb.client_id, "docker-client");
+        assert_eq!(config.auth.proxy_auth_header, "Remote-User");
+        assert!(persisted.contains("port = 9091"));
+        assert!(persisted.contains("client_id = \"docker-client\""));
+        assert!(persisted.contains("proxy_auth_header = \"Remote-User\""));
+
+        std::env::remove_var("CLAUDIO_PORT");
+        std::env::remove_var("CLAUDIO_IGDB_CLIENT_ID");
+        std::env::remove_var("CLAUDIO_PROXY_AUTH_HEADER");
+    }
+
+    #[test]
     fn load_oidc_authority_falls_back_to_discovery_url() {
         let _guard = ENV_LOCK.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
@@ -528,5 +692,78 @@ redirect_uri = "http://localhost:8080/api/auth/oidc/zitadel/callback"
         assert_eq!(config.auth.oidc_providers[1].slug, "zitadel");
         assert!(config.auth.find_oidc_provider("pocketid").is_some());
         assert!(config.auth.find_oidc_provider("zitadel").is_some());
+    }
+
+    #[test]
+    fn config_store_updates_credentials_and_preserves_other_settings() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.toml");
+
+        fs::write(
+            &path,
+            r#"
+[server]
+port = 7777
+
+[igdb]
+client_id = "original-id"
+client_secret = "original-secret"
+
+[steamgriddb]
+api_key = "original-key"
+"#,
+        )
+        .unwrap();
+
+        let store = ConfigStore::load(&path).unwrap();
+        let credentials = store
+            .update_api_credentials(
+                Some("updated-id".to_string()),
+                None,
+                Some("updated-key".to_string()),
+            )
+            .unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(credentials.igdb_client_id, "updated-id");
+        assert_eq!(credentials.igdb_client_secret, "original-secret");
+        assert_eq!(credentials.steamgriddb_api_key, "updated-key");
+        assert!(persisted.contains("port = 7777"));
+        assert!(persisted.contains("client_id = \"updated-id\""));
+        assert!(persisted.contains("client_secret = \"original-secret\""));
+        assert!(persisted.contains("api_key = \"updated-key\""));
+    }
+
+    #[test]
+    fn config_store_keeps_env_credentials_active_after_admin_update() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.toml");
+
+        std::env::set_var("CLAUDIO_IGDB_CLIENT_ID", "env-id");
+        std::env::set_var("CLAUDIO_IGDB_CLIENT_SECRET", "env-secret");
+        std::env::set_var("CLAUDIO_STEAMGRIDDB_API_KEY", "env-key");
+
+        let store = ConfigStore::load(&path).unwrap();
+        let credentials = store
+            .update_api_credentials(
+                Some("saved-id".to_string()),
+                Some("saved-secret".to_string()),
+                Some("saved-key".to_string()),
+            )
+            .unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(credentials.igdb_client_id, "env-id");
+        assert_eq!(credentials.igdb_client_secret, "env-secret");
+        assert_eq!(credentials.steamgriddb_api_key, "env-key");
+        assert!(persisted.contains("client_id = \"saved-id\""));
+        assert!(persisted.contains("client_secret = \"saved-secret\""));
+        assert!(persisted.contains("api_key = \"saved-key\""));
+
+        std::env::remove_var("CLAUDIO_IGDB_CLIENT_ID");
+        std::env::remove_var("CLAUDIO_IGDB_CLIENT_SECRET");
+        std::env::remove_var("CLAUDIO_STEAMGRIDDB_API_KEY");
     }
 }

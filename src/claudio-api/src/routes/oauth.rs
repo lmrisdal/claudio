@@ -265,7 +265,10 @@ mod tests {
 
     #[test]
     fn sanitize_return_to_allows_relative_paths() {
-        assert_eq!(sanitize_return_to(Some("/auth/callback".into())), "/auth/callback");
+        assert_eq!(
+            sanitize_return_to(Some("/auth/callback".into())),
+            "/auth/callback"
+        );
     }
 
     #[test]
@@ -296,7 +299,10 @@ mod tests {
 
     #[test]
     fn sanitize_return_to_rejects_non_loopback_http() {
-        assert_eq!(sanitize_return_to(Some("http://evil.com:12345/callback".into())), "/");
+        assert_eq!(
+            sanitize_return_to(Some("http://evil.com:12345/callback".into())),
+            "/"
+        );
     }
 
     #[test]

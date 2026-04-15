@@ -4,7 +4,6 @@ use claudio_api::{
     auth, build_router, config, db,
     services::{
         compression::CompressionService,
-        config_file::ConfigFileService,
         download::DownloadService,
         igdb::IgdbService,
         library_scan::LibraryScanService,
@@ -23,17 +22,15 @@ async fn main() -> anyhow::Result<()> {
     let config_path =
         std::env::var("CLAUDIO_CONFIG_PATH").unwrap_or_else(|_| "config/config.toml".to_string());
 
-    let config = config::ClaudioConfig::load(&config_path)?;
+    let config_store = Arc::new(config::ConfigStore::load(&config_path)?);
+    let config = config_store.current()?;
 
     tracing_subscriber::registry()
         .with(EnvFilter::new(&config.server.log_level))
         .with(fmt::layer())
         .init();
 
-    let port: u16 = std::env::var("CLAUDIO_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(config.server.port);
+    let port = config.server.port;
 
     let config_dir = config.config_dir(&config_path);
     std::fs::create_dir_all(&config_dir)?;
@@ -49,18 +46,17 @@ async fn main() -> anyhow::Result<()> {
     let shared_config = Arc::new(config);
     let jwt = auth::jwt::JwtKeys::load_or_generate(&config_dir)?;
     let download_service = Arc::new(DownloadService::new(&shared_config)?);
-    let config_file_service = Arc::new(ConfigFileService::new(&config_path, &shared_config));
     let http_client = reqwest::Client::builder().user_agent("claudio").build()?;
     let compression_service = Arc::new(CompressionService::new(db.clone()));
     let igdb_service = Arc::new(IgdbService::new(
         db.clone(),
         http_client.clone(),
-        Arc::clone(&config_file_service),
+        Arc::clone(&config_store),
     ));
     let library_scan_service = Arc::new(LibraryScanService::new(
         db.clone(),
         Arc::clone(&shared_config),
-        Arc::clone(&config_file_service),
+        Arc::clone(&config_store),
         http_client.clone(),
         Arc::clone(&compression_service),
         Arc::clone(&igdb_service),
@@ -72,7 +68,7 @@ async fn main() -> anyhow::Result<()> {
         config: shared_config,
         jwt: Arc::new(jwt),
         http_client,
-        config_file_service,
+        config_store,
         proxy_nonce_store: Arc::new(ProxyNonceStore::new()),
         external_login_nonce_store: Arc::new(ExternalLoginNonceStore::new()),
         github_state_store: Arc::new(OAuthStateStore::new()),

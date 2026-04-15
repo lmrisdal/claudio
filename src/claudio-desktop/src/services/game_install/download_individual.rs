@@ -58,13 +58,15 @@ where
 
     emit_progress_with_bytes_to(
         on_progress,
-        game_id,
-        "downloading",
-        Some(0.0),
-        Some(&format!("Downloading {game_title}")),
-        Some(0),
-        Some(total_bytes),
-        None,
+        InstallProgress {
+            game_id,
+            status: "downloading".to_string(),
+            percent: Some(0.0),
+            indeterminate: None,
+            detail: Some(format!("Downloading {game_title}")),
+            bytes_downloaded: Some(0),
+            total_bytes: Some(total_bytes),
+        },
     );
 
     let server_url = opts.server_url.to_owned();
@@ -202,13 +204,15 @@ where
                     };
                     emit_progress_with_bytes_to(
                         on_progress,
-                        game_id,
-                        "downloading",
-                        percent,
-                        Some(&format!("Downloading {game_title}")),
-                        Some(dl),
-                        Some(total_bytes),
-                        None,
+                        InstallProgress {
+                            game_id,
+                            status: "downloading".to_string(),
+                            percent,
+                            indeterminate: None,
+                            detail: Some(format!("Downloading {game_title}")),
+                            bytes_downloaded: Some(dl),
+                            total_bytes: Some(total_bytes),
+                        },
                     );
                 }
             }
@@ -246,13 +250,15 @@ where
     };
     emit_progress_with_bytes_to(
         on_progress,
-        game_id,
-        "downloading",
-        percent,
-        Some(&format!("Downloading {game_title}")),
-        Some(dl),
-        Some(total_bytes),
-        None,
+        InstallProgress {
+            game_id,
+            status: "downloading".to_string(),
+            percent,
+            indeterminate: None,
+            detail: Some(format!("Downloading {game_title}")),
+            bytes_downloaded: Some(dl),
+            total_bytes: Some(total_bytes),
+        },
     );
 
     Ok(DownloadInfo {

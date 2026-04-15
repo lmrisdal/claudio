@@ -13,7 +13,7 @@ pub enum IgdbError {
     #[error("IGDB request failed.")]
     RequestFailed,
     #[error("failed to read IGDB credentials: {0}")]
-    Credentials(#[from] crate::services::config_file::ConfigFileError),
+    Credentials(#[from] crate::config::ConfigError),
     #[error("database error: {0}")]
     Database(#[from] sea_orm::DbErr),
     #[error("http request failed: {0}")]

@@ -136,11 +136,10 @@ impl LibraryScanService {
         let config = Arc::clone(&self.config);
         let compression_service = Arc::clone(&self.compression_service);
 
-        let discovery = tokio::task::spawn_blocking(move || {
-            discover_library(&config, &compression_service)
-        })
-        .await
-        .map_err(|error| LibraryScanError::Scan(error.to_string()))?;
+        let discovery =
+            tokio::task::spawn_blocking(move || discover_library(&config, &compression_service))
+                .await
+                .map_err(|error| LibraryScanError::Scan(error.to_string()))?;
 
         let mut games_found = 0usize;
         let mut games_added = 0usize;
