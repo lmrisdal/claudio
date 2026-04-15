@@ -61,6 +61,7 @@ impl TestApp {
                     .expect("valid utf-8 path")
                     .to_string()],
                 exclude_platforms: vec![],
+                scan_interval_secs: 120,
             },
             ..Default::default()
         };
