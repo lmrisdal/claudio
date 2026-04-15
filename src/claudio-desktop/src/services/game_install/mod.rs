@@ -85,8 +85,6 @@ use installer_detect::{InstallerType, detect_installer_type, stream_requests_ele
 #[cfg(all(feature = "integration-tests", target_os = "windows"))]
 use installer_innoextract::run_innoextract_with_binary;
 use installer_install::install_installer;
-#[cfg(all(test, not(target_os = "windows")))]
-use installer_run::RunInstallerError;
 use installer_run::{confirm_installer_elevation, run_installer, run_installer_with_retries};
 use paths::{
     build_install_dir, download_workspace_root, format_install_io_error,

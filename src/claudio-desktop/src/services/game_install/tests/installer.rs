@@ -1,4 +1,5 @@
 use super::*;
+use crate::services::game_install::installer_run::RunInstallerError;
 
 #[test]
 fn detect_installer_and_windows_executable_find_sorted_matches() {
