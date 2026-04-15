@@ -146,7 +146,7 @@ CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/authentik/ca
 Or via `config.toml`:
 
 ```toml
-[auth.oidc_provider]
+[[auth.oidc_providers]]
 slug = "authentik"
 display_name = "Authentik"
 logo_url = "https://auth.example.com/static/dist/assets/icons/icon.png"

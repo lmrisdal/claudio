@@ -71,13 +71,11 @@ impl ClaudioConfig {
     }
 
     fn normalize(&mut self) {
-        if self.auth.oidc_provider.discovery_url.is_empty()
-            && !self.auth.oidc_provider.authority.is_empty()
-        {
-            self.auth.oidc_provider.discovery_url = self.auth.oidc_provider.authority.clone();
-        }
-
         for provider in &mut self.auth.oidc_providers {
+            if provider.display_name.is_empty() && !provider.slug.is_empty() {
+                provider.display_name = provider.slug.clone();
+            }
+
             if provider.discovery_url.is_empty() && !provider.authority.is_empty() {
                 provider.discovery_url = provider.authority.clone();
             }
@@ -187,35 +185,35 @@ impl ClaudioConfig {
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_SLUG") {
-            self.auth.oidc_provider.slug = value;
+            self.auth.first_oidc_provider_mut().slug = value;
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_DISPLAY_NAME") {
-            self.auth.oidc_provider.display_name = value;
+            self.auth.first_oidc_provider_mut().display_name = value;
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_LOGO_URL") {
-            self.auth.oidc_provider.logo_url = Some(value);
+            self.auth.first_oidc_provider_mut().logo_url = Some(value);
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_DISCOVERY_URL") {
-            self.auth.oidc_provider.discovery_url = value;
+            self.auth.first_oidc_provider_mut().discovery_url = value;
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_CLIENT_ID") {
-            self.auth.oidc_provider.client_id = value;
+            self.auth.first_oidc_provider_mut().client_id = value;
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_CLIENT_SECRET") {
-            self.auth.oidc_provider.client_secret = value;
+            self.auth.first_oidc_provider_mut().client_secret = value;
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_REDIRECT_URI") {
-            self.auth.oidc_provider.redirect_uri = value;
+            self.auth.first_oidc_provider_mut().redirect_uri = value;
         }
 
         if let Ok(value) = std::env::var("CLAUDIO_OIDC_SCOPE") {
-            self.auth.oidc_provider.scope = value;
+            self.auth.first_oidc_provider_mut().scope = value;
         }
     }
 }
@@ -352,28 +350,31 @@ pub struct AuthConfig {
     pub disable_auth: bool,
     pub disable_local_login: bool,
     pub disable_user_creation: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub proxy_auth_header: String,
     pub proxy_auth_auto_create: bool,
+    #[serde(skip_serializing_if = "GitHubOAuthConfig::is_empty")]
     pub github: GitHubOAuthConfig,
+    #[serde(skip_serializing_if = "GoogleOAuthConfig::is_empty")]
     pub google: GoogleOAuthConfig,
-    pub oidc_provider: OidcProviderConfig,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub oidc_providers: Vec<OidcProviderConfig>,
 }
 
 impl AuthConfig {
-    pub fn oidc_providers(&self) -> Vec<&OidcProviderConfig> {
-        let configured_plural = self
-            .oidc_providers
-            .iter()
-            .filter(|provider| provider.is_configured());
-
-        if self.oidc_provider.is_configured() {
-            configured_plural
-                .chain(std::iter::once(&self.oidc_provider))
-                .collect()
-        } else {
-            configured_plural.collect()
+    fn first_oidc_provider_mut(&mut self) -> &mut OidcProviderConfig {
+        if self.oidc_providers.is_empty() {
+            self.oidc_providers.push(OidcProviderConfig::default());
         }
+
+        &mut self.oidc_providers[0]
+    }
+
+    pub fn oidc_providers(&self) -> Vec<&OidcProviderConfig> {
+        self.oidc_providers
+            .iter()
+            .filter(|provider| provider.is_configured())
+            .collect()
     }
 
     pub fn find_oidc_provider(&self, slug: &str) -> Option<&OidcProviderConfig> {
@@ -392,6 +393,10 @@ pub struct GitHubOAuthConfig {
 }
 
 impl GitHubOAuthConfig {
+    pub fn is_empty(&self) -> bool {
+        self.client_id.is_empty() && self.client_secret.is_empty() && self.redirect_uri.is_empty()
+    }
+
     pub fn is_configured(&self) -> bool {
         !self.client_id.is_empty()
             && !self.client_secret.is_empty()
@@ -408,6 +413,10 @@ pub struct GoogleOAuthConfig {
 }
 
 impl GoogleOAuthConfig {
+    pub fn is_empty(&self) -> bool {
+        self.client_id.is_empty() && self.client_secret.is_empty() && self.redirect_uri.is_empty()
+    }
+
     pub fn is_configured(&self) -> bool {
         !self.client_id.is_empty()
             && !self.client_secret.is_empty()
@@ -420,6 +429,7 @@ impl GoogleOAuthConfig {
 pub struct OidcProviderConfig {
     pub slug: String,
     pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub logo_url: Option<String>,
     pub discovery_url: String,
     pub authority: String,
@@ -454,9 +464,19 @@ impl Default for OidcProviderConfig {
 }
 
 impl OidcProviderConfig {
+    pub fn is_empty(&self) -> bool {
+        self.slug.is_empty()
+            && self.display_name.is_empty()
+            && self.logo_url.is_none()
+            && self.discovery_url.is_empty()
+            && self.authority.is_empty()
+            && self.client_id.is_empty()
+            && self.client_secret.is_empty()
+            && self.redirect_uri.is_empty()
+    }
+
     pub fn is_configured(&self) -> bool {
         !self.slug.is_empty()
-            && !self.display_name.is_empty()
             && !self.discovery_url.is_empty()
             && !self.client_id.is_empty()
             && !self.client_secret.is_empty()
@@ -529,6 +549,9 @@ mod tests {
         assert!(persisted.contains("port = 8080"));
         assert!(persisted.contains("sqlite_path = \"/config/claudio.db\""));
         assert!(persisted.contains("library_paths = [\"/games\"]"));
+        assert!(!persisted.contains("[auth.github]"));
+        assert!(!persisted.contains("[auth.google]"));
+        assert!(!persisted.contains("oidc_providers = []"));
     }
 
     #[test]
@@ -625,6 +648,41 @@ exclude_platforms = ["ps", "gba"]
     }
 
     #[test]
+    fn load_and_persist_serializes_oidc_env_as_provider_list() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.toml");
+
+        std::env::set_var("CLAUDIO_OIDC_SLUG", "authentik");
+        std::env::set_var("CLAUDIO_OIDC_DISPLAY_NAME", "Authentik");
+        std::env::set_var(
+            "CLAUDIO_OIDC_DISCOVERY_URL",
+            "https://auth.example.com/.well-known/openid-configuration",
+        );
+        std::env::set_var("CLAUDIO_OIDC_CLIENT_ID", "client-id");
+        std::env::set_var("CLAUDIO_OIDC_CLIENT_SECRET", "client-secret");
+        std::env::set_var(
+            "CLAUDIO_OIDC_REDIRECT_URI",
+            "https://claudio.example.com/api/auth/oidc/authentik/callback",
+        );
+
+        let config = ClaudioConfig::load_and_persist(path.to_str().unwrap()).unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(config.auth.oidc_providers.len(), 1);
+        assert_eq!(config.auth.oidc_providers[0].slug, "authentik");
+        assert!(persisted.contains("[[auth.oidc_providers]]"));
+        assert!(!persisted.contains("[auth.oidc_provider]"));
+
+        std::env::remove_var("CLAUDIO_OIDC_SLUG");
+        std::env::remove_var("CLAUDIO_OIDC_DISPLAY_NAME");
+        std::env::remove_var("CLAUDIO_OIDC_DISCOVERY_URL");
+        std::env::remove_var("CLAUDIO_OIDC_CLIENT_ID");
+        std::env::remove_var("CLAUDIO_OIDC_CLIENT_SECRET");
+        std::env::remove_var("CLAUDIO_OIDC_REDIRECT_URI");
+    }
+
+    #[test]
     fn load_oidc_authority_falls_back_to_discovery_url() {
         let _guard = ENV_LOCK.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
@@ -633,7 +691,7 @@ exclude_platforms = ["ps", "gba"]
         fs::write(
             &path,
             r#"
-[auth.oidc_provider]
+[[auth.oidc_providers]]
 slug = "authentik"
 display_name = "Authentik"
 authority = "https://auth.example.com"
@@ -647,10 +705,10 @@ redirect_uri = "https://app/callback"
         let config = ClaudioConfig::load(path.to_str().unwrap()).unwrap();
 
         assert_eq!(
-            config.auth.oidc_provider.discovery_url,
+            config.auth.oidc_providers[0].discovery_url,
             "https://auth.example.com"
         );
-        assert!(config.auth.oidc_provider.is_configured());
+        assert!(config.auth.oidc_providers[0].is_configured());
     }
 
     #[test]
@@ -692,6 +750,65 @@ redirect_uri = "http://localhost:8080/api/auth/oidc/zitadel/callback"
         assert_eq!(config.auth.oidc_providers[1].slug, "zitadel");
         assert!(config.auth.find_oidc_provider("pocketid").is_some());
         assert!(config.auth.find_oidc_provider("zitadel").is_some());
+
+        config.persist(path.to_str().unwrap()).unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+        assert!(persisted.contains("[[auth.oidc_providers]]"));
+    }
+
+    #[test]
+    fn load_and_persist_preserves_oidc_provider_added_to_generated_config() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.toml");
+
+        ClaudioConfig::load_and_persist(path.to_str().unwrap()).unwrap();
+
+        fs::write(
+            &path,
+            format!(
+                "{}\n\n[[auth.oidc_providers]]\nslug = \"authentik\"\ndisplay_name = \"Authentik\"\ndiscovery_url = \"https://auth.example.com/application/o/claudio/.well-known/openid-configuration\"\nclient_id = \"client-id\"\nclient_secret = \"client-secret\"\nredirect_uri = \"https://claudio.example.com/api/auth/oidc/authentik/callback\"\n",
+                fs::read_to_string(&path).unwrap().trim_end()
+            ),
+        )
+        .unwrap();
+
+        let config = ClaudioConfig::load_and_persist(path.to_str().unwrap()).unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(config.auth.oidc_providers.len(), 1);
+        assert_eq!(config.auth.oidc_providers[0].slug, "authentik");
+        assert!(config.auth.oidc_providers[0].is_configured());
+        assert!(persisted.contains("[[auth.oidc_providers]]"));
+        assert!(persisted.contains("slug = \"authentik\""));
+    }
+
+    #[test]
+    fn load_oidc_provider_defaults_display_name_from_slug() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.toml");
+
+        fs::write(
+            &path,
+            r#"
+[[auth.oidc_providers]]
+slug = "authentik"
+discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"
+client_id = "client-id"
+client_secret = "client-secret"
+redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
+"#,
+        )
+        .unwrap();
+
+        let config = ClaudioConfig::load_and_persist(path.to_str().unwrap()).unwrap();
+        let persisted = fs::read_to_string(&path).unwrap();
+
+        assert_eq!(config.auth.oidc_providers.len(), 1);
+        assert_eq!(config.auth.oidc_providers[0].display_name, "authentik");
+        assert!(config.auth.oidc_providers[0].is_configured());
+        assert!(persisted.contains("display_name = \"authentik\""));
     }
 
     #[test]

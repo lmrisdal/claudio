@@ -21,7 +21,7 @@ client_id = ""
 client_secret = ""
 redirect_uri = "http://localhost:8080/api/auth/google/callback"
 
-[auth.oidc_provider]
+[[auth.oidc_providers]]
 slug = "authentik"
 display_name = "Authentik"
 logo_url = "https://goauthentik.io/img/icon.png"
