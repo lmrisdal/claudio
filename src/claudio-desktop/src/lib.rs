@@ -275,6 +275,9 @@ pub fn run() {
                 }
             });
 
+            #[cfg(not(target_os = "macos"))]
+            window.set_decorations(false)?;
+
             let logged_in =
                 tauri::async_runtime::block_on(auth::restore_session(&settings::load()))
                     .map(|session| session.is_logged_in)
