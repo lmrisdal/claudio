@@ -26,13 +26,12 @@ impl LibraryScanService {
         let scan_started_at = Instant::now();
         debug!("TEMP_SCAN_DEBUG: perform_scan() start");
 
-        let txn = self.db.begin().await?;
-        debug!("TEMP_SCAN_DEBUG: database transaction started for library scan");
-
         let mut found_paths = HashSet::new();
         let mut games_found = 0usize;
         let mut games_added = 0usize;
         let mut games_missing = 0usize;
+        let mut pending_inserts = Vec::new();
+        let mut pending_updates = Vec::new();
 
         for scan_path in &self.config.library.library_paths {
             debug!(path = %scan_path, "TEMP_SCAN_DEBUG: starting scan path");
@@ -44,7 +43,7 @@ impl LibraryScanService {
                 continue;
             }
 
-            for platform_dir in fs::read_directories(root) {
+            for platform_dir in fs::read_directories(root)? {
                 let platform_name = platform_dir
                     .file_name()
                     .map(|value| value.to_string_lossy().to_string())
@@ -75,7 +74,7 @@ impl LibraryScanService {
                 }
 
                 debug!(normalized_platform = %platform, "TEMP_SCAN_DEBUG: starting folder-based game enumeration for platform");
-                for game_dir in fs::read_directories(&platform_dir) {
+                for game_dir in fs::read_directories(&platform_dir)? {
                     let folder_name = game_dir
                         .file_name()
                         .map(|value| value.to_string_lossy().to_string())
@@ -99,7 +98,7 @@ impl LibraryScanService {
                     let existing = game::Entity::find()
                         .filter(game::Column::Platform.eq(platform.clone()))
                         .filter(game::Column::FolderName.eq(folder_name.clone()))
-                        .one(&txn)
+                        .one(&self.db)
                         .await?;
                     debug!(normalized_platform = %platform, folder_name = %folder_name, exists = existing.is_some(), "TEMP_SCAN_DEBUG: queried existing game row for directory-backed game");
 
@@ -108,26 +107,26 @@ impl LibraryScanService {
 
                     if let Some(existing_game) = existing {
                         debug!(normalized_platform = %platform, folder_name = %folder_name, "TEMP_SCAN_DEBUG: existing directory-backed game found, updating size/path/missing only");
-                        let size_bytes = fs::directory_size(&game_dir);
+                        let size_bytes = fs::directory_size(&game_dir)?;
                         let folder_path = game_dir.to_string_lossy().to_string();
 
                         let mut active_model: game::ActiveModel = existing_game.into();
                         active_model.size_bytes = Set(size_bytes);
                         active_model.folder_path = Set(folder_path);
                         active_model.is_missing = Set(false);
-                        active_model.update(&txn).await?;
+                        pending_updates.push(active_model);
 
                         games_found += 1;
-                        debug!(games_found, size_bytes, "TEMP_SCAN_DEBUG: existing directory-backed game updated");
+                        debug!(games_found, size_bytes, pending_updates = pending_updates.len(), "TEMP_SCAN_DEBUG: existing directory-backed game queued for update");
                         continue;
                     }
 
                     debug!(normalized_platform = %platform, folder_name = %folder_name, "TEMP_SCAN_DEBUG: directory-backed game is new, computing install_type and size");
-                    let install_type = fs::detect_install_type(&game_dir);
-                    let size_bytes = fs::directory_size(&game_dir);
+                    let install_type = fs::detect_install_type(&game_dir)?;
+                    let size_bytes = fs::directory_size(&game_dir)?;
                     let folder_path = game_dir.to_string_lossy().to_string();
 
-                    game::ActiveModel {
+                    pending_inserts.push(game::ActiveModel {
                         title: Set(folder_name.clone()),
                         platform: Set(platform.clone()),
                         folder_name: Set(folder_name.clone()),
@@ -136,17 +135,15 @@ impl LibraryScanService {
                         size_bytes: Set(size_bytes),
                         is_missing: Set(false),
                         ..Default::default()
-                    }
-                    .insert(&txn)
-                    .await?;
+                    });
 
                     games_found += 1;
                     games_added += 1;
-                    debug!(games_found, games_added, size_bytes, "TEMP_SCAN_DEBUG: inserted new directory-backed game");
+                    debug!(games_found, games_added, size_bytes, pending_inserts = pending_inserts.len(), "TEMP_SCAN_DEBUG: new directory-backed game queued for insert");
                 }
 
                 debug!(normalized_platform = %platform, "TEMP_SCAN_DEBUG: starting standalone archive enumeration for platform");
-                for archive_path in fs::read_archive_files(&platform_dir) {
+                for archive_path in fs::read_archive_files(&platform_dir)? {
                     let file_name = archive_path
                         .file_name()
                         .map(|value| value.to_string_lossy().to_string())
@@ -170,14 +167,13 @@ impl LibraryScanService {
                     let existing = game::Entity::find()
                         .filter(game::Column::Platform.eq(platform.clone()))
                         .filter(game::Column::FolderName.eq(file_name.clone()))
-                        .one(&txn)
+                        .one(&self.db)
                         .await?;
                     debug!(normalized_platform = %platform, file_name = %file_name, exists = existing.is_some(), "TEMP_SCAN_DEBUG: queried existing game row for archive-backed game");
 
                     let size_bytes = archive_path
-                        .metadata()
-                        .map(|metadata| metadata.len() as i64)
-                        .unwrap_or_default();
+                        .metadata()?
+                        .len() as i64;
                     debug!(normalized_platform = %platform, file_name = %file_name, size_bytes, "TEMP_SCAN_DEBUG: archive size resolved");
 
                     if let Some(existing_game) = existing {
@@ -188,10 +184,10 @@ impl LibraryScanService {
                         active_model.size_bytes = Set(size_bytes);
                         active_model.folder_path = Set(folder_path);
                         active_model.is_missing = Set(false);
-                        active_model.update(&txn).await?;
+                        pending_updates.push(active_model);
 
                         games_found += 1;
-                        debug!(games_found, size_bytes, "TEMP_SCAN_DEBUG: existing archive-backed game updated");
+                        debug!(games_found, size_bytes, pending_updates = pending_updates.len(), "TEMP_SCAN_DEBUG: existing archive-backed game queued for update");
                         continue;
                     }
 
@@ -199,7 +195,7 @@ impl LibraryScanService {
                     let folder_path = archive_path.to_string_lossy().to_string();
                     debug!(normalized_platform = %platform, file_name = %file_name, title = %title, "TEMP_SCAN_DEBUG: archive-backed game is new, inserting");
 
-                    game::ActiveModel {
+                    pending_inserts.push(game::ActiveModel {
                         title: Set(title),
                         platform: Set(platform.clone()),
                         folder_name: Set(file_name.clone()),
@@ -208,13 +204,11 @@ impl LibraryScanService {
                         size_bytes: Set(size_bytes),
                         is_missing: Set(false),
                         ..Default::default()
-                    }
-                    .insert(&txn)
-                    .await?;
+                    });
 
                     games_found += 1;
                     games_added += 1;
-                    debug!(games_found, games_added, size_bytes, "TEMP_SCAN_DEBUG: inserted new archive-backed game");
+                    debug!(games_found, games_added, size_bytes, pending_inserts = pending_inserts.len(), "TEMP_SCAN_DEBUG: new archive-backed game queued for insert");
                 }
 
                 debug!(normalized_platform = %platform, games_found, games_added, found_paths = found_paths.len(), "TEMP_SCAN_DEBUG: finished platform scan");
@@ -224,7 +218,7 @@ impl LibraryScanService {
         }
 
         debug!("TEMP_SCAN_DEBUG: starting missing-game reconciliation");
-        let all_games = game::Entity::find().all(&txn).await?;
+        let all_games = game::Entity::find().all(&self.db).await?;
         debug!(all_games = all_games.len(), "TEMP_SCAN_DEBUG: loaded all games for missing reconciliation");
 
         for existing_game in all_games {
@@ -241,14 +235,31 @@ impl LibraryScanService {
 
             let mut active_model: game::ActiveModel = existing_game.into();
             active_model.is_missing = Set(true);
-            active_model.update(&txn).await?;
+            pending_updates.push(active_model);
             games_missing += 1;
-            debug!(games_missing, "TEMP_SCAN_DEBUG: marked game as missing");
+            debug!(games_missing, pending_updates = pending_updates.len(), "TEMP_SCAN_DEBUG: queued game missing update");
         }
 
-        debug!("TEMP_SCAN_DEBUG: committing library scan transaction");
+        debug!(
+            pending_inserts = pending_inserts.len(),
+            pending_updates = pending_updates.len(),
+            "TEMP_SCAN_DEBUG: starting final library scan save phase"
+        );
+        let txn = self.db.begin().await?;
+        debug!("TEMP_SCAN_DEBUG: final library scan transaction started");
+
+        for active_model in pending_inserts {
+            active_model.insert(&txn).await?;
+        }
+        debug!("TEMP_SCAN_DEBUG: finished applying pending inserts");
+
+        for active_model in pending_updates {
+            active_model.update(&txn).await?;
+        }
+        debug!("TEMP_SCAN_DEBUG: finished applying pending updates");
+
         txn.commit().await?;
-        debug!("TEMP_SCAN_DEBUG: library scan transaction committed");
+        debug!("TEMP_SCAN_DEBUG: final library scan transaction committed");
 
         let total_elapsed = scan_started_at.elapsed();
         debug!(

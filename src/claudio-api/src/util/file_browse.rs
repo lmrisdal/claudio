@@ -14,6 +14,7 @@ const HIDDEN_NAMES: &[&str] = &[
     "@eaDir",
     "#recycle",
     "Thumbs.db",
+    ".claudio",
 ];
 const EXECUTABLE_EXTENSIONS: &[&str] = &[".exe", ".iso"];
 
@@ -67,6 +68,11 @@ pub fn find_single_archive(folder_path: &Path) -> Option<PathBuf> {
     let mut archives = Vec::new();
 
     for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        if is_hidden_name(&file_name) {
+            continue;
+        }
+
         let path = entry.path();
         if path.is_dir() {
             directories.push(path);

@@ -66,6 +66,18 @@ impl SteamGridDbWorker {
         true
     }
 
+    pub(super) fn start(&self) {
+        self.update_status(|status| {
+            *status = BackgroundTaskStatus {
+                is_running: true,
+                current_game: None,
+                total: 0,
+                processed: 0,
+                matched: 0,
+            }
+        });
+    }
+
     pub(super) fn reset_status(&self) {
         self.update_status(|status| *status = BackgroundTaskStatus::default());
     }
