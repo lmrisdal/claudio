@@ -55,7 +55,7 @@ export default function Header() {
         <div
           data-tauri-drag-region={isDesktop || undefined}
           style={desktopHeaderRowHeight}
-          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-6") : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} flex items-center justify-between gap-4`}
+          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-1") : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} flex items-center justify-between gap-4`}
         >
           {isDesktop ? (
             <div

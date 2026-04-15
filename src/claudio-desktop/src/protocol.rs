@@ -129,6 +129,10 @@ where
     let mut builder = http::Response::builder().status(status);
 
     for (name, value) in response.headers() {
+        if should_skip_response_header(name.as_str()) {
+            continue;
+        }
+
         builder = builder.header(name.as_str(), value.as_bytes());
     }
 
@@ -195,6 +199,19 @@ fn should_skip_request_header(name: &str) -> bool {
             | "content-length"
             | "access-control-request-method"
             | "access-control-request-headers"
+    )
+}
+
+fn should_skip_response_header(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "access-control-allow-origin"
+            | "access-control-allow-methods"
+            | "access-control-allow-headers"
+            | "access-control-expose-headers"
+            | "access-control-allow-credentials"
+            | "access-control-max-age"
+            | "access-control-allow-private-network"
     )
 }
 

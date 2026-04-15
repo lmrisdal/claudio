@@ -419,10 +419,6 @@ html[data-desktop] [role="button"] {
   background-size: 28px 28px;
 }
 
-html[data-desktop] .bg-grid {
-  background-image: none;
-}
-
 html[data-desktop] .auth-shell {
   position: relative;
   isolation: isolate;

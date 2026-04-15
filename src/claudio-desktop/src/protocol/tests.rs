@@ -110,6 +110,14 @@ fn apply_request_headers_skips_blocked_headers() {
 }
 
 #[test]
+fn should_skip_response_header_blocks_upstream_cors_headers() {
+    assert!(should_skip_response_header("Access-Control-Allow-Origin"));
+    assert!(should_skip_response_header("access-control-allow-methods"));
+    assert!(should_skip_response_header("ACCESS-CONTROL-EXPOSE-HEADERS"));
+    assert!(!should_skip_response_header("content-type"));
+}
+
+#[test]
 fn cors_response_reflects_origin_and_requested_headers() {
     let request = http::Request::builder()
         .uri("claudio://api/games")
@@ -318,6 +326,79 @@ async fn forward_request_passes_through_unknown_5xx_statuses() {
             .expect("proxy request should complete");
 
         assert_eq!(response.status().as_u16(), 526);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn forward_request_rewrites_upstream_cors_headers() {
+    let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
+    let server = TestServer::spawn(|request| match request.path.as_str() {
+        "/api/games" => TestResponse {
+            status: 200,
+            headers: vec![
+                (
+                    "access-control-allow-origin".to_string(),
+                    "*".to_string(),
+                ),
+                (
+                    "access-control-expose-headers".to_string(),
+                    "x-upstream".to_string(),
+                ),
+                ("content-type".to_string(), "application/json".to_string()),
+            ],
+            body: br#"{"ok":true}"#.to_vec(),
+        },
+        _ => TestResponse::text(404, "missing"),
+    });
+
+    with_test_data_dir_async(unique_test_dir("proxy-cors-rewrite"), || async {
+        let settings = test_settings(server.url());
+        crate::settings::save(&settings).expect("settings should save");
+        store_tokens(
+            &settings,
+            &StoredTokens {
+                access_token: "access-token".to_string(),
+                refresh_token: Some("refresh-token".to_string()),
+            },
+        )
+        .expect("tokens should store");
+
+        let request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri("claudio://api/games")
+            .header(http::header::ORIGIN, "http://tauri.localhost")
+            .header("access-control-request-headers", "content-type")
+            .body(Vec::new())
+            .expect("request should build");
+
+        let response = forward_request_with(request, || Ok(()))
+            .await
+            .expect("proxy request should complete");
+
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get(http::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .and_then(|value| value.to_str().ok()),
+            Some("http://tauri.localhost")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get_all(http::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .iter()
+                .count(),
+            1
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(http::header::ACCESS_CONTROL_EXPOSE_HEADERS)
+                .and_then(|value| value.to_str().ok()),
+            Some("*")
+        );
     })
     .await;
 }
