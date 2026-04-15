@@ -12,12 +12,14 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(target_os = "windows")]
-use windows::Win32::Foundation::{CloseHandle, WAIT_TIMEOUT};
+use windows::Win32::Foundation::CloseHandle;
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Threading::{
-    OpenProcess, WaitForSingleObject, CREATE_NO_WINDOW, PROCESS_QUERY_LIMITED_INFORMATION,
-    SYNCHRONIZE,
+    GetExitCodeProcess, OpenProcess, CREATE_NO_WINDOW, PROCESS_QUERY_LIMITED_INFORMATION,
 };
+
+#[cfg(target_os = "windows")]
+const STILL_ACTIVE_EXIT_CODE: u32 = 259;
 
 pub struct RunningGamesState {
     games_by_id: Mutex<HashMap<i32, RunningGameInfo>>,
@@ -197,7 +199,10 @@ fn is_process_running(pid: u32) -> bool {
     #[cfg(target_os = "windows")]
     {
         with_process_handle(pid, |handle| unsafe {
-            matches!(WaitForSingleObject(handle, 0), WAIT_TIMEOUT)
+            let mut exit_code = 0u32;
+            GetExitCodeProcess(handle, &mut exit_code)
+                .map(|_| exit_code == STILL_ACTIVE_EXIT_CODE)
+                .unwrap_or(false)
         })
         .unwrap_or(false)
     }
@@ -235,8 +240,7 @@ fn with_process_handle<T>(
     callback: impl FnOnce(windows::Win32::Foundation::HANDLE) -> T,
 ) -> Option<T> {
     unsafe {
-        let handle = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, false, pid)
-        {
+        let handle = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
             Ok(handle) if !handle.is_invalid() => handle,
             _ => return None,
         };
