@@ -70,9 +70,9 @@ use file_ops::{
     move_visible_entries_into_dir, normalize_into_final_dir, sanitize_segment,
 };
 use install::{install_game_inner, urlencoding_encode};
-use installer_cleanup::{cleanup_directory, cleanup_partial_install_dir};
 #[cfg(any(test, feature = "integration-tests"))]
 use installer_cleanup::cleanup_failed_installer_state;
+use installer_cleanup::{cleanup_directory, cleanup_partial_install_dir};
 #[cfg(test)]
 use installer_detect::detect_installer;
 use installer_detect::{

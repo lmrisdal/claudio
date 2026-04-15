@@ -337,10 +337,7 @@ async fn forward_request_rewrites_upstream_cors_headers() {
         "/api/games" => TestResponse {
             status: 200,
             headers: vec![
-                (
-                    "access-control-allow-origin".to_string(),
-                    "*".to_string(),
-                ),
+                ("access-control-allow-origin".to_string(), "*".to_string()),
                 (
                     "access-control-expose-headers".to_string(),
                     "x-upstream".to_string(),

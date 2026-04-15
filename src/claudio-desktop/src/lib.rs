@@ -1,5 +1,6 @@
 mod auth;
 mod commands;
+mod deep_link;
 mod http_client;
 #[cfg(feature = "integration-tests")]
 pub mod integration_test_api;
@@ -23,10 +24,9 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_deep_link::{DeepLinkExt, OpenUrlEvent};
 #[cfg(target_os = "windows")]
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
-use tauri_plugin_deep_link::DeepLinkExt;
-
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
 #[cfg(target_os = "macos")]
 const ABOUT_ICON_PNG: &[u8] = include_bytes!("../icons/icon.png");
@@ -208,6 +208,9 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            restore_main_window(app);
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -321,57 +324,10 @@ pub fn run() {
                 .build(app)?;
 
             let deep_link_handle = app.handle().clone();
-            app.deep_link().on_open_url(move |event| {
-                for parsed in event.urls() {
-                    if parsed.scheme() != "claudio" {
-                        continue;
-                    }
-
-                    let is_auth_callback =
-                        parsed.host_str() == Some("auth") && parsed.path() == "/callback";
-
-                    if !is_auth_callback {
-                        continue;
-                    }
-
-                    let nonce = parsed
-                        .query_pairs()
-                        .find(|(key, _)| key == "nonce")
-                        .map(|(_, value)| value.to_string());
-
-                    let error = parsed
-                        .query_pairs()
-                        .find(|(key, _)| key == "error")
-                        .map(|(_, value)| value.to_string());
-
-                    if let Some(error) = error {
-                        log::warn!("Deep link auth callback returned error: {error}");
-                        let _ = deep_link_handle.emit("deep-link-auth-error", error);
-                        restore_main_window(&deep_link_handle);
-                        return;
-                    }
-
-                    let Some(nonce) = nonce else {
-                        continue;
-                    };
-
-                    let handle = deep_link_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        match auth::complete_external_login(&settings::load(), &nonce).await {
-                            Ok(session) => {
-                                let _ = refresh_auth_state_ui(&handle, session.is_logged_in);
-                                let _ = handle.emit("deep-link-auth-complete", ());
-                            }
-                            Err(message) => {
-                                log::error!("Deep link login failed: {message}");
-                                let _ = handle.emit("deep-link-auth-error", message);
-                            }
-                        }
-                        restore_main_window(&handle);
-                    });
-                    return;
-                }
+            app.deep_link().on_open_url(move |event: OpenUrlEvent| {
+                deep_link::handle_auth_callback_urls(&deep_link_handle, event.urls().iter());
             });
+            deep_link::handle_initial_url(app.handle());
 
             let _ = window;
             Ok(())

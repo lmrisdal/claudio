@@ -35,7 +35,10 @@ use audio::{
     mute_process_audio as mute_process_audio_inner,
     terminate_tracked_processes as terminate_tracked_processes_inner,
 };
-use power::{allow_system_sleep as allow_system_sleep_inner, prevent_system_sleep as prevent_system_sleep_inner};
+use power::{
+    allow_system_sleep as allow_system_sleep_inner,
+    prevent_system_sleep as prevent_system_sleep_inner,
+};
 use registration::{deregister as deregister_inner, register as register_inner};
 
 pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
