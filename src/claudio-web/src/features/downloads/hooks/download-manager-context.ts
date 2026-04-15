@@ -33,7 +33,7 @@ export interface DownloadManagerContextValue {
   cancelDownload: (gameId: number) => Promise<void>;
   restartDownloadInteractive: (gameId: number) => Promise<void>;
   retryDownload: (gameId: number) => Promise<void>;
-  dismissDownload: (gameId: number) => void;
+  cancelFailedDownload: (gameId: number) => Promise<void>;
 }
 
 export const DownloadManagerContext = createContext<DownloadManagerContextValue | null>(null);

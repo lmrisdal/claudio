@@ -58,7 +58,7 @@ pub(super) async fn install_installer(
             log_io_failure("create installer staging directory", &staging_dir, &err);
             format_install_io_error("create the installer staging folder", &staging_dir, &err)
         })?;
-        let install_result = (|| -> Result<Option<String>, String> {
+            let install_result = (|| -> Result<Option<String>, String> {
             extract_archive_or_copy(
                 &package_path_owned,
                 &staging_dir,
@@ -197,12 +197,8 @@ pub(super) async fn install_installer(
         match install_result {
             Ok(exe) => Ok(exe),
             Err(install_error) => {
-                if let Err(cleanup_error) =
-                    cleanup_failed_installer_state(&target_dir_owned, &staging_dir)
-                {
-                    return Err(format!(
-                        "{install_error} Cleanup also failed: {cleanup_error}"
-                    ));
+                if let Err(cleanup_error) = cleanup_partial_install_dir(&target_dir_owned) {
+                    return Err(format!("{install_error} Cleanup also failed: {cleanup_error}"));
                 }
 
                 Err(install_error)

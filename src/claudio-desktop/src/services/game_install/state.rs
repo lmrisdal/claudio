@@ -2,12 +2,27 @@ use super::*;
 
 pub struct InstallState {
     installs: Mutex<HashMap<i32, InstallControl>>,
+    exit_approved: AtomicBool,
 }
 
 impl Default for InstallState {
     fn default() -> Self {
         Self {
             installs: Mutex::new(HashMap::new()),
+            exit_approved: AtomicBool::new(false),
+        }
+    }
+}
+
+struct ActiveInstallGuard<'a> {
+    state: &'a InstallState,
+    should_release: bool,
+}
+
+impl Drop for ActiveInstallGuard<'_> {
+    fn drop(&mut self) {
+        if self.should_release {
+            self.state.release_active_operation();
         }
     }
 }
@@ -105,15 +120,46 @@ impl InstallState {
         if installs.contains_key(&game_id) {
             return Err("This game is already being installed.".to_string());
         }
+        let should_acquire = installs.is_empty();
+        let mut guard = ActiveInstallGuard {
+            state: self,
+            should_release: false,
+        };
+        if should_acquire {
+            self.acquire_active_operation()?;
+            guard.should_release = true;
+        }
         let control = InstallControl::new();
         installs.insert(game_id, control.clone());
+        guard.should_release = false;
         Ok(control)
     }
 
     pub(super) fn finish(&self, game_id: i32) {
         if let Ok(mut installs) = self.installs.lock() {
-            installs.remove(&game_id);
+            let removed = installs.remove(&game_id).is_some();
+            let should_release = removed && installs.is_empty();
+            drop(installs);
+            if should_release {
+                self.release_active_operation();
+            }
         }
+    }
+
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    pub fn has_active_operations(&self) -> bool {
+        self.installs
+            .lock()
+            .map(|installs| !installs.is_empty())
+            .unwrap_or(false)
+    }
+
+    pub fn approve_exit(&self) {
+        self.exit_approved.store(true, Ordering::Relaxed);
+    }
+
+    pub fn take_exit_approval(&self) -> bool {
+        self.exit_approved.swap(false, Ordering::Relaxed)
     }
 
     pub(super) fn cancel(&self, app: &AppHandle, game_id: i32) -> Result<(), String> {
@@ -159,6 +205,20 @@ impl InstallState {
             Ok(())
         } else {
             Err("No active install for this game.".to_string())
+        }
+    }
+
+    fn acquire_active_operation(&self) -> Result<(), String> {
+        #[cfg(target_os = "windows")]
+        crate::windows_integration::prevent_system_sleep()?;
+
+        Ok(())
+    }
+
+    fn release_active_operation(&self) {
+        #[cfg(target_os = "windows")]
+        if let Err(error) = crate::windows_integration::allow_system_sleep() {
+            log::warn!("[installer] failed to clear Windows sleep prevention: {error}");
         }
     }
 }

@@ -1,5 +1,5 @@
 #[cfg(target_os = "windows")]
-use super::installer_detect::{InstallerType, detect_installer_type};
+use super::installer_detect::{detect_installer_type, InstallerType};
 #[cfg(target_os = "windows")]
 use super::installer_elevated::spawn_mute_wait;
 #[cfg(target_os = "windows")]
@@ -36,7 +36,15 @@ where
 
                 return Err("Install cancelled.".to_string());
             }
-            Err(RunInstallerError::Failed(message)) => return Err(message),
+            Err(RunInstallerError::Failed(message)) => {
+                if !attempt.force_interactive {
+                    on_restart_interactive()?;
+                    attempt.force_interactive = true;
+                    continue;
+                }
+
+                return Err(message);
+            }
         }
     }
 }

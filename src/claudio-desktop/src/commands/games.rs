@@ -133,6 +133,11 @@ pub fn restart_install_interactive(
 }
 
 #[tauri::command]
+pub fn cleanup_failed_install(game: RemoteGame) -> Result<(), String> {
+    game_install::cleanup_failed_install(&game)
+}
+
+#[tauri::command]
 pub async fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
     uninstall_game_command(remote_game_id, delete_files).await
 }

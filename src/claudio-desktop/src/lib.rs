@@ -23,6 +23,8 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(target_os = "windows")]
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
@@ -49,6 +51,57 @@ pub(crate) fn restore_main_window(app: &AppHandle) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+fn should_confirm_exit_for_active_install(app: &AppHandle) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        return app
+            .try_state::<services::game_install::InstallState>()
+            .map(|state| state.has_active_operations())
+            .unwrap_or(false);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        false
+    }
+}
+
+fn confirm_exit_for_active_install(app: &AppHandle) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        return app
+            .dialog()
+            .message(
+                "A download or installation is still in progress. Closing Claudio will stop it. Quit anyway?",
+            )
+            .title("Quit Claudio?")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Quit".to_string(),
+                "Keep Running".to_string(),
+            ))
+            .blocking_show();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        true
+    }
+}
+
+fn request_app_exit(app: &AppHandle) {
+    if should_confirm_exit_for_active_install(app) && !confirm_exit_for_active_install(app) {
+        return;
+    }
+
+    if let Some(state) = app.try_state::<services::game_install::InstallState>() {
+        state.approve_exit();
+    }
+    app.exit(0);
 }
 
 #[cfg(target_os = "macos")]
@@ -169,6 +222,7 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             commands::games::cancel_install,
+            commands::games::cleanup_failed_install,
             commands::games::download_game_package,
             commands::games::get_installed_game,
             commands::games::install_game,
@@ -212,6 +266,9 @@ pub fn run() {
                         if current_settings.hide_dock_icon {
                             set_dock_visibility(window_for_close.app_handle(), false);
                         }
+                    } else {
+                        api.prevent_close();
+                        request_app_exit(window_for_close.app_handle());
                     }
                 }
             });
@@ -330,7 +387,7 @@ pub fn run() {
                 restore_main_window(app);
             }
             "tray-quit" => {
-                app.exit(0);
+                request_app_exit(app);
             }
             _ => {}
         })
@@ -371,6 +428,20 @@ pub fn run() {
         .expect("error while building Claudio");
 
     app.run(|_app, _event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = &_event
+            && let Some(state) = _app.try_state::<services::game_install::InstallState>()
+        {
+            if state.take_exit_approval() {
+                return;
+            }
+
+            if should_confirm_exit_for_active_install(_app) {
+                api.prevent_exit();
+                request_app_exit(_app);
+                return;
+            }
+        }
+
         #[cfg(target_os = "macos")]
         if matches!(_event, tauri::RunEvent::Reopen { .. }) {
             restore_main_window(_app);

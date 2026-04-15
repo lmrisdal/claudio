@@ -22,6 +22,7 @@ type ProgressHandler = (progress: {
 const installGameMock = vi.fn();
 const downloadGamePackageMock = vi.fn();
 const cancelInstallMock = vi.fn();
+const cleanupFailedInstallMock = vi.fn();
 const restartInstallInteractiveMock = vi.fn();
 let progressHandler: ProgressHandler | null = null;
 
@@ -30,6 +31,7 @@ vi.mock("../../desktop/hooks/use-desktop", () => ({
   installGame: (...arguments_: unknown[]) => installGameMock(...arguments_),
   downloadGamePackage: (...arguments_: unknown[]) => downloadGamePackageMock(...arguments_),
   cancelInstall: (...arguments_: unknown[]) => cancelInstallMock(...arguments_),
+  cleanupFailedInstall: (...arguments_: unknown[]) => cleanupFailedInstallMock(...arguments_),
   restartInstallInteractive: (...arguments_: unknown[]) =>
     restartInstallInteractiveMock(...arguments_),
   listenToInstallProgress: async (handler: ProgressHandler) => {
@@ -71,10 +73,12 @@ function TestHarness() {
       </button>
       <button
         type="button"
-        data-testid="dismiss-install"
-        onClick={() => manager.dismissDownload(game.id)}
+        data-testid="cancel-failed-install"
+        onClick={() => {
+          void manager.cancelFailedDownload(game.id);
+        }}
       >
-        Dismiss
+        Cancel
       </button>
       <div data-testid="download-count">{manager.activeDownloads.size}</div>
       <div data-testid="failed-count">
@@ -105,6 +109,7 @@ beforeEach(() => {
   installGameMock.mockReset();
   downloadGamePackageMock.mockReset();
   cancelInstallMock.mockReset();
+  cleanupFailedInstallMock.mockReset();
   restartInstallInteractiveMock.mockReset();
   progressHandler = null;
 });
@@ -220,6 +225,34 @@ describe("DownloadManagerProvider", () => {
 
     expect(view.container.textContent).toContain("Failed");
     expect(view.container.textContent).toContain("Install failed: os error 5");
+    view.unmount();
+  });
+
+  it("cleans up retained failed install files when cancelled from downloads", async () => {
+    installGameMock.mockRejectedValue(new Error("Install failed: os error 5"));
+
+    const view = renderDownloadManager(<TestHarness />);
+    const startButton = view.container.querySelector<HTMLButtonElement>(
+      '[data-testid="start-install"]',
+    );
+    const cancelButton = view.container.querySelector<HTMLButtonElement>(
+      '[data-testid="cancel-failed-install"]',
+    );
+    expect(startButton).not.toBeNull();
+    expect(cancelButton).not.toBeNull();
+
+    await act(async () => {
+      startButton?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      cancelButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(cleanupFailedInstallMock).toHaveBeenCalledTimes(1);
+    expect(view.container.querySelector('[data-testid="download-count"]')?.textContent).toBe("0");
     view.unmount();
   });
 });

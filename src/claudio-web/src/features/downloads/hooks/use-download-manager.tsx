@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   cancelInstall,
+  cleanupFailedInstall,
   downloadGamePackage,
   installGame,
   isDesktop,
@@ -371,15 +372,27 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     }
   }, []);
 
-  const dismissDownload = useCallback((gameId: number) => {
-    setActiveDownloads((previous) => {
-      const next = new Map(previous);
-      next.delete(gameId);
-      return next;
-    });
-    seenFailures.current.delete(gameId);
-    speedState.current.delete(gameId);
-  }, []);
+  const cancelFailedDownload = useCallback(
+    async (gameId: number) => {
+      const existing = activeDownloads.get(gameId);
+      if (!existing) {
+        return;
+      }
+
+      if (existing.kind === "install") {
+        await cleanupFailedInstall(existing.game);
+      }
+
+      setActiveDownloads((previous) => {
+        const next = new Map(previous);
+        next.delete(gameId);
+        return next;
+      });
+      seenFailures.current.delete(gameId);
+      speedState.current.delete(gameId);
+    },
+    [activeDownloads],
+  );
 
   const retryDownload = useCallback(
     async (gameId: number) => {
@@ -462,7 +475,7 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
     cancelDownload,
     restartDownloadInteractive,
     retryDownload,
-    dismissDownload,
+    cancelFailedDownload,
   };
 
   return (

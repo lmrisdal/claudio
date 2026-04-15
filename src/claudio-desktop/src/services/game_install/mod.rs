@@ -48,10 +48,10 @@ mod state;
 mod tests;
 
 pub use api::{
-    cancel_install, download_game_package, get_installed_game, install_game, list_game_executables,
-    list_installed_games, open_install_folder, resolve_default_download_root_path,
-    resolve_download_path, resolve_install_path, restart_install_interactive, set_game_exe,
-    uninstall_game, validate_install_target,
+    cancel_install, cleanup_failed_install, download_game_package, get_installed_game,
+    install_game, list_game_executables, list_installed_games, open_install_folder,
+    resolve_default_download_root_path, resolve_download_path, resolve_install_path,
+    restart_install_interactive, set_game_exe, uninstall_game, validate_install_target,
 };
 pub use state::InstallState;
 
@@ -70,9 +70,9 @@ use file_ops::{
     move_visible_entries_into_dir, normalize_into_final_dir, sanitize_segment,
 };
 use install::{install_game_inner, urlencoding_encode};
-use installer_cleanup::{
-    cleanup_directory, cleanup_failed_installer_state, cleanup_partial_install_dir,
-};
+use installer_cleanup::{cleanup_directory, cleanup_partial_install_dir};
+#[cfg(any(test, feature = "integration-tests"))]
+use installer_cleanup::cleanup_failed_installer_state;
 #[cfg(test)]
 use installer_detect::detect_installer;
 use installer_detect::{

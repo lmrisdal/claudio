@@ -22,6 +22,7 @@ use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
 
 mod audio;
+mod power;
 mod registration;
 mod shell_dirs;
 #[cfg(test)]
@@ -34,6 +35,7 @@ use audio::{
     mute_process_audio as mute_process_audio_inner,
     terminate_tracked_processes as terminate_tracked_processes_inner,
 };
+use power::{allow_system_sleep as allow_system_sleep_inner, prevent_system_sleep as prevent_system_sleep_inner};
 use registration::{deregister as deregister_inner, register as register_inner};
 
 pub fn mute_process_audio(pid: u32, exe_name: Option<String>) {
@@ -49,6 +51,14 @@ pub fn terminate_tracked_processes(
     exe_name: Option<&str>,
 ) -> Result<(), String> {
     terminate_tracked_processes_inner(seed_pids, exe_name)
+}
+
+pub fn prevent_system_sleep() -> Result<(), String> {
+    prevent_system_sleep_inner()
+}
+
+pub fn allow_system_sleep() -> Result<(), String> {
+    allow_system_sleep_inner()
 }
 
 pub fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {

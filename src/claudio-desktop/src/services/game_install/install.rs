@@ -84,7 +84,9 @@ pub(super) async fn install_game_inner(
 
     if let Err(ref err) = install_result {
         log::error!("Install failed for '{}': {}", game.title, err);
-        let _ = fs::remove_dir_all(&temp_root);
+        if !matches!(game.install_type, InstallType::Installer) {
+            let _ = fs::remove_dir_all(&temp_root);
+        }
     }
 
     let installed = install_result?;

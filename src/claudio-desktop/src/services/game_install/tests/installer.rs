@@ -150,6 +150,39 @@ fn run_installer_fails_closed_on_non_windows() {
     }
 }
 
+#[test]
+fn run_installer_with_retries_restarts_interactively_after_silent_failure() {
+    let mut attempts = Vec::new();
+    let mut restart_calls = 0;
+
+    let result = run_installer_with_retries(
+        InstallerAttemptConfig {
+            force_interactive: false,
+            run_as_administrator: false,
+            force_run_as_invoker: false,
+        },
+        |attempt| {
+            attempts.push(attempt.force_interactive);
+            if attempt.force_interactive {
+                Ok(())
+            } else {
+                Err(RunInstallerError::Failed(
+                    "Installer exited with status 1.".to_string(),
+                ))
+            }
+        },
+        || {
+            restart_calls += 1;
+            Ok(())
+        },
+        || false,
+    );
+
+    assert!(result.is_ok());
+    assert_eq!(attempts, vec![false, true]);
+    assert_eq!(restart_calls, 1);
+}
+
 #[cfg(target_os = "windows")]
 #[test]
 fn stream_requests_elevation_detects_ascii_and_utf16_markers() {

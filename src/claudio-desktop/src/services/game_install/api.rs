@@ -303,6 +303,20 @@ pub fn restart_install_interactive(
     state.restart_interactive(app, game_id)
 }
 
+pub fn cleanup_failed_install(game: &RemoteGame) -> Result<(), String> {
+    let settings = settings::load();
+    let downloads_root = settings::resolve_download_root(&settings)?;
+    let temp_root = install_download_root(&downloads_root, game);
+    if temp_root.exists() {
+        fs::remove_dir_all(&temp_root).map_err(|err| {
+            log_io_failure("remove failed install workspace", &temp_root, &err);
+            format_install_io_error("clean the failed install workspace", &temp_root, &err)
+        })?;
+    }
+
+    Ok(())
+}
+
 pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), String> {
     let removed = registry::remove(remote_game_id)?;
 

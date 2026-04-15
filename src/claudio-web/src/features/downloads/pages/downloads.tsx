@@ -17,7 +17,7 @@ export default function Downloads() {
     cancelDownload,
     restartDownloadInteractive,
     retryDownload,
-    dismissDownload,
+    cancelFailedDownload,
   } = useDownloadManager();
 
   const games = queryClient.getQueryData<Game[]>(["games"]);
@@ -173,23 +173,11 @@ export default function Downloads() {
                         Retry
                       </button>
                       <button
-                        onClick={() => dismissDownload(game.id)}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
-                        title="Dismiss failed download"
+                        onClick={() => void cancelFailedDownload(game.id)}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition hover:border-red-500/50 hover:text-red-400"
+                        title="Cancel failed download"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
+                        Cancel
                       </button>
                     </div>
                   </div>
