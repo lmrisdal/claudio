@@ -25,10 +25,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("react-router", () => ({
-  Link: ({
-    children,
-    ...properties
-  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+  Link: ({ children, ...properties }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
     <a {...properties}>{children}</a>
   ),
   useNavigate: () => navigateMock,
@@ -79,9 +76,7 @@ vi.mock("../components/game-detail-actions", () => ({
 }));
 
 vi.mock("../components/game-detail-overview", () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 const cachedGame: Game = {
@@ -100,31 +95,29 @@ const cachedGame: Game = {
 function mockQueries() {
   getQueryDataMock.mockReturnValue([cachedGame]);
   getQueryStateMock.mockReturnValue({ dataUpdatedAt: 123 });
-  useQueryMock.mockImplementation(
-    (options: { queryKey: string[]; initialData?: unknown }) => {
-      switch (options.queryKey[0]) {
-        case "game": {
-          return { data: options.initialData, isLoading: false };
-        }
-        case "installedGame": {
-          return {
-            data: null,
-            refetch: vi.fn(),
-            isFetching: false,
-          };
-        }
-        case "browse": {
-          return { data: undefined, isLoading: false };
-        }
-        case "emulation": {
-          return { data: { supported: false }, isLoading: false };
-        }
-        default: {
-          return { data: undefined, isLoading: false };
-        }
+  useQueryMock.mockImplementation((options: { queryKey: string[]; initialData?: unknown }) => {
+    switch (options.queryKey[0]) {
+      case "game": {
+        return { data: options.initialData, isLoading: false };
       }
-    },
-  );
+      case "installedGame": {
+        return {
+          data: null,
+          refetch: vi.fn(),
+          isFetching: false,
+        };
+      }
+      case "browse": {
+        return { data: undefined, isLoading: false };
+      }
+      case "emulation": {
+        return { data: { supported: false }, isLoading: false };
+      }
+      default: {
+        return { data: undefined, isLoading: false };
+      }
+    }
+  });
 }
 
 describe("GameDetail", () => {
@@ -142,8 +135,7 @@ describe("GameDetail", () => {
 
     const view = renderInDom(<GameDetail />);
 
-    const image =
-      view.container.querySelector<HTMLImageElement>('img[alt="Alpha"]');
+    const image = view.container.querySelector<HTMLImageElement>('img[alt="Alpha"]');
     expect(image).not.toBeNull();
     expect(image?.getAttribute("src")).toBe(cachedGame.coverUrl);
     expect(image?.parentElement?.style.viewTransitionName).toBe(
@@ -159,9 +151,9 @@ describe("GameDetail", () => {
 
     const view = renderInDom(<GameDetail />);
 
-    const shortcutHandler = useShortcutMock.mock.calls.find(
-      (call) => call[0] === "escape",
-    )?.[1] as (() => void) | undefined;
+    const shortcutHandler = useShortcutMock.mock.calls.find((call) => call[0] === "escape")?.[1] as
+      | (() => void)
+      | undefined;
 
     expect(shortcutHandler).toBeDefined();
 

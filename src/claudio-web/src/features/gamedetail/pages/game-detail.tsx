@@ -4,27 +4,17 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useAuth } from "../../auth/hooks/use-auth";
 import { api } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
-import {
-  useInputScope,
-  useInputScopeState,
-} from "../../core/hooks/use-input-scope";
+import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { isMac } from "../../core/utils/os";
 import { sounds } from "../../core/utils/sounds";
-import {
-  useDesktop,
-  type InstalledGame,
-} from "../../desktop/hooks/use-desktop";
+import { useDesktop, type InstalledGame } from "../../desktop/hooks/use-desktop";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import BrowseFilesDialog from "../components/browse-files-dialog";
 import GameDetailActions from "../components/game-detail-actions";
 import GameDetailOverview from "../components/game-detail-overview";
-import {
-  getGameCoverViewTransitionName,
-  isPcPlatform,
-  type BrowseResponse,
-} from "../shared";
+import { getGameCoverViewTransitionName, isPcPlatform, type BrowseResponse } from "../shared";
 
 export default function GameDetail() {
   const { id } = useParams();
@@ -56,9 +46,7 @@ export default function GameDetail() {
       return;
     }
 
-    navigateToLibrary(
-      !!cachedGame?.coverUrl || !!game?.coverUrl || !!installedGame?.coverUrl,
-    );
+    navigateToLibrary(!!cachedGame?.coverUrl || !!game?.coverUrl || !!installedGame?.coverUrl);
   });
 
   const handleMainKeyDown = useArrowNav(mainReference, {
@@ -67,9 +55,7 @@ export default function GameDetail() {
   });
 
   const cachedGames = queryClient.getQueryData<Game[]>(["games"]);
-  const cachedGamesUpdatedAt = queryClient.getQueryState([
-    "games",
-  ])?.dataUpdatedAt;
+  const cachedGamesUpdatedAt = queryClient.getQueryState(["games"])?.dataUpdatedAt;
   const cachedGame = cachedGames?.find((entry) => String(entry.id) === id);
 
   const { data: game, isLoading } = useQuery({
@@ -94,9 +80,7 @@ export default function GameDetail() {
   const { data: browseData, isLoading: browseLoading } = useQuery({
     queryKey: ["browse", id, browsePath],
     queryFn: () =>
-      api.get<BrowseResponse>(
-        `/games/${id}/browse?path=${encodeURIComponent(browsePath ?? "")}`,
-      ),
+      api.get<BrowseResponse>(`/games/${id}/browse?path=${encodeURIComponent(browsePath ?? "")}`),
     enabled: browsePath !== null,
   });
 
@@ -110,17 +94,13 @@ export default function GameDetail() {
     enabled: !!id,
   });
 
-  const displayGame = useMemo(
-    () => mergeDisplayGame(game, installedGame),
-    [game, installedGame],
-  );
+  const displayGame = useMemo(() => mergeDisplayGame(game, installedGame), [game, installedGame]);
   const useLibraryViewTransition = !!displayGame?.coverUrl;
   const isDesktopPcGame =
     isDesktop && !isMac && !!displayGame && isPcPlatform(displayGame.platform);
   const isDesktopPcDownload =
     isDesktop && isMac && !!displayGame && isPcPlatform(displayGame.platform);
-  const needsInstallerExe =
-    game?.installType === "installer" && !game.installerExe;
+  const needsInstallerExe = game?.installType === "installer" && !game.installerExe;
   const needsGameExe = game?.installType === "portable" && !game.gameExe;
   const installExeLabel = needsInstallerExe
     ? "Setup Executable"
@@ -153,10 +133,7 @@ export default function GameDetail() {
     return (
       <main className="max-w-5xl mx-auto px-6 py-24 text-center flex-1 w-full">
         <p className="text-text-muted">Game not found</p>
-        <Link
-          to="/"
-          className="text-accent hover:underline text-sm mt-2 inline-block"
-        >
+        <Link to="/" className="text-accent hover:underline text-sm mt-2 inline-block">
           Back to library
         </Link>
       </main>
@@ -196,8 +173,7 @@ export default function GameDetail() {
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" || event.key === "ArrowRight") {
               event.preventDefault();
-              const first =
-                mainReference.current?.querySelector<HTMLElement>("[data-nav]");
+              const first = mainReference.current?.querySelector<HTMLElement>("[data-nav]");
               if (first) {
                 first.focus();
                 void sounds.navigate();
@@ -230,11 +206,7 @@ export default function GameDetail() {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
           Library
         </Link>
@@ -245,9 +217,7 @@ export default function GameDetail() {
               style={
                 displayGame.coverUrl
                   ? {
-                      viewTransitionName: getGameCoverViewTransitionName(
-                        displayGame.id,
-                      ),
+                      viewTransitionName: getGameCoverViewTransitionName(displayGame.id),
                     }
                   : undefined
               }
