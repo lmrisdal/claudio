@@ -160,7 +160,7 @@ describe("GameDetail", () => {
     const view = renderInDom(<GameDetail />);
 
     const shortcutHandler = useShortcutMock.mock.calls.find(
-      ([key]: [string]) => key === "escape",
+      (call) => call[0] === "escape",
     )?.[1] as (() => void) | undefined;
 
     expect(shortcutHandler).toBeDefined();
