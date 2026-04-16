@@ -38,6 +38,11 @@ export default function GameDetail() {
   const focusAnchorReference = useRef<HTMLDivElement>(null);
   const [browsePath, setBrowsePath] = useState<string | null>(null);
 
+  function navigateToLibrary(useViewTransition: boolean) {
+    void sounds.back();
+    void navigate("/", { viewTransition: useViewTransition });
+  }
+
   useInputScope({ id: "game-detail-page", kind: "page" });
 
   useShortcut("escape", () => {
@@ -51,8 +56,9 @@ export default function GameDetail() {
       return;
     }
 
-    void sounds.back();
-    void navigate("/");
+    navigateToLibrary(
+      !!cachedGame?.coverUrl || !!game?.coverUrl || !!installedGame?.coverUrl,
+    );
   });
 
   const handleMainKeyDown = useArrowNav(mainReference, {
@@ -108,6 +114,7 @@ export default function GameDetail() {
     () => mergeDisplayGame(game, installedGame),
     [game, installedGame],
   );
+  const useLibraryViewTransition = !!displayGame?.coverUrl;
   const isDesktopPcGame =
     isDesktop && !isMac && !!displayGame && isPcPlatform(displayGame.platform);
   const isDesktopPcDownload =
@@ -203,7 +210,7 @@ export default function GameDetail() {
 
         <Link
           to="/"
-          viewTransition={!!displayGame.coverUrl}
+          viewTransition={useLibraryViewTransition}
           data-nav
           onKeyDown={(event) => {
             if (event.key === "Enter") {
