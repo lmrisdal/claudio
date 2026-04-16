@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
+import { getGameCoverViewTransitionName } from "../../gamedetail/shared";
 
 export default function GameCard({
   game,
@@ -12,12 +13,21 @@ export default function GameCard({
   return (
     <Link
       to={`/games/${game.id}`}
+      viewTransition={!!game.coverUrl}
       data-game-id={game.id}
       onMouseEnter={() => onPreviewStart?.(game)}
       onFocus={() => onPreviewStart?.(game)}
       className={`group outline-none ${game.isMissing ? "opacity-50" : ""}`}
     >
-      <div className="aspect-2/3 bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:outline-2 group-focus-visible:outline-focus-ring group-focus-visible:outline-offset-4 transition-all duration-200 relative">
+      <div
+        data-game-cover
+        style={
+          game.coverUrl
+            ? { viewTransitionName: getGameCoverViewTransitionName(game.id) }
+            : undefined
+        }
+        className="aspect-2/3 bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:outline-2 group-focus-visible:outline-focus-ring group-focus-visible:outline-offset-4 transition-all duration-200 relative"
+      >
         {game.isMissing && (
           <div className="absolute top-2 right-2 z-10 bg-red-500/90 text-white text-[10px] font-bold uppercase px-1.5 py-0.5 rounded">
             Missing

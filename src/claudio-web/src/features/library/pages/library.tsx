@@ -15,6 +15,7 @@ import type { Game, TasksStatus } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 import { sounds } from "../../core/utils/sounds";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
+import { loadGameDetailPage } from "../../gamedetail/load-game-detail-page";
 import GameCard from "../components/game-card";
 
 let lastFocusedGameId: string | null = null;
@@ -132,11 +133,35 @@ export default function Library() {
     });
   }, []);
 
-  const saveGridFocus = useCallback(() => {
-    const active = document.activeElement as HTMLElement;
-    const gameId = active?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
-    if (gameId) lastFocusedGameId = gameId;
+  const handleGamePreviewStart = useCallback(
+    (game: Game) => {
+      preloadHeaderImage(game.heroUrl);
+      void loadGameDetailPage();
+    },
+    [preloadHeaderImage],
+  );
+
+  const saveFocusedGameId = useCallback((gameId?: string | number | null) => {
+    if (gameId !== null && gameId !== undefined) {
+      lastFocusedGameId = String(gameId);
+    }
   }, []);
+
+  const saveGridFocus = useCallback(
+    (target?: EventTarget | null) => {
+      if (target instanceof HTMLElement) {
+        const gameId = target.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
+        if (gameId) {
+          saveFocusedGameId(gameId);
+          return;
+        }
+      }
+
+      const active = document.activeElement as HTMLElement;
+      saveFocusedGameId(active?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId);
+    },
+    [saveFocusedGameId],
+  );
 
   const handleDirectionalNavigation = useCallback(
     (key: string) => {
@@ -835,19 +860,19 @@ export default function Library() {
         <div
           ref={gridReference}
           onKeyDown={handleGridKeyDown}
-          onClick={saveGridFocus}
+          onClick={(event) => saveGridFocus(event.target)}
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
         >
           {filtered.map((game) => (
-            <GameCard
-              key={game.id}
-              game={game}
-              onPreviewStart={(g) => preloadHeaderImage(g.heroUrl)}
-            />
+            <GameCard key={game.id} game={game} onPreviewStart={handleGamePreviewStart} />
           ))}
         </div>
       ) : view === "grouped" ? (
-        <div ref={gridReference} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
+        <div
+          ref={gridReference}
+          onKeyDown={handleGridKeyDown}
+          onClick={(event) => saveGridFocus(event.target)}
+        >
           {Object.entries(grouped).map(([p, games]) => (
             <section key={p} className="mb-10">
               <button
@@ -882,11 +907,7 @@ export default function Library() {
               {!collapsedGroups.has(p) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
                   {games.map((game) => (
-                    <GameCard
-                      key={game.id}
-                      game={game}
-                      onPreviewStart={(g) => preloadHeaderImage(g.heroUrl)}
-                    />
+                    <GameCard key={game.id} game={game} onPreviewStart={handleGamePreviewStart} />
                   ))}
                 </div>
               )}
@@ -894,7 +915,11 @@ export default function Library() {
           ))}
         </div>
       ) : (
-        <div ref={gridReference} onKeyDown={handleGridKeyDown} onClick={saveGridFocus}>
+        <div
+          ref={gridReference}
+          onKeyDown={handleGridKeyDown}
+          onClick={(event) => saveGridFocus(event.target)}
+        >
           <table className="w-full text-sm table-fixed">
             <colgroup>
               <col className="w-25" />
@@ -943,7 +968,10 @@ export default function Library() {
               {sorted.map((game) => (
                 <tr
                   key={game.id}
-                  onClick={() => navigate(`/games/${game.id}`)}
+                  onClick={() => {
+                    saveFocusedGameId(game.id);
+                    void navigate(`/games/${game.id}`);
+                  }}
                   onMouseEnter={() => preloadHeaderImage(game.heroUrl)}
                   className="border-b border-border/50 hover:bg-surface-raised/50 transition-colors cursor-pointer"
                 >

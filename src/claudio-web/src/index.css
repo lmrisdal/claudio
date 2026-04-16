@@ -440,3 +440,8 @@ html[data-desktop] [role="button"] {
     background-image: none;
   }
 }
+
+::view-transition-group(*) {
+  /* animation-duration: 150ms; */
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}

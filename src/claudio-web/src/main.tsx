@@ -1,10 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router";
-import App from "./app";
+import { RouterProvider } from "react-router/dom";
+import { appRouter } from "./app-router";
 import AuthProvider from "./features/auth/components/auth-provider";
-import NavigationProvider from "./features/core/components/navigation-provider";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
@@ -53,21 +52,17 @@ const queryClient = new QueryClient({
 createRoot(document.querySelector("#root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ServerStatusProvider>
-          <AuthProvider>
-            <InputScopeProvider>
-              <SettingsDialogProvider>
-                <NavigationProvider>
-                  <main data-ui-scroll-container>
-                    <App />
-                  </main>
-                </NavigationProvider>
-              </SettingsDialogProvider>
-            </InputScopeProvider>
-          </AuthProvider>
-        </ServerStatusProvider>
-      </BrowserRouter>
+      <ServerStatusProvider>
+        <AuthProvider>
+          <InputScopeProvider>
+            <SettingsDialogProvider>
+              <main data-ui-scroll-container>
+                <RouterProvider router={appRouter} />
+              </main>
+            </SettingsDialogProvider>
+          </InputScopeProvider>
+        </AuthProvider>
+      </ServerStatusProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

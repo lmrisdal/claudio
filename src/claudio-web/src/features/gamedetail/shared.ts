@@ -6,6 +6,10 @@ export function isPcPlatform(platform: string) {
   return pcPlatforms.has(platform.toLowerCase());
 }
 
+export function getGameCoverViewTransitionName(gameId: number | string) {
+  return `game-cover-${gameId}`;
+}
+
 export interface BrowseEntry {
   name: string;
   isDirectory: boolean;

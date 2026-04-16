@@ -65,6 +65,11 @@ beforeEach(() => {
     return { data: undefined, isLoading: false };
   });
   HTMLElement.prototype.scrollIntoView = vi.fn();
+  globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+    callback(0);
+    return 0;
+  });
+  globalThis.cancelAnimationFrame = vi.fn();
 });
 
 afterEach(() => {
@@ -192,5 +197,34 @@ describe("Library", () => {
     expect(view.container.textContent).toContain("Alpha");
     expect(view.container.textContent).toContain("Beta");
     view.unmount();
+  });
+
+  it("restores the clicked game after mouse navigation back to the library", () => {
+    localStorage.setItem("library-view", "grid");
+    const firstView = renderInDom(
+      <InputScopeProvider>
+        <Library />
+      </InputScopeProvider>,
+    );
+
+    const firstLinks = firstView.container.querySelectorAll<HTMLAnchorElement>("a[data-game-id]");
+    expect(firstLinks).toHaveLength(3);
+
+    act(() => {
+      firstLinks[1]?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    firstView.unmount();
+
+    const secondView = renderInDom(
+      <InputScopeProvider>
+        <Library />
+      </InputScopeProvider>,
+    );
+
+    const secondLinks = secondView.container.querySelectorAll<HTMLAnchorElement>("a[data-game-id]");
+    expect(document.activeElement).toBe(secondLinks[1]);
+
+    secondView.unmount();
   });
 });
