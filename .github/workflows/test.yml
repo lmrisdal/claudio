@@ -15,13 +15,13 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - run: dotnet restore tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj
+      - run: dotnet restore tests/claudio-api/Claudio.Api.Tests.csproj
 
-      - run: dotnet build tests/Claudio.Api.Tests/Claudio.Api.Tests.csproj --no-restore
+      - run: dotnet build tests/claudio-api/Claudio.Api.Tests.csproj --no-restore
 
       - name: Run tests with coverage
         run: |
-          dotnet test --project tests/Claudio.Api.Tests --no-build \
+          dotnet test --project tests/claudio-api --no-build \
             --results-directory $RUNNER_TEMP/TestResults \
             -- --coverage --coverage-output-format cobertura
 
