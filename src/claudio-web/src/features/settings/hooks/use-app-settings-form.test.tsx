@@ -8,8 +8,11 @@ import { useAppSettingsForm } from "./use-app-settings-form";
 const getSettingsMock = vi.fn();
 const resolveDefaultDownloadRootMock = vi.fn();
 const updateSettingsMock = vi.fn();
+const desktopCheckServerConnectionMock = vi.fn();
 
 vi.mock("../../desktop/hooks/use-desktop", () => ({
+  desktopCheckServerConnection: (...arguments_: unknown[]) =>
+    desktopCheckServerConnectionMock(...arguments_),
   getSettings: (...arguments_: unknown[]) => getSettingsMock(...arguments_),
   resolveDefaultDownloadRoot: (...arguments_: unknown[]) =>
     resolveDefaultDownloadRootMock(...arguments_),
@@ -26,6 +29,16 @@ function TestHarness() {
         value={form.downloadPath}
         onChange={(event) => form.setDownloadPath(event.target.value)}
       />
+      <button
+        type="button"
+        data-testid="test"
+        onClick={() => {
+          void form.handleTest();
+        }}
+      >
+        Test
+      </button>
+      <div data-testid="connection-message">{form.connectionMessage}</div>
       <button
         type="button"
         data-testid="save"
@@ -84,8 +97,10 @@ describe("useAppSettingsForm", () => {
     getSettingsMock.mockReset();
     resolveDefaultDownloadRootMock.mockReset();
     updateSettingsMock.mockReset();
+    desktopCheckServerConnectionMock.mockReset();
     getSettingsMock.mockResolvedValue(baseSettings);
     resolveDefaultDownloadRootMock.mockResolvedValue(appDefaultDownloads);
+    desktopCheckServerConnectionMock.mockResolvedValue({ ok: true, status: 200 });
   });
 
   afterEach(() => {
@@ -193,5 +208,32 @@ describe("useAppSettingsForm", () => {
     expect(updateSettingsMock).toHaveBeenCalledTimes(1);
     const saved = updateSettingsMock.mock.calls[0]?.[0];
     expect(saved.defaultDownloadPath).toBe("D:/Custom/Downloads");
+  });
+
+  it("tests connection with unsaved custom headers through the desktop command", async () => {
+    getSettingsMock.mockResolvedValue({
+      ...baseSettings,
+      customHeaders: { "X-Saved": "saved" },
+    });
+    desktopCheckServerConnectionMock.mockResolvedValue({ ok: false, status: 401 });
+
+    const view = renderInDom(<TestHarness />);
+
+    await flushFormLoad();
+
+    await act(async () => {
+      const testButton = view.container.querySelector<HTMLButtonElement>('[data-testid="test"]');
+      testButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(desktopCheckServerConnectionMock).toHaveBeenCalledWith({
+      serverUrl: "https://example.com",
+      customHeaders: { "X-Saved": "saved" },
+      path: "/api/auth/providers",
+    });
+
+    const message = view.container.querySelector('[data-testid="connection-message"]');
+    expect(message?.textContent).toBe("Server responded with 401.");
   });
 });

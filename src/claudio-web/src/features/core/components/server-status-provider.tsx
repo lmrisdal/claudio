@@ -1,35 +1,27 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { isDesktop } from "../../desktop/hooks/use-desktop";
+import { desktopCheckServerConnection, isDesktop } from "../../desktop/hooks/use-desktop";
 import { ServerStatusContext } from "../hooks/use-server-status";
 
 const HEALTH_TIMEOUT_MS = 3000;
 const CONNECTED_POLL_INTERVAL_MS = 30_000;
 const DISCONNECTED_POLL_INTERVAL_MS = 5000;
 
-function parseCustomHeaders(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem("claudio_custom_headers");
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
-}
-
 async function checkDesktopServerHealth(signal: AbortSignal): Promise<boolean> {
-  const serverUrl = localStorage.getItem("claudio_server_url")?.trim();
-  if (!serverUrl) {
-    return true;
-  }
-
   try {
-    const healthUrl = `${serverUrl.replace(/\/+$/, "")}/health`;
-    const response = await fetch(healthUrl, {
-      method: "GET",
-      headers: parseCustomHeaders(),
-      signal,
-    });
+    const response = await Promise.race([
+      desktopCheckServerConnection({ path: "/health" }),
+      new Promise<never>((_, reject) => {
+        signal.addEventListener(
+          "abort",
+          () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          },
+          { once: true },
+        );
+      }),
+    ]);
 
     return response.ok;
   } catch {

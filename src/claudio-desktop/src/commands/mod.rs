@@ -1,5 +1,6 @@
 pub mod games;
 pub mod ping;
+pub mod server_connection;
 
 use crate::{auth, refresh_auth_state_ui, settings};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};

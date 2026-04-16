@@ -35,6 +35,11 @@ interface PingResponse {
   platform: string;
 }
 
+interface DesktopServerConnectionResult {
+  ok: boolean;
+  status: number | null;
+}
+
 interface DownloadPackageInput {
   id: number;
   title: string;
@@ -110,6 +115,14 @@ interface RunningGame {
 
 export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
+}
+
+export async function desktopCheckServerConnection(input?: {
+  serverUrl?: string | null;
+  customHeaders?: Record<string, string> | null;
+  path?: string;
+}): Promise<DesktopServerConnectionResult> {
+  return invoke<DesktopServerConnectionResult>("desktop_check_server_connection", input);
 }
 
 export async function getSettings(): Promise<DesktopSettings> {
@@ -236,6 +249,7 @@ export function useDesktop() {
     desktopCompleteExternalLogin,
     desktopProxyLogin,
     desktopLogout,
+    desktopCheckServerConnection,
     ping,
     getSettings,
     updateSettings,
@@ -257,5 +271,6 @@ export type {
   InstalledGame,
   InstallProgress,
   PingResponse,
+  DesktopServerConnectionResult,
   RunningGame,
 };

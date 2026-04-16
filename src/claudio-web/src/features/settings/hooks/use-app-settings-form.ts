@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  desktopCheckServerConnection,
   getSettings,
   resolveDefaultDownloadRoot,
   updateSettings,
   type DesktopSettings,
 } from "../../desktop/hooks/use-desktop";
+import { getConnectionErrorMessage } from "../../desktop/utils/connection-check";
 import { buildDesktopCustomHeaders } from "../../desktop/utils/custom-headers";
 
 type HeaderField = { name: string; value: string };
@@ -142,17 +144,19 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         return;
       }
 
-      const response = await fetch(`${trimmedUrl}/api/auth/providers`, {
-        headers: customHeaders,
+      const result = await desktopCheckServerConnection({
+        serverUrl: trimmedUrl,
+        customHeaders,
+        path: "/api/auth/providers",
       });
 
-      if (response.ok) {
+      if (result.ok) {
         setConnectionMessage("Connection successful.");
       } else {
-        setConnectionMessage(`Server responded with ${response.status}.`);
+        setConnectionMessage(getConnectionErrorMessage(result.status));
       }
     } catch {
-      setConnectionMessage("Could not connect. Check the URL and try again.");
+      setConnectionMessage(getConnectionErrorMessage());
     } finally {
       setTesting(false);
     }

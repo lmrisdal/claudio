@@ -248,6 +248,7 @@ pub fn run() {
             commands::desktop_logout,
             commands::desktop_proxy_login,
             commands::ping::ping,
+            commands::server_connection::desktop_check_server_connection,
             commands::get_settings,
             commands::update_settings,
             commands::restart_app,

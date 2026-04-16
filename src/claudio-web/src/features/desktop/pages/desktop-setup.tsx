@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Logo from "../../core/components/logo";
 import { useDesktop } from "../hooks/use-desktop";
+import { getConnectionErrorMessage } from "../utils/connection-check";
 import { buildDesktopCustomHeaders } from "../utils/custom-headers";
 
 export default function DesktopSetup({
@@ -8,7 +9,7 @@ export default function DesktopSetup({
 }: {
   onConnected: (serverUrl: string) => void;
 }) {
-  const { getSettings, updateSettings } = useDesktop();
+  const { getSettings, updateSettings, desktopCheckServerConnection } = useDesktop();
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState<{ name: string; value: string }[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
@@ -71,18 +72,20 @@ export default function DesktopSetup({
         return;
       }
 
-      const res = await fetch(`${trimmed}/api/auth/providers`, {
-        headers: customHeaders,
+      const result = await desktopCheckServerConnection({
+        serverUrl: trimmed,
+        customHeaders,
+        path: "/api/auth/providers",
       });
-      if (res.ok) {
+      if (result.ok) {
         setTestResult("success");
       } else {
         setTestResult("error");
-        setError(`Server responded with ${res.status}.`);
+        setError(getConnectionErrorMessage(result.status));
       }
     } catch {
       setTestResult("error");
-      setError("Could not connect. Check the URL and make sure the server is running.");
+      setError(getConnectionErrorMessage());
     } finally {
       setTesting(false);
     }
@@ -120,146 +123,148 @@ export default function DesktopSetup({
   }
 
   return (
-    <div className="min-h-screen bg-grid app-overlay-scrim app-modal-backdrop-blur flex items-center justify-center p-6">
+    <div className="auth-shell min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Logo className="text-3xl mx-auto mb-4" />
-          <p className="text-text-secondary text-sm">
+        <div className="text-center mb-10">
+          <Logo className="text-5xl mx-auto" />
+          <p className="text-text-muted text-sm mt-3">
             Connect to your Claudio server to get started.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="server-url"
-              className="block text-sm font-medium text-text-secondary mb-1.5"
-            >
-              Server URL
-            </label>
-            <input
-              id="server-url"
-              type="url"
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                setTestResult("");
-              }}
-              placeholder="https://claudio.example.com…"
-              autoFocus
-              spellCheck={false}
-              autoComplete="url"
-              className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowHeaders(!showHeaders)}
-              className="text-xs text-text-muted hover:text-text-secondary transition flex items-center gap-1"
-            >
-              <svg
-                className={`w-3 h-3 transition-transform ${showHeaders ? "rotate-90" : ""}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+        <div className="card auth-card bg-surface rounded-xl p-6 ring-1 ring-border">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                htmlFor="server-url"
+                className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-              Custom headers
-            </button>
-            {showHeaders && (
-              <div className="mt-2 space-y-2">
-                {headers.map((h, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={h.name}
-                      onChange={(e) => {
-                        const next = [...headers];
-                        next[index] = { ...h, name: e.target.value };
-                        setHeaders(next);
-                      }}
-                      placeholder="Header name…"
-                      spellCheck={false}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={h.value}
-                      onChange={(e) => {
-                        const next = [...headers];
-                        next[index] = { ...h, value: e.target.value };
-                        setHeaders(next);
-                      }}
-                      placeholder="Value…"
-                      spellCheck={false}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setHeaders(headers.filter((_, index_) => index_ !== index))}
-                      className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
-                      aria-label="Remove header"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setHeaders([...headers, { name: "", value: "" }])}
-                  className="text-xs text-accent hover:text-accent-hover transition"
+                Server URL
+              </label>
+              <input
+                id="server-url"
+                type="url"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  setTestResult("");
+                }}
+                placeholder="https://claudio.example.com…"
+                autoFocus
+                spellCheck={false}
+                autoComplete="url"
+                className="input-field w-full bg-surface-raised border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
+              />
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowHeaders(!showHeaders)}
+                className="text-xs text-text-muted hover:text-text-secondary transition flex items-center gap-1"
+              >
+                <svg
+                  className={`w-3 h-3 transition-transform ${showHeaders ? "rotate-90" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
                 >
-                  + Add header
-                </button>
-              </div>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                Custom headers
+              </button>
+              {showHeaders && (
+                <div className="mt-3 space-y-2">
+                  {headers.map((h, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={h.name}
+                        onChange={(e) => {
+                          const next = [...headers];
+                          next[index] = { ...h, name: e.target.value };
+                          setHeaders(next);
+                        }}
+                        placeholder="Header name…"
+                        spellCheck={false}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
+                      />
+                      <input
+                        type="text"
+                        value={h.value}
+                        onChange={(e) => {
+                          const next = [...headers];
+                          next[index] = { ...h, value: e.target.value };
+                          setHeaders(next);
+                        }}
+                        placeholder="Value…"
+                        spellCheck={false}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-muted text-xs focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setHeaders(headers.filter((_, index_) => index_ !== index))}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-surface-raised transition"
+                        aria-label="Remove header"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setHeaders([...headers, { name: "", value: "" }])}
+                    className="text-xs text-accent hover:text-accent-hover transition"
+                  >
+                    + Add header
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p className="text-red-400 text-sm" role="alert">
+                {error}
+              </p>
             )}
-          </div>
+            {testResult === "success" && (
+              <p className="text-accent text-sm" role="status">
+                Connection successful.
+              </p>
+            )}
 
-          {error && (
-            <p className="text-red-400 text-sm" role="alert">
-              {error}
-            </p>
-          )}
-          {testResult === "success" && (
-            <p className="text-accent text-sm" role="status">
-              Connection successful.
-            </p>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={testing || !url.trim()}
-              className="px-4 py-2.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-surface-raised text-sm transition disabled:opacity-60"
-            >
-              {testing ? "Testing…" : "Test connection"}
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !url.trim()}
-              className="flex-1 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-accent-foreground font-medium text-sm transition disabled:opacity-60"
-            >
-              {saving ? "Saving…" : "Save & continue"}
-            </button>
-          </div>
-        </form>
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={testing || !url.trim()}
+                className="px-4 py-2.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-surface-raised text-sm transition disabled:opacity-60"
+              >
+                {testing ? "Testing…" : "Test connection"}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !url.trim()}
+                className="flex-1 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-accent-foreground font-semibold text-sm transition disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save & continue"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
