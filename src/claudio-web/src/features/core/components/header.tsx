@@ -32,6 +32,7 @@ export default function Header() {
   const settingsDialog = useSettingsDialog();
   const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
   const desktopHeaderRowHeight = isDesktop ? { height: HEADER_HEIGHT } : undefined;
+  const headerBackdropClass = isDesktop ? "desktop-header-backdrop" : "bg-bg-blur";
 
   useEffect(() => {
     if (!isDesktop) {
@@ -50,12 +51,17 @@ export default function Header() {
     <>
       <header
         data-tauri-drag-region={isDesktop || undefined}
-        className={`app-blur-surface border-b ${isDesktop ? "border-border/50" : "border-border"} z-50 bg-bg-blur fixed top-0 inset-x-0`}
+        className="z-50 fixed top-0 inset-x-0"
       >
         <div
+          aria-hidden="true"
+          style={{ viewTransitionName: "app-header-backdrop" }}
+          className={`app-blur-surface border-b ${isDesktop ? "border-border/50" : "border-border"} ${headerBackdropClass} absolute inset-0 pointer-events-none`}
+        />
+        <div
           data-tauri-drag-region={isDesktop || undefined}
-          style={desktopHeaderRowHeight}
-          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-1") : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} flex items-center justify-between gap-4`}
+          style={{ ...desktopHeaderRowHeight, viewTransitionName: "app-header-content" }}
+          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-1") : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} relative flex items-center justify-between gap-4`}
         >
           {isDesktop ? (
             <div

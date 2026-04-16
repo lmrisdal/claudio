@@ -55,67 +55,33 @@ export const appRouter = createBrowserRouter(
       )}
       <Route path="/auth/callback" element={<ExternalAuthCallback />} />
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <DesktopLayout>
-              <Library />
-            </DesktopLayout>
+            <DesktopLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/games/:id"
-        element={
-          <ProtectedRoute>
-            <DesktopLayout>
-              <GameDetail />
-            </DesktopLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/games/:id/edit"
-        element={
-          <AdminRoute>
-            <DesktopLayout>
-              <GameEdit />
-            </DesktopLayout>
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="/games/:id/play"
-        element={
-          <ProtectedRoute>
-            <DesktopLayout>
-              <GameEmulator />
-            </DesktopLayout>
-          </ProtectedRoute>
-        }
-      />
-      {isDesktop && (
+      >
+        <Route index element={<Library />} />
+        <Route path="games/:id" element={<GameDetail />} />
         <Route
-          path="/downloads"
+          path="games/:id/edit"
           element={
-            <ProtectedRoute>
-              <DesktopLayout>
-                <Downloads />
-              </DesktopLayout>
-            </ProtectedRoute>
+            <AdminRoute>
+              <GameEdit />
+            </AdminRoute>
           }
         />
-      )}
-      <Route
-        path="/admin"
-        element={
-          <AdminRoute>
-            <DesktopLayout>
+        <Route path="games/:id/play" element={<GameEmulator />} />
+        {isDesktop && <Route path="downloads" element={<Downloads />} />}
+        <Route
+          path="admin"
+          element={
+            <AdminRoute>
               <Admin />
-            </DesktopLayout>
-          </AdminRoute>
-        }
-      />
+            </AdminRoute>
+          }
+        />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>,
   ),

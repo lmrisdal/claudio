@@ -111,8 +111,8 @@ export default function DesktopLayoutInner({ children }: { children: React.React
         ref={contentReference}
         style={{
           marginLeft,
-          marginTop: HEADER_HEIGHT,
-          height: `calc(100dvh - ${HEADER_HEIGHT}px)`,
+          paddingTop: HEADER_HEIGHT,
+          height: "100dvh",
         }}
         className={`flex flex-col min-h-0 overflow-y-auto overflow-x-hidden ${animateMargin ? "transition-[margin-left] duration-200 ease-in-out" : ""}`}
       >
