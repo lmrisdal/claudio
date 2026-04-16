@@ -7,7 +7,7 @@ export default function DesktopLayout({ children }: { children: React.ReactNode 
     return (
       <>
         <Header />
-        {children}
+        <div className="flex-1 flex flex-col min-h-0 pt-14">{children}</div>
       </>
     );
   }

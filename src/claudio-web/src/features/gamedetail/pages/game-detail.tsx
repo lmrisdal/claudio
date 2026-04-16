@@ -158,19 +158,24 @@ export default function GameDetail() {
 
   return (
     <div className="relative flex-1 w-full">
-      {displayGame.heroUrl && (
+      {displayGame.heroUrl ? (
         <div
-          className="game-hero-backdrop pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden"
+          className="game-hero-backdrop pointer-events-none absolute inset-x-0 -top-14 h-72 overflow-hidden"
           aria-hidden="true"
         >
           <img
             src={displayGame.heroUrl}
             alt=""
-            className="w-full h-full object-cover opacity-60"
+            className="game-hero-backdrop-blur absolute inset-0 h-full w-full object-cover"
+          />
+          <img
+            src={displayGame.heroUrl}
+            alt=""
+            className="game-hero-backdrop-image top-14 relative z-1 h-full w-full object-cover object-center"
           />
           <div className="game-hero-overlay absolute inset-0" />
         </div>
-      )}
+      ) : null}
 
       <main
         ref={mainReference}

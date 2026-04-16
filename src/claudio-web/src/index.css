@@ -177,6 +177,11 @@ body {
   background-color: var(--overlay-scrim-strong);
 }
 
+.app-blur-surface {
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
 .app-modal-backdrop-blur {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -195,6 +200,7 @@ body {
 }
 
 .game-hero-backdrop {
+  isolation: isolate;
   mask-image: linear-gradient(
     to bottom,
     rgb(0 0 0 / 0.95) 0%,
@@ -209,8 +215,25 @@ body {
   );
 }
 
+.game-hero-backdrop-blur {
+  filter: blur(14px) saturate(1.2);
+  opacity: 1;
+  transform: scale(1.12);
+  transform-origin: center center;
+}
+
+.game-hero-backdrop-image {
+  opacity: 1;
+  transform: scale(1.02);
+  transform-origin: center top;
+}
+
 .game-hero-overlay {
-  background: linear-gradient(to top, var(--desktop-main-panel-bg) 0%, transparent 58%);
+  z-index: 2;
+  background:
+    linear-gradient(to top, var(--desktop-main-panel-bg) 0%, transparent 62%),
+    linear-gradient(90deg, rgb(6 10 18 / 0.28) 0%, transparent 42%, rgb(6 10 18 / 0.18) 100%),
+    radial-gradient(circle at top center, rgb(255 255 255 / 0.12), transparent 48%);
 }
 
 .guide-reduced-hover-surface,
