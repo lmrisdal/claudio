@@ -183,7 +183,7 @@ body {
 }
 
 .desktop-header-backdrop {
-  background-color: var(--desktop-header-blur);
+  background-color: var(--surface);
 }
 
 .app-modal-backdrop-blur {

@@ -163,7 +163,6 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 - Focus states are clearly visible, and the tab order is logical and intuitive.
 - Arrow keys and gamepad navigation work seamlessly for browsing game lists, menus, and dialogs.
 - Dialogs trap focus and can be dismissed with Escape key or gamepad B button. When more dialogs are added, ensure they stack properly and manage focus correctly.
-- Navigating with a controller or keyboard should play navigation sounds and provide haptic feedback (if supported) for a responsive, console-like experience if enabled with the global user preferences toggle. Navigating with a mouse should not play navigation sounds.
 
 ## Git Conventions
 
