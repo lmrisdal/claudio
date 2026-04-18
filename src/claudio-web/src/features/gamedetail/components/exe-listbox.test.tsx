@@ -2,19 +2,11 @@
 
 import { useRef } from "react";
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { InputScopeProvider, useInputScope } from "../../core/hooks/use-input-scope";
 import ExeListbox from "./exe-listbox";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
-
-vi.mock("../../core/utils/sounds", () => ({
-  sounds: {
-    navigate: vi.fn(async () => {}),
-    select: vi.fn(async () => {}),
-    back: vi.fn(async () => {}),
-  },
-}));
 
 function DialogHarness() {
   const containerReference = useRef<HTMLDivElement>(null);

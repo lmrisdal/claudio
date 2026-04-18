@@ -8,7 +8,6 @@ import {
 import { useInputScopeState } from "./use-input-scope";
 import { useGamepadEvent } from "./use-shortcut";
 import { isEditableTarget } from "../utils/dom";
-import { sounds } from "../utils/sounds";
 
 /**
  * Returns an onKeyDown handler for arrow-key navigation among [data-nav] elements
@@ -52,7 +51,6 @@ export function useArrowNav(
 
       if (nextIndex !== currentIndex) {
         items[nextIndex].focus({ focusVisible: true } as FocusOptions);
-        void sounds.navigate();
         return true;
       }
 

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { api } from "../../core/api/client";
 import { formatSize } from "../../core/utils/format";
-import { sounds } from "../../core/utils/sounds";
 
 export default function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   const [preparing, setPreparing] = useState(false);
@@ -25,9 +24,6 @@ export default function DownloadButton({ gameId, size }: { gameId: number; size:
   return (
     <button
       onClick={handleDownload}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") void sounds.download();
-      }}
       disabled={preparing}
       data-nav
       aria-label={preparing ? "Preparing download" : `Download ${size} bytes`}

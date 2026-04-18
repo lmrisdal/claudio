@@ -40,14 +40,6 @@ vi.mock("../components/game-card", () => ({
   ),
 }));
 
-vi.mock("../../core/utils/sounds", () => ({
-  sounds: {
-    navigate: vi.fn(async () => {}),
-    select: vi.fn(async () => {}),
-    back: vi.fn(async () => {}),
-  },
-}));
-
 const games = [
   { id: 1, title: "Alpha", platform: "pc", sizeBytes: 100, isMissing: false },
   { id: 2, title: "Beta", platform: "pc", sizeBytes: 120, isMissing: false },

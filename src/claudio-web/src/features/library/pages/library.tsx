@@ -13,7 +13,6 @@ import { useGamepadEvent } from "../../core/hooks/use-shortcut";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game, TasksStatus } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
-import { sounds } from "../../core/utils/sounds";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import { loadGameDetailPage } from "../../gamedetail/load-game-detail-page";
 import GameCard from "../components/game-card";
@@ -75,7 +74,6 @@ export default function Library() {
     (event) => {
       event.preventDefault();
       setPlatformDropdownOpen(false);
-      void sounds.back();
     },
     { enabled: platformDropdownOpen },
   );
@@ -181,11 +179,9 @@ export default function Library() {
             }
 
             focusVisible(firstElement);
-            void sounds.navigate();
             return true;
           }
           case "ArrowUp": {
-            void sounds.navigate();
             return true;
           }
           case "ArrowLeft": {
@@ -217,7 +213,6 @@ export default function Library() {
         }
 
         focusVisible(firstElement);
-        void sounds.navigate();
         return true;
       }
 
@@ -236,14 +231,12 @@ export default function Library() {
             // If group is expanded, go to first game card; otherwise next toggle
             if (firstLink) {
               focusVisible(firstLink);
-              void sounds.navigate();
               return true;
             }
 
             if (toggleIndex + 1 < toggles.length) {
               focusVisible(toggles[toggleIndex + 1]);
               toggles[toggleIndex + 1].scrollIntoView({ block: "nearest" });
-              void sounds.navigate();
               return true;
             }
 
@@ -268,19 +261,16 @@ export default function Library() {
                 focusVisible(toggles[toggleIndex - 1]);
                 toggles[toggleIndex - 1].scrollIntoView({ block: "nearest" });
               }
-              void sounds.navigate();
               return true;
             }
 
             focusAnchorReference.current?.focus();
             window.scrollTo({ top: 0, behavior: "smooth" });
-            void sounds.navigate();
             return true;
           }
           case "ArrowRight": {
             if (firstLink) {
               focusVisible(firstLink);
-              void sounds.navigate();
               return true;
             }
 
@@ -311,7 +301,6 @@ export default function Library() {
           const nextIndex = allIndex + 1;
           if (nextIndex < allLinks.length) {
             focusVisible(allLinks[nextIndex]);
-            void sounds.navigate();
             return true;
           }
 
@@ -325,7 +314,6 @@ export default function Library() {
           const nextIndex = allIndex - 1;
           if (nextIndex >= 0) {
             focusVisible(allLinks[nextIndex]);
-            void sounds.navigate();
             return true;
           }
 
@@ -335,7 +323,6 @@ export default function Library() {
           const nextIndex = scopedIndex + cols;
           if (nextIndex < scopedLinks.length) {
             focusVisible(scopedLinks[nextIndex]);
-            void sounds.navigate();
             return true;
           }
 
@@ -346,7 +333,6 @@ export default function Library() {
             // Not on the last row yet — go to same column on last row
             const target = Math.min(lastRowStart + currentCol, scopedLinks.length - 1);
             focusVisible(scopedLinks[target]);
-            void sounds.navigate();
             return true;
           }
 
@@ -357,7 +343,6 @@ export default function Library() {
           if (nextToggle) {
             focusVisible(nextToggle);
             nextToggle.scrollIntoView({ block: "nearest" });
-            void sounds.navigate();
             return true;
           }
 
@@ -367,7 +352,6 @@ export default function Library() {
           const nextIndex = scopedIndex - cols;
           if (nextIndex >= 0) {
             focusVisible(scopedLinks[nextIndex]);
-            void sounds.navigate();
             return true;
           }
 
@@ -377,13 +361,11 @@ export default function Library() {
           if (toggle) {
             focusVisible(toggle);
             toggle.scrollIntoView({ block: "nearest" });
-            void sounds.navigate();
             return true;
           }
 
           focusAnchorReference.current?.focus();
           window.scrollTo({ top: 0, behavior: "smooth" });
-          void sounds.navigate();
           return true;
         }
         default: {
@@ -416,7 +398,6 @@ export default function Library() {
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
         saveGridFocus();
-        void sounds.select();
         return;
       }
       if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) return;
@@ -483,7 +464,6 @@ export default function Library() {
       const target = firstLink ?? toggles[targetIndex];
       focusVisible(target);
       target.scrollIntoView({ block: "center", behavior: "smooth" });
-      void sounds.navigate();
     },
     [isActionBlocked],
   );

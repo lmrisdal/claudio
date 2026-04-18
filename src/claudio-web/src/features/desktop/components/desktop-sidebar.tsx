@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
-import { sounds } from "../../core/utils/sounds";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import { useDesktopShellNavigation } from "../hooks/use-desktop-shell-navigation";
 import {
@@ -129,23 +128,9 @@ export default function DesktopSidebar({
       }
 
       items[nextIndex].focus({ focusVisible: true } as FocusOptions);
-      void sounds.navigate();
       return true;
     },
     [navigationReference],
-  );
-
-  const playSelectSound = useCallback(() => {
-    void sounds.select();
-  }, []);
-
-  const handleSelectKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
-      if (event.key === "Enter" || event.key === " ") {
-        playSelectSound();
-      }
-    },
-    [playSelectSound],
   );
 
   const handleSidebarKeyDown = useCallback(
@@ -231,7 +216,6 @@ export default function DesktopSidebar({
           <Link
             key={item.to}
             to={item.to}
-            onKeyDown={handleSelectKeyDown}
             data-desktop-sidebar-nav
             data-desktop-sidebar-active={isActive(item.to) ? "true" : undefined}
             className={`flex items-center gap-3 rounded-lg transition text-sm font-medium ${
@@ -258,7 +242,6 @@ export default function DesktopSidebar({
         {/* Settings button */}
         <button
           onClick={() => globalThis.dispatchEvent(new CustomEvent("claudio:open-desktop-settings"))}
-          onKeyDown={handleSelectKeyDown}
           data-desktop-sidebar-nav
           className={`flex items-center gap-3 rounded-lg transition text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-hover ${
             collapsed ? "justify-center p-2.5" : "px-3 py-2"
@@ -297,7 +280,6 @@ export default function DesktopSidebar({
                   <Link
                     key={`installing-${game.id}`}
                     to={`/games/${game.id}`}
-                    onKeyDown={handleSelectKeyDown}
                     data-desktop-sidebar-nav
                     data-desktop-sidebar-active={active ? "true" : undefined}
                     onContextMenu={(e) => {
@@ -375,7 +357,6 @@ export default function DesktopSidebar({
                     <Link
                       key={installed.remoteGameId}
                       to={`/games/${installed.remoteGameId}`}
-                      onKeyDown={handleSelectKeyDown}
                       data-desktop-sidebar-nav
                       data-desktop-sidebar-active={active ? "true" : undefined}
                       onContextMenu={(e) => {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../core/components/header";
-import { sounds } from "../../core/utils/sounds";
 import {
   DesktopShellNavigationContext,
   type DesktopShellNavigationContextValue,
@@ -71,7 +70,6 @@ export default function DesktopLayoutInner({ children }: { children: React.React
       items[0];
 
     target.focus({ focusVisible: true } as FocusOptions);
-    void sounds.navigate();
     return true;
   }, []);
 
@@ -94,7 +92,6 @@ export default function DesktopLayoutInner({ children }: { children: React.React
     }
 
     items[0].focus({ focusVisible: true } as FocusOptions);
-    void sounds.navigate();
     return true;
   }, []);
 

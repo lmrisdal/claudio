@@ -19,14 +19,6 @@ vi.mock("react-router", () => ({
   useNavigate: () => navigateMock,
 }));
 
-vi.mock("../utils/sounds", () => ({
-  sounds: {
-    navigate: vi.fn(async () => {}),
-    select: vi.fn(async () => {}),
-    back: vi.fn(async () => {}),
-  },
-}));
-
 function PageHarness({ onClose }: { onClose: () => void }) {
   const containerReference = useRef<HTMLDivElement>(null);
   useInputScope({ id: "page", kind: "page" });

@@ -1,18 +1,10 @@
 // @vitest-environment happy-dom
 
 import { act, useRef } from "react";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { InputScopeProvider, useInputScope } from "./use-input-scope";
 import { useArrowNav } from "./use-arrow-nav";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
-
-vi.mock("../utils/sounds", () => ({
-  sounds: {
-    navigate: vi.fn(async () => {}),
-    select: vi.fn(async () => {}),
-    back: vi.fn(async () => {}),
-  },
-}));
 
 function ArrowNavHarness({ dialogOpen }: { dialogOpen: boolean }) {
   const containerReference = useRef<HTMLDivElement>(null);

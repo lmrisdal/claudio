@@ -8,7 +8,6 @@ import {
 } from "../../core/hooks/use-gamepad";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
-import { sounds } from "../../core/utils/sounds";
 import { isDesktop, ping } from "../../desktop/hooks/use-desktop";
 import { useAppSettingsForm } from "../hooks/use-app-settings-form";
 import { type SettingsTab } from "../hooks/use-settings-dialog";
@@ -301,13 +300,10 @@ export default function SettingsDialog({
     setShowSidebarFocusRing(true);
     if (focusZone === "sidebar") {
       focusSidebar(sidebarIndex - 1);
-      void sounds.navigate();
     } else if (contentIndex === 0) {
       setFocusZone("sidebar");
-      void sounds.navigate();
     } else {
       focusContent(contentIndex - 1);
-      void sounds.navigate();
     }
   }, [contentIndex, focusSidebar, focusContent, focusZone, sidebarIndex]);
 
@@ -315,10 +311,8 @@ export default function SettingsDialog({
     setShowSidebarFocusRing(true);
     if (focusZone === "sidebar") {
       focusSidebar(sidebarIndex + 1);
-      void sounds.navigate();
     } else {
       focusContent(contentIndex + 1);
-      void sounds.navigate();
     }
   }, [contentIndex, focusSidebar, focusContent, focusZone, sidebarIndex]);
 
@@ -327,7 +321,6 @@ export default function SettingsDialog({
     if (focusZone === "sidebar") {
       setFocusZone("content");
       setContentIndex(0);
-      void sounds.navigate();
     }
   }, [focusZone]);
 
@@ -335,7 +328,6 @@ export default function SettingsDialog({
     setShowSidebarFocusRing(true);
     if (focusZone === "content") {
       setFocusZone("sidebar");
-      void sounds.navigate();
     }
   }, [focusZone]);
 
@@ -409,11 +401,6 @@ export default function SettingsDialog({
 
       e.preventDefault();
       setShowSidebarFocusRing(true);
-      if (focusZone === "sidebar" && sidebarIndex < visibleTabs.length) {
-        void sounds.select();
-      } else {
-        void sounds.navigate();
-      }
       if (focusZone === "sidebar") {
         sidebarReferences.current[sidebarIndex]?.click();
       } else {
@@ -432,7 +419,6 @@ export default function SettingsDialog({
       setSidebarIndex(nextIndex);
       setContentIndex(0);
       setShowSidebarFocusRing(true);
-      void sounds.select();
     },
     [visibleTabs, activeTab],
   );

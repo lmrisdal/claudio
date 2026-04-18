@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Link } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import type { Game } from "../../core/types/models";
-import { sounds } from "../../core/utils/sounds";
 import {
   launchGame,
   listGameExecutables,
@@ -290,11 +289,6 @@ export default function GameDetailActions({
           <Link
             to={`/games/${displayGame.id}/play`}
             data-nav
-            onClick={(event) => {
-              if (event.detail === 0) {
-                void sounds.download();
-              }
-            }}
             className="inline-flex items-center gap-2 rounded-lg bg-surface-raised px-6 py-3 text-sm font-semibold text-text-primary ring-1 ring-border transition hover:border-accent hover:text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
           >
             <svg

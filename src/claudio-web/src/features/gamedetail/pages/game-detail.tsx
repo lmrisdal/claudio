@@ -8,7 +8,6 @@ import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-sc
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { isMac } from "../../core/utils/os";
-import { sounds } from "../../core/utils/sounds";
 import { useDesktop, type InstalledGame } from "../../desktop/hooks/use-desktop";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import BrowseFilesDialog from "../components/browse-files-dialog";
@@ -29,7 +28,6 @@ export default function GameDetail() {
   const [browsePath, setBrowsePath] = useState<string | null>(null);
 
   function navigateToLibrary(useViewTransition: boolean) {
-    void sounds.back();
     void navigate("/", { viewTransition: useViewTransition });
   }
 
@@ -42,7 +40,6 @@ export default function GameDetail() {
 
     if (browsePath !== null) {
       setBrowsePath(null);
-      void sounds.back();
       return;
     }
 
@@ -176,7 +173,6 @@ export default function GameDetail() {
               const first = mainReference.current?.querySelector<HTMLElement>("[data-nav]");
               if (first) {
                 first.focus();
-                void sounds.navigate();
               }
             } else if (event.key === "ArrowLeft" && focusSidebar()) {
               event.preventDefault();
@@ -188,11 +184,6 @@ export default function GameDetail() {
           to="/"
           viewTransition={useLibraryViewTransition}
           data-nav
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              void sounds.back();
-            }
-          }}
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
             displayGame.heroUrl
               ? "hero-glass-chip bg-black/30 dark:text-white/85 text-black/80 ring-1 ring-white/10 backdrop-blur-sm hover:bg-black/40 dark:hover:text-white hover:text-black shadow-[0_4px_20px_rgba(0,0,0,0.2)]"

@@ -9,7 +9,6 @@ import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 import { isEmulatorFullscreenEnabled } from "../../core/utils/preferences";
-import { sounds } from "../../core/utils/sounds";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 
 interface EmulationInfo {
@@ -103,7 +102,6 @@ export default function GameEmulator() {
     () => {
       if (isActionBlocked("page-nav")) return;
       if (frameUrl) return;
-      void sounds.back();
       void navigate(`/games/${gameId}`);
     },
     { enabled: Boolean(gameId) },
@@ -130,7 +128,6 @@ export default function GameEmulator() {
     const target = items[index];
     if (!target) return;
     target.focus({ focusVisible: true } as FocusOptions);
-    void sounds.navigate();
   }, []);
 
   const handleNavKeyDown = useArrowNav(pageReference, { onExitLeft: focusSidebar });
@@ -211,9 +208,6 @@ export default function GameEmulator() {
             <Link
               to={`/games/${game.id}`}
               data-nav
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void sounds.back();
-              }}
               className="rounded text-sm text-text-muted transition hover:text-accent outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)]"
             >
               ← Back to {game.title}

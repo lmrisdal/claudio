@@ -6,10 +6,9 @@ import type { Game } from "../../core/types/models";
 import { getGameCoverViewTransitionName } from "../shared";
 import GameDetail from "./game-detail";
 
-const { navigateMock, useShortcutMock, backSoundMock } = vi.hoisted(() => ({
+const { navigateMock, useShortcutMock } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   useShortcutMock: vi.fn(),
-  backSoundMock: vi.fn(async () => {}),
 }));
 
 const useQueryMock = vi.fn();
@@ -47,13 +46,6 @@ vi.mock("../../core/hooks/use-input-scope", () => ({
 
 vi.mock("../../core/hooks/use-shortcut", () => ({
   useShortcut: useShortcutMock,
-}));
-
-vi.mock("../../core/utils/sounds", () => ({
-  sounds: {
-    back: backSoundMock,
-    navigate: vi.fn(async () => {}),
-  },
 }));
 
 vi.mock("../../desktop/hooks/use-desktop-shell-navigation", () => ({
@@ -127,7 +119,6 @@ describe("GameDetail", () => {
     getQueryStateMock.mockReset();
     navigateMock.mockReset();
     useShortcutMock.mockReset();
-    backSoundMock.mockClear();
   });
 
   it("renders the cached library cover immediately", () => {
@@ -159,7 +150,6 @@ describe("GameDetail", () => {
 
     shortcutHandler?.();
 
-    expect(backSoundMock).toHaveBeenCalledOnce();
     expect(navigateMock).toHaveBeenCalledWith("/", { viewTransition: true });
 
     view.unmount();
