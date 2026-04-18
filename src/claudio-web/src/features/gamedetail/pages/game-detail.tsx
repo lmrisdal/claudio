@@ -13,7 +13,7 @@ import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell
 import BrowseFilesDialog from "../components/browse-files-dialog";
 import GameDetailActions from "../components/game-detail-actions";
 import GameDetailOverview from "../components/game-detail-overview";
-import { getGameCoverViewTransitionName, isPcPlatform, type BrowseResponse } from "../shared";
+import { isPcPlatform, type BrowseResponse } from "../shared";
 
 export default function GameDetail() {
   const { id } = useParams();
@@ -27,8 +27,8 @@ export default function GameDetail() {
   const focusAnchorReference = useRef<HTMLDivElement>(null);
   const [browsePath, setBrowsePath] = useState<string | null>(null);
 
-  function navigateToLibrary(useViewTransition: boolean) {
-    void navigate("/", { viewTransition: useViewTransition });
+  function navigateToLibrary() {
+    void navigate("/", { viewTransition: true });
   }
 
   useInputScope({ id: "game-detail-page", kind: "page" });
@@ -43,7 +43,7 @@ export default function GameDetail() {
       return;
     }
 
-    navigateToLibrary(!!cachedGame?.coverUrl || !!game?.coverUrl || !!installedGame?.coverUrl);
+    navigateToLibrary();
   });
 
   const handleMainKeyDown = useArrowNav(mainReference, {
@@ -92,7 +92,6 @@ export default function GameDetail() {
   });
 
   const displayGame = useMemo(() => mergeDisplayGame(game, installedGame), [game, installedGame]);
-  const useLibraryViewTransition = !!displayGame?.coverUrl;
   const isDesktopPcGame =
     isDesktop && !isMac && !!displayGame && isPcPlatform(displayGame.platform);
   const isDesktopPcDownload =
@@ -182,7 +181,7 @@ export default function GameDetail() {
 
         <Link
           to="/"
-          viewTransition={useLibraryViewTransition}
+          viewTransition
           data-nav
           className={`inline-flex items-center gap-1.5 text-sm transition mb-8 rounded-lg px-3 py-2 outline-none focus-visible:[box-shadow:0_0_0_4px_var(--bg),0_0_0_6px_var(--focus-ring)] ${
             displayGame.heroUrl
@@ -204,16 +203,7 @@ export default function GameDetail() {
 
         <div className="flex flex-col md:flex-row gap-10">
           <div className="w-72 shrink-0 mx-auto md:mx-0">
-            <div
-              style={
-                displayGame.coverUrl
-                  ? {
-                      viewTransitionName: getGameCoverViewTransitionName(displayGame.id),
-                    }
-                  : undefined
-              }
-              className="aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border"
-            >
+            <div className="aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border">
               {displayGame.coverUrl ? (
                 <img
                   src={displayGame.coverUrl}

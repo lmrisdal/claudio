@@ -1,15 +1,17 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { useAuth } from "../../auth/hooks/use-auth";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
-import { useDesktopShellNavigation } from "../hooks/use-desktop-shell-navigation";
 import {
   isDesktop,
   listInstalledGames,
   openInstallFolder,
   uninstallGame,
 } from "../hooks/use-desktop";
+import { useDesktopShellNavigation } from "../hooks/use-desktop-shell-navigation";
+import AdminIcon from "./admin-icon";
 import DownloadsIcon from "./downloads-icon";
 import LibraryIcon from "./library-icon";
 import SettingsIcon from "./settings-icon";
@@ -98,7 +100,9 @@ export default function DesktopSidebar({
       badge: activeCount > 0 ? activeCount : undefined,
     },
   ];
-
+  if (useAuth().isAdmin) {
+    navItems.push({ to: "/admin", icon: AdminIcon, label: "Admin" });
+  }
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 

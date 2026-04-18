@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from "vite-plus/test";
-import { getGameCoverViewTransitionName } from "../../gamedetail/shared";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 import GameCard from "./game-card";
 
@@ -12,7 +11,7 @@ vi.mock("react-router", () => ({
 }));
 
 describe("GameCard", () => {
-  it("applies a shared poster transition name when a cover exists", () => {
+  it("renders the game cover when one exists", () => {
     const view = renderInDom(
       <GameCard
         game={{
@@ -32,7 +31,7 @@ describe("GameCard", () => {
 
     const image = view.container.querySelector<HTMLImageElement>('img[alt="Alpha"]');
     expect(image).not.toBeNull();
-    expect(image?.parentElement?.style.viewTransitionName).toBe(getGameCoverViewTransitionName(7));
+    expect(image?.getAttribute("src")).toBe("https://example.com/cover.png");
 
     view.unmount();
     cleanupRenderedDom();

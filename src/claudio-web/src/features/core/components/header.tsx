@@ -185,6 +185,10 @@ export default function Header() {
                 {isAdmin && (
                   <>
                     <TasksPopover />
+                  </>
+                )}
+                {isAdmin && !isDesktop && (
+                  <>
                     <Link
                       to="/admin"
                       className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"

@@ -477,6 +477,15 @@ html[data-desktop] [role="button"] {
 
 ::view-transition-group(root) {
   z-index: 0;
+  animation-duration: 150ms;
+}
+
+::view-transition-old(root) {
+  animation: fadeOut 150ms ease;
+}
+
+::view-transition-new(root) {
+  animation: fadeIn 150ms ease;
 }
 
 ::view-transition-group(app-header-backdrop),
@@ -499,4 +508,14 @@ html[data-desktop] [role="button"] {
 
 ::view-transition-group(app-header-content) {
   z-index: 100;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }

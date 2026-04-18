@@ -3,7 +3,6 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 import type { Game } from "../../core/types/models";
-import { getGameCoverViewTransitionName } from "../shared";
 import GameDetail from "./game-detail";
 
 const { navigateMock, useShortcutMock } = vi.hoisted(() => ({
@@ -129,9 +128,6 @@ describe("GameDetail", () => {
     const image = view.container.querySelector<HTMLImageElement>('img[alt="Alpha"]');
     expect(image).not.toBeNull();
     expect(image?.getAttribute("src")).toBe(cachedGame.coverUrl);
-    expect(image?.parentElement?.style.viewTransitionName).toBe(
-      getGameCoverViewTransitionName(cachedGame.id),
-    );
 
     view.unmount();
     cleanupRenderedDom();

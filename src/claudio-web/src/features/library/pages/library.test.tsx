@@ -219,4 +219,17 @@ describe("Library", () => {
 
     secondView.unmount();
   });
+
+  it("does not show the card size slider", () => {
+    localStorage.setItem("library-view", "grid");
+    localStorage.setItem("library-card-width", "220");
+    const view = renderInDom(
+      <InputScopeProvider>
+        <Library />
+      </InputScopeProvider>,
+    );
+
+    expect(view.container.querySelector('input[type="range"]')).toBeNull();
+    view.unmount();
+  });
 });

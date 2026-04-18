@@ -1,31 +1,42 @@
+import type { FocusEventHandler, KeyboardEventHandler, MouseEventHandler, Ref } from "react";
 import { Link } from "react-router";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
-import { getGameCoverViewTransitionName } from "../../gamedetail/shared";
-
 export default function GameCard({
+  focusKey,
   game,
+  linkRef,
+  onClick,
+  onFocus,
+  onKeyDown,
   onPreviewStart,
 }: {
+  focusKey?: string;
   game: Game;
+  linkRef?: Ref<HTMLAnchorElement>;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
+  onFocus?: FocusEventHandler<HTMLAnchorElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLAnchorElement>;
   onPreviewStart?: (game: Game) => void;
 }) {
   return (
     <Link
+      ref={linkRef}
       to={`/games/${game.id}`}
-      viewTransition={!!game.coverUrl}
+      viewTransition
+      data-focus-key={focusKey}
       data-game-id={game.id}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
       onMouseEnter={() => onPreviewStart?.(game)}
-      onFocus={() => onPreviewStart?.(game)}
+      onFocus={(event) => {
+        onPreviewStart?.(game);
+        onFocus?.(event);
+      }}
       className={`group outline-none ${game.isMissing ? "opacity-50" : ""}`}
     >
       <div
         data-game-cover
-        style={
-          game.coverUrl
-            ? { viewTransitionName: getGameCoverViewTransitionName(game.id) }
-            : undefined
-        }
         className="aspect-2/3 bg-surface-raised rounded-lg overflow-hidden mb-2 ring-1 ring-border group-hover:ring-accent/50 group-focus-visible:outline-2 group-focus-visible:outline-focus-ring group-focus-visible:outline-offset-4 transition-all duration-200 relative"
       >
         {game.isMissing && (

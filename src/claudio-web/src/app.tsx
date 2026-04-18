@@ -29,7 +29,7 @@ export default function AppShell() {
   }
 
   return (
-    <div className="h-full bg-grid flex flex-col">
+    <div className="min-h-dvh bg-grid flex flex-col">
       <NavigationProvider>
         <DesktopGate>
           <DownloadManagerProvider>

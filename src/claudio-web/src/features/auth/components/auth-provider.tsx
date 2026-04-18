@@ -6,7 +6,6 @@ import {
   desktopGetSession,
   desktopLogin,
   desktopLogout,
-  desktopProxyLogin,
   isDesktop,
   type DesktopSession,
 } from "../../desktop/hooks/use-desktop";
@@ -188,17 +187,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
 
         applyDesktopSession(session);
-        if (session.isLoggedIn) {
-          return;
-        }
-
-        return desktopProxyLogin()
-          .then((proxySession) => {
-            if (!cancelled) {
-              applyDesktopSession(proxySession);
-            }
-          })
-          .catch(() => {});
       })
       .catch(() => {});
 
@@ -226,17 +214,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
 
         applyDesktopSession(session);
-        if (session.isLoggedIn) {
-          return;
-        }
-
-        return desktopProxyLogin()
-          .then((proxySession) => {
-            if (!cancelled) {
-              applyDesktopSession(proxySession);
-            }
-          })
-          .catch(() => {});
       })
       .catch(() => {});
 
