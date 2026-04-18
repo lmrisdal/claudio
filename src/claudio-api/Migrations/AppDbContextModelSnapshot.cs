@@ -184,6 +184,25 @@ namespace Claudio.Api.Migrations
                     b.ToTable("Games");
                 });
 
+            modelBuilder.Entity("Claudio.Api.Data.UserPreferences", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PreferencesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("{}");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserPreferences");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<int>", b =>
                 {
                     b.Property<int>("Id")
@@ -575,6 +594,17 @@ namespace Claudio.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Claudio.Api.Data.UserPreferences", b =>
+                {
+                    b.HasOne("Claudio.Api.Data.ApplicationUser", "User")
+                        .WithOne("Preferences")
+                        .HasForeignKey("Claudio.Api.Data.UserPreferences", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization", b =>
                 {
                     b.HasOne("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", "Application")
@@ -609,6 +639,11 @@ namespace Claudio.Api.Migrations
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization", b =>
                 {
                     b.Navigation("Tokens");
+                });
+
+            modelBuilder.Entity("Claudio.Api.Data.ApplicationUser", b =>
+                {
+                    b.Navigation("Preferences");
                 });
 #pragma warning restore 612, 618
         }

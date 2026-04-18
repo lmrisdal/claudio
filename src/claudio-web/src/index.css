@@ -83,11 +83,9 @@
   --hero-glass-bg-hover: rgba(255, 255, 255, 0.56);
   --hero-glass-border: rgba(255, 255, 255, 0.35);
   --modal-backdrop: rgba(26, 26, 46, 0.42);
-  --guide-backdrop: rgba(26, 26, 46, 0.5);
   --overlay-scrim: rgba(26, 26, 46, 0.42);
   --overlay-scrim-strong: rgba(26, 26, 46, 0.5);
   --glass-panel-bg: rgba(255, 255, 255, 0.92);
-  --guide-panel-bg: rgba(255, 255, 255, 0.74);
   --surface: #ffffff;
   --surface-raised: #e9eaef;
   --surface-overlay: #dfe1e8;
@@ -240,13 +238,6 @@ body {
     radial-gradient(circle at top center, rgb(255 255 255 / 0.12), transparent 48%);
 }
 
-.guide-reduced-hover-surface,
-.guide-reduced-active-surface,
-.guide-reduced-divider,
-.overlay-reduced-active-surface {
-  /* no-op outside reduced-transparency mode */
-}
-
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --bg-blur: var(--bg);
@@ -291,26 +282,6 @@ body {
   .app-glass-panel,
   .app-guide-panel {
     box-shadow: none;
-  }
-
-  .guide-reduced-hover-surface:hover,
-  .guide-reduced-hover-surface:focus-visible {
-    background-color: var(--surface-raised) !important;
-    color: var(--text-primary) !important;
-  }
-
-  .guide-reduced-active-surface {
-    background-color: var(--surface-overlay) !important;
-    color: var(--text-primary) !important;
-    box-shadow: none !important;
-  }
-
-  .guide-reduced-divider {
-    background-color: var(--border-color) !important;
-  }
-
-  .overlay-reduced-active-surface {
-    background-color: var(--surface-overlay) !important;
   }
 }
 

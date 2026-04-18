@@ -8,6 +8,18 @@ import { DesktopShellNavigationContext } from "../../desktop/hooks/use-desktop-s
 import Library from "./library";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 
+const setPlatformOrderMock = vi.fn();
+
+vi.mock("../../preferences/hooks/use-user-preferences", () => ({
+  useUserPreferences: () => ({
+    isLoading: false,
+    isSaving: false,
+    preferences: { library: { platformOrder: [] } },
+    updatePreferences: vi.fn(),
+    setPlatformOrder: setPlatformOrderMock,
+  }),
+}));
+
 const navigateMock = vi.fn();
 const useQueryMock = vi.fn();
 
@@ -48,6 +60,7 @@ const games = [
 
 beforeEach(() => {
   navigateMock.mockReset();
+  setPlatformOrderMock.mockReset();
   localStorage.clear();
   useQueryMock.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
     if (queryKey[0] === "games") {
@@ -136,6 +149,34 @@ describe("Library", () => {
     });
 
     expect(document.activeElement).toBe(links[0]);
+    view.unmount();
+  });
+
+  it("saves platform reordering through user preferences", () => {
+    localStorage.setItem("library-view", "grouped");
+    const view = renderInDom(
+      <InputScopeProvider>
+        <Library />
+      </InputScopeProvider>,
+    );
+
+    const dropdownButton = [...view.container.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("All platforms"),
+    );
+
+    act(() => {
+      dropdownButton?.click();
+    });
+
+    const movePcDown = view.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Move pc down"]',
+    );
+
+    act(() => {
+      movePcDown?.click();
+    });
+
+    expect(setPlatformOrderMock).toHaveBeenCalledWith(["snes", "pc"]);
     view.unmount();
   });
 

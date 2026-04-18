@@ -8,6 +8,7 @@ import ServerStatusProvider from "./features/core/components/server-status-provi
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
+import UserPreferencesProvider from "./features/preferences/components/user-preferences-provider";
 import "./index.css";
 
 const LOG_ATTACH_TIMEOUT_MS = 1500;
@@ -54,13 +55,15 @@ createRoot(document.querySelector("#root")!).render(
     <QueryClientProvider client={queryClient}>
       <ServerStatusProvider>
         <AuthProvider>
-          <InputScopeProvider>
-            <SettingsDialogProvider>
-              <main data-ui-scroll-container>
-                <RouterProvider router={appRouter} />
-              </main>
-            </SettingsDialogProvider>
-          </InputScopeProvider>
+          <UserPreferencesProvider>
+            <InputScopeProvider>
+              <SettingsDialogProvider>
+                <main data-ui-scroll-container>
+                  <RouterProvider router={appRouter} />
+                </main>
+              </SettingsDialogProvider>
+            </InputScopeProvider>
+          </UserPreferencesProvider>
         </AuthProvider>
       </ServerStatusProvider>
     </QueryClientProvider>

@@ -214,6 +214,7 @@ if (!config.Auth.DisableAuth)
 }
 app.MapGameEndpoints();
 app.MapAdminEndpoints();
+app.MapPreferencesEndpoints();
 
 // SPA fallback — serve index.html for non-API, non-file routes
 app.MapFallbackToFile("index.html");

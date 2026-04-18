@@ -65,3 +65,11 @@ export interface User {
   role: "user" | "admin";
   createdAt: string;
 }
+
+export interface LibraryPreferences {
+  platformOrder: string[];
+}
+
+export interface UserPreferences {
+  library: LibraryPreferences;
+}

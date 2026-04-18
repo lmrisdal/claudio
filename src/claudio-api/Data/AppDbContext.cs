@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
     public DbSet<Game> Games => Set<Game>();
+    public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,6 +19,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         modelBuilder.Entity<Game>(e =>
         {
             e.HasIndex(g => new { g.Platform, g.FolderName }).IsUnique();
+        });
+
+        modelBuilder.Entity<UserPreferences>(e =>
+        {
+            e.HasKey(p => p.UserId);
+            e.Property(p => p.PreferencesJson).HasDefaultValue("{}");
+            e.HasOne(p => p.User)
+                .WithOne(u => u.Preferences)
+                .HasForeignKey<UserPreferences>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
@@ -48,4 +59,12 @@ public class Game
     public string? Franchise { get; set; }
     public string? GameEngine { get; set; }
     public bool IsProcessing { get; set; }
+}
+
+public class UserPreferences
+{
+    public int UserId { get; set; }
+    public string PreferencesJson { get; set; } = "{}";
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public ApplicationUser User { get; set; } = null!;
 }
