@@ -2,12 +2,12 @@ This file provides guidance to Claude Code (claude.ai/code) and other AI agents 
 
 ## Build & Run Commands
 
-### Backend (Rust)
+### Backend (.NET 10)
 
 ```bash
-cargo build -p claudio-api                          # build API
-cargo run -p claudio-api                            # run API (serves on port 8080)
-cargo test -p claudio-api-tests                     # run API tests only
+dotnet build src/claudio-api               # build API
+dotnet run src/claudio-api                 # run API (serves on port 8080)
+dotnet test --project tests/claudio-api    # run API tests only
 ```
 
 ### Frontend (React + Vite)

@@ -68,7 +68,7 @@ volumes:
 | `CLAUDIO_PORT`                   | HTTP port                                                        | `8080`                 |
 | `CLAUDIO_LOG_LEVEL`              | Log level: `error`, `warn`, `info`, `debug`, `trace`             | `warn`                 |
 | `CLAUDIO_LIBRARY_PATHS`          | Comma-separated game library paths                               | `/games`               |
-| `CLAUDIO_SCAN_INTERVAL`         | Library scan interval in seconds                                 | `120`                  |
+| `CLAUDIO_SCAN_INTERVAL`          | Library scan interval in seconds                                 | `120`                  |
 | `CLAUDIO_IGDB_CLIENT_ID`         | IGDB/Twitch client ID                                            |                        |
 | `CLAUDIO_IGDB_CLIENT_SECRET`     | IGDB/Twitch client secret                                        |                        |
 | `CLAUDIO_STEAMGRIDDB_API_KEY`    | SteamGridDB API key (for cover art search)                       |                        |
@@ -223,7 +223,7 @@ Games are organized by platform in your library directories:
 ### Backend
 
 ```bash
-cargo run -p claudio-api
+dotnet run src/claudio-api
 ```
 
 ### Frontend
@@ -265,7 +265,7 @@ This updates `src/claudio-desktop/tauri.conf.json`, `src/claudio-desktop/Cargo.t
 
 ## Tech Stack
 
-- **Backend:** Rust, Axum, SeaORM, SQLite/PostgreSQL
+- **Backend:** C#, .NET 10, EF Core, SQLite/PostgreSQL
 - **Frontend:** React 19, Vite, TanStack Query, Tailwind CSS v4, Headless UI
 - **Auth:** JWT, OAuth 2.0 / OpenID Connect
 - **Metadata:** IGDB API via Twitch OAuth

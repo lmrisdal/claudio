@@ -14,15 +14,17 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "stopAtEntry": false,
-      // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
-      // "serverReadyAction": {
-      //     "action": "openExternally",
-      //     "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-      // },
+      "console": "internalConsole",
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_URLS": "http://localhost:8080",
-        "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml"
+        "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml",
+        "CLAUDIO_LOG_LEVEL": "info"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+https?://\\S+",
+        "uriFormat": "http://localhost:8080"
       },
       "sourceFileMap": {
         "/Views": "${workspaceFolder}/Views"
