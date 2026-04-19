@@ -100,7 +100,7 @@ async fn download_package_with_refreshes_when_manifest_and_download_require_reau
                 fresh_count_for_server.fetch_add(1, Ordering::SeqCst);
                 TestResponse::text(200, "ok")
             }
-            "/connect/token" => TestResponse::json(
+            "/api/auth/token/refresh" => TestResponse::json(
                 200,
                 r#"{"access_token":"fresh-token","refresh_token":"fresh-refresh"}"#,
             ),

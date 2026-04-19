@@ -42,12 +42,14 @@ fn target_url_maps_api_requests() {
 }
 
 #[test]
-fn target_url_maps_connect_requests() {
-    let uri: http::Uri = "claudio://connect/token".parse().expect("uri should parse");
+fn target_url_maps_auth_token_requests() {
+    let uri: http::Uri = "claudio://api/auth/token/refresh"
+        .parse()
+        .expect("uri should parse");
 
     let target = target_url("https://example.com", &uri).expect("target should build");
 
-    assert_eq!(target, "https://example.com/connect/token");
+    assert_eq!(target, "https://example.com/api/auth/token/refresh");
 }
 
 #[test]
@@ -62,14 +64,14 @@ fn target_url_rejects_unsupported_hosts() {
 #[test]
 fn authenticated_route_excludes_token_exchange() {
     let api_uri: http::Uri = "claudio://api/games".parse().expect("uri should parse");
-    let token_uri: http::Uri = "claudio://connect/token".parse().expect("uri should parse");
-    let userinfo_uri: http::Uri = "claudio://connect/userinfo"
+    let token_uri: http::Uri = "claudio://api/auth/token/refresh"
         .parse()
         .expect("uri should parse");
+    let providers_uri: http::Uri = "claudio://api/auth/providers".parse().expect("uri should parse");
 
     assert!(is_authenticated_route(&api_uri));
     assert!(!is_authenticated_route(&token_uri));
-    assert!(is_authenticated_route(&userinfo_uri));
+    assert!(!is_authenticated_route(&providers_uri));
 }
 
 #[test]
@@ -209,7 +211,7 @@ async fn forward_request_refreshes_after_unauthorized_response() {
                 TestResponse::json(200, r#"{"retried":true}"#)
             }
         }
-        "/connect/token" => TestResponse::json(
+        "/api/auth/token/refresh" => TestResponse::json(
             200,
             r#"{"access_token":"fresh-token","refresh_token":"fresh-refresh"}"#,
         ),
@@ -254,7 +256,7 @@ async fn forward_request_notifies_logout_when_refresh_fails() {
     let logout_calls = Arc::new(AtomicUsize::new(0));
     let server = TestServer::spawn(|request| match request.path.as_str() {
         "/api/games" => TestResponse::text(401, "expired"),
-        "/connect/token" => TestResponse::json(400, r#"{"error":"invalid_grant"}"#),
+        "/api/auth/token/refresh" => TestResponse::json(400, r#"{"error":"invalid_grant"}"#),
         _ => TestResponse::text(404, "missing"),
     });
 

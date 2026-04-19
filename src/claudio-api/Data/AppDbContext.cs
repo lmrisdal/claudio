@@ -8,13 +8,28 @@ namespace Claudio.Api.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
+    public DbSet<DesktopRefreshToken> DesktopRefreshTokens => Set<DesktopRefreshToken>();
     public DbSet<Game> Games => Set<Game>();
     public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.UseOpenIddict();
+
+        modelBuilder.Entity<DesktopRefreshToken>(e =>
+        {
+            e.HasIndex(token => token.TokenHash).IsUnique();
+            e.HasIndex(token => new { token.UserId, token.ExpiresAt });
+            e.Property(token => token.TokenHash).HasMaxLength(128);
+            e.HasOne(token => token.User)
+                .WithMany()
+                .HasForeignKey(token => token.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(token => token.ReplacedByToken)
+                .WithMany()
+                .HasForeignKey(token => token.ReplacedByTokenId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         modelBuilder.Entity<Game>(e =>
         {

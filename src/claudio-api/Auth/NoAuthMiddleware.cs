@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using OpenIddict.Abstractions;
 
 namespace Claudio.Api.Auth;
 
@@ -19,10 +18,10 @@ public class NoAuthMiddleware(RequestDelegate next)
 
     private static ClaimsPrincipal CreateAdminPrincipal()
     {
-        var identity = new ClaimsIdentity("NoAuth", OpenIddictConstants.Claims.Name, OpenIddictConstants.Claims.Role);
-        identity.AddClaim(new Claim(OpenIddictConstants.Claims.Subject, "1"));
-        identity.AddClaim(new Claim(OpenIddictConstants.Claims.Name, "admin"));
-        identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, "admin"));
+        var identity = new ClaimsIdentity("NoAuth", ClaimTypes.Name, ClaimTypes.Role);
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "1"));
+        identity.AddClaim(new Claim(ClaimTypes.Name, "admin"));
+        identity.AddClaim(new Claim(ClaimTypes.Role, "admin"));
         identity.AddClaim(new Claim("role", "admin"));
         return new ClaimsPrincipal(identity);
     }

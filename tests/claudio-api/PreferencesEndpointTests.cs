@@ -21,16 +21,11 @@ public class PreferencesEndpointTests : IAsyncDisposable
     {
         await client.PostAsJsonAsync("/api/auth/register", new { username, password });
 
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var tokenResponse = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = username,
-            ["password"] = password,
-            ["client_id"] = "claudio-spa",
-            ["scope"] = "openid profile offline_access roles",
+            username,
+            password,
         });
-
-        var tokenResponse = await client.PostAsync("/connect/token", tokenRequest);
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
         return tokenJson.GetProperty("access_token").GetString()!;
     }

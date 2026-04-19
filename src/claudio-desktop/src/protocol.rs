@@ -162,14 +162,16 @@ fn target_url(origin: &str, uri: &http::Uri) -> Result<String, String> {
 
     match uri.host() {
         Some("api") => Ok(format!("{origin}/api{path_and_query}")),
-        Some("connect") => Ok(format!("{origin}/connect{path_and_query}")),
         _ => Err("Unsupported desktop URI target.".to_string()),
     }
 }
 
 fn is_authenticated_route(uri: &http::Uri) -> bool {
-    matches!(uri.host(), Some("api") | Some("connect"))
-        && !matches!(uri.host(), Some("connect") if uri.path() == "/token")
+    matches!(uri.host(), Some("api"))
+        && !uri.path().starts_with("/auth/token/")
+        && uri.path() != "/auth/providers"
+        && uri.path() != "/auth/login"
+        && uri.path() != "/auth/register"
 }
 
 fn apply_request_headers(

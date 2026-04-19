@@ -32,8 +32,10 @@ async fn auth_flow_logs_in_and_restores_session() {
     }));
     let access_token_for_server = access_token.clone();
     let server = TestServer::spawn(move |request| match request.path.as_str() {
-        "/connect/token" => {
-            assert!(String::from_utf8_lossy(&request.body).contains("grant_type=password"));
+        "/api/auth/token/login" => {
+            let body = String::from_utf8_lossy(&request.body);
+            assert!(body.contains("\"username\":\"lars\""));
+            assert!(body.contains("\"password\":\"secret\""));
             TestResponse::json(
                 200,
                 &json!({
@@ -81,7 +83,7 @@ async fn auth_flow_refreshes_and_replaces_tokens() {
     let server = TestServer::spawn(move |request| {
         refresh_calls_for_server.fetch_add(1, Ordering::SeqCst);
         match request.path.as_str() {
-            "/connect/token" => TestResponse::json(
+            "/api/auth/token/refresh" => TestResponse::json(
                 200,
                 r#"{"access_token":"fresh-token","refresh_token":"fresh-refresh"}"#,
             ),

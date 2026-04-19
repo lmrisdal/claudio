@@ -34,15 +34,11 @@ public class AdminEndpointTests : IAsyncDisposable
         var client = _factory.CreateClient();
         // First user is admin
         await client.PostAsJsonAsync("/api/auth/register", new { username = "admin", password = "password123" });
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var tokenResponse = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = "admin",
-            ["password"] = "password123",
-            ["client_id"] = "claudio-spa",
-            ["scope"] = "openid profile offline_access roles",
+            username = "admin",
+            password = "password123",
         });
-        var tokenResponse = await client.PostAsync("/connect/token", tokenRequest);
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", tokenJson.GetProperty("access_token").GetString()!);
@@ -380,20 +376,21 @@ public class AdminEndpointTests : IAsyncDisposable
     // --- Proxy auth ---
 
     [Test]
-    public async Task ProxyLogin_WithValidHeader_ReturnsNonce()
+    public async Task ProxyLogin_WithValidHeader_ReturnsTokens()
     {
         _factory.TestConfig.Auth.ProxyAuthHeader = "X-Remote-User";
         _factory.TestConfig.Auth.ProxyAuthAutoCreate = true;
         var client = _factory.CreateClient();
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/remote");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/token/proxy");
         request.Headers.Add("X-Remote-User", "proxyuser");
 
         var response = await client.SendAsync(request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        result.GetProperty("nonce").GetString().Should().NotBeNullOrEmpty();
+        result.GetProperty("access_token").GetString().Should().NotBeNullOrEmpty();
+        result.GetProperty("refresh_token").GetString().Should().NotBeNullOrEmpty();
     }
 
     [Test]
@@ -402,7 +399,7 @@ public class AdminEndpointTests : IAsyncDisposable
         _factory.TestConfig.Auth.ProxyAuthHeader = "X-Remote-User";
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsync("/api/auth/remote", null);
+        var response = await client.PostAsJsonAsync("/api/auth/token/proxy", new { });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -412,7 +409,7 @@ public class AdminEndpointTests : IAsyncDisposable
     {
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsync("/api/auth/remote", null);
+        var response = await client.PostAsJsonAsync("/api/auth/token/proxy", new { });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -424,7 +421,7 @@ public class AdminEndpointTests : IAsyncDisposable
         _factory.TestConfig.Auth.ProxyAuthAutoCreate = false;
         var client = _factory.CreateClient();
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/remote");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/token/proxy");
         request.Headers.Add("X-Remote-User", "unknown");
 
         var response = await client.SendAsync(request);

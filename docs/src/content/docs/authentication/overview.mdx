@@ -11,6 +11,14 @@ Claudio supports multiple authentication methods that can be used together:
 - **Custom OIDC** — Any OpenID Connect provider (Authentik, Authelia, Pocket ID, etc.)
 - **Proxy authentication** — Trust a header from a reverse proxy for SSO
 
+## Session Model
+
+- **Web** uses ASP.NET Identity cookie sessions. The browser does not store JWT access tokens or refresh tokens.
+- **Desktop** uses Claudio-issued bearer access tokens plus opaque refresh tokens stored in secure local storage.
+- **Web auth state** is loaded from `GET /api/auth/me`.
+
+If the browser app and API are served from different origins, set `CLAUDIO_BROWSER_ORIGINS` to the browser-visible frontend origin or origins. For same-origin reverse-proxy deployments, leave it unset.
+
 ## First User
 
 The first user created (local or external) automatically becomes admin.
@@ -21,8 +29,8 @@ When a user signs in with an external provider whose verified email matches an e
 
 ## Disabling Auth
 
-| Variable | Effect |
-|---|---|
-| `CLAUDIO_DISABLE_AUTH=true` | Disable authentication entirely — open access, everyone is admin |
-| `CLAUDIO_DISABLE_LOCAL_LOGIN=true` | Disable username/password login, require external providers only |
-| `CLAUDIO_DISABLE_USER_CREATION=true` | Block new account creation. Existing users can still sign in |
+| Variable                             | Effect                                                           |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| `CLAUDIO_DISABLE_AUTH=true`          | Disable authentication entirely — open access, everyone is admin |
+| `CLAUDIO_DISABLE_LOCAL_LOGIN=true`   | Disable username/password login, require external providers only |
+| `CLAUDIO_DISABLE_USER_CREATION=true` | Block new account creation. Existing users can still sign in     |

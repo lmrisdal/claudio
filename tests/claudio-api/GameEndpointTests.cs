@@ -33,15 +33,11 @@ public class GameEndpointTests : IAsyncDisposable
     {
         var client = _factory.CreateClient();
         await client.PostAsJsonAsync("/api/auth/register", new { username = "testuser", password = "password123" });
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var tokenResponse = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = "testuser",
-            ["password"] = "password123",
-            ["client_id"] = "claudio-spa",
-            ["scope"] = "openid profile offline_access roles",
+            username = "testuser",
+            password = "password123",
         });
-        var tokenResponse = await client.PostAsync("/connect/token", tokenRequest);
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", tokenJson.GetProperty("access_token").GetString()!);

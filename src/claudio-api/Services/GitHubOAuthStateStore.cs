@@ -5,22 +5,22 @@ namespace Claudio.Api.Services;
 
 public class GitHubOAuthStateStore
 {
-    private readonly ConcurrentDictionary<string, (string ReturnTo, DateTimeOffset Expiry)> _states = new();
+    private readonly ConcurrentDictionary<string, (string ReturnTo, string ClientType, DateTimeOffset Expiry)> _states = new();
     private DateTimeOffset _lastPurge = DateTimeOffset.UtcNow;
 
-    public string CreateState(string returnTo)
+    public string CreateState(string returnTo, string clientType)
     {
         PurgeExpired();
         var state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        _states[state] = (returnTo, DateTimeOffset.UtcNow.AddMinutes(5));
+        _states[state] = (returnTo, clientType, DateTimeOffset.UtcNow.AddMinutes(5));
         return state;
     }
 
-    public string? ConsumeState(string state)
+    public (string ReturnTo, string ClientType)? ConsumeState(string state)
     {
         if (_states.TryRemove(state, out var entry) && DateTimeOffset.UtcNow <= entry.Expiry)
-            return entry.ReturnTo;
+            return (entry.ReturnTo, entry.ClientType);
 
         return null;
     }

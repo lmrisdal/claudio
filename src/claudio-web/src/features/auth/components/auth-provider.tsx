@@ -15,16 +15,29 @@ import type { User } from "../../core/types/models";
 import type { AuthProvider, AuthProviders } from "../hooks/use-auth";
 import { AuthContext } from "../hooks/use-auth";
 
-interface TokenResponse {
-  access_token: string;
-  refresh_token?: string;
-}
-
 interface AuthProvidersResponse {
   providers: AuthProvider[];
   authDisabled: boolean;
   localLoginEnabled: boolean;
   userCreationEnabled: boolean;
+}
+
+const DEFAULT_AUTH_PROVIDERS: AuthProviders = {
+  providers: [],
+  authDisabled: false,
+  localLoginEnabled: true,
+  userCreationEnabled: true,
+};
+
+function normalizeAuthProvidersResponse(
+  response: AuthProvidersResponse | null | undefined,
+): AuthProviders {
+  return {
+    providers: Array.isArray(response?.providers) ? response.providers : [],
+    authDisabled: response?.authDisabled ?? false,
+    localLoginEnabled: response?.localLoginEnabled ?? true,
+    userCreationEnabled: response?.userCreationEnabled ?? true,
+  };
 }
 
 const AUTH_DISABLED_USER: User = {
@@ -33,23 +46,6 @@ const AUTH_DISABLED_USER: User = {
   role: "admin",
   createdAt: "",
 };
-
-function parseToken(token: string): User | null {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const exp = payload.exp * 1000;
-    if (Date.now() > exp) return null;
-
-    return {
-      id: Number(payload.sub),
-      username: payload.name,
-      role: (payload.role as string).toLowerCase() as "user" | "admin",
-      createdAt: "",
-    };
-  } catch {
-    return null;
-  }
-}
 
 function toUser(session: DesktopSession): User | null {
   if (!session.user) {
@@ -64,85 +60,30 @@ function toUser(session: DesktopSession): User | null {
   };
 }
 
-async function exchangeTokens(parameters: Record<string, string>): Promise<TokenResponse> {
-  const body = new URLSearchParams({ ...parameters, client_id: "claudio-spa" });
-  const serverUrl = localStorage.getItem("claudio_server_url") ?? "";
-  const res = await fetch(`${serverUrl}/connect/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    try {
-      const json = JSON.parse(text);
-      const description: string = json.error_description || json.error || "Authentication failed";
-      throw new Error(description);
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new TypeError(text || "Authentication failed");
-      }
-      throw error;
-    }
-  }
-
-  return res.json();
-}
-
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const { isConnected } = useServerStatus();
-  const [token, setTokenState] = useState<string | null>(() => {
-    if (isDesktop) return null;
-    return localStorage.getItem("token");
-  });
   const [authDisabled, setAuthDisabled] = useState(false);
-  const [providers, setProviders] = useState<AuthProviders>({
-    providers: [],
-    authDisabled: false,
-    localLoginEnabled: true,
-    userCreationEnabled: true,
-  });
-  const [user, setUser] = useState<User | null>(() => {
-    if (isDesktop) return null;
-    const existingToken = localStorage.getItem("token");
-    return existingToken ? parseToken(existingToken) : null;
-  });
+  const [isReady, setIsReady] = useState(false);
+  const [providers, setProviders] = useState<AuthProviders>(DEFAULT_AUTH_PROVIDERS);
+  const [user, setUser] = useState<User | null>(null);
   const previousConnectedReference = useRef(isConnected);
 
-  const clearWebAuthState = useCallback(() => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-    setTokenState(null);
-    setUser(null);
-  }, []);
-
-  const applyWebTokenResponse = useCallback((response: TokenResponse) => {
-    localStorage.setItem("token", response.access_token);
-    if (response.refresh_token) {
-      localStorage.setItem("refresh_token", response.refresh_token);
+  const loadWebSession = useCallback(async () => {
+    try {
+      setUser(await api.get<User>("/auth/me"));
+    } catch {
+      setUser(null);
     }
-    setTokenState(response.access_token);
-    setUser(parseToken(response.access_token));
   }, []);
 
   const applyDesktopSession = useCallback((session: DesktopSession) => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-    setTokenState(null);
     setUser(toUser(session));
   }, []);
-
-  if (!isDesktop && token) {
-    const parsed = parseToken(token);
-    if (!parsed && user !== null) {
-      clearWebAuthState();
-    }
-  }
 
   useEffect(() => {
     if (isDesktop && !isConnected) {
       setAuthDisabled(true);
+      setIsReady(true);
       return;
     }
 
@@ -150,50 +91,57 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     void api
       .get<AuthProvidersResponse>("/auth/providers")
-      .then((response) => {
+      .then(async (response) => {
         if (cancelled) return;
-        setProviders(response);
+        const normalizedProviders = normalizeAuthProvidersResponse(response);
+        setProviders(normalizedProviders);
 
-        if (response.authDisabled) {
-          clearWebAuthState();
+        if (normalizedProviders.authDisabled) {
           setUser(AUTH_DISABLED_USER);
           setAuthDisabled(true);
+          setIsReady(true);
           return;
         }
 
         setAuthDisabled(false);
-        if (!token) {
-          setUser(null);
+        if (!isDesktop) {
+          await loadWebSession();
         }
+
+        setIsReady(true);
       })
       .catch(() => {
         if (cancelled) return;
         setAuthDisabled(true);
+        setIsReady(true);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [clearWebAuthState, isConnected, token]);
+  }, [isConnected, loadWebSession]);
 
   useEffect(() => {
     if (!isDesktop) return;
 
     let cancelled = false;
-    clearWebAuthState();
 
     void desktopGetSession()
       .then((session) => {
         if (cancelled) return;
-
         applyDesktopSession(session);
+        setIsReady(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) {
+          setIsReady(true);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [applyDesktopSession, clearWebAuthState]);
+  }, [applyDesktopSession]);
 
   useEffect(() => {
     if (!isDesktop) {
@@ -212,7 +160,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     void desktopGetSession()
       .then((session) => {
         if (cancelled) return;
-
         applyDesktopSession(session);
       })
       .catch(() => {});
@@ -221,53 +168,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [applyDesktopSession, isConnected]);
-
-  useEffect(() => {
-    if (isDesktop || token) return;
-
-    api
-      .post<{ nonce: string }>("/auth/remote", {})
-      .then(async ({ nonce }) => {
-        const response = await exchangeTokens({
-          grant_type: "urn:claudio:proxy_nonce",
-          nonce,
-          scope: "openid offline_access roles",
-        });
-        applyWebTokenResponse(response);
-      })
-      .catch(() => {});
-  }, [applyWebTokenResponse, token]);
-
-  useEffect(() => {
-    if (isDesktop) return;
-
-    function handleStorage(event: StorageEvent) {
-      if (event.storageArea !== localStorage) return;
-      if (event.key !== "token" && event.key !== null) return;
-
-      const nextToken = localStorage.getItem("token");
-      if (!nextToken) {
-        setTokenState(null);
-        setUser(null);
-        return;
-      }
-
-      const parsed = parseToken(nextToken);
-      if (!parsed) {
-        clearWebAuthState();
-        return;
-      }
-
-      setTokenState(nextToken);
-      setUser(parsed);
-    }
-
-    globalThis.addEventListener("storage", handleStorage);
-
-    return () => {
-      globalThis.removeEventListener("storage", handleStorage);
-    };
-  }, [clearWebAuthState]);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -290,15 +190,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const response = await exchangeTokens({
-        grant_type: "password",
-        username,
-        password,
-        scope: "openid offline_access roles",
-      });
-      applyWebTokenResponse(response);
+      await api.post<void>("/auth/login", { username, password });
+      await loadWebSession();
     },
-    [applyDesktopSession, applyWebTokenResponse],
+    [applyDesktopSession, loadWebSession],
   );
 
   const register = useCallback(
@@ -310,15 +205,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const response = await exchangeTokens({
-        grant_type: "password",
-        username,
-        password,
-        scope: "openid offline_access roles",
-      });
-      applyWebTokenResponse(response);
+      await loadWebSession();
     },
-    [applyDesktopSession, applyWebTokenResponse],
+    [applyDesktopSession, loadWebSession],
   );
 
   const completeExternalLogin = useCallback(
@@ -328,14 +217,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const response = await exchangeTokens({
-        grant_type: "urn:claudio:external_login_nonce",
-        nonce,
-        scope: "openid offline_access roles",
-      });
-      applyWebTokenResponse(response);
+      await loadWebSession();
     },
-    [applyDesktopSession, applyWebTokenResponse],
+    [applyDesktopSession, loadWebSession],
   );
 
   const logout = useCallback(async () => {
@@ -344,14 +228,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    clearWebAuthState();
-  }, [applyDesktopSession, clearWebAuthState]);
-
-  const updateToken = useCallback((newToken: string) => {
-    if (isDesktop) return;
-    localStorage.setItem("token", newToken);
-    setTokenState(newToken);
-  }, []);
+    await api.post<void>("/auth/logout", {});
+    setUser(null);
+  }, [applyDesktopSession]);
 
   const updateUser = useCallback((newUser: User) => {
     setUser(newUser);
@@ -361,15 +240,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext
       value={{
         user,
-        token,
+        token: null,
         login,
         register,
         completeExternalLogin,
         logout,
-        setToken: updateToken,
+        setToken: () => {},
         setUser: updateUser,
         providers,
         authDisabled,
+        isReady,
         isAdmin: user?.role === "admin",
         isLoggedIn: !!user,
       }}

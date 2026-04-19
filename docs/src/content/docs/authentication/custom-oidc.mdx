@@ -32,20 +32,20 @@ redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
 
 ## Fields
 
-| Field | Required | Description |
-|---|---|---|
-| `slug` | Yes | Stable provider identifier used in callback URLs |
-| `display_name` | Yes | Button label shown in the login UI |
-| `logo_url` | No | Image shown beside the provider button |
-| `discovery_url` | Yes | Full OIDC discovery document URL (must end in `/.well-known/openid-configuration`) |
-| `client_id` | Yes | OAuth client ID |
-| `client_secret` | Yes | OAuth client secret |
-| `redirect_uri` | Yes | Must match the provider-side callback exactly |
-| `scope` | No | Defaults to `openid profile email` |
-| `user_id_claim` | No | Defaults to `sub` |
-| `username_claim` | No | Defaults to `preferred_username` |
-| `name_claim` | No | Defaults to `name` |
-| `email_claim` | No | Defaults to `email` |
+| Field            | Required | Description                                                                        |
+| ---------------- | -------- | ---------------------------------------------------------------------------------- |
+| `slug`           | Yes      | Stable provider identifier used in callback URLs                                   |
+| `display_name`   | Yes      | Button label shown in the login UI                                                 |
+| `logo_url`       | No       | Image shown beside the provider button                                             |
+| `discovery_url`  | Yes      | Full OIDC discovery document URL (must end in `/.well-known/openid-configuration`) |
+| `client_id`      | Yes      | OAuth client ID                                                                    |
+| `client_secret`  | Yes      | OAuth client secret                                                                |
+| `redirect_uri`   | Yes      | Must match the provider-side callback exactly                                      |
+| `scope`          | No       | Defaults to `openid profile email`                                                 |
+| `user_id_claim`  | No       | Defaults to `sub`                                                                  |
+| `username_claim` | No       | Defaults to `preferred_username`                                                   |
+| `name_claim`     | No       | Defaults to `name`                                                                 |
+| `email_claim`    | No       | Defaults to `email`                                                                |
 
 If your provider uses standard OIDC claim names, you can omit `scope` and the claim mapping fields.
 

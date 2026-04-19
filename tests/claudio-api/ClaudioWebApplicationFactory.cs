@@ -39,8 +39,7 @@ public class ClaudioWebApplicationFactory : WebApplicationFactory<Program>
             if (dbDescriptor is not null) services.Remove(dbDescriptor);
 
             services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite($"Data Source={_dbPath}")
-                    .UseOpenIddict());
+                options.UseSqlite($"Data Source={_dbPath}"));
 
             // Replace ClaudioConfig with test config
             var configDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ClaudioConfig));

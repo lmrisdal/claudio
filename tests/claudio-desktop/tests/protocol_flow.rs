@@ -33,7 +33,7 @@ async fn protocol_flow_refreshes_and_retries_authenticated_requests() {
                 TestResponse::json(200, r#"{"ok":true}"#)
             }
         }
-        "/connect/token" => TestResponse::json(
+        "/api/auth/token/refresh" => TestResponse::json(
             200,
             r#"{"access_token":"fresh-token","refresh_token":"fresh-refresh"}"#,
         ),
@@ -76,7 +76,7 @@ async fn protocol_flow_clears_tokens_when_refresh_fails() {
     let logout_calls = Arc::new(AtomicUsize::new(0));
     let server = TestServer::spawn(|request| match request.path.as_str() {
         "/api/games" => TestResponse::text(401, "expired"),
-        "/connect/token" => TestResponse::json(400, r#"{"error":"invalid_grant"}"#),
+        "/api/auth/token/refresh" => TestResponse::json(400, r#"{"error":"invalid_grant"}"#),
         _ => TestResponse::text(404, "missing"),
     });
 

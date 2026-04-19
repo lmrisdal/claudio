@@ -31,8 +31,8 @@ TUnit + AwesomeAssertions test project.
 
 ## Frontend Structure
 
-- **API client** at `src/claudio-web/src/api/client.ts` — wraps fetch with JWT auth header injection
-- **Auth context** at `src/claudio-web/src/hooks/useAuth.tsx` — JWT parsing, login/register/logout
+- **API client** at `src/claudio-web/src/features/core/api/client.ts` — wraps fetch, includes browser cookies, and sends CSRF headers for mutating browser requests
+- **Auth context** at `src/claudio-web/src/features/auth/components/auth-provider.tsx` — loads auth state from `/api/auth/me`, handles login/register/logout, and manages desktop session state
 - **Theming** uses CSS custom properties with Tailwind semantic tokens (`text-text-primary`, `bg-surface`, etc.)
 
 ## Configuration

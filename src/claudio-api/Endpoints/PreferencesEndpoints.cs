@@ -1,11 +1,11 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Claudio.Api.Auth;
 using Claudio.Api.Data;
 using Claudio.Api.Enums;
 using Claudio.Api.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
 
 namespace Claudio.Api.Endpoints;
 
@@ -87,8 +87,7 @@ public static class PreferencesEndpoints
 
     private static int? GetUserId(ClaimsPrincipal principal)
     {
-        var userId = principal.FindFirstValue(OpenIddictConstants.Claims.Subject);
-        return int.TryParse(userId, out var value) ? value : null;
+        return principal.GetUserId();
     }
 
     private static UserPreferencesDto DeserializePreferences(string? preferencesJson)

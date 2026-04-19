@@ -15,10 +15,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
-    <PackageReference Include="OpenIddict.AspNetCore" />
-    <PackageReference Include="OpenIddict.EntityFrameworkCore" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="Tomlyn" />
     <PackageReference Include="IGDB" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />

@@ -34,6 +34,9 @@ services:
       - PGID=1000
       - CLAUDIO_IGDB_CLIENT_ID=your_client_id
       - CLAUDIO_IGDB_CLIENT_SECRET=your_client_secret
+      # Same-origin reverse proxy: leave CLAUDIO_BROWSER_ORIGINS unset.
+      # Multiple origins should be comma-separated with no spaces.
+      # - CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com,https://staging.example.com
 
 volumes:
   claudio-data:
@@ -56,6 +59,9 @@ services:
       - PGID=1000
       - CLAUDIO_DB_PROVIDER=postgres
       - CLAUDIO_DB_POSTGRES=postgres://claudio:secret@db/claudio
+      # Same-origin reverse proxy: leave CLAUDIO_BROWSER_ORIGINS unset.
+      # Multiple origins should be comma-separated with no spaces.
+      # - CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com,https://staging.example.com
     depends_on:
       - db
 
@@ -79,3 +85,9 @@ volumes:
 Claudio stores a signing key (`claudio-signing.key`) alongside the database in the config directory. This key signs authentication tokens — if it's lost, all users will need to sign in again.
 
 Make sure the `/config` volume is persistent.
+
+## Reverse Proxy And Browser Origins
+
+The browser app now uses cookie sessions. If your reverse proxy serves the SPA and API from the same origin, such as `https://claudio.example.com` and `https://claudio.example.com/api`, leave `CLAUDIO_BROWSER_ORIGINS` unset.
+
+If the SPA and API are served from different origins, set `CLAUDIO_BROWSER_ORIGINS` to the browser-visible frontend origin. For multiple frontend origins, use a comma-separated list with no spaces.

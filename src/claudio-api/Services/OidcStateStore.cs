@@ -5,22 +5,22 @@ namespace Claudio.Api.Services;
 
 public class OidcStateStore
 {
-    private readonly ConcurrentDictionary<string, (string ProviderSlug, string ReturnTo, DateTimeOffset Expiry)> _states = new();
+    private readonly ConcurrentDictionary<string, (string ProviderSlug, string ReturnTo, string ClientType, DateTimeOffset Expiry)> _states = new();
     private DateTimeOffset _lastPurge = DateTimeOffset.UtcNow;
 
-    public string CreateState(string providerSlug, string returnTo)
+    public string CreateState(string providerSlug, string returnTo, string clientType)
     {
         PurgeExpired();
         var state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        _states[state] = (providerSlug, returnTo, DateTimeOffset.UtcNow.AddMinutes(5));
+        _states[state] = (providerSlug, returnTo, clientType, DateTimeOffset.UtcNow.AddMinutes(5));
         return state;
     }
 
-    public (string ProviderSlug, string ReturnTo)? ConsumeState(string state)
+    public (string ProviderSlug, string ReturnTo, string ClientType)? ConsumeState(string state)
     {
         if (_states.TryRemove(state, out var entry) && DateTimeOffset.UtcNow <= entry.Expiry)
-            return (entry.ProviderSlug, entry.ReturnTo);
+            return (entry.ProviderSlug, entry.ReturnTo, entry.ClientType);
 
         return null;
     }

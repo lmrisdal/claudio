@@ -28,6 +28,7 @@ public class AuthConfig
     public bool DisableAuth { get; set; } = false;
     public bool DisableLocalLogin { get; set; } = false;
     public bool DisableUserCreation { get; set; } = false;
+    public List<string> BrowserOrigins { get; set; } = ["http://localhost:5173", "http://127.0.0.1:5173"];
     public string ProxyAuthHeader { get; set; } = string.Empty;
     public bool ProxyAuthAutoCreate { get; set; } = false;
     public GitHubOAuthConfig Github { get; set; } = new();

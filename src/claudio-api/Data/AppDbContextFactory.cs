@@ -18,7 +18,6 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connection)
-            .UseOpenIddict()
             .Options;
 
         return new AppDbContext(options);

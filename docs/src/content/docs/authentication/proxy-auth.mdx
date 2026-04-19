@@ -24,6 +24,8 @@ CLAUDIO_PROXY_AUTH_AUTO_CREATE=true
 
 When a request arrives with the configured header, Claudio creates or finds the user and issues a token automatically.
 
+If your reverse proxy also serves the browser app from a different origin than the API, set `CLAUDIO_BROWSER_ORIGINS` to the browser-visible frontend origin. For same-origin reverse-proxy deployments, leave it unset.
+
 :::danger
 Only use proxy authentication when the reverse proxy is the **sole entry point** to Claudio. The header value is trusted unconditionally — if users can reach Claudio directly, they can forge the header and impersonate any user.
 :::

@@ -10,6 +10,7 @@ sqlite_path = "/config/claudio.db"
 disable_auth = false             # Set to true to disable authentication entirely (open access)
 disable_local_login = false      # Set to true to require OIDC/external login
 disable_user_creation = false    # Set to true to prevent new local or external accounts
+browser_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 [auth.github]
 client_id = ""

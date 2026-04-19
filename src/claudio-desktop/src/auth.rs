@@ -16,7 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
-use network::{ExchangeError, derive_session, exchange_tokens, request_proxy_nonce};
+use network::{ExchangeError, derive_session, exchange_tokens};
 #[cfg(test)]
 use storage::fallback_tokens_path;
 #[cfg(any(test, feature = "integration-tests"))]
@@ -29,11 +29,6 @@ use storage::{
 
 const KEYRING_SERVICE: &str = "claudio-desktop";
 const KEYRING_ACCOUNT: &str = "auth-tokens";
-const CLIENT_ID: &str = "claudio-spa";
-const PASSWORD_GRANT_TYPE: &str = "password";
-const PROXY_NONCE_GRANT_TYPE: &str = "urn:claudio:proxy_nonce";
-const EXTERNAL_LOGIN_NONCE_GRANT_TYPE: &str = "urn:claudio:external_login_nonce";
-const REFRESH_TOKEN_GRANT_TYPE: &str = "refresh_token";
 const SECURE_STORAGE_ERROR_PREFIX: &str = "Secure storage unavailable:";
 const REAUTH_REQUIRED_PREFIX: &str = "Reauthentication required:";
 
@@ -65,11 +60,6 @@ pub struct DesktopUser {
 struct TokenResponse {
     access_token: String,
     refresh_token: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ProxyNonceResponse {
-    nonce: String,
 }
 
 #[derive(Clone, Copy)]
@@ -210,12 +200,11 @@ pub async fn login_with_password(
 ) -> Result<DesktopSession, String> {
     let tokens = exchange_tokens(
         settings,
-        vec![
-            ("grant_type", PASSWORD_GRANT_TYPE.to_string()),
-            ("username", username.to_string()),
-            ("password", password.to_string()),
-            ("scope", "openid offline_access roles".to_string()),
-        ],
+        "/api/auth/token/login",
+        serde_json::json!({
+            "username": username,
+            "password": password,
+        }),
     )
     .await?;
 
@@ -228,11 +217,10 @@ pub async fn complete_external_login(
 ) -> Result<DesktopSession, String> {
     let tokens = exchange_tokens(
         settings,
-        vec![
-            ("grant_type", EXTERNAL_LOGIN_NONCE_GRANT_TYPE.to_string()),
-            ("nonce", nonce.to_string()),
-            ("scope", "openid offline_access roles".to_string()),
-        ],
+        "/api/auth/token/external",
+        serde_json::json!({
+            "nonce": nonce,
+        }),
     )
     .await?;
 
@@ -240,16 +228,7 @@ pub async fn complete_external_login(
 }
 
 pub async fn proxy_login(settings: &DesktopSettings) -> Result<DesktopSession, String> {
-    let nonce = request_proxy_nonce(settings).await?;
-    let tokens = exchange_tokens(
-        settings,
-        vec![
-            ("grant_type", PROXY_NONCE_GRANT_TYPE.to_string()),
-            ("nonce", nonce),
-            ("scope", "openid offline_access roles".to_string()),
-        ],
-    )
-    .await?;
+    let tokens = exchange_tokens(settings, "/api/auth/token/proxy", serde_json::json!({})).await?;
 
     finalize_login(settings, tokens).await
 }
@@ -279,10 +258,10 @@ pub async fn refresh_access_token(settings: &DesktopSettings) -> Result<Option<S
 
     let result = exchange_tokens(
         settings,
-        vec![
-            ("grant_type", REFRESH_TOKEN_GRANT_TYPE.to_string()),
-            ("refresh_token", refresh_token),
-        ],
+        "/api/auth/token/refresh",
+        serde_json::json!({
+            "refreshToken": refresh_token,
+        }),
     )
     .await;
 

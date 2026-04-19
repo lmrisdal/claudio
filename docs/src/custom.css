@@ -5,158 +5,158 @@
 
 /* Dark mode (default) */
 :root {
-	--sl-font: "DM Sans", system-ui, sans-serif;
-	--sl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sl-font: "DM Sans", system-ui, sans-serif;
+  --sl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-	--sl-color-white: #e5e5e5;
-	--sl-color-black: #0a0a0f;
+  --sl-color-white: #e5e5e5;
+  --sl-color-black: #0a0a0f;
 
-	--sl-color-bg: #0a0a0f;
-	--sl-color-bg-nav: rgba(10, 10, 15, 0.8);
-	--sl-color-bg-sidebar: transparent;
-	--sl-color-bg-inline-code: #1a1a24;
+  --sl-color-bg: #0a0a0f;
+  --sl-color-bg-nav: rgba(10, 10, 15, 0.8);
+  --sl-color-bg-sidebar: transparent;
+  --sl-color-bg-inline-code: #1a1a24;
 
-	--sl-color-text: #e5e5e5;
-	--sl-color-text-accent: #00d9b8;
-	--sl-color-text-invert: #0a0a0f;
+  --sl-color-text: #e5e5e5;
+  --sl-color-text-accent: #00d9b8;
+  --sl-color-text-invert: #0a0a0f;
 
-	--sl-color-accent-low: rgba(0, 217, 184, 0.15);
-	--sl-color-accent: #00d9b8;
-	--sl-color-accent-high: #b3f5ea;
+  --sl-color-accent-low: rgba(0, 217, 184, 0.15);
+  --sl-color-accent: #00d9b8;
+  --sl-color-accent-high: #b3f5ea;
 
-	--sl-color-bg-accent: #00d9b8;
+  --sl-color-bg-accent: #00d9b8;
 
-	--sl-color-gray-1: #e5e5e5;
-	--sl-color-gray-2: #a0a0b0;
-	--sl-color-gray-3: #6b6b7b;
-	--sl-color-gray-4: #3a3a4a;
-	--sl-color-gray-5: #2a2a36;
-	--sl-color-gray-6: #1a1a24;
-	--sl-color-gray-7: #111118;
+  --sl-color-gray-1: #e5e5e5;
+  --sl-color-gray-2: #a0a0b0;
+  --sl-color-gray-3: #6b6b7b;
+  --sl-color-gray-4: #3a3a4a;
+  --sl-color-gray-5: #2a2a36;
+  --sl-color-gray-6: #1a1a24;
+  --sl-color-gray-7: #111118;
 
-	--sl-color-hairline: #2a2a36;
-	--sl-color-hairline-light: rgba(255, 255, 255, 0.018);
-	--sl-color-hairline-shade: #1a1a24;
+  --sl-color-hairline: #2a2a36;
+  --sl-color-hairline-light: rgba(255, 255, 255, 0.018);
+  --sl-color-hairline-shade: #1a1a24;
 }
 
 /* Light mode */
 :root[data-theme="light"] {
-	--sl-color-white: #1a1a2e;
-	--sl-color-black: #f8f8fa;
+  --sl-color-white: #1a1a2e;
+  --sl-color-black: #f8f8fa;
 
-	--sl-color-bg: #f8f8fa;
-	--sl-color-bg-nav: rgba(248, 248, 250, 0.85);
-	--sl-color-bg-sidebar: transparent;
-	--sl-color-bg-inline-code: #f0f0f3;
+  --sl-color-bg: #f8f8fa;
+  --sl-color-bg-nav: rgba(248, 248, 250, 0.85);
+  --sl-color-bg-sidebar: transparent;
+  --sl-color-bg-inline-code: #f0f0f3;
 
-	--sl-color-text: #1a1a2e;
-	--sl-color-text-accent: #009e87;
-	--sl-color-text-invert: #f8f8fa;
+  --sl-color-text: #1a1a2e;
+  --sl-color-text-accent: #009e87;
+  --sl-color-text-invert: #f8f8fa;
 
-	--sl-color-accent-low: rgba(0, 158, 135, 0.1);
-	--sl-color-accent: #009e87;
-	--sl-color-accent-high: #006b5c;
+  --sl-color-accent-low: rgba(0, 158, 135, 0.1);
+  --sl-color-accent: #009e87;
+  --sl-color-accent-high: #006b5c;
 
-	--sl-color-bg-accent: #009e87;
+  --sl-color-bg-accent: #009e87;
 
-	--sl-color-gray-1: #1a1a2e;
-	--sl-color-gray-2: #555566;
-	--sl-color-gray-3: #888899;
-	--sl-color-gray-4: #b0b0bb;
-	--sl-color-gray-5: #d8d8df;
-	--sl-color-gray-6: #f0f0f3;
-	--sl-color-gray-7: #ffffff;
+  --sl-color-gray-1: #1a1a2e;
+  --sl-color-gray-2: #555566;
+  --sl-color-gray-3: #888899;
+  --sl-color-gray-4: #b0b0bb;
+  --sl-color-gray-5: #d8d8df;
+  --sl-color-gray-6: #f0f0f3;
+  --sl-color-gray-7: #ffffff;
 
-	--sl-color-hairline: #d8d8df;
-	--sl-color-hairline-light: rgba(0, 0, 0, 0.04);
-	--sl-color-hairline-shade: #e8e8ec;
+  --sl-color-hairline: #d8d8df;
+  --sl-color-hairline-light: rgba(0, 0, 0, 0.04);
+  --sl-color-hairline-shade: #e8e8ec;
 }
 
 /* Background grid */
 body {
-	background-image:
-		linear-gradient(to right, var(--sl-color-hairline-light) 1px, transparent 1px),
-		linear-gradient(to bottom, var(--sl-color-hairline-light) 1px, transparent 1px);
-	background-size: 28px 28px;
+  background-image:
+    linear-gradient(to right, var(--sl-color-hairline-light) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--sl-color-hairline-light) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 /* Frosted glass navbar */
 .header {
-	-webkit-backdrop-filter: blur(12px);
-	backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 /* Rounded corners to match frontend (rounded-lg = 0.5rem, rounded-xl = 0.75rem) */
 :root {
-	--sl-search-corners: 0.75rem;
+  --sl-search-corners: 0.75rem;
 }
 
 /* Code blocks */
 .expressive-code figure.frame {
-	border-radius: 0.75rem !important;
-	overflow: hidden;
+  border-radius: 0.75rem !important;
+  overflow: hidden;
 }
 .expressive-code figure.frame > figcaption.header {
-	border-radius: 0.75rem 0.75rem 0 0 !important;
+  border-radius: 0.75rem 0.75rem 0 0 !important;
 }
 
 /* Cards & link cards */
 .card {
-	border-radius: 0.75rem;
+  border-radius: 0.75rem;
 }
 .sl-link-card {
-	border-radius: 0.75rem;
+  border-radius: 0.75rem;
 }
 
 /* Aside/callout blocks */
 .starlight-aside {
-	border-radius: 0.75rem;
+  border-radius: 0.75rem;
 }
 
 /* Pagination links */
 .pagination-links a {
-	border-radius: 0.75rem;
+  border-radius: 0.75rem;
 }
 
 /* Inline code */
 :not(pre) > code {
-	border-radius: 0.375rem;
+  border-radius: 0.375rem;
 }
 
 /* Mobile TOC */
 mobile-starlight-toc summary {
-	border-radius: 0.5rem;
+  border-radius: 0.5rem;
 }
 
 /* Steps counter circles are fine rounded-full, but the sidebar items need a bump */
 nav.sidebar-content a {
-	border-radius: 0.375rem;
+  border-radius: 0.375rem;
 }
 
 /* Sidebar current page — use subtle highlight instead of solid accent bg */
-nav.sidebar-content [aria-current='page'],
-nav.sidebar-content [aria-current='page']:hover,
-nav.sidebar-content [aria-current='page']:focus {
-	color: var(--sl-color-text-accent) !important;
-	background-color: var(--sl-color-accent-low) !important;
+nav.sidebar-content [aria-current="page"],
+nav.sidebar-content [aria-current="page"]:hover,
+nav.sidebar-content [aria-current="page"]:focus {
+  color: var(--sl-color-text-accent) !important;
+  background-color: var(--sl-color-accent-low) !important;
 }
 
 /* Hero section tweaks */
 .hero .action.primary {
-	background-color: #00d9b8 !important;
-	border-color: #00d9b8 !important;
-	color: #0a0a0f !important;
+  background-color: #00d9b8 !important;
+  border-color: #00d9b8 !important;
+  color: #0a0a0f !important;
 }
 .hero .action.primary:hover {
-	background-color: #00c4a6 !important;
-	border-color: #00c4a6 !important;
+  background-color: #00c4a6 !important;
+  border-color: #00c4a6 !important;
 }
 :root[data-theme="light"] .hero .action.primary {
-	background-color: #009e87 !important;
-	border-color: #009e87 !important;
-	color: #f8f8fa !important;
+  background-color: #009e87 !important;
+  border-color: #009e87 !important;
+  color: #f8f8fa !important;
 }
 :root[data-theme="light"] .hero .action.primary:hover {
-	background-color: #008a76 !important;
-	border-color: #008a76 !important;
+  background-color: #008a76 !important;
+  border-color: #008a76 !important;
 }

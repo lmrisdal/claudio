@@ -118,14 +118,15 @@ fn open_external_login_production(app: tauri::AppHandle, full_url: &str) -> Resu
 
     let existing: Vec<(String, String)> = parsed
         .query_pairs()
-        .filter(|(key, _)| key != "returnTo")
+        .filter(|(key, _)| key != "returnTo" && key != "client")
         .map(|(k, v)| (k.into_owned(), v.into_owned()))
         .collect();
     parsed
         .query_pairs_mut()
         .clear()
         .extend_pairs(existing)
-        .append_pair("returnTo", "claudio://auth/callback");
+        .append_pair("returnTo", "claudio://auth/callback")
+        .append_pair("client", "desktop");
 
     app.opener()
         .open_url(parsed.as_str(), None::<&str>)
@@ -149,14 +150,15 @@ async fn open_external_login_dev(app: tauri::AppHandle, full_url: &str) -> Resul
 
     let existing: Vec<(String, String)> = parsed
         .query_pairs()
-        .filter(|(key, _)| key != "returnTo")
+        .filter(|(key, _)| key != "returnTo" && key != "client")
         .map(|(k, v)| (k.into_owned(), v.into_owned()))
         .collect();
     parsed
         .query_pairs_mut()
         .clear()
         .extend_pairs(existing)
-        .append_pair("returnTo", &callback_url);
+        .append_pair("returnTo", &callback_url)
+        .append_pair("client", "desktop");
 
     app.opener()
         .open_url(parsed.as_str(), None::<&str>)

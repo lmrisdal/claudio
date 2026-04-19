@@ -1,14 +1,17 @@
 using System.Security.Cryptography;
-using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using Claudio.Api.Auth;
 using Claudio.Api.Configuration;
 using Claudio.Api.Data;
 using Claudio.Api.Endpoints;
+using Claudio.Api.Models;
 using Claudio.Api.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
-using OpenIddict.Validation.AspNetCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 var configPath = Environment.GetEnvironmentVariable("CLAUDIO_CONFIG_PATH")
     ?? "/config/config.toml";
@@ -20,120 +23,136 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://+:{port}");
 builder.Logging.SetMinimumLevel(ParseLogLevel(config.Server.LogLevel));
 
-// CORS — allow desktop app (Tauri) to connect from different origins
+var browserOrigins = config.Auth.BrowserOrigins
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        if (browserOrigins.Length > 0)
+            policy.WithOrigins(browserOrigins);
+
+        policy.AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
     });
 });
 
-// Database
 if (config.Database.Provider == "postgres" && config.Database.PostgresConnection is not null)
 {
     builder.Services.AddDbContext<AppDbContext>(opt =>
         opt.UseNpgsql(config.Database.PostgresConnection)
-           .UseOpenIddict()
-           .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 }
 else
 {
     builder.Services.AddDbContext<AppDbContext>(opt =>
         opt.UseSqlite($"Data Source={config.Database.SqlitePath}")
-           .UseOpenIddict()
-           .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 }
 
-// Identity
-builder.Services.AddIdentityCore<ApplicationUser>(options =>
-{
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 8;
-    options.User.RequireUniqueEmail = false;
-})
-.AddRoles<IdentityRole<int>>()
-.AddEntityFrameworkStores<AppDbContext>()
-.AddDefaultTokenProviders()
-.AddSignInManager();
+builder.Services
+    .AddIdentity<ApplicationUser, IdentityRole<int>>(options =>
+    {
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequiredLength = 8;
+        options.User.RequireUniqueEmail = false;
+    })
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
 
-// OpenIddict
-// Load or generate a persistent RSA signing key stored alongside the config.
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, ApplicationUserClaimsPrincipalFactory>();
+builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, ApplicationUserClaimsTransformation>();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "claudio.auth";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Events.OnRedirectToLogin = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
+});
+
 var configDir = config.Database.Provider == "postgres"
     ? Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? "/config"
     : Path.GetDirectoryName(config.Database.SqlitePath) ?? "/config";
 Directory.CreateDirectory(configDir);
 
 var signingKeyPath = Path.Combine(configDir, "claudio-signing.key");
-RsaSecurityKey signingKey;
 var rsa = RSA.Create(2048);
 if (File.Exists(signingKeyPath))
-{
     rsa.ImportRSAPrivateKey(Convert.FromBase64String(File.ReadAllText(signingKeyPath)), out _);
-}
 else
-{
     File.WriteAllText(signingKeyPath, Convert.ToBase64String(rsa.ExportRSAPrivateKey()));
-}
-signingKey = new RsaSecurityKey(rsa);
 
-builder.Services.AddOpenIddict()
-    .AddCore(options =>
+var signingKey = new RsaSecurityKey(rsa);
+builder.Services.AddSingleton<SecurityKey>(signingKey);
+builder.Services.AddScoped<DesktopTokenService>();
+
+builder.Services
+    .AddAuthentication(options =>
     {
-        options.UseEntityFrameworkCore()
-            .UseDbContext<AppDbContext>();
+        options.DefaultScheme = "auth";
+        options.DefaultAuthenticateScheme = "auth";
+        options.DefaultChallengeScheme = "auth";
     })
-    .AddServer(options =>
+    .AddPolicyScheme("auth", "Cookie or bearer", options =>
     {
-        options.SetTokenEndpointUris("/connect/token");
-        options.SetUserInfoEndpointUris("/connect/userinfo");
-
-        options.AllowPasswordFlow();
-        options.AllowRefreshTokenFlow();
-        options.AllowCustomFlow(ConnectEndpoints.ProxyNonceGrantType);
-        options.AllowCustomFlow(ConnectEndpoints.ExternalLoginNonceGrantType);
-
-        options.RegisterScopes(
-            OpenIddictConstants.Scopes.OpenId,
-            OpenIddictConstants.Scopes.Profile,
-            OpenIddictConstants.Scopes.OfflineAccess,
-            "roles");
-
-        options.UseReferenceRefreshTokens();
-
-        // Persistent RSA key — tokens survive restarts. Encryption disabled so the SPA
-        // can read the JWT payload directly. Refresh tokens are opaque handles in the DB.
-        options.AddSigningKey(signingKey);
-        options.AddEphemeralEncryptionKey();
-        options.DisableAccessTokenEncryption();
-
-        options.UseAspNetCore()
-            .EnableTokenEndpointPassthrough()
-            .EnableUserInfoEndpointPassthrough()
-            .DisableTransportSecurityRequirement();
+        options.ForwardDefaultSelector = context =>
+            HasBearerAuthorization(context.Request)
+                ? JwtBearerDefaults.AuthenticationScheme
+                : IdentityConstants.ApplicationScheme;
     })
-    .AddValidation(options =>
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        options.UseLocalServer();
-        options.UseAspNetCore();
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = signingKey,
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
     });
 
-builder.Services.AddAuthentication(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder("auth")
+        .RequireAuthenticatedUser()
+        .Build());
 
-// JSON serialization
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "claudio.af";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+});
+
 builder.Services.ConfigureHttpJsonOptions(opt =>
 {
     opt.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase));
 });
 
-// Services
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton(new ConfigFileService(configPath, config));
 builder.Services.AddSingleton<ProxyNonceStore>();
@@ -159,40 +178,15 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// Auto-migrate database and seed OpenIddict application
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-
-    var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
-    if (await applicationManager.FindByClientIdAsync("claudio-spa") is null)
-    {
-        var descriptor = new OpenIddictApplicationDescriptor
-        {
-            ClientId = "claudio-spa",
-            ClientType = OpenIddictConstants.ClientTypes.Public,
-            DisplayName = "Claudio SPA",
-        };
-        descriptor.AddGrantTypePermissions(
-            OpenIddictConstants.GrantTypes.Password,
-            OpenIddictConstants.GrantTypes.RefreshToken,
-            ConnectEndpoints.ProxyNonceGrantType,
-            ConnectEndpoints.ExternalLoginNonceGrantType);
-        descriptor.AddScopePermissions(
-            OpenIddictConstants.Scopes.OpenId,
-            OpenIddictConstants.Scopes.Profile,
-            OpenIddictConstants.Scopes.OfflineAccess,
-            "roles");
-        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
-        await applicationManager.CreateAsync(descriptor);
-    }
 }
 
 app.UseCors();
 app.UseStaticFiles();
 
-// Serve uploaded game images from /config/images/ under /images/
 var imagesDir = Path.Combine(configDir, "images");
 Directory.CreateDirectory(imagesDir);
 app.UseStaticFiles(new StaticFileOptions
@@ -204,25 +198,58 @@ app.UseStaticFiles(new StaticFileOptions
 if (config.Auth.DisableAuth)
     app.UseMiddleware<NoAuthMiddleware>();
 else
+{
     app.UseAuthentication();
+    app.Use(async (context, next) =>
+    {
+        if (RequiresAntiforgeryValidation(context.Request) && !HasBearerAuthorization(context.Request))
+        {
+            var antiforgery = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.Antiforgery.IAntiforgery>();
+            await antiforgery.ValidateRequestAsync(context);
+        }
+
+        await next();
+    });
+}
+
 app.UseAuthorization();
 
-// Minimal API endpoints
 app.MapHealthEndpoints();
 
 if (!config.Auth.DisableAuth)
-{
-    app.MapConnectEndpoints();
     app.MapAuthEndpoints();
-}
+
 app.MapGameEndpoints();
 app.MapAdminEndpoints();
 app.MapPreferencesEndpoints();
-
-// SPA fallback — serve index.html for non-API, non-file routes
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+static bool HasBearerAuthorization(HttpRequest request) =>
+    request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+
+static bool RequiresAntiforgeryValidation(HttpRequest request)
+{
+    if (!HttpMethods.IsPost(request.Method) && !HttpMethods.IsPut(request.Method) && !HttpMethods.IsDelete(request.Method))
+        return false;
+
+    var path = request.Path.Value ?? string.Empty;
+    if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
+        return false;
+
+    if (path.StartsWith("/api/auth/token/", StringComparison.OrdinalIgnoreCase))
+        return false;
+
+    if (path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/api/auth/register", StringComparison.OrdinalIgnoreCase))
+        return false;
+
+    if (!request.Cookies.ContainsKey("claudio.auth"))
+        return false;
+
+    return !path.Contains("/upload-image", StringComparison.OrdinalIgnoreCase);
+}
 
 static LogLevel ParseLogLevel(string value) => value.Trim().ToLowerInvariant() switch
 {
@@ -236,5 +263,4 @@ static LogLevel ParseLogLevel(string value) => value.Trim().ToLowerInvariant() s
     _ => LogLevel.Warning,
 };
 
-// Make Program accessible to integration tests via WebApplicationFactory<Program>
 public partial class Program;

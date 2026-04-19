@@ -3,77 +3,80 @@ title: Environment Variables
 description: All environment variables supported by Claudio.
 ---
 
-import { Badge } from '@astrojs/starlight/components';
+import { Badge } from "@astrojs/starlight/components";
 
 All settings can be configured via environment variables. These take precedence over values in `config.toml`.
 
 ## Container
 
-| Variable | Description | Default |
-|---|---|---|
-| `PUID` | User ID to run the process as | `0` (root) |
-| `PGID` | Group ID to run the process as | `0` (root) |
+| Variable | Description                    | Default    |
+| -------- | ------------------------------ | ---------- |
+| `PUID`   | User ID to run the process as  | `0` (root) |
+| `PGID`   | Group ID to run the process as | `0` (root) |
 
 ## Server
 
-| Variable | Description | Default |
-|---|---|---|
-| `CLAUDIO_PORT` | HTTP port | `8080` |
-| `CLAUDIO_LOG_LEVEL` | Log level (`error`, `warn`, `info`, `debug`, `trace`) | `warn` |
+| Variable            | Description                                           | Default |
+| ------------------- | ----------------------------------------------------- | ------- |
+| `CLAUDIO_PORT`      | HTTP port                                             | `8080`  |
+| `CLAUDIO_LOG_LEVEL` | Log level (`error`, `warn`, `info`, `debug`, `trace`) | `warn`  |
 
 ## Library
 
-| Variable | Description | Default |
-|---|---|---|
+| Variable                | Description                        | Default  |
+| ----------------------- | ---------------------------------- | -------- |
 | `CLAUDIO_LIBRARY_PATHS` | Comma-separated game library paths | `/games` |
-| `CLAUDIO_SCAN_INTERVAL` | Library scan interval in seconds | `120` |
+| `CLAUDIO_SCAN_INTERVAL` | Library scan interval in seconds   | `120`    |
 
 ## Database
 
-| Variable | Description | Default |
-|---|---|---|
-| `CLAUDIO_DB_PROVIDER` | `sqlite` or `postgres` | `sqlite` |
-| `CLAUDIO_DB_SQLITE_PATH` | SQLite database file path | `/config/claudio.db` |
-| `CLAUDIO_DB_POSTGRES` | PostgreSQL connection string | |
+| Variable                 | Description                  | Default              |
+| ------------------------ | ---------------------------- | -------------------- |
+| `CLAUDIO_DB_PROVIDER`    | `sqlite` or `postgres`       | `sqlite`             |
+| `CLAUDIO_DB_SQLITE_PATH` | SQLite database file path    | `/config/claudio.db` |
+| `CLAUDIO_DB_POSTGRES`    | PostgreSQL connection string |                      |
 
 ## Metadata
 
-| Variable | Description | Default |
-|---|---|---|
-| `CLAUDIO_IGDB_CLIENT_ID` | IGDB/Twitch client ID | |
-| `CLAUDIO_IGDB_CLIENT_SECRET` | IGDB/Twitch client secret | |
-| `CLAUDIO_STEAMGRIDDB_API_KEY` | SteamGridDB API key (for cover art search) | |
+| Variable                      | Description                                | Default |
+| ----------------------------- | ------------------------------------------ | ------- |
+| `CLAUDIO_IGDB_CLIENT_ID`      | IGDB/Twitch client ID                      |         |
+| `CLAUDIO_IGDB_CLIENT_SECRET`  | IGDB/Twitch client secret                  |         |
+| `CLAUDIO_STEAMGRIDDB_API_KEY` | SteamGridDB API key (for cover art search) |         |
 
 ## Authentication
 
-| Variable | Description | Default |
-|---|---|---|
-| `CLAUDIO_DISABLE_AUTH` | Disable authentication entirely (open access, everyone is admin) | `false` |
-| `CLAUDIO_DISABLE_LOCAL_LOGIN` | Disable username/password login and registration | `false` |
-| `CLAUDIO_DISABLE_USER_CREATION` | Prevent creation of new local and external users | `false` |
-| `CLAUDIO_PROXY_AUTH_HEADER` | HTTP header for proxy authentication (e.g. `Remote-User`) | |
-| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header | `false` |
+| Variable                         | Description                                                      | Default |
+| -------------------------------- | ---------------------------------------------------------------- | ------- |
+| `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin) | `false` |
+| `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                 | `false` |
+| `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                 | `false` |
+| `CLAUDIO_BROWSER_ORIGINS`        | Comma-separated browser origins allowed for cookie-auth CORS     |         |
+| `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)        |         |
+| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                         | `false` |
+
+`CLAUDIO_BROWSER_ORIGINS` is only needed when the browser app and API are served from different origins. For multiple frontend origins, use a comma-separated list with no spaces.
 
 ## OAuth
 
-| Variable | Description | Default |
-|---|---|---|
-| `CLAUDIO_GITHUB_CLIENT_ID` | GitHub OAuth app client ID | |
-| `CLAUDIO_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret | |
-| `CLAUDIO_GITHUB_REDIRECT_URI` | GitHub OAuth callback URL | |
-| `CLAUDIO_GOOGLE_CLIENT_ID` | Google OAuth client ID | |
-| `CLAUDIO_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | |
-| `CLAUDIO_GOOGLE_REDIRECT_URI` | Google OAuth callback URL | |
+| Variable                       | Description                    | Default |
+| ------------------------------ | ------------------------------ | ------- |
+| `CLAUDIO_GITHUB_CLIENT_ID`     | GitHub OAuth app client ID     |         |
+| `CLAUDIO_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |         |
+| `CLAUDIO_GITHUB_REDIRECT_URI`  | GitHub OAuth callback URL      |         |
+| `CLAUDIO_GOOGLE_CLIENT_ID`     | Google OAuth client ID         |         |
+| `CLAUDIO_GOOGLE_CLIENT_SECRET` | Google OAuth client secret     |         |
+| `CLAUDIO_GOOGLE_REDIRECT_URI`  | Google OAuth callback URL      |         |
 
 ## OIDC
 
-| Variable | Description | Default |
-|---|---|---|
-| `CLAUDIO_OIDC_SLUG` | Provider identifier (used in callback URLs) | |
-| `CLAUDIO_OIDC_DISPLAY_NAME` | Button label in the login UI | |
-| `CLAUDIO_OIDC_LOGO_URL` | Image shown beside the provider button | |
-| `CLAUDIO_OIDC_DISCOVERY_URL` | OIDC discovery document URL | |
-| `CLAUDIO_OIDC_CLIENT_ID` | OAuth client ID | |
-| `CLAUDIO_OIDC_CLIENT_SECRET` | OAuth client secret | |
-| `CLAUDIO_OIDC_REDIRECT_URI` | OAuth callback URL | |
-| `CLAUDIO_OIDC_SCOPE` | OIDC scopes | `openid profile email` |
+| Variable                     | Description                                 | Default                |
+| ---------------------------- | ------------------------------------------- | ---------------------- |
+| `CLAUDIO_OIDC_SLUG`          | Provider identifier (used in callback URLs) |                        |
+| `CLAUDIO_OIDC_DISPLAY_NAME`  | Button label in the login UI                |                        |
+| `CLAUDIO_OIDC_LOGO_URL`      | Image shown beside the provider button      |                        |
+| `CLAUDIO_OIDC_DISCOVERY_URL` | OIDC discovery document URL                 |                        |
+| `CLAUDIO_OIDC_CLIENT_ID`     | OAuth client ID                             |                        |
+| `CLAUDIO_OIDC_CLIENT_SECRET` | OAuth client secret                         |                        |
+| `CLAUDIO_OIDC_REDIRECT_URI`  | OAuth callback URL                          |                        |
+| `CLAUDIO_OIDC_SCOPE`         | OIDC scopes                                 | `openid profile email` |

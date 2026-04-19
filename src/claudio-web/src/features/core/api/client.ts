@@ -1,6 +1,6 @@
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 
-function getDesktopTransportBase(target: "api" | "connect"): string {
+function getDesktopTransportBase(): string {
   const convertFileSrc = (
     globalThis.window as typeof globalThis.window & {
       __TAURI_INTERNALS__?: { convertFileSrc?: (filePath: string, protocol?: string) => string };
@@ -11,14 +11,14 @@ function getDesktopTransportBase(target: "api" | "connect"): string {
     try {
       const sample = new URL(convertFileSrc("", "claudio"));
       if (sample.protocol === "http:" || sample.protocol === "https:") {
-        return `${sample.protocol}//claudio.${target}`;
+        return `${sample.protocol}//claudio.api`;
       }
     } catch {
-      // Fall back to the direct custom protocol form used on macOS and Linux.
+      return "claudio://api";
     }
   }
 
-  return `claudio://${target}`;
+  return "claudio://api";
 }
 
 function getServerBase(): string {
@@ -32,11 +32,7 @@ function getServerOrigin(): string {
 }
 
 function getApiBase(): string {
-  return isDesktop ? getDesktopTransportBase("api") : getServerBase();
-}
-
-function getConnectBase(): string {
-  return isDesktop ? getDesktopTransportBase("connect") : `${getServerOrigin()}/connect`;
+  return isDesktop ? getDesktopTransportBase() : getServerBase();
 }
 
 export function resolveServerUrl(path: string): string {
@@ -70,49 +66,33 @@ function toHeaderRecord(headers?: HeadersInit): Record<string, string> {
   return normalized;
 }
 
-function buildRequestHeaders(init: RequestInit | undefined, isFormData: boolean): HeadersInit {
-  const token = isDesktop ? null : localStorage.getItem("token");
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
 
+  const cookies = document.cookie.split(";");
+  for (const cookie of cookies) {
+    const [rawName, ...rest] = cookie.trim().split("=");
+    if (rawName === name) {
+      return decodeURIComponent(rest.join("="));
+    }
+  }
+
+  return null;
+}
+
+function buildRequestHeaders(
+  init: RequestInit | undefined,
+  isFormData: boolean,
+  isMutation: boolean,
+): HeadersInit {
   return {
     ...(isDesktop ? {} : getCustomHeaders()),
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(!isDesktop && isMutation ? { "X-CSRF-TOKEN": readCookie("claudio.csrf") ?? "" } : {}),
     ...toHeaderRecord(init?.headers),
   };
-}
-
-async function tryRefreshToken(): Promise<string | null> {
-  if (isDesktop) return null;
-
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken) return null;
-
-  try {
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: "claudio-spa",
-    });
-    const res = await fetch(`${getConnectBase()}/token`, {
-      method: "POST",
-      headers: {
-        ...getCustomHeaders(),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: body.toString(),
-    });
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const newToken: string = data.access_token;
-    localStorage.setItem("token", newToken);
-    if (data.refresh_token) {
-      localStorage.setItem("refresh_token", data.refresh_token);
-    }
-    return newToken;
-  } catch {
-    return null;
-  }
 }
 
 function redirectToLogin() {
@@ -121,11 +101,6 @@ function redirectToLogin() {
 
 function reportDesktopUnauthorized(path: string, message: string) {
   console.error(`Desktop API unauthorized for ${path}: ${message}`);
-}
-
-function clearWebAuthState() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("refresh_token");
 }
 
 async function readError(response: Response, fallback: string): Promise<string> {
@@ -154,28 +129,17 @@ async function readSuccess<T>(response: Response): Promise<T> {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
-  const headers = buildRequestHeaders(init, isFormData);
-  const res = await fetch(`${getApiBase()}${path}`, { ...init, headers });
+  const method = init?.method?.toUpperCase() ?? "GET";
+  const isMutation = method !== "GET" && method !== "HEAD";
+  const headers = buildRequestHeaders(init, isFormData, isMutation);
+  const res = await fetch(`${getApiBase()}${path}`, {
+    ...init,
+    credentials: isDesktop ? undefined : "include",
+    headers,
+  });
 
   if (res.status === 401) {
     const isAuthEndpoint = path.startsWith("/auth/");
-    if (!isDesktop && !isAuthEndpoint) {
-      const newToken = await tryRefreshToken();
-      if (newToken) {
-        const retryHeaders: HeadersInit = {
-          ...(isFormData ? {} : { "Content-Type": "application/json" }),
-          Authorization: `Bearer ${newToken}`,
-          ...toHeaderRecord(init?.headers),
-        };
-        const retryRes = await fetch(`${getApiBase()}${path}`, { ...init, headers: retryHeaders });
-        if (retryRes.ok) {
-          return readSuccess<T>(retryRes);
-        }
-      }
-
-      clearWebAuthState();
-      redirectToLogin();
-    }
 
     if (isDesktop && !isAuthEndpoint) {
       reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
@@ -193,29 +157,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
-  const headers = buildRequestHeaders(init, true);
-  const res = await fetch(`${getApiBase()}${path}`, { ...init, headers });
+  const headers = buildRequestHeaders(init, true, false);
+  const res = await fetch(`${getApiBase()}${path}`, {
+    ...init,
+    credentials: isDesktop ? undefined : "include",
+    headers,
+  });
 
   if (res.status === 401) {
-    if (!isDesktop) {
-      const newToken = await tryRefreshToken();
-      if (newToken) {
-        const retryHeaders: HeadersInit = {
-          Authorization: `Bearer ${newToken}`,
-          ...toHeaderRecord(init?.headers),
-        };
-        const retryRes = await fetch(`${getApiBase()}${path}`, { ...init, headers: retryHeaders });
-        if (retryRes.ok) return retryRes.arrayBuffer();
-      }
-
-      clearWebAuthState();
-    }
-
     if (isDesktop) {
       reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
+      redirectToLogin();
     }
 
-    redirectToLogin();
     throw new Error("Unauthorized");
   }
 

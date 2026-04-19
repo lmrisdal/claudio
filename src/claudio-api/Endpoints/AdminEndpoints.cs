@@ -16,7 +16,8 @@ public static class AdminEndpoints
     {
         var group = app.MapGroup("/api/admin")
             .WithTags("Admin")
-            .RequireAuthorization(policy => policy.RequireClaim("role", "admin"));
+            .RequireAuthorization(policy => policy.RequireAssertion(context =>
+                context.User.IsInRole("admin") || context.User.HasClaim("role", "admin")));
 
         group.MapGet("/users", GetUsers);
         group.MapDelete("/users/{id:int}", DeleteUser);

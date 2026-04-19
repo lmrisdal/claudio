@@ -20,12 +20,7 @@ export default function ExternalAuthCallback() {
       return;
     }
 
-    if (!externalNonce) {
-      void navigate("/login", { replace: true });
-      return;
-    }
-
-    completeExternalLogin(externalNonce)
+    completeExternalLogin(externalNonce ?? "")
       .then(() => {
         void navigate("/", { replace: true });
       })

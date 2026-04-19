@@ -20,9 +20,7 @@ sqlite_path = "/config/claudio.db"
 # postgres_connection = "postgres://claudio:secret@localhost/claudio"
 
 [auth]
-jwt_secret = "CHANGE-ME-TO-A-RANDOM-SECRET"
-access_token_expiry_minutes = 15       # Short-lived access token
-refresh_token_expiry_days = 180        # Long-lived refresh token (6 months). Use -1 for infinite expiry
+# browser_origins = ["https://claudio.example.com"]
 # proxy_auth_header = "Remote-User"
 # proxy_auth_auto_create = false
 
@@ -38,28 +36,37 @@ library_paths = ["/games"]
 ## Sections
 
 ### `[server]`
+
 Server configuration including the HTTP port and log level.
 
 - `port` — HTTP port to listen on (default: `8080`)
 - `log_level` — controls log verbosity. Accepts `error`, `warn`, `info`, `debug`, or `trace` (default: `warn`). Also accepts the full filter syntax, e.g. `warn,claudio_api=debug`.
 
 ### `[database]`
+
 Database provider selection (`sqlite` or `postgres`) and connection details.
 
 ### `[auth]`
-Authentication settings including JWT secrets, token expiry, and proxy authentication. See [Authentication](/claudio/authentication/overview/) for details.
+
+Authentication settings including browser origins for cookie-auth CORS and proxy authentication. See [Authentication](/claudio/authentication/overview/) for details.
 
 ### `[igdb]`
+
 IGDB/Twitch API credentials for game metadata. See the [Twitch Developer Portal](https://dev.twitch.tv/console) to create credentials.
 
 ### `[library]`
+
 List of paths to scan for game directories and scan timing.
 
 - `library_paths` — directories to scan for platform/game folders (default: `["/games"]`)
 - `scan_interval_secs` — how often to re-scan the library in seconds (default: `120`)
 
 ### `[auth.github]` / `[auth.google]`
+
 OAuth provider credentials. See [OAuth Providers](/claudio/authentication/oauth-providers/).
 
 ### `[auth.oidc_provider]`
+
 Custom OpenID Connect provider. See [Custom OIDC](/claudio/authentication/custom-oidc/).
+
+`browser_origins` is only needed when the browser app and API are served from different origins, such as `https://claudio.example.com` for the SPA and `https://api.example.com` for the API. For same-origin reverse-proxy setups, leave it unset.

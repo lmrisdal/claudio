@@ -78,6 +78,7 @@ volumes:
 | `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin) | `false`                |
 | `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                 | `false`                |
 | `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                 | `false`                |
+| `CLAUDIO_BROWSER_ORIGINS`        | Comma-separated browser origins allowed for cookie auth CORS     |                        |
 | `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)        |                        |
 | `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                         | `false`                |
 | `CLAUDIO_GITHUB_CLIENT_ID`       | GitHub OAuth app client ID                                       |                        |
@@ -96,6 +97,39 @@ volumes:
 | `CLAUDIO_OIDC_SCOPE`             | OIDC scopes                                                      | `openid profile email` |
 
 Alternatively, create a `config.toml` file — see [config.example.toml](config.example.toml) for the schema.
+
+### Reverse Proxy And Browser Origins
+
+The web app now uses ASP.NET Identity cookies for browser auth. Whether you need `CLAUDIO_BROWSER_ORIGINS` depends on how your reverse proxy exposes the SPA and API:
+
+- Same-origin reverse proxy: not required
+- Split frontend/API origins: required
+
+Same-origin example:
+
+- SPA: `https://claudio.example.com`
+- API through the same proxy: `https://claudio.example.com/api/*`
+
+In this setup the browser is same-origin, so CORS is not involved and you do not need `CLAUDIO_BROWSER_ORIGINS`.
+
+Split-origin example:
+
+- SPA: `https://claudio.example.com`
+- API: `https://api.example.com`
+
+In this setup the browser is cross-origin and you must allow the frontend origin explicitly:
+
+```bash
+CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com
+```
+
+Use the browser-visible frontend origin, not the API origin. For multiple frontend origins, provide a comma-separated list:
+
+```bash
+CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com,https://staging.example.com
+```
+
+For production deployments, the simplest setup is usually to keep the SPA and API behind the same reverse-proxy origin.
 
 ### OAuth Login
 

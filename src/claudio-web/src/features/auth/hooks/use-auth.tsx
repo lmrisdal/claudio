@@ -35,6 +35,7 @@ export interface AuthState {
   }) => void;
   providers: AuthProviders;
   authDisabled: boolean;
+  isReady: boolean;
   isAdmin: boolean;
   isLoggedIn: boolean;
 }

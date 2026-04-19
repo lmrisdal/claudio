@@ -11,9 +11,9 @@ services:
     environment:
       - CLAUDIO_DB_PROVIDER=postgres
       - CLAUDIO_DB_POSTGRES=postgres://claudio:secret@db/claudio
-      # - CLAUDIO_IGDB_CLIENT_ID=
-      # - CLAUDIO_IGDB_CLIENT_SECRET=
       # - CLAUDIO_PORT=8080
+      # Multiple origins should be comma-separated with no spaces.
+      # - CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com,https://staging.example.com
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s

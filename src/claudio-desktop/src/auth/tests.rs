@@ -147,8 +147,10 @@ async fn login_with_password_stores_tokens_in_plaintext_fallback() {
     let token_for_assert = access_token.clone();
     let server = TestServer::spawn(move |request| {
         assert_eq!(request.method, "POST");
-        assert_eq!(request.path, "/connect/token");
-        assert!(String::from_utf8_lossy(&request.body).contains("grant_type=password"));
+        assert_eq!(request.path, "/api/auth/token/login");
+        let body = String::from_utf8_lossy(&request.body);
+        assert!(body.contains("\"username\":\"lars\""));
+        assert!(body.contains("\"password\":\"secret\""));
         TestResponse::json(
             200,
             &json!({
@@ -180,7 +182,7 @@ async fn login_with_password_stores_tokens_in_plaintext_fallback() {
 async fn refresh_access_token_clears_tokens_after_rejected_refresh() {
     let _auth_guard = TestAuthGuard::plain_file_secure_storage_unavailable();
     let server = TestServer::spawn(|request| {
-        assert_eq!(request.path, "/connect/token");
+        assert_eq!(request.path, "/api/auth/token/refresh");
         TestResponse::json(400, r#"{"error":"invalid_grant"}"#)
     });
 

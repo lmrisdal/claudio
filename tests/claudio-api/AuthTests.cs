@@ -43,16 +43,11 @@ public class AuthTests : IAsyncDisposable
 
     private async Task<string> GetTokenAsync(HttpClient client, string username, string password)
     {
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var tokenResponse = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = username,
-            ["password"] = password,
-            ["client_id"] = "claudio-spa",
-            ["scope"] = "openid profile offline_access roles",
+            username,
+            password,
         });
-
-        var tokenResponse = await client.PostAsync("/connect/token", tokenRequest);
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
         return tokenJson.GetProperty("access_token").GetString()!;
     }
@@ -145,16 +140,11 @@ public class AuthTests : IAsyncDisposable
         var client = CreateClient();
         await client.PostAsJsonAsync("/api/auth/register", new { username = "user", password = "password123" });
 
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var response = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = "user",
-            ["password"] = "password123",
-            ["client_id"] = "claudio-spa",
-            ["scope"] = "openid profile offline_access roles",
+            username = "user",
+            password = "password123",
         });
-
-        var response = await client.PostAsync("/connect/token", tokenRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -168,15 +158,11 @@ public class AuthTests : IAsyncDisposable
         var client = CreateClient();
         await client.PostAsJsonAsync("/api/auth/register", new { username = "user", password = "password123" });
 
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var response = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = "user",
-            ["password"] = "wrongpassword",
-            ["client_id"] = "claudio-spa",
+            username = "user",
+            password = "wrongpassword",
         });
-
-        var response = await client.PostAsync("/connect/token", tokenRequest);
 
         response.IsSuccessStatusCode.Should().BeFalse();
     }
@@ -186,15 +172,11 @@ public class AuthTests : IAsyncDisposable
     {
         var client = CreateClient();
 
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var response = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = "nobody",
-            ["password"] = "password123",
-            ["client_id"] = "claudio-spa",
+            username = "nobody",
+            password = "password123",
         });
-
-        var response = await client.PostAsync("/connect/token", tokenRequest);
 
         response.IsSuccessStatusCode.Should().BeFalse();
     }
@@ -234,7 +216,7 @@ public class AuthTests : IAsyncDisposable
         var token = await RegisterAndGetTokenAsync(client, "cpuser", "oldpassword1");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await client.PutAsJsonAsync("/api/auth/change-password",
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
             new { currentPassword = "oldpassword1", newPassword = "newpassword1" });
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -251,7 +233,7 @@ public class AuthTests : IAsyncDisposable
         var token = await RegisterAndGetTokenAsync(client, "cpuser2", "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await client.PutAsJsonAsync("/api/auth/change-password",
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
             new { currentPassword = "wrongpassword", newPassword = "newpassword1" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -264,7 +246,7 @@ public class AuthTests : IAsyncDisposable
         var token = await RegisterAndGetTokenAsync(client, "cpuser3", "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await client.PutAsJsonAsync("/api/auth/change-password",
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
             new { currentPassword = "password123", newPassword = "short" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -528,26 +510,18 @@ public class AuthTests : IAsyncDisposable
         await client.PostAsJsonAsync("/api/auth/register", new { username = "refreshuser", password = "password123" });
 
         // Get initial tokens
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var tokenResponse = await client.PostAsJsonAsync("/api/auth/token/login", new
         {
-            ["grant_type"] = "password",
-            ["username"] = "refreshuser",
-            ["password"] = "password123",
-            ["client_id"] = "claudio-spa",
-            ["scope"] = "openid profile offline_access roles",
+            username = "refreshuser",
+            password = "password123",
         });
-        var tokenResponse = await client.PostAsync("/connect/token", tokenRequest);
         var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
         var refreshToken = tokenJson.GetProperty("refresh_token").GetString()!;
 
-        // Use refresh token
-        var refreshRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        var refreshResponse = await client.PostAsJsonAsync("/api/auth/token/refresh", new
         {
-            ["grant_type"] = "refresh_token",
-            ["refresh_token"] = refreshToken,
-            ["client_id"] = "claudio-spa",
+            refreshToken,
         });
-        var refreshResponse = await client.PostAsync("/connect/token", refreshRequest);
 
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var refreshJson = await refreshResponse.Content.ReadFromJsonAsync<JsonElement>();

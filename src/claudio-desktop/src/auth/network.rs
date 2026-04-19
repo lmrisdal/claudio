@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::Value;
 
 pub(super) fn server_origin(settings: &DesktopSettings) -> Result<String, String> {
     settings
@@ -8,31 +9,6 @@ pub(super) fn server_origin(settings: &DesktopSettings) -> Result<String, String
         .filter(|value| !value.is_empty())
         .map(|value| value.trim_end_matches('/').to_string())
         .ok_or_else(|| "Desktop server URL is not configured.".to_string())
-}
-
-pub(super) async fn request_proxy_nonce(settings: &DesktopSettings) -> Result<String, String> {
-    let origin = server_origin(settings)?;
-    let client = desktop_http_client()?;
-    let response = apply_custom_headers(
-        client.post(format!("{origin}/api/auth/remote")),
-        &settings.custom_headers,
-    )
-    .send()
-    .await
-    .map_err(|error| format!("Failed to contact auth server: {error}"))?;
-
-    if !response.status().is_success() {
-        return Err(parse_response_error(response, "Authentication failed")
-            .await
-            .unwrap_or_else(|message| message));
-    }
-
-    let payload: ProxyNonceResponse = response
-        .json()
-        .await
-        .map_err(|error| format!("Failed to parse proxy login response: {error}"))?;
-
-    Ok(payload.nonce)
 }
 
 pub(super) async fn derive_session(
@@ -98,17 +74,16 @@ pub(super) async fn derive_session(
 
 pub(super) async fn exchange_tokens(
     settings: &DesktopSettings,
-    mut parameters: Vec<(&'static str, String)>,
+    path: &str,
+    payload: Value,
 ) -> Result<StoredTokens, ExchangeError> {
     let origin = server_origin(settings).map_err(ExchangeError::Transport)?;
-    parameters.push(("client_id", CLIENT_ID.to_string()));
 
     let client = desktop_http_client().map_err(ExchangeError::Transport)?;
     let response = apply_custom_headers(
         client
-            .post(format!("{origin}/connect/token"))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .form(&parameters),
+            .post(format!("{origin}{path}"))
+            .json(&payload),
         &settings.custom_headers,
     )
     .send()
