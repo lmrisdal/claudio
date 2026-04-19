@@ -93,7 +93,7 @@ public static class AdminEndpoints
 
     private static IResult TriggerIgdbScan(IgdbService igdbService)
     {
-        igdbService.StartScanInBackground();
+        igdbService.QueueScan();
         return Results.Accepted();
     }
 
@@ -198,13 +198,13 @@ public static class AdminEndpoints
         return Results.Ok(compressionService.GetStatus());
     }
 
-    private static IResult GetTasksStatus(CompressionService compressionService, IgdbService igdbService, LibraryScanService scanService)
+    private static IResult GetTasksStatus(CompressionService compressionService, IgdbService igdbService, SteamGridDbService steamGridDbService)
     {
         return Results.Ok(new
         {
             compression = compressionService.GetStatus(),
             igdb = igdbService.GetScanStatus(),
-            steamGridDb = scanService.GetSteamGridDbStatus(),
+            steamGridDb = steamGridDbService.GetStatus(),
         });
     }
 

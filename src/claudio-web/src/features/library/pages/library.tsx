@@ -1,12 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../../core/api/client";
 import {
@@ -15,10 +8,7 @@ import {
   GAMEPAD_NAV_RIGHT_EVENT,
   GAMEPAD_NAV_UP_EVENT,
 } from "../../core/hooks/use-gamepad";
-import {
-  useInputScope,
-  useInputScopeState,
-} from "../../core/hooks/use-input-scope";
+import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game, TasksStatus } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
@@ -48,8 +38,7 @@ function getFocusKeyFromElement(element: HTMLElement | null) {
     return `toggle:${toggle.dataset.groupToggle}`;
   }
 
-  const gameId =
-    element?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
+  const gameId = element?.closest<HTMLElement>("[data-game-id]")?.dataset.gameId;
   return gameId ? `game:${gameId}` : null;
 }
 
@@ -59,23 +48,19 @@ export default function Library() {
   const { focusSidebar } = useDesktopShellNavigation();
   const { isActionBlocked } = useInputScopeState();
   const { preferences, setPlatformOrder } = useUserPreferences();
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(
-    () => {
-      try {
-        const saved = localStorage.getItem("library-platforms");
-        return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
-      } catch {
-        return new Set();
-      }
-    },
-  );
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("library-platforms");
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
   const [view, setView] = useState<ViewMode>(
     () => (localStorage.getItem("library-view") as ViewMode) || "grouped",
   );
-  const [sortBy, setSortBy] = useState<"platform" | "title" | "year" | "size">(
-    "title",
-  );
+  const [sortBy, setSortBy] = useState<"platform" | "title" | "year" | "size">("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
@@ -111,8 +96,7 @@ export default function Library() {
     queryFn: () => api.get<TasksStatus>("/admin/tasks/status"),
     queryKey: ["tasksStatus"],
   });
-  const hasActiveTasks =
-    tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning;
+  const hasActiveTasks = tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning;
 
   const { data: games = [], isLoading } = useQuery({
     queryFn: () => api.get<Game[]>("/games"),
@@ -126,10 +110,7 @@ export default function Library() {
 
     for (const game of games) {
       platformSet.add(game.platform);
-      if (
-        selectedPlatforms.size === 0 ||
-        selectedPlatforms.has(game.platform)
-      ) {
+      if (selectedPlatforms.size === 0 || selectedPlatforms.has(game.platform)) {
         filteredGames.push(game);
       }
     }
@@ -142,12 +123,8 @@ export default function Library() {
 
   const platforms = useMemo(
     () => [
-      ...preferences.library.platformOrder.filter((platform) =>
-        allPlatforms.includes(platform),
-      ),
-      ...allPlatforms.filter(
-        (platform) => !preferences.library.platformOrder.includes(platform),
-      ),
+      ...preferences.library.platformOrder.filter((platform) => allPlatforms.includes(platform)),
+      ...allPlatforms.filter((platform) => !preferences.library.platformOrder.includes(platform)),
     ],
     [allPlatforms, preferences.library.platformOrder],
   );
@@ -171,9 +148,7 @@ export default function Library() {
           return direction * left.title.localeCompare(right.title);
         }
         case "year": {
-          return (
-            direction * ((left.releaseYear ?? 0) - (right.releaseYear ?? 0))
-          );
+          return direction * ((left.releaseYear ?? 0) - (right.releaseYear ?? 0));
         }
         default: {
           return 0;
@@ -240,10 +215,7 @@ export default function Library() {
 
       const activeElement = document.activeElement as HTMLElement | null;
 
-      if (
-        focusAnchorReference.current &&
-        activeElement === focusAnchorReference.current
-      ) {
+      if (focusAnchorReference.current && activeElement === focusAnchorReference.current) {
         switch (direction) {
           case "ArrowDown":
           case "ArrowRight": {
@@ -283,8 +255,7 @@ export default function Library() {
         return true;
       }
 
-      const currentKey =
-        activeFocusKey.current ?? activeElement?.dataset.focusKey ?? null;
+      const currentKey = activeFocusKey.current ?? activeElement?.dataset.focusKey ?? null;
 
       if (!currentKey) {
         return false;
@@ -334,9 +305,7 @@ export default function Library() {
         return;
       }
 
-      if (
-        !["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(event.key)
-      ) {
+      if (!["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(event.key)) {
         return;
       }
 
@@ -397,11 +366,7 @@ export default function Library() {
         return;
       }
 
-      const targetKey = getGroupJumpTarget(
-        model,
-        activeFocusKey.current,
-        direction,
-      );
+      const targetKey = getGroupJumpTarget(model, activeFocusKey.current, direction);
       if (!targetKey) {
         return;
       }
@@ -411,18 +376,10 @@ export default function Library() {
     [isActionBlocked, model, queueFocus],
   );
 
-  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, () =>
-    handleDirectionalNavigation("ArrowUp"),
-  );
-  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, () =>
-    handleDirectionalNavigation("ArrowDown"),
-  );
-  useGamepadEvent(GAMEPAD_NAV_LEFT_EVENT, () =>
-    handleDirectionalNavigation("ArrowLeft"),
-  );
-  useGamepadEvent(GAMEPAD_NAV_RIGHT_EVENT, () =>
-    handleDirectionalNavigation("ArrowRight"),
-  );
+  useGamepadEvent(GAMEPAD_NAV_UP_EVENT, () => handleDirectionalNavigation("ArrowUp"));
+  useGamepadEvent(GAMEPAD_NAV_DOWN_EVENT, () => handleDirectionalNavigation("ArrowDown"));
+  useGamepadEvent(GAMEPAD_NAV_LEFT_EVENT, () => handleDirectionalNavigation("ArrowLeft"));
+  useGamepadEvent(GAMEPAD_NAV_RIGHT_EVENT, () => handleDirectionalNavigation("ArrowRight"));
   useGamepadEvent(
     "gamepad-rt",
     () => jumpGroup(1),
@@ -461,9 +418,7 @@ export default function Library() {
   useEffect(() => {
     function handleMouseDown(event: MouseEvent) {
       if (
-        !(event.target as HTMLElement).closest(
-          'a, button, input, [role="link"], [role="listbox"]',
-        )
+        !(event.target as HTMLElement).closest('a, button, input, [role="link"], [role="listbox"]')
       ) {
         event.preventDefault();
         if (focusAnchorReference.current) {
@@ -483,8 +438,7 @@ export default function Library() {
     }
 
     const updateMeasurements = () => {
-      const nextWidth =
-        element.clientWidth || element.getBoundingClientRect().width || 1280;
+      const nextWidth = element.clientWidth || element.getBoundingClientRect().width || 1280;
       setContentWidth(nextWidth);
       setScrollMargin(element.offsetTop);
     };
@@ -534,10 +488,7 @@ export default function Library() {
   }, [isLoading, model, queueFocus]);
 
   useEffect(() => {
-    if (
-      activeFocusKey.current &&
-      !model.focusableByKey.has(activeFocusKey.current)
-    ) {
+    if (activeFocusKey.current && !model.focusableByKey.has(activeFocusKey.current)) {
       activeFocusKey.current = null;
     }
   }, [model]);
@@ -550,10 +501,7 @@ export default function Library() {
       }
 
       const nextOrder = [...platforms];
-      [nextOrder[index], nextOrder[targetIndex]] = [
-        nextOrder[targetIndex],
-        nextOrder[index],
-      ];
+      [nextOrder[index], nextOrder[targetIndex]] = [nextOrder[targetIndex], nextOrder[index]];
       setPlatformOrder(nextOrder);
     },
     [platforms, setPlatformOrder],
@@ -610,9 +558,7 @@ export default function Library() {
   );
 
   const handleDownloadGame = useCallback(async (game: Game) => {
-    const { ticket } = await api.post<{ ticket: string }>(
-      `/games/${game.id}/download-ticket`,
-    );
+    const { ticket } = await api.post<{ ticket: string }>(`/games/${game.id}/download-ticket`);
     const anchor = document.createElement("a");
     anchor.href = `/api/games/${game.id}/download?ticket=${encodeURIComponent(ticket)}`;
     anchor.download = "";
@@ -828,10 +774,8 @@ export default function Library() {
       {!isLoading && (
         <p className="text-xs text-text-muted mb-4 font-mono">
           {filtered.length} {filtered.length === 1 ? "game" : "games"}
-          {selectedPlatforms.size === 1 &&
-            ` in ${formatPlatform([...selectedPlatforms][0])}`}
-          {selectedPlatforms.size > 1 &&
-            ` across ${selectedPlatforms.size} platforms`}
+          {selectedPlatforms.size === 1 && ` in ${formatPlatform([...selectedPlatforms][0])}`}
+          {selectedPlatforms.size > 1 && ` across ${selectedPlatforms.size} platforms`}
         </p>
       )}
 
@@ -858,9 +802,7 @@ export default function Library() {
               saveFocusedGameId(key.slice(5));
             }
           }}
-          onGameActivate={
-            view === "list" ? handleGameActivate : handleGameCardActivate
-          }
+          onGameActivate={view === "list" ? handleGameActivate : handleGameCardActivate}
           onGamePreviewStart={handleGamePreviewStart}
           onKeyDown={handleFocusableKeyDown}
           onPendingFocusHandled={(key) => {

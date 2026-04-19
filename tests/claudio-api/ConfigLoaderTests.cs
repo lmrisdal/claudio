@@ -19,6 +19,8 @@ public class ConfigLoaderTests
         config.Library.LibraryPaths.Should().BeEquivalentTo(["/games"]);
         config.Library.ExcludePlatforms.Should().BeEmpty();
         config.Library.ScanIntervalSecs.Should().Be(120);
+        config.Igdb.TimeoutSecs.Should().Be(600);
+        config.Steamgriddb.TimeoutSecs.Should().Be(900);
     }
 
     [Test]
@@ -117,17 +119,37 @@ public class ConfigLoaderTests
     {
         Environment.SetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_ID", "test-id");
         Environment.SetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_SECRET", "test-secret");
+        Environment.SetEnvironmentVariable("CLAUDIO_IGDB_TIMEOUT_SECS", "30");
         try
         {
             var config = ConfigLoader.Load("/nonexistent.toml");
 
             config.Igdb.ClientId.Should().Be("test-id");
             config.Igdb.ClientSecret.Should().Be("test-secret");
+            config.Igdb.TimeoutSecs.Should().Be(30);
         }
         finally
         {
             Environment.SetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_ID", null);
             Environment.SetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_SECRET", null);
+            Environment.SetEnvironmentVariable("CLAUDIO_IGDB_TIMEOUT_SECS", null);
+        }
+    }
+
+    [Test]
+    [NotInParallel(nameof(EnvironmentVariables))]
+    public void Load_EnvVarOverridesSteamGridDbTimeout()
+    {
+        Environment.SetEnvironmentVariable("CLAUDIO_STEAMGRIDDB_TIMEOUT_SECS", "75");
+        try
+        {
+            var config = ConfigLoader.Load("/nonexistent.toml");
+
+            config.Steamgriddb.TimeoutSecs.Should().Be(75);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CLAUDIO_STEAMGRIDDB_TIMEOUT_SECS", null);
         }
     }
 

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using Claudio.Api.Data;
 using Claudio.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -12,153 +13,248 @@ public class IgdbService(
     IServiceScopeFactory scopeFactory,
     ClaudioConfig config,
     IHttpClientFactory httpClientFactory,
+    SteamGridDbService steamGridDbService,
     ILogger<IgdbService> logger)
 {
     private string? _accessToken;
     private DateTime _tokenExpiry;
+    private readonly Channel<bool> _channel = Channel.CreateUnbounded<bool>();
+    private readonly Lock _queueLock = new();
+    private bool _scanQueued;
     private readonly Lock _statusLock = new();
-    private IgdbScanStatus _scanStatus = new(false, null, 0, 0, 0);
+    private IgdbScanStatus _scanStatus = new(false, false, null, 0, 0, 0, null);
 
     public IgdbScanStatus GetScanStatus()
     {
-        lock (_statusLock) { return _scanStatus; }
-    }
-
-    public void StartScanInBackground()
-    {
         lock (_statusLock)
         {
-            if (_scanStatus.IsRunning)
-                throw new InvalidOperationException("IGDB scan is already running.");
-            _scanStatus = new IgdbScanStatus(true, null, 0, 0, 0);
+            return _scanStatus;
         }
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await ScanAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Background IGDB scan failed");
-                lock (_statusLock)
-                {
-                    _scanStatus = _scanStatus with { IsRunning = false };
-                }
-            }
-        });
     }
 
-    public async Task<IgdbScanResult> ScanAsync()
+    public bool QueueScan()
     {
-        if (string.IsNullOrEmpty(config.Igdb.ClientId) || string.IsNullOrEmpty(config.Igdb.ClientSecret))
-            throw new InvalidOperationException("IGDB client_id and client_secret must be configured.");
+        EnsureConfigured();
+
+        lock (_queueLock)
+        {
+            if (_scanQueued || GetScanStatus().IsRunning)
+                return false;
+
+            _scanQueued = true;
+            if (!_channel.Writer.TryWrite(true))
+            {
+                _scanQueued = false;
+                return false;
+            }
+
+            UpdateStatus(GetScanStatus() with { IsQueued = true, LastError = null });
+            return true;
+        }
+    }
+
+    public async Task ProcessQueueAsync(CancellationToken stoppingToken)
+    {
+        await foreach (var _ in _channel.Reader.ReadAllAsync(stoppingToken))
+        {
+            lock (_queueLock)
+            {
+                _scanQueued = false;
+            }
+
+            UpdateStatus(GetScanStatus() with { IsQueued = false });
+
+            try
+            {
+                await RunQueuedScanAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                UpdateStatus(new IgdbScanStatus(false, GetQueuedFlag(), null, 0, 0, 0, null));
+                break;
+            }
+        }
+    }
+
+    public async Task<IgdbScanResult> ScanAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        return await RunScanAsync(cancellationToken);
+    }
+
+    public async Task<List<IgdbCandidate>> SearchCandidatesAsync(string query, CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        var (title, year, _) = ParseFolderName(query);
+        return await SearchIgdbAsync(title, year, cancellationToken);
+    }
+
+    public async Task ApplyMatchAsync(int gameId, long igdbId, CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var games = await db.Games
+        var game = await db.Games.FindAsync([gameId], cancellationToken)
+            ?? throw new InvalidOperationException("Game not found.");
+
+        var candidate = await FetchByIdAsync(igdbId, cancellationToken)
+            ?? throw new InvalidOperationException("IGDB game not found.");
+
+        ApplyCandidate(game, candidate);
+        await db.SaveChangesAsync(cancellationToken);
+
+        steamGridDbService.QueueGameHeroFetch(game.Id);
+        logger.LogInformation("Matched: {Title} -> IGDB #{IgdbId}", game.Title, igdbId);
+    }
+
+    private async Task RunQueuedScanAsync(CancellationToken stoppingToken)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, config.Igdb.TimeoutSecs)));
+
+        try
+        {
+            await RunScanAsync(timeoutCts.Token);
+            UpdateStatus(new IgdbScanStatus(false, GetQueuedFlag(), null, 0, 0, 0, null));
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            var message = $"Timed out after {Math.Max(1, config.Igdb.TimeoutSecs)} seconds.";
+            logger.LogWarning("IGDB scan timed out after {TimeoutSeconds} seconds", Math.Max(1, config.Igdb.TimeoutSecs));
+            UpdateStatus(new IgdbScanStatus(false, GetQueuedFlag(), null, 0, 0, 0, message));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Background IGDB scan failed");
+            UpdateStatus(new IgdbScanStatus(false, GetQueuedFlag(), null, 0, 0, 0, ex.Message));
+        }
+    }
+
+    private async Task<IgdbScanResult> RunScanAsync(CancellationToken cancellationToken)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var gameIds = await db.Games
+            .AsNoTracking()
             .Where(g => g.IgdbId == null && !g.IsMissing)
-            .ToListAsync();
+            .OrderBy(g => g.Title)
+            .Select(g => g.Id)
+            .ToListAsync(cancellationToken);
 
         var matched = 0;
         var skipped = 0;
+        UpdateStatus(new IgdbScanStatus(true, GetQueuedFlag(), null, gameIds.Count, 0, 0, null));
 
-        lock (_statusLock)
+        foreach (var gameId in gameIds)
         {
-            _scanStatus = new IgdbScanStatus(true, null, games.Count, 0, 0);
-        }
+            cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var game in games)
-        {
-            lock (_statusLock)
+            using var gameScope = scopeFactory.CreateScope();
+            var gameDb = gameScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var game = await gameDb.Games.FirstOrDefaultAsync(g => g.Id == gameId && g.IgdbId == null && !g.IsMissing, cancellationToken);
+            if (game is null)
             {
-                _scanStatus = _scanStatus with { CurrentGame = game.Title };
+                skipped++;
+                UpdateStatus(GetScanStatus() with { Processed = matched + skipped });
+                continue;
             }
+
+            UpdateStatus(GetScanStatus() with { CurrentGame = game.Title, LastError = null });
 
             try
             {
-                var (cleanedTitle, year, igdbId) = ParseFolderName(game.FolderName);
-
-                IgdbCandidate? result;
-                if (igdbId.HasValue)
+                var candidate = await FindCandidateAsync(game, cancellationToken);
+                if (candidate is null)
                 {
-                    result = await FetchByIdAsync(igdbId.Value);
-                    if (result is null)
-                    {
-                        logger.LogInformation("IGDB ID {IgdbId} not found for: {Title}", igdbId.Value, game.Title);
-                        skipped++;
-                        continue;
-                    }
-                }
-                else
-                {
-                    var candidates = await SearchIgdbAsync(cleanedTitle, year);
-                    if (candidates.Count == 0)
-                    {
-                        logger.LogInformation("No IGDB match for: {Title} ({Platform})", game.Title, game.Platform);
-                        skipped++;
-                        continue;
-                    }
-
-                    result = SelectBestCandidate(candidates, cleanedTitle, game.Platform);
+                    logger.LogInformation("No IGDB match for: {Title} ({Platform})", game.Title, game.Platform);
+                    skipped++;
+                    UpdateStatus(GetScanStatus() with { Processed = matched + skipped });
+                    continue;
                 }
 
-                logger.LogInformation("Matched: {Title} -> {IgdbName} (IGDB #{IgdbId})", game.Title, result.Name, result.IgdbId);
-                game.Title = result.Name;
-                if (ShouldReplaceCover(game, result.IgdbId))
-                    game.CoverUrl = result.CoverUrl;
-                game.IgdbId = result.IgdbId;
-                game.IgdbSlug = result.Slug;
-                game.Summary = result.Summary;
-                game.Genre = result.Genre;
-                game.ReleaseYear = result.ReleaseYear;
-                game.Developer = result.Developer;
-                game.Publisher = result.Publisher;
-                game.GameMode = result.GameMode;
-                game.Series = result.Series;
-                game.Franchise = result.Franchise;
-                game.GameEngine = result.GameEngine;
+                logger.LogInformation("Matched: {Title} -> {IgdbName} (IGDB #{IgdbId})", game.Title, candidate.Name, candidate.IgdbId);
+                ApplyCandidate(game, candidate);
+                await gameDb.SaveChangesAsync(cancellationToken);
+                steamGridDbService.QueueGameHeroFetch(game.Id);
+
                 matched++;
-                await db.SaveChangesAsync();
-
-                lock (_statusLock)
-                {
-                    _scanStatus = _scanStatus with { Matched = matched, Processed = matched + skipped };
-                }
-
-                // Rate limit: IGDB allows 4 requests/second
-                await Task.Delay(300);
+                UpdateStatus(GetScanStatus() with { Matched = matched, Processed = matched + skipped });
+                await Task.Delay(300, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Failed to fetch IGDB data for: {Title}", game.Title);
                 skipped++;
-
-                lock (_statusLock)
-                {
-                    _scanStatus = _scanStatus with { Processed = matched + skipped };
-                }
+                UpdateStatus(GetScanStatus() with { Processed = matched + skipped });
             }
         }
 
-        lock (_statusLock)
-        {
-            _scanStatus = new IgdbScanStatus(false, null, 0, 0, 0);
-        }
+        logger.LogInformation(
+            "IGDB scan complete: {Matched} matched, {Skipped} skipped out of {Total}",
+            matched,
+            skipped,
+            gameIds.Count);
 
-        logger.LogInformation("IGDB scan complete: {Matched} matched, {Skipped} skipped out of {Total}",
-            matched, skipped, games.Count);
-
-        return new IgdbScanResult(games.Count, matched, skipped);
+        return new IgdbScanResult(gameIds.Count, matched, skipped);
     }
 
-    public async Task<List<IgdbCandidate>> SearchCandidatesAsync(string query)
+    private async Task<IgdbCandidate?> FindCandidateAsync(Game game, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
-        var (title, year, _) = ParseFolderName(query);
-        return await SearchIgdbAsync(title, year);
+        var (cleanedTitle, year, igdbId) = ParseFolderName(game.FolderName);
+
+        if (igdbId.HasValue)
+        {
+            var byId = await FetchByIdAsync(igdbId.Value, cancellationToken);
+            if (byId is null)
+                logger.LogInformation("IGDB ID {IgdbId} not found for: {Title}", igdbId.Value, game.Title);
+            return byId;
+        }
+
+        var candidates = await SearchIgdbAsync(cleanedTitle, year, cancellationToken);
+        if (candidates.Count == 0)
+            return null;
+
+        return SelectBestCandidate(candidates, cleanedTitle, game.Platform);
+    }
+
+    private static void ApplyCandidate(Game game, IgdbCandidate candidate)
+    {
+        game.Title = candidate.Name;
+        if (ShouldReplaceCover(game, candidate.IgdbId))
+            game.CoverUrl = candidate.CoverUrl;
+        game.IgdbId = candidate.IgdbId;
+        game.IgdbSlug = candidate.Slug;
+        game.Summary = candidate.Summary;
+        game.Genre = candidate.Genre;
+        game.ReleaseYear = candidate.ReleaseYear;
+        game.Developer = candidate.Developer;
+        game.Publisher = candidate.Publisher;
+        game.GameMode = candidate.GameMode;
+        game.Series = candidate.Series;
+        game.Franchise = candidate.Franchise;
+        game.GameEngine = candidate.GameEngine;
+    }
+
+    private bool GetQueuedFlag()
+    {
+        lock (_queueLock)
+        {
+            return _scanQueued;
+        }
+    }
+
+    private void UpdateStatus(IgdbScanStatus status)
+    {
+        lock (_statusLock)
+        {
+            _scanStatus = status;
+        }
     }
 
     private static (string Title, int? Year, long? IgdbId) ParseFolderName(string title)
@@ -166,12 +262,9 @@ public class IgdbService(
         long? igdbId = null;
         int? year = null;
 
-        // Strip file extension for standalone archives
-        var ext = Path.GetExtension(title);
         if (Endpoints.GameEndpoints.IsArchiveFile(title))
             title = Path.GetFileNameWithoutExtension(title);
 
-        // Extract igdb-NNNNN tag (with or without parentheses)
         var igdbMatch = Regex.Match(title, @"\(?igdb-(\d+)\)?");
         if (igdbMatch.Success)
         {
@@ -179,7 +272,6 @@ public class IgdbService(
             title = title.Remove(igdbMatch.Index, igdbMatch.Length).Trim();
         }
 
-        // Extract (YYYY) year — keep it for search filtering
         var yearMatch = Regex.Match(title, @"\((\d{4})\)");
         if (yearMatch.Success)
         {
@@ -187,19 +279,12 @@ public class IgdbService(
             title = title.Remove(yearMatch.Index, yearMatch.Length).Trim();
         }
 
-        // Strip all remaining parenthesized parts (e.g. region, language, enhancement tags)
         title = Regex.Replace(title, @"\([^)]*\)", "").Trim();
-
-        // Replace periods and dashes with spaces
         var cleaned = title.Replace('.', ' ').Replace('-', ' ').Trim();
-
         return (cleaned, year, igdbId);
     }
 
-    private static IgdbCandidate SelectBestCandidate(
-        List<IgdbCandidate> candidates,
-        string cleanedTitle,
-        string platform)
+    private static IgdbCandidate SelectBestCandidate(List<IgdbCandidate> candidates, string cleanedTitle, string platform)
     {
         var expectedPlatformSlug = NormalizePlatformSlug(platform);
 
@@ -224,74 +309,43 @@ public class IgdbService(
             ? "win"
             : platform.Trim().ToLowerInvariant();
 
-    public async Task ApplyMatchAsync(int gameId, long igdbId)
-    {
-        EnsureConfigured();
-
-        using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var game = await db.Games.FindAsync(gameId)
-            ?? throw new InvalidOperationException("Game not found.");
-
-        // Fetch the specific IGDB game by ID
-        var candidate = await FetchByIdAsync(igdbId)
-            ?? throw new InvalidOperationException("IGDB game not found.");
-
-        game.Title = candidate.Name;
-        if (ShouldReplaceCover(game, candidate.IgdbId))
-            game.CoverUrl = candidate.CoverUrl;
-        game.IgdbId = candidate.IgdbId;
-        game.IgdbSlug = candidate.Slug;
-        game.Summary = candidate.Summary;
-        game.Genre = candidate.Genre;
-        game.ReleaseYear = candidate.ReleaseYear;
-        game.Developer = candidate.Developer;
-        game.Publisher = candidate.Publisher;
-        game.GameMode = candidate.GameMode;
-        game.Series = candidate.Series;
-        game.Franchise = candidate.Franchise;
-        game.GameEngine = candidate.GameEngine;
-        await db.SaveChangesAsync();
-
-        logger.LogInformation("Matched: {Title} -> IGDB #{IgdbId}", game.Title, igdbId);
-    }
-
-    /// Replace cover if: no existing cover, existing cover is from IGDB, or the IGDB ID changed.
     private static bool ShouldReplaceCover(Game game, long newIgdbId)
     {
-        if (string.IsNullOrEmpty(game.CoverUrl)) return true;
-        if (game.IgdbId != newIgdbId) return true;
+        if (string.IsNullOrEmpty(game.CoverUrl))
+            return true;
+        if (game.IgdbId != newIgdbId)
+            return true;
         return game.CoverUrl.StartsWith("https://images.igdb.com", StringComparison.OrdinalIgnoreCase);
     }
 
     private void EnsureConfigured()
     {
-        if (string.IsNullOrEmpty(config.Igdb.ClientId) || string.IsNullOrEmpty(config.Igdb.ClientSecret))
+        if (string.IsNullOrWhiteSpace(config.Igdb.ClientId) || string.IsNullOrWhiteSpace(config.Igdb.ClientSecret))
             throw new InvalidOperationException("IGDB client_id and client_secret must be configured.");
     }
 
-    private async Task<IgdbCandidate?> FetchByIdAsync(long igdbId)
+    private async Task<IgdbCandidate?> FetchByIdAsync(long igdbId, CancellationToken cancellationToken)
     {
-        var token = await GetAccessTokenAsync();
+        var token = await GetAccessTokenAsync(cancellationToken);
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Client-ID", config.Igdb.ClientId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var query = $"where id = {igdbId}; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name,platforms.slug; limit 1;";
-        var response = await client.PostAsync("https://api.igdb.com/v4/games", new StringContent(query));
+        var response = await client.PostAsync("https://api.igdb.com/v4/games", new StringContent(query), cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var results = JsonSerializer.Deserialize<List<IgdbGame>>(json);
+        if (results is null || results.Count == 0)
+            return null;
 
-        if (results is null || results.Count == 0) return null;
         return ToCandidate(results[0]);
     }
 
-    private async Task<List<IgdbCandidate>> SearchIgdbAsync(string title, int? year = null)
+    private async Task<List<IgdbCandidate>> SearchIgdbAsync(string title, int? year, CancellationToken cancellationToken)
     {
-        var token = await GetAccessTokenAsync();
+        var token = await GetAccessTokenAsync(cancellationToken);
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Client-ID", config.Igdb.ClientId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -304,16 +358,14 @@ public class IgdbService(
             var end = new DateTimeOffset(year.Value, 12, 31, 23, 59, 59, TimeSpan.Zero).ToUnixTimeSeconds();
             whereClause = $" where first_release_date >= {start} & first_release_date <= {end};";
         }
+
         var query = $"""search "{searchTitle}"; fields name,slug,summary,genres.name,first_release_date,cover.image_id,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,game_modes.name,collection.name,franchises.name,game_engines.name,platforms.name,platforms.slug;{whereClause} limit 20;""";
 
-        var response = await client.PostAsync(
-            "https://api.igdb.com/v4/games",
-            new StringContent(query));
+        var response = await client.PostAsync("https://api.igdb.com/v4/games", new StringContent(query), cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var results = JsonSerializer.Deserialize<List<IgdbGame>>(json);
-
         if (results is null || results.Count == 0)
             return [];
 
@@ -344,8 +396,10 @@ public class IgdbService(
             publisher = string.Join(", ", match.InvolvedCompanies
                 .Where(c => c.Publisher && c.Company?.Name is not null)
                 .Select(c => c.Company!.Name));
-            if (string.IsNullOrEmpty(developer)) developer = null;
-            if (string.IsNullOrEmpty(publisher)) publisher = null;
+            if (string.IsNullOrEmpty(developer))
+                developer = null;
+            if (string.IsNullOrEmpty(publisher))
+                publisher = null;
         }
 
         string? gameMode = null;
@@ -370,11 +424,25 @@ public class IgdbService(
         if (match.Platforms is { Count: > 0 })
             platformSlug = string.Join(", ", match.Platforms.Select(p => p.Slug));
 
-        return new IgdbCandidate(match.Id, match.Name ?? "", match.Slug, match.Summary, genre, releaseYear, coverUrl,
-            developer, publisher, gameMode, series, franchise, gameEngine, platform, platformSlug);
+        return new IgdbCandidate(
+            match.Id,
+            match.Name ?? "",
+            match.Slug,
+            match.Summary,
+            genre,
+            releaseYear,
+            coverUrl,
+            developer,
+            publisher,
+            gameMode,
+            series,
+            franchise,
+            gameEngine,
+            platform,
+            platformSlug);
     }
 
-    private async Task<string> GetAccessTokenAsync()
+    private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         if (_accessToken is not null && DateTime.UtcNow < _tokenExpiry)
             return _accessToken;
@@ -382,26 +450,38 @@ public class IgdbService(
         var client = httpClientFactory.CreateClient();
         var response = await client.PostAsync(
             $"https://id.twitch.tv/oauth2/token?client_id={config.Igdb.ClientId}&client_secret={config.Igdb.ClientSecret}&grant_type=client_credentials",
-            null);
+            null,
+            cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var token = JsonSerializer.Deserialize<TwitchTokenResponse>(json)!;
 
         _accessToken = token.AccessToken;
         _tokenExpiry = DateTime.UtcNow.AddSeconds(token.ExpiresIn - 60);
-
         return _accessToken;
     }
 
     public record IgdbScanResult(int Total, int Matched, int Skipped);
-    public record IgdbScanStatus(bool IsRunning, string? CurrentGame, int Total, int Processed, int Matched);
+    public record IgdbScanStatus(bool IsRunning, bool IsQueued, string? CurrentGame, int Total, int Processed, int Matched, string? LastError);
     public record IgdbCandidate(
-        long IgdbId, string Name, string? Slug, string? Summary, string? Genre, int? ReleaseYear, string? CoverUrl,
-        string? Developer, string? Publisher, string? GameMode, string? Series, string? Franchise, string? GameEngine,
-        string? Platform, string? PlatformSlug);
+        long IgdbId,
+        string Name,
+        string? Slug,
+        string? Summary,
+        string? Genre,
+        int? ReleaseYear,
+        string? CoverUrl,
+        string? Developer,
+        string? Publisher,
+        string? GameMode,
+        string? Series,
+        string? Franchise,
+        string? GameEngine,
+        string? Platform,
+        string? PlatformSlug);
 
-    private class TwitchTokenResponse
+    private sealed class TwitchTokenResponse
     {
         [JsonPropertyName("access_token")]
         public string AccessToken { get; set; } = string.Empty;
@@ -410,7 +490,7 @@ public class IgdbService(
         public int ExpiresIn { get; set; }
     }
 
-    private class IgdbGame
+    private sealed class IgdbGame
     {
         [JsonPropertyName("id")]
         public long Id { get; set; }
@@ -450,26 +530,24 @@ public class IgdbService(
 
         [JsonPropertyName("platforms")]
         public List<IgdbNamedEntity>? Platforms { get; set; }
-
-        [JsonPropertyName("platform_slugs")]
-        public List<IgdbNamedEntity>? PlatformSlugs { get; set; }
     }
 
-    private class IgdbNamedEntity
+    private sealed class IgdbNamedEntity
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
+
         [JsonPropertyName("slug")]
         public string? Slug { get; set; }
     }
 
-    private class IgdbCover
+    private sealed class IgdbCover
     {
         [JsonPropertyName("image_id")]
         public string? ImageId { get; set; }
     }
 
-    private class IgdbInvolvedCompany
+    private sealed class IgdbInvolvedCompany
     {
         [JsonPropertyName("company")]
         public IgdbNamedEntity? Company { get; set; }
@@ -479,5 +557,13 @@ public class IgdbService(
 
         [JsonPropertyName("publisher")]
         public bool Publisher { get; set; }
+    }
+}
+
+public class IgdbBackgroundService(IgdbService igdbService) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await igdbService.ProcessQueueAsync(stoppingToken);
     }
 }

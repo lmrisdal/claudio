@@ -39,9 +39,11 @@ redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
 [igdb]
 client_id = ""
 client_secret = ""
+timeout_secs = 600                     # Maximum runtime for a queued IGDB scan job
 
 [steamgriddb]
 api_key = ""
+timeout_secs = 900                     # Maximum runtime for a queued SteamGridDB hero job or sweep
 
 [library]
 library_paths = ["/games"]

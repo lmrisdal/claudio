@@ -37,10 +37,15 @@ public class LibraryScanServiceTests : IDisposable
 
     private LibraryScanService CreateService()
     {
-        return new LibraryScanService(
+        var steamGridDbService = new SteamGridDbService(
             _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             _config,
             _serviceProvider.GetRequiredService<IHttpClientFactory>(),
+            NullLogger<SteamGridDbService>.Instance);
+
+        return new LibraryScanService(
+            _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            _config,
             new CompressionService(
                 _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<CompressionService>.Instance),
@@ -48,7 +53,9 @@ public class LibraryScanServiceTests : IDisposable
                 _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                 _config,
                 _serviceProvider.GetRequiredService<IHttpClientFactory>(),
+                steamGridDbService,
                 NullLogger<IgdbService>.Instance),
+            steamGridDbService,
             NullLogger<LibraryScanService>.Instance);
     }
 

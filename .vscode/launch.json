@@ -8,7 +8,7 @@
       "name": "Claudio API",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build api with spa",
+      "preLaunchTask": "build api",
       // If you have changed target frameworks, make sure to update the program path.
       "program": "${workspaceFolder}/src/claudio-api/bin/Debug/net10.0/Claudio.Api.dll",
       "args": [],
@@ -32,7 +32,7 @@
       "name": "Claudio API (No Debug)",
       "type": "node",
       "request": "launch",
-      "preLaunchTask": "build api with spa",
+      "preLaunchTask": "build api",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "src/claudio-api/Claudio.Api.csproj"],

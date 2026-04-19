@@ -1,5 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+	<PropertyGroup>
+		<IsPackable>false</IsPackable>
+		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+		<SpaRoot>../claudio-web/</SpaRoot>
+		<SpaProxyServerUrl>http://localhost:8080</SpaProxyServerUrl>
+		<SpaProxyLaunchCommand>npm start</SpaProxyLaunchCommand>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+	</PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
@@ -12,6 +21,7 @@
     <PackageReference Include="OpenIddict.EntityFrameworkCore" />
     <PackageReference Include="Tomlyn" />
     <PackageReference Include="IGDB" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
   </ItemGroup>
 
 </Project>

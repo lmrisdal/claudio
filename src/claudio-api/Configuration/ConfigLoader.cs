@@ -58,6 +58,12 @@ public static class ConfigLoader
         if (Environment.GetEnvironmentVariable("CLAUDIO_IGDB_CLIENT_SECRET") is { Length: > 0 } igdbSecret)
             config.Igdb.ClientSecret = igdbSecret;
 
+        if (Environment.GetEnvironmentVariable("CLAUDIO_IGDB_TIMEOUT_SECS") is { Length: > 0 } igdbTimeout &&
+            int.TryParse(igdbTimeout, out var parsedIgdbTimeout))
+        {
+            config.Igdb.TimeoutSecs = parsedIgdbTimeout;
+        }
+
         if (Environment.GetEnvironmentVariable("CLAUDIO_DISABLE_AUTH") is { Length: > 0 } disableAuth)
             config.Auth.DisableAuth = disableAuth.Equals("true", StringComparison.OrdinalIgnoreCase);
 
@@ -78,6 +84,12 @@ public static class ConfigLoader
 
         if (Environment.GetEnvironmentVariable("CLAUDIO_STEAMGRIDDB_API_KEY") is { Length: > 0 } sgdbKey)
             config.Steamgriddb.ApiKey = sgdbKey;
+
+        if (Environment.GetEnvironmentVariable("CLAUDIO_STEAMGRIDDB_TIMEOUT_SECS") is { Length: > 0 } sgdbTimeout &&
+            int.TryParse(sgdbTimeout, out var parsedSgdbTimeout))
+        {
+            config.Steamgriddb.TimeoutSecs = parsedSgdbTimeout;
+        }
 
         if (Environment.GetEnvironmentVariable("CLAUDIO_PROXY_AUTH_HEADER") is { Length: > 0 } proxyHeader)
             config.Auth.ProxyAuthHeader = proxyHeader;

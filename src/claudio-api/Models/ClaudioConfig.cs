@@ -102,11 +102,13 @@ public class IgdbConfig
 {
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecret { get; set; } = string.Empty;
+    public int TimeoutSecs { get; set; } = 600;
 }
 
 public class SteamGridDbConfig
 {
     public string ApiKey { get; set; } = string.Empty;
+    public int TimeoutSecs { get; set; } = 900;
 }
 
 public class LibraryConfig
