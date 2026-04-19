@@ -70,3 +70,5 @@ OAuth provider credentials. See [OAuth Providers](/claudio/authentication/oauth-
 Custom OpenID Connect provider. See [Custom OIDC](/claudio/authentication/custom-oidc/).
 
 `browser_origins` is only needed when the browser app and API are served from different origins, such as `https://claudio.example.com` for the SPA and `https://api.example.com` for the API. For same-origin reverse-proxy setups, leave it unset.
+
+This is an advanced setting and is not needed for normal Docker deployments where Claudio serves the SPA and API from the same origin.

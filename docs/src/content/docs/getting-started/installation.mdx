@@ -91,3 +91,5 @@ Make sure the `/config` volume is persistent.
 The browser app now uses cookie sessions. If your reverse proxy serves the SPA and API from the same origin, such as `https://claudio.example.com` and `https://claudio.example.com/api`, leave `CLAUDIO_BROWSER_ORIGINS` unset.
 
 If the SPA and API are served from different origins, set `CLAUDIO_BROWSER_ORIGINS` to the browser-visible frontend origin. For multiple frontend origins, use a comma-separated list with no spaces.
+
+This is an advanced setup. The normal Docker and reverse-proxy deployment path is same-origin, so most installations do not need this setting.

@@ -46,16 +46,16 @@ All settings can be configured via environment variables. These take precedence 
 
 ## Authentication
 
-| Variable                         | Description                                                      | Default |
-| -------------------------------- | ---------------------------------------------------------------- | ------- |
-| `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin) | `false` |
-| `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                 | `false` |
-| `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                 | `false` |
-| `CLAUDIO_BROWSER_ORIGINS`        | Comma-separated browser origins allowed for cookie-auth CORS     |         |
-| `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)        |         |
-| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                         | `false` |
+| Variable                         | Description                                                                 | Default |
+| -------------------------------- | --------------------------------------------------------------------------- | ------- |
+| `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin)            | `false` |
+| `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                            | `false` |
+| `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                            | `false` |
+| `CLAUDIO_BROWSER_ORIGINS`        | Advanced: comma-separated browser origins for split-origin cookie-auth CORS |         |
+| `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)                   |         |
+| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                                    | `false` |
 
-`CLAUDIO_BROWSER_ORIGINS` is only needed when the browser app and API are served from different origins. For multiple frontend origins, use a comma-separated list with no spaces.
+`CLAUDIO_BROWSER_ORIGINS` is only needed when the browser app and API are served from different origins. Most deployments should leave it unset. For multiple frontend origins, use a comma-separated list with no spaces.
 
 ## OAuth
 

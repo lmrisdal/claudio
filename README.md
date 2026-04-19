@@ -78,7 +78,7 @@ volumes:
 | `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin) | `false`                |
 | `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                 | `false`                |
 | `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                 | `false`                |
-| `CLAUDIO_BROWSER_ORIGINS`        | Comma-separated browser origins allowed for cookie auth CORS     |                        |
+| `CLAUDIO_BROWSER_ORIGINS`        | Advanced: comma-separated browser origins for split-origin cookie auth CORS |                        |
 | `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)        |                        |
 | `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                         | `false`                |
 | `CLAUDIO_GITHUB_CLIENT_ID`       | GitHub OAuth app client ID                                       |                        |
@@ -104,6 +104,8 @@ The web app now uses ASP.NET Identity cookies for browser auth. Whether you need
 
 - Same-origin reverse proxy: not required
 - Split frontend/API origins: required
+
+Most deployments should leave this unset. Claudio is normally served as a single app where the SPA and API share the same origin.
 
 Same-origin example:
 

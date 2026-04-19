@@ -10,8 +10,6 @@ services:
     user: "1000:1000"
     environment:
       # - CLAUDIO_PORT=8080
-      # Multiple origins should be comma-separated with no spaces.
-      # - CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com,https://staging.example.com
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s
