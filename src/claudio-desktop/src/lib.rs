@@ -1,6 +1,4 @@
-mod auth;
 mod commands;
-mod deep_link;
 mod http_client;
 #[cfg(feature = "integration-tests")]
 pub mod integration_test_api;
@@ -23,7 +21,6 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_deep_link::{DeepLinkExt, OpenUrlEvent};
 #[cfg(target_os = "windows")]
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray-icon.png");
@@ -104,7 +101,7 @@ fn request_app_exit(app: &AppHandle) {
 }
 
 #[cfg(target_os = "macos")]
-fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
+fn build_app_menu(app: &AppHandle) -> tauri::Result<()> {
     let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
@@ -117,14 +114,10 @@ fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
         .icon(Some(about_icon))
         .build();
 
-    let mut app_submenu = SubmenuBuilder::new(app, "Claudio")
+    let app_submenu = SubmenuBuilder::new(app, "Claudio")
         .about(Some(about_metadata))
-        .separator();
-    if logged_in {
-        app_submenu = app_submenu.item(&settings_item);
-    }
-
-    let app_submenu = app_submenu
+        .separator()
+        .item(&settings_item)
         .item(&check_updates_item)
         .separator()
         .services()
@@ -165,17 +158,7 @@ fn build_app_menu(app: &AppHandle, logged_in: bool) -> tauri::Result<()> {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn build_app_menu(_app: &AppHandle, _logged_in: bool) -> tauri::Result<()> {
-    Ok(())
-}
-
-pub(crate) fn refresh_auth_state_ui(app: &AppHandle, logged_in: bool) -> Result<(), String> {
-    build_app_menu(app, logged_in).map_err(|error| error.to_string())?;
-
-    if !logged_in && let Some(window) = app.get_webview_window("settings") {
-        let _ = window.close();
-    }
-
+fn build_app_menu(_app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
@@ -206,7 +189,6 @@ pub fn run() {
                 ])
                 .build(),
         )
-        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             restore_main_window(app);
         }))
@@ -241,12 +223,6 @@ pub fn run() {
             commands::games::set_game_exe,
             commands::games::stop_game,
             commands::games::uninstall_game,
-            commands::desktop_complete_external_login,
-            commands::desktop_get_session,
-            commands::desktop_open_external_login,
-            commands::desktop_login,
-            commands::desktop_logout,
-            commands::desktop_proxy_login,
             commands::ping::ping,
             commands::server_connection::desktop_check_server_connection,
             commands::get_settings,
@@ -279,11 +255,7 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             window.set_decorations(false)?;
 
-            let logged_in =
-                tauri::async_runtime::block_on(auth::restore_session(&settings::load()))
-                    .map(|session| session.is_logged_in)
-                    .unwrap_or(false);
-            build_app_menu(app.handle(), logged_in)?;
+            build_app_menu(app.handle())?;
 
             let show_item = MenuItemBuilder::with_id("tray-show", "Show Claudio")
                 .accelerator("CmdOrCtrl+O")
@@ -320,12 +292,6 @@ pub fn run() {
                 })
                 .icon_as_template(cfg!(target_os = "macos"))
                 .build(app)?;
-
-            let deep_link_handle = app.handle().clone();
-            app.deep_link().on_open_url(move |event: OpenUrlEvent| {
-                deep_link::handle_auth_callback_urls(&deep_link_handle, event.urls().iter());
-            });
-            deep_link::handle_initial_url(app.handle());
 
             let _ = window;
             Ok(())

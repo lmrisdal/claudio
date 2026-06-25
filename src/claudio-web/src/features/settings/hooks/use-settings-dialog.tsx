@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-export type SettingsTab = "account" | "interface" | "app.general" | "app.server" | "app.downloads";
+export type SettingsTab = "interface" | "app.general" | "app.server" | "app.downloads";
 
 export interface SettingsDialogContextValue {
   isOpen: boolean;

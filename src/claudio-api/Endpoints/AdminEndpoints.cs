@@ -2,9 +2,9 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Claudio.Api.Data;
-using Claudio.Api.Services;
 using Claudio.Api.Enums;
 using Claudio.Api.Models;
+using Claudio.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,13 +15,8 @@ public static class AdminEndpoints
     public static RouteGroupBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admin")
-            .WithTags("Admin")
-            .RequireAuthorization(policy => policy.RequireAssertion(context =>
-                context.User.IsInRole("admin") || context.User.HasClaim("role", "admin")));
+            .WithTags("Admin");
 
-        group.MapGet("/users", GetUsers);
-        group.MapDelete("/users/{id:int}", DeleteUser);
-        group.MapPut("/users/{id:int}/role", UpdateUserRole);
         group.MapPost("/scan", TriggerScan);
         group.MapPost("/scan/igdb", TriggerIgdbScan);
         group.MapGet("/scan/igdb/status", GetIgdbScanStatus);
@@ -45,45 +40,6 @@ public static class AdminEndpoints
         group.MapPut("/config", UpdateConfig);
 
         return group;
-    }
-
-    private static async Task<IResult> GetUsers(AppDbContext db)
-    {
-        var users = await db.Users
-            .OrderBy(u => u.UserName)
-            .Select(u => new UserDto
-            {
-                Id = u.Id,
-                Username = u.UserName!,
-                Role = u.Role,
-                CreatedAt = u.CreatedAt,
-            })
-            .ToListAsync();
-
-        return Results.Ok(users);
-    }
-
-    private static async Task<IResult> DeleteUser(int id, AppDbContext db)
-    {
-        var user = await db.Users.FindAsync(id);
-        if (user is null) return Results.NotFound();
-
-        db.Users.Remove(user);
-        await db.SaveChangesAsync();
-        return Results.NoContent();
-    }
-
-    private static async Task<IResult> UpdateUserRole(int id, RoleUpdateRequest request, AppDbContext db)
-    {
-        var user = await db.Users.FindAsync(id);
-        if (user is null) return Results.NotFound();
-
-        if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
-            return Results.BadRequest("Invalid role.");
-
-        user.Role = role;
-        await db.SaveChangesAsync();
-        return Results.NoContent();
     }
 
     private static async Task<IResult> TriggerScan(LibraryScanService scanService)

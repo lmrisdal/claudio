@@ -3,17 +3,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export const isDesktop = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis;
 
-interface DesktopSession {
-  isLoggedIn: boolean;
-  user: DesktopSessionUser | null;
-}
-
-interface DesktopSessionUser {
-  id: number;
-  username: string;
-  role: "user" | "admin";
-}
-
 interface DesktopSettings {
   serverUrl: string | null;
   logLevel: "error" | "warn" | "info" | "debug" | "trace";
@@ -26,7 +15,6 @@ interface DesktopSettings {
   closeToTray: boolean;
   hideDockIcon: boolean;
   customHeaders: Record<string, string>;
-  allowInsecureAuthStorage: boolean;
   downloadSpeedLimitKbs: number | null;
 }
 
@@ -137,30 +125,6 @@ export async function openSettingsWindow(): Promise<void> {
   return invoke<void>("open_settings_window");
 }
 
-export async function desktopGetSession(): Promise<DesktopSession> {
-  return invoke<DesktopSession>("desktop_get_session");
-}
-
-export async function desktopLogin(username: string, password: string): Promise<DesktopSession> {
-  return invoke<DesktopSession>("desktop_login", { username, password });
-}
-
-export async function desktopCompleteExternalLogin(nonce: string): Promise<DesktopSession> {
-  return invoke<DesktopSession>("desktop_complete_external_login", { nonce });
-}
-
-export async function desktopOpenExternalLogin(startUrl: string): Promise<void> {
-  return invoke<void>("desktop_open_external_login", { startUrl });
-}
-
-export async function desktopProxyLogin(): Promise<DesktopSession> {
-  return invoke<DesktopSession>("desktop_proxy_login");
-}
-
-export async function desktopLogout(): Promise<DesktopSession> {
-  return invoke<DesktopSession>("desktop_logout");
-}
-
 export async function installGame(game: DesktopInstallGameInput): Promise<InstalledGame> {
   return invoke<InstalledGame>("install_game", { game });
 }
@@ -244,11 +208,6 @@ export async function listenToInstallProgress(
 export function useDesktop() {
   return {
     isDesktop,
-    desktopGetSession,
-    desktopLogin,
-    desktopCompleteExternalLogin,
-    desktopProxyLogin,
-    desktopLogout,
     desktopCheckServerConnection,
     ping,
     getSettings,
@@ -266,7 +225,6 @@ export function useDesktop() {
 export type {
   DesktopInstallGameInput,
   DownloadPackageInput,
-  DesktopSession,
   DesktopSettings,
   InstalledGame,
   InstallProgress,

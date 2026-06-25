@@ -66,37 +66,15 @@ function toHeaderRecord(headers?: HeadersInit): Record<string, string> {
   return normalized;
 }
 
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  const cookies = document.cookie.split(";");
-  for (const cookie of cookies) {
-    const [rawName, ...rest] = cookie.trim().split("=");
-    if (rawName === name) {
-      return decodeURIComponent(rest.join("="));
-    }
-  }
-
-  return null;
-}
-
 function buildRequestHeaders(
   init: RequestInit | undefined,
   isFormData: boolean,
-  isMutation: boolean,
 ): HeadersInit {
   return {
     ...(isDesktop ? {} : getCustomHeaders()),
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
-    ...(!isDesktop && isMutation ? { "X-CSRF-TOKEN": readCookie("claudio.csrf") ?? "" } : {}),
     ...toHeaderRecord(init?.headers),
   };
-}
-
-function redirectToLogin() {
-  globalThis.location.href = "/login";
 }
 
 function reportDesktopUnauthorized(path: string, message: string) {
@@ -129,9 +107,7 @@ async function readSuccess<T>(response: Response): Promise<T> {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
-  const method = init?.method?.toUpperCase() ?? "GET";
-  const isMutation = method !== "GET" && method !== "HEAD";
-  const headers = buildRequestHeaders(init, isFormData, isMutation);
+  const headers = buildRequestHeaders(init, isFormData);
   const res = await fetch(`${getApiBase()}${path}`, {
     ...init,
     credentials: isDesktop ? undefined : "include",
@@ -139,12 +115,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (res.status === 401) {
-    const isAuthEndpoint = path.startsWith("/auth/");
-
-    if (isDesktop && !isAuthEndpoint) {
-      reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
-      redirectToLogin();
-    }
+    if (isDesktop) reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
 
     throw new Error(await readError(res, "Unauthorized"));
   }
@@ -157,7 +128,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
-  const headers = buildRequestHeaders(init, true, false);
+  const headers = buildRequestHeaders(init, true);
   const res = await fetch(`${getApiBase()}${path}`, {
     ...init,
     credentials: isDesktop ? undefined : "include",
@@ -165,10 +136,7 @@ async function requestBinary(path: string, init?: RequestInit): Promise<ArrayBuf
   });
 
   if (res.status === 401) {
-    if (isDesktop) {
-      reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
-      redirectToLogin();
-    }
+    if (isDesktop) reportDesktopUnauthorized(path, await readError(res.clone(), "Unauthorized"));
 
     throw new Error("Unauthorized");
   }

@@ -67,7 +67,7 @@ export default function DesktopSetup({
       if (forbiddenHeaders.length > 0) {
         setTestResult("error");
         setError(
-          `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+          `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
         );
         return;
       }
@@ -75,7 +75,7 @@ export default function DesktopSetup({
       const result = await desktopCheckServerConnection({
         serverUrl: trimmed,
         customHeaders,
-        path: "/api/auth/providers",
+        path: "/health",
       });
       if (result.ok) {
         setTestResult("success");
@@ -104,7 +104,7 @@ export default function DesktopSetup({
     const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
     if (forbiddenHeaders.length > 0) {
       setError(
-        `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+        `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
       );
       return;
     }
@@ -123,7 +123,7 @@ export default function DesktopSetup({
   }
 
   return (
-    <div className="auth-shell min-h-screen flex items-center justify-center px-4">
+    <div className="setup-shell min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <Logo className="text-5xl mx-auto" />
@@ -132,7 +132,7 @@ export default function DesktopSetup({
           </p>
         </div>
 
-        <div className="card auth-card bg-surface rounded-xl p-6 ring-1 ring-border">
+        <div className="card setup-card bg-surface rounded-xl p-6 ring-1 ring-border">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label

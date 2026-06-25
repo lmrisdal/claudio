@@ -6,28 +6,28 @@ import SettingsDialog from "./settings-dialog";
 
 export default function SettingsDialogProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [initialTab, setInitialTab] = useState<SettingsTab>("account");
+  const [initialTab, setInitialTab] = useState<SettingsTab>("interface");
 
   const openTab = useCallback((tab: SettingsTab) => {
     setInitialTab(tab);
     setIsOpen(true);
   }, []);
-  const open = useCallback(() => openTab("account"), [openTab]);
+  const open = useCallback(() => openTab("interface"), [openTab]);
   const close = useCallback(() => setIsOpen(false), []);
 
   useEffect(() => {
-    const openAccount = () => openTab("account");
+    const openSettings = () => openTab("interface");
     const openDesktop = () => {
       void openSettingsWindow();
     };
 
-    globalThis.addEventListener("claudio:open-account", openAccount);
+    globalThis.addEventListener("claudio:open-account", openSettings);
     if (isDesktop) {
       globalThis.addEventListener("claudio:open-desktop-settings", openDesktop);
     }
 
     return () => {
-      globalThis.removeEventListener("claudio:open-account", openAccount);
+      globalThis.removeEventListener("claudio:open-account", openSettings);
       if (isDesktop) {
         globalThis.removeEventListener("claudio:open-desktop-settings", openDesktop);
       }

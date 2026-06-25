@@ -1,4 +1,14 @@
-const forbiddenHeaderNames = new Set(["authorization", "cookie", "proxy-authorization"]);
+const forbiddenHeaderNames = new Set([
+  "host",
+  "content-length",
+  "connection",
+  "transfer-encoding",
+  "upgrade",
+  "te",
+  "trailer",
+  "keep-alive",
+  "proxy-connection",
+]);
 
 export function isForbiddenDesktopHeader(name: string): boolean {
   return forbiddenHeaderNames.has(name.trim().toLowerCase());

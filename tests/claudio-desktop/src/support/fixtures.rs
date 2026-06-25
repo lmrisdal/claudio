@@ -5,7 +5,6 @@ use claudio_desktop::integration_test_api::{
 pub fn desktop_settings(server_url: &str) -> DesktopSettings {
     DesktopSettings {
         server_url: Some(server_url.to_string()),
-        allow_insecure_auth_storage: true,
         ..DesktopSettings::default()
     }
 }

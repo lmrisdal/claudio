@@ -10,8 +10,8 @@ import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 
 const setPlatformOrderMock = vi.fn();
 
-vi.mock("../../preferences/hooks/use-user-preferences", () => ({
-  useUserPreferences: () => ({
+vi.mock("../../preferences/hooks/use-app-preferences", () => ({
+  useAppPreferences: () => ({
     isLoading: false,
     isSaving: false,
     preferences: { library: { platformOrder: [] } },
@@ -152,7 +152,7 @@ describe("Library", () => {
     view.unmount();
   });
 
-  it("saves platform reordering through user preferences", () => {
+  it("saves platform reordering through app preferences", () => {
     localStorage.setItem("library-view", "grouped");
     const view = renderInDom(
       <InputScopeProvider>

@@ -1,49 +1,25 @@
 using Claudio.Api.Enums;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Claudio.Api.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
+    : DbContext(options)
 {
-    public DbSet<DesktopRefreshToken> DesktopRefreshTokens => Set<DesktopRefreshToken>();
     public DbSet<Game> Games => Set<Game>();
-    public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
+    public DbSet<AppPreferences> AppPreferences => Set<AppPreferences>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
-
-        modelBuilder.Entity<DesktopRefreshToken>(e =>
-        {
-            e.HasIndex(token => token.TokenHash).IsUnique();
-            e.HasIndex(token => new { token.UserId, token.ExpiresAt });
-            e.Property(token => token.TokenHash).HasMaxLength(128);
-            e.HasOne(token => token.User)
-                .WithMany()
-                .HasForeignKey(token => token.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(token => token.ReplacedByToken)
-                .WithMany()
-                .HasForeignKey(token => token.ReplacedByTokenId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
         modelBuilder.Entity<Game>(e =>
         {
             e.HasIndex(g => new { g.Platform, g.FolderName }).IsUnique();
         });
 
-        modelBuilder.Entity<UserPreferences>(e =>
+        modelBuilder.Entity<AppPreferences>(e =>
         {
-            e.HasKey(p => p.UserId);
+            e.HasKey(p => p.Id);
             e.Property(p => p.PreferencesJson).HasDefaultValue("{}");
-            e.HasOne(p => p.User)
-                .WithOne(u => u.Preferences)
-                .HasForeignKey<UserPreferences>(p => p.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
@@ -76,10 +52,9 @@ public class Game
     public bool IsProcessing { get; set; }
 }
 
-public class UserPreferences
+public class AppPreferences
 {
-    public int UserId { get; set; }
+    public int Id { get; set; }
     public string PreferencesJson { get; set; } = "{}";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    public ApplicationUser User { get; set; } = null!;
 }

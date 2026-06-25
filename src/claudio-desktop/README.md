@@ -2,19 +2,15 @@
 
 Tauri 2 desktop client for Claudio. Wraps the `claudio-web` SPA in a native
 window and adds the local capabilities the browser can't: installing games to
-disk, launching them, storing auth tokens in the OS keyring, and proxying API
-traffic to the user's configured Claudio server.
+disk, launching them, and proxying API traffic to the user's configured Claudio
+server.
 
 ## Features
 
 - Native shell around `../claudio-web/dist` (single `main` window + on-demand
   `settings` window).
 - `claudio://` URI scheme that forwards SPA requests to the configured
-  server, attaches bearer tokens, refreshes on 401, and injects user-defined
-  custom headers.
-- OAuth login (password, proxy-nonce, external-login-nonce, refresh grants)
-  with tokens stored in the OS keyring. Plaintext fallback only if the user
-  opts in.
+  server and injects user-defined custom headers.
 - Game install pipeline: streamed download with optional speed limiting,
   `.zip` / `.tar.gz` extraction, native installer execution
   (`.exe` / `.msi`), progress events, cancellation, interactive-restart of
@@ -37,7 +33,6 @@ traffic to the user's configured Claudio server.
 src/
   main.rs                    entry → claudio_desktop::run()
   lib.rs                     Tauri builder, tray, menus, plugins, handlers
-  auth.rs                    OAuth + keyring token storage
   protocol.rs                claudio:// → server request forwarding
   settings.rs                DesktopSettings (JSON on disk)
   registry.rs                installed-games JSON registry
@@ -72,7 +67,6 @@ Cargo features: `devtools`, `integration-tests`.
 
 - **Settings** — JSON in the platform app-data dir (`serverUrl`, `logLevel`,
   window geometry, `defaultInstallPath`, `closeToTray`, `hideDockIcon`,
-  `customHeaders`, `allowInsecureAuthStorage`, `downloadSpeedLimitKbs`).
-- **Tokens** — OS keyring, service `claudio-desktop`, account `auth-tokens`.
+  `customHeaders`, `downloadSpeedLimitKbs`).
 - **Installed games** — JSON registry alongside settings.
 - **Logs** — `tauri-plugin-log`, 10 MB rotation, one file kept.

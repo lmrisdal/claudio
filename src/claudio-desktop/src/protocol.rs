@@ -1,5 +1,5 @@
 use crate::http_client::desktop_http_client;
-use crate::{auth, refresh_auth_state_ui, settings};
+use crate::settings;
 use reqwest::Method;
 use std::borrow::Cow;
 use tauri::AppHandle;
@@ -21,7 +21,6 @@ pub async fn handle_request(
     match forward_request(app, request).await {
         Ok(response) => response,
         Err(message) => {
-            auth::maybe_show_secure_storage_dialog(app, &message);
             cors_response(
                 &http::Request::new(Vec::new()),
                 http::Response::builder()
@@ -35,15 +34,15 @@ pub async fn handle_request(
 }
 
 async fn forward_request(
-    app: &AppHandle,
+    _app: &AppHandle,
     request: http::Request<Vec<u8>>,
 ) -> Result<http::Response<Cow<'static, [u8]>>, String> {
-    forward_request_with(request, || refresh_auth_state_ui(app, false)).await
+    forward_request_with(request, || Ok(())).await
 }
 
 async fn forward_request_with<F>(
     request: http::Request<Vec<u8>>,
-    mut on_logged_out: F,
+    _on_logged_out: F,
 ) -> Result<http::Response<Cow<'static, [u8]>>, String>
 where
     F: FnMut() -> Result<(), String>,
@@ -60,69 +59,20 @@ where
     let method = Method::from_bytes(request.method().as_str().as_bytes())
         .map_err(|error| error.to_string())?;
     let client = desktop_http_client()?;
-    let mut attached_auth = false;
-
     let mut builder = client.request(method.clone(), &target);
-    builder = auth::apply_custom_headers(builder, &settings.custom_headers);
+    builder = apply_custom_headers(builder, &settings.custom_headers)?;
     builder = apply_request_headers(builder, request.headers());
 
     if !request.body().is_empty() {
         builder = builder.body(request.body().clone());
     }
 
-    let builder_with_auth = if is_authenticated_route(request.uri()) {
-        let had_tokens = auth::load_tokens(&settings)?.is_some();
-        if let Some(access_token) = auth::access_token_for_request(&settings).await? {
-            attached_auth = true;
-            builder.bearer_auth(access_token)
-        } else {
-            if had_tokens {
-                let _ = on_logged_out();
-            }
-            builder
-        }
-    } else {
-        builder
-    };
-
-    let retry_builder = builder_with_auth.try_clone();
-    log::debug!(
-        "desktop proxy {} {} auth_attached={}",
-        method,
-        target,
-        attached_auth
-    );
-    let response = builder_with_auth
+    log::debug!("desktop proxy {} {}", method, target);
+    let response = builder
         .send()
         .await
         .map_err(|error| error.to_string())?;
     log_proxy_response(&target, response.status(), false);
-
-    let response = if response.status() == reqwest::StatusCode::UNAUTHORIZED
-        && is_authenticated_route(request.uri())
-    {
-        log::warn!(
-            "desktop proxy unauthorized for {}, attempting refresh",
-            target
-        );
-        match (retry_builder, auth::refresh_access_token(&settings).await?) {
-            (Some(retry_builder), Some(access_token)) => {
-                let retried = retry_builder
-                    .bearer_auth(access_token)
-                    .send()
-                    .await
-                    .map_err(|error| error.to_string())?;
-                log_proxy_response(&target, retried.status(), true);
-                retried
-            }
-            _ => {
-                let _ = on_logged_out();
-                response
-            }
-        }
-    } else {
-        response
-    };
 
     let status = http::StatusCode::from_u16(response.status().as_u16())
         .map_err(|error| error.to_string())?;
@@ -166,14 +116,6 @@ fn target_url(origin: &str, uri: &http::Uri) -> Result<String, String> {
     }
 }
 
-fn is_authenticated_route(uri: &http::Uri) -> bool {
-    matches!(uri.host(), Some("api"))
-        && !uri.path().starts_with("/auth/token/")
-        && uri.path() != "/auth/providers"
-        && uri.path() != "/auth/login"
-        && uri.path() != "/auth/register"
-}
-
 fn apply_request_headers(
     builder: reqwest::RequestBuilder,
     headers: &http::HeaderMap,
@@ -189,6 +131,27 @@ fn apply_request_headers(
     }
 
     builder
+}
+
+fn apply_custom_headers(
+    builder: reqwest::RequestBuilder,
+    custom_headers: &std::collections::HashMap<String, String>,
+) -> Result<reqwest::RequestBuilder, String> {
+    let mut builder = builder;
+
+    for (name, value) in custom_headers {
+        if settings::is_forbidden_custom_header(name) {
+            continue;
+        }
+
+        builder = builder.header(
+            reqwest::header::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|error| error.to_string())?,
+            reqwest::header::HeaderValue::from_str(value).map_err(|error| error.to_string())?,
+        );
+    }
+
+    Ok(builder)
 }
 
 fn should_skip_request_header(name: &str) -> bool {
@@ -263,6 +226,3 @@ fn cors_response(
 
     builder
 }
-
-#[cfg(test)]
-mod tests;

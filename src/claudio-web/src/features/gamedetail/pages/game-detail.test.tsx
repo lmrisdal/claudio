@@ -30,10 +30,6 @@ vi.mock("react-router", () => ({
   useParams: () => ({ id: "1" }),
 }));
 
-vi.mock("../../auth/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { role: "user" } }),
-}));
-
 vi.mock("../../core/hooks/use-arrow-nav", () => ({
   useArrowNav: () => {},
 }));

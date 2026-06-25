@@ -11,20 +11,6 @@ pub use crate::settings::DesktopSettings;
 pub use crate::test_support::{TestRequest, TestResponse, TestServer};
 pub use tauri::http;
 
-pub struct PlaintextAuthGuard(#[allow(dead_code)] crate::auth::TestAuthGuard);
-
-impl Default for PlaintextAuthGuard {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PlaintextAuthGuard {
-    pub fn new() -> Self {
-        Self(crate::auth::TestAuthGuard::plain_file_secure_storage_unavailable())
-    }
-}
-
 #[derive(Clone)]
 pub struct InstallController(
     crate::services::game_install::integration_testing::TestInstallController,
@@ -50,7 +36,6 @@ impl InstallController {
     }
 }
 
-pub use crate::auth::{DesktopSession, StoredTokens};
 #[cfg(target_os = "windows")]
 pub use crate::services::game_install::integration_testing::{
     TestInstallerAttempt, TestInstallerLaunchKind, TestInstallerOutcome, TestInstallerSimulation,
@@ -222,34 +207,6 @@ pub fn record_running_game_for_test(
     game: RunningGameInfo,
 ) -> Result<(), String> {
     crate::services::game_runtime::record_running_game_for_tests(state, game)
-}
-
-pub fn store_tokens(settings: &DesktopSettings, tokens: &StoredTokens) -> Result<(), String> {
-    crate::auth::store_tokens(settings, tokens)
-}
-
-pub fn load_tokens(settings: &DesktopSettings) -> Result<Option<StoredTokens>, String> {
-    crate::auth::load_tokens(settings)
-}
-
-pub fn clear_tokens(settings: &DesktopSettings) -> Result<(), String> {
-    crate::auth::clear_tokens(settings)
-}
-
-pub async fn login_with_password(
-    settings: &DesktopSettings,
-    username: &str,
-    password: &str,
-) -> Result<DesktopSession, String> {
-    crate::auth::login_with_password(settings, username, password).await
-}
-
-pub async fn restore_session(settings: &DesktopSettings) -> Result<DesktopSession, String> {
-    crate::auth::restore_session(settings).await
-}
-
-pub async fn refresh_access_token(settings: &DesktopSettings) -> Result<Option<String>, String> {
-    crate::auth::refresh_access_token(settings).await
 }
 
 pub async fn forward_protocol_request<F>(

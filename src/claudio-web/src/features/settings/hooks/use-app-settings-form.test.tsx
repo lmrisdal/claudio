@@ -86,7 +86,6 @@ const baseSettings = {
   closeToTray: false,
   hideDockIcon: false,
   customHeaders: {},
-  allowInsecureAuthStorage: false,
   downloadSpeedLimitKbs: null,
 };
 
@@ -230,7 +229,7 @@ describe("useAppSettingsForm", () => {
     expect(desktopCheckServerConnectionMock).toHaveBeenCalledWith({
       serverUrl: "https://example.com",
       customHeaders: { "X-Saved": "saved" },
-      path: "/api/auth/providers",
+      path: "/health",
     });
 
     const message = view.container.querySelector('[data-testid="connection-message"]');

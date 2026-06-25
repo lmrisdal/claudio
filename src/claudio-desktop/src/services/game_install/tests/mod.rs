@@ -1,22 +1,13 @@
 use super::*;
-use crate::auth::{StoredTokens, TestAuthGuard, store_tokens};
-use crate::test_support::{TestResponse, TestServer};
 use flate2::{Compression, write::GzEncoder};
-use reqwest::header::HeaderValue;
+use reqwest::header::{AUTHORIZATION, HeaderValue};
 use std::sync::Arc;
-use std::sync::Arc as StdArc;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicBool;
 use zip::write::SimpleFileOptions;
 
 mod core;
-mod download;
-mod download_fallbacks;
-#[cfg(feature = "integration-tests")]
-mod download_progress;
 mod extract;
 mod installer;
-#[cfg(feature = "integration-tests")]
-mod portable;
 
 fn unique_test_dir(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -49,14 +40,6 @@ fn installed_game(remote_game_id: i32, title: &str, install_path: &Path) -> Inst
         series: None,
         franchise: None,
         game_engine: None,
-    }
-}
-
-fn download_settings(server_url: &str) -> settings::DesktopSettings {
-    settings::DesktopSettings {
-        server_url: Some(server_url.to_string()),
-        allow_insecure_auth_storage: true,
-        ..settings::DesktopSettings::default()
     }
 }
 

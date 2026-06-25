@@ -7,7 +7,6 @@ import SettingsWindowErrorBoundary from "./settings-window-error-boundary";
 
 const SETTINGS_TAB_STORAGE_KEY = "claudio_settings_active_tab";
 const SETTINGS_TABS = new Set<SettingsTab>([
-  "account",
   "interface",
   "app.general",
   "app.server",
@@ -16,7 +15,7 @@ const SETTINGS_TABS = new Set<SettingsTab>([
 
 function getInitialSettingsTab(): SettingsTab {
   const saved = globalThis.sessionStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-  return SETTINGS_TABS.has(saved as SettingsTab) ? (saved as SettingsTab) : "account";
+  return SETTINGS_TABS.has(saved as SettingsTab) ? (saved as SettingsTab) : "interface";
 }
 
 function closeSettingsWindow(): void {

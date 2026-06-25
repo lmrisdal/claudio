@@ -47,7 +47,8 @@ fn save_and_load_use_overridden_data_dir() {
             default_download_path: Some("/tmp/downloads".to_string()),
             custom_headers: HashMap::from([
                 ("X-Test".to_string(), "ok".to_string()),
-                ("Authorization".to_string(), "blocked".to_string()),
+                ("Authorization".to_string(), "allowed".to_string()),
+                ("Host".to_string(), "blocked".to_string()),
             ]),
             ..DesktopSettings::default()
         };
@@ -65,7 +66,11 @@ fn save_and_load_use_overridden_data_dir() {
             loaded.custom_headers.get("X-Test").map(String::as_str),
             Some("ok")
         );
-        assert!(!loaded.custom_headers.contains_key("Authorization"));
+        assert_eq!(
+            loaded.custom_headers.get("Authorization").map(String::as_str),
+            Some("allowed")
+        );
+        assert!(!loaded.custom_headers.contains_key("Host"));
         assert!(settings_path().exists());
     });
 }
@@ -127,11 +132,18 @@ fn default_download_root_falls_back_to_app_data_downloads_subdir() {
 fn sanitize_custom_headers_removes_forbidden_entries() {
     let sanitized = sanitize_custom_headers(&HashMap::from([
         ("X-Test".to_string(), "ok".to_string()),
-        ("Authorization".to_string(), "blocked".to_string()),
-        ("Proxy-Authorization".to_string(), "blocked".to_string()),
+        ("Authorization".to_string(), "allowed".to_string()),
+        ("Cookie".to_string(), "allowed".to_string()),
+        ("Host".to_string(), "blocked".to_string()),
+        ("Content-Length".to_string(), "blocked".to_string()),
     ]));
 
     assert_eq!(sanitized.get("X-Test").map(String::as_str), Some("ok"));
-    assert!(!sanitized.contains_key("Authorization"));
-    assert!(!sanitized.contains_key("Proxy-Authorization"));
+    assert_eq!(
+        sanitized.get("Authorization").map(String::as_str),
+        Some("allowed")
+    );
+    assert_eq!(sanitized.get("Cookie").map(String::as_str), Some("allowed"));
+    assert!(!sanitized.contains_key("Host"));
+    assert!(!sanitized.contains_key("Content-Length"));
 }

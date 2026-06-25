@@ -1,4 +1,3 @@
-use crate::auth;
 use crate::http_client::desktop_http_client;
 use crate::settings;
 use serde::Serialize;
@@ -37,10 +36,18 @@ pub async fn desktop_check_server_connection(
         .unwrap_or_else(|| settings.custom_headers.clone());
     let path = normalize_path(path.as_deref().unwrap_or("/health"))?;
     let client = desktop_http_client()?;
-    let response = auth::apply_custom_headers(client.get(format!("{origin}{path}")), &custom_headers)
-        .send()
-        .await
-        .map_err(|error| error.to_string())?;
+    let mut request = client.get(format!("{origin}{path}"));
+    for (name, value) in &custom_headers {
+        if settings::is_forbidden_custom_header(name) {
+            continue;
+        }
+        request = request.header(
+            reqwest::header::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|error| error.to_string())?,
+            reqwest::header::HeaderValue::from_str(value).map_err(|error| error.to_string())?,
+        );
+    }
+    let response = request.send().await.map_err(|error| error.to_string())?;
 
     Ok(DesktopServerConnectionResult {
         ok: response.status().is_success(),
@@ -82,7 +89,6 @@ mod tests {
     fn test_settings(server_url: &str) -> DesktopSettings {
         DesktopSettings {
             server_url: Some(server_url.to_string()),
-            allow_insecure_auth_storage: true,
             ..DesktopSettings::default()
         }
     }
@@ -97,7 +103,7 @@ mod tests {
     #[tokio::test]
     async fn desktop_check_server_connection_uses_override_headers() {
         let server = TestServer::spawn(|request| {
-            assert_eq!(request.path, "/api/auth/providers");
+            assert_eq!(request.path, "/health");
             assert_eq!(request.headers.get("x-test").map(String::as_str), Some("ok"));
             TestResponse::json(200, r#"{"providers":[]}"#)
         });
@@ -106,7 +112,7 @@ mod tests {
             let result = desktop_check_server_connection(
                 Some(server.url().to_string()),
                 Some(HashMap::from([("X-Test".to_string(), "ok".to_string())])),
-                Some("/api/auth/providers".to_string()),
+                Some("/health".to_string()),
             )
             .await
             .expect("connection check should succeed");

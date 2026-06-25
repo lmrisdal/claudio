@@ -9,8 +9,7 @@ A self-hosted game library manager for organizing, browsing, and downloading you
 - **File browsing** — Browse game folder contents directly in the browser, including inside zip/tar/tar.gz archives
 - **Downloads** — Download games as tar bundles with resume support; pre-zipped games are served directly
 - **Search** — Global search dialog (Cmd/Ctrl+K) for quick access to any game
-- **Admin panel** — User management, manual library scanning, IGDB metadata fetching, and per-game editing
-- **Flexible auth** — Local accounts, GitHub, Google, or any OpenID Connect provider (Authentik, Authelia, Pocket ID, etc.). Proxy authentication for reverse-proxy SSO setups
+- **Admin panel** — Manual library scanning, IGDB metadata fetching, and per-game editing
 - **Multi-platform** — Supports PC, Mac, Linux, consoles (Switch, PlayStation, Xbox, Nintendo), and more
 - **Dark/light mode** — Theme toggle with system preference detection
 
@@ -28,7 +27,7 @@ docker run -d \
   ghcr.io/lmrisdal/claudio:latest
 ```
 
-Open http://localhost:8080 and register your first user (automatically gets admin role).
+Open http://localhost:8080 to start using Claudio.
 
 ### Docker Compose
 
@@ -47,12 +46,6 @@ services:
       - PGID=1000
       - CLAUDIO_IGDB_CLIENT_ID=your_client_id
       - CLAUDIO_IGDB_CLIENT_SECRET=your_client_secret
-      # - CLAUDIO_GITHUB_CLIENT_ID=your_github_client_id
-      # - CLAUDIO_GITHUB_CLIENT_SECRET=your_github_client_secret
-      # - CLAUDIO_GITHUB_REDIRECT_URI=https://your-host/api/auth/github/callback
-      # - CLAUDIO_GOOGLE_CLIENT_ID=your_google_client_id
-      # - CLAUDIO_GOOGLE_CLIENT_SECRET=your_google_client_secret
-      # - CLAUDIO_GOOGLE_REDIRECT_URI=https://your-host/api/auth/google/callback
       # - CLAUDIO_PORT=8080
 
 volumes:
@@ -75,161 +68,20 @@ volumes:
 | `CLAUDIO_DB_PROVIDER`            | `sqlite` or `postgres`                                           | `sqlite`               |
 | `CLAUDIO_DB_SQLITE_PATH`         | SQLite database file path                                        | `/config/claudio.db`   |
 | `CLAUDIO_DB_POSTGRES`            | PostgreSQL connection string                                     |                        |
-| `CLAUDIO_DISABLE_AUTH`           | Disable authentication entirely (open access, everyone is admin) | `false`                |
-| `CLAUDIO_DISABLE_LOCAL_LOGIN`    | Disable username/password login and registration                 | `false`                |
-| `CLAUDIO_DISABLE_USER_CREATION`  | Prevent creation of new local and external users                 | `false`                |
-| `CLAUDIO_BROWSER_ORIGINS`        | Advanced: comma-separated browser origins for split-origin cookie auth CORS |                        |
-| `CLAUDIO_PROXY_AUTH_HEADER`      | HTTP header for proxy authentication (e.g. `Remote-User`)        |                        |
-| `CLAUDIO_PROXY_AUTH_AUTO_CREATE` | Auto-create users from proxy auth header                         | `false`                |
-| `CLAUDIO_GITHUB_CLIENT_ID`       | GitHub OAuth app client ID                                       |                        |
-| `CLAUDIO_GITHUB_CLIENT_SECRET`   | GitHub OAuth app client secret                                   |                        |
-| `CLAUDIO_GITHUB_REDIRECT_URI`    | GitHub OAuth callback URL                                        |                        |
-| `CLAUDIO_GOOGLE_CLIENT_ID`       | Google OAuth client ID                                           |                        |
-| `CLAUDIO_GOOGLE_CLIENT_SECRET`   | Google OAuth client secret                                       |                        |
-| `CLAUDIO_GOOGLE_REDIRECT_URI`    | Google OAuth callback URL                                        |                        |
-| `CLAUDIO_OIDC_SLUG`              | OIDC provider identifier (used in callback URLs)                 |                        |
-| `CLAUDIO_OIDC_DISPLAY_NAME`      | OIDC provider button label                                       |                        |
-| `CLAUDIO_OIDC_LOGO_URL`          | OIDC provider button image                                       |                        |
-| `CLAUDIO_OIDC_DISCOVERY_URL`     | OIDC discovery document URL                                      |                        |
-| `CLAUDIO_OIDC_CLIENT_ID`         | OIDC client ID                                                   |                        |
-| `CLAUDIO_OIDC_CLIENT_SECRET`     | OIDC client secret                                               |                        |
-| `CLAUDIO_OIDC_REDIRECT_URI`      | OIDC callback URL                                                |                        |
-| `CLAUDIO_OIDC_SCOPE`             | OIDC scopes                                                      | `openid profile email` |
 
 Alternatively, create a `config.toml` file — see [config.example.toml](config.example.toml) for the schema.
 
-### Reverse Proxy And Browser Origins
+### Reverse Proxy
 
-The web app now uses ASP.NET Identity cookies for browser auth. Whether you need `CLAUDIO_BROWSER_ORIGINS` depends on how your reverse proxy exposes the SPA and API:
-
-- Same-origin reverse proxy: not required
-- Split frontend/API origins: required
-
-Most deployments should leave this unset. Claudio is normally served as a single app where the SPA and API share the same origin.
-
-Same-origin example:
-
-- SPA: `https://claudio.example.com`
-- API through the same proxy: `https://claudio.example.com/api/*`
-
-In this setup the browser is same-origin, so CORS is not involved and you do not need `CLAUDIO_BROWSER_ORIGINS`.
-
-Split-origin example:
-
-- SPA: `https://claudio.example.com`
-- API: `https://api.example.com`
-
-In this setup the browser is cross-origin and you must allow the frontend origin explicitly:
-
-```bash
-CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com
-```
-
-Use the browser-visible frontend origin, not the API origin. For multiple frontend origins, provide a comma-separated list:
-
-```bash
-CLAUDIO_BROWSER_ORIGINS=https://claudio.example.com,https://staging.example.com
-```
-
-For production deployments, the simplest setup is usually to keep the SPA and API behind the same reverse-proxy origin.
-
-### OAuth Login
-
-Claudio supports GitHub and Google login out of the box, plus any OpenID Connect provider. If a provider is not fully configured, its login button is hidden from the UI.
-
-You can configure GitHub and Google through either environment variables or `config.toml`.
-
-Example `config.toml`:
-
-```toml
-[auth.github]
-client_id = "your_github_client_id"
-client_secret = "your_github_client_secret"
-redirect_uri = "https://your-host/api/auth/github/callback"
-
-[auth.google]
-client_id = "your_google_client_id"
-client_secret = "your_google_client_secret"
-redirect_uri = "https://your-host/api/auth/google/callback"
-```
-
-Notes:
-
-- The redirect URI must exactly match the callback URL registered with the provider.
-- For GitHub, register `https://your-host/api/auth/github/callback` as the authorization callback URL.
-- For Google, register `https://your-host/api/auth/google/callback` as an authorized redirect URI.
-- The first user created (local or external) automatically becomes admin.
-- Existing users are automatically linked when signing in with an external provider whose verified email matches their account.
-- Set `CLAUDIO_DISABLE_LOCAL_LOGIN=true` to require external providers only.
-- Set `CLAUDIO_DISABLE_USER_CREATION=true` to block new account creation. Existing users can still sign in, but first-time registration and first-time external sign-in will be rejected.
-
-### Custom OIDC Provider
-
-Claudio supports a custom OpenID Connect provider for self-hosted identity systems such as Authentik, Authelia, and Pocket ID.
-
-Configure via environment variables:
-
-```bash
-CLAUDIO_OIDC_SLUG=authentik
-CLAUDIO_OIDC_DISPLAY_NAME=Authentik
-CLAUDIO_OIDC_LOGO_URL=https://auth.example.com/static/dist/assets/icons/icon.png
-CLAUDIO_OIDC_DISCOVERY_URL=https://auth.example.com/application/o/claudio/.well-known/openid-configuration
-CLAUDIO_OIDC_CLIENT_ID=your_oidc_client_id
-CLAUDIO_OIDC_CLIENT_SECRET=your_oidc_client_secret
-CLAUDIO_OIDC_REDIRECT_URI=https://claudio.example.com/api/auth/oidc/authentik/callback
-```
-
-Or via `config.toml`:
-
-```toml
-[[auth.oidc_providers]]
-slug = "authentik"
-display_name = "Authentik"
-logo_url = "https://auth.example.com/static/dist/assets/icons/icon.png"
-discovery_url = "https://auth.example.com/application/o/claudio/.well-known/openid-configuration"
-client_id = "your_oidc_client_id"
-client_secret = "your_oidc_client_secret"
-redirect_uri = "https://claudio.example.com/api/auth/oidc/authentik/callback"
-```
-
-Provider fields:
-
-- `slug`: stable provider identifier used in callback URLs
-- `display_name`: button label shown in the login UI
-- `logo_url`: optional image shown beside the provider button
-- `discovery_url`: full OIDC discovery document URL ending in `/.well-known/openid-configuration`
-- `redirect_uri`: must match the provider-side callback exactly
-- `scope`: optional, defaults to `openid profile email`
-- `user_id_claim`: optional, defaults to `sub`
-- `username_claim`: optional, defaults to `preferred_username`
-- `name_claim`: optional, defaults to `name`
-- `email_claim`: optional, defaults to `email`
-
-If your provider uses the standard OIDC claim names, you can omit `scope` and the claim mapping fields entirely. Only set them when your provider needs non-default values.
-
-Notes:
-
-- The login UI shows the OIDC provider button and uses `logo_url` when present.
-- Existing users are linked by verified email when a matching OIDC login succeeds.
-- If discovery returns HTML instead of JSON, the configured `discovery_url` is probably pointing at a login page or app URL rather than the actual discovery document.
-
-### Proxy Authentication
-
-For reverse-proxy SSO setups (Authelia, Authentik, etc.), Claudio can trust a header set by the proxy to identify the user:
-
-```toml
-[auth]
-proxy_auth_header = "Remote-User"
-proxy_auth_auto_create = true
-```
-
-Or via environment variables: `CLAUDIO_PROXY_AUTH_HEADER=Remote-User` and `CLAUDIO_PROXY_AUTH_AUTO_CREATE=true`.
-
-When a request arrives with this header, Claudio creates or finds the user and issues a token automatically. Only use this when the proxy is the sole entry point — Claudio trusts the header value unconditionally.
+Claudio does not include built-in authentication. Put it behind your reverse
+proxy or SSO gateway if you need access control. The desktop app supports
+custom headers on the server selection screen for proxy-specific routing or
+identity headers.
 
 ### Data Persistence
 
-Claudio stores a signing key (`claudio-signing.key`) alongside the database in the config directory. This key signs authentication tokens — if it's lost, all users will need to sign in again. Make sure the `/config` volume is persistent.
+Keep the `/config` volume persistent; it contains the SQLite database and app
+configuration.
 
 ## Library Structure
 
@@ -303,5 +155,4 @@ This updates `src/claudio-desktop/tauri.conf.json`, `src/claudio-desktop/Cargo.t
 
 - **Backend:** C#, .NET 10, EF Core, SQLite/PostgreSQL
 - **Frontend:** React 19, Vite, TanStack Query, Tailwind CSS v4, Headless UI
-- **Auth:** JWT, OAuth 2.0 / OpenID Connect
 - **Metadata:** IGDB API via Twitch OAuth

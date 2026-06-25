@@ -59,17 +59,10 @@ export interface TasksStatus {
   steamGridDb: SteamGridDbScanStatus;
 }
 
-export interface User {
-  id: number;
-  username: string;
-  role: "user" | "admin";
-  createdAt: string;
-}
-
 export interface LibraryPreferences {
   platformOrder: string[];
 }
 
-export interface UserPreferences {
+export interface AppPreferences {
   library: LibraryPreferences;
 }

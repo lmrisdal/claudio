@@ -15,7 +15,7 @@ import { formatPlatform } from "../../core/utils/platforms";
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import { loadGameDetailPage } from "../../gamedetail/load-game-detail-page";
-import { useUserPreferences } from "../../preferences/hooks/use-user-preferences";
+import { useAppPreferences } from "../../preferences/hooks/use-app-preferences";
 import LibraryVirtualContent from "../components/library-virtual-content";
 import {
   buildLibraryLayoutModel,
@@ -47,7 +47,7 @@ export default function Library() {
   const navigate = useNavigate();
   const { focusSidebar } = useDesktopShellNavigation();
   const { isActionBlocked } = useInputScopeState();
-  const { preferences, setPlatformOrder } = useUserPreferences();
+  const { preferences, setPlatformOrder } = useAppPreferences();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem("library-platforms");

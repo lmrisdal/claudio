@@ -139,7 +139,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
       if (forbiddenHeaders.length > 0) {
         setConnectionMessage(
-          `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+          `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
         );
         return;
       }
@@ -147,7 +147,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       const result = await desktopCheckServerConnection({
         serverUrl: trimmedUrl,
         customHeaders,
-        path: "/api/auth/providers",
+        path: "/health",
       });
 
       if (result.ok) {
@@ -175,7 +175,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
       if (forbiddenHeaders.length > 0) {
         setSaveMessage(
-          `These headers are managed by desktop auth and cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
+          `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
         );
         return;
       }

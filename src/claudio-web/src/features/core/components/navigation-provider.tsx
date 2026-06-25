@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
-import { useAuth } from "../../auth/hooks/use-auth";
 import { useGamepad } from "../hooks/use-gamepad";
 import { useInputScopeState } from "../hooks/use-input-scope";
 import { NavigationContext } from "../hooks/use-navigation";
@@ -10,7 +9,6 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   useGamepad();
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const { isLoggedIn } = useAuth();
   const { isActionBlocked } = useInputScopeState();
   const location = useLocation();
 
@@ -46,14 +44,12 @@ export default function NavigationProvider({ children }: { children: ReactNode }
   const toggleSearch = useCallback(() => setSearchOpen((v) => !v), []);
 
   useShortcut("mod+k", (e) => {
-    if (!isLoggedIn) return;
     if (isActionBlocked("search")) return;
     e.preventDefault();
     toggleSearch();
   });
 
   useGamepadEvent("gamepad-search", () => {
-    if (!isLoggedIn) return;
     if (document.body.dataset.emulatorActive) return;
     if (isActionBlocked("search")) return;
     toggleSearch();

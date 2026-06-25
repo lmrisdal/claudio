@@ -1,8 +1,6 @@
-import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useAuth } from "../../auth/hooks/use-auth";
 import {
   COLLAPSED_KEY,
   HEADER_HEIGHT,
@@ -10,7 +8,6 @@ import {
 } from "../../desktop/components/desktop-sidebar";
 import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
 import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
-import { useGamepadDirectionalKeyBridge } from "../hooks/use-gamepad-directional-key-bridge";
 import { useNavigation } from "../hooks/use-navigation";
 import { useServerStatus } from "../hooks/use-server-status";
 import { isMac } from "../utils/os";
@@ -19,11 +16,7 @@ import SearchDialog from "./search-dialog";
 import TasksPopover from "./tasks-popover";
 
 export default function Header() {
-  const userMenuBridgeId = useId();
-  useGamepadDirectionalKeyBridge(userMenuBridgeId);
-
   const navigate = useNavigate();
-  const { isLoggedIn, isAdmin, user, logout } = useAuth();
   const { isConnected } = useServerStatus();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
     () => isDesktop && localStorage.getItem(COLLAPSED_KEY) === "true",
@@ -147,7 +140,7 @@ export default function Header() {
           )}
 
           <div className="desktop-no-drag flex items-center gap-1 ml-auto min-w-0">
-            {isLoggedIn && !isConnected && isDesktop && (
+            {!isConnected && isDesktop && (
               <span
                 className="mr-2 flex items-center gap-2 text-xs text-red-400"
                 title="Server could not connect"
@@ -158,140 +151,64 @@ export default function Header() {
               </span>
             )}
 
-            {isLoggedIn && (
-              <button
-                onClick={toggleSearch}
-                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
-                title="Search games (Ctrl+K)"
+            <button
+              onClick={toggleSearch}
+              className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
+              title="Search games (Ctrl+K)"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                  />
-                </svg>
-              </button>
-            )}
-
-            {isLoggedIn ? (
-              <>
-                {isAdmin && (
-                  <>
-                    <TasksPopover />
-                  </>
-                )}
-                {isAdmin && !isDesktop && (
-                  <>
-                    <Link
-                      to="/admin"
-                      className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
-                    >
-                      Admin
-                    </Link>
-                  </>
-                )}
-                {user && (
-                  <div
-                    className={`flex items-center gap-2 ml-2 pl-3 border-l ${isDesktop ? "border-border/50" : "border-border"}`}
-                  >
-                    <Menu as="div" className="relative h-full flex items-center">
-                      <MenuButton
-                        data-gamepad-nav-bridge={userMenuBridgeId}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary font-mono hover:bg-surface-raised transition outline-none ring-offset-bg focus-visible:ring-2 focus-visible:ring-focus-ring"
-                        title="User menu"
-                      >
-                        {user?.username}
-                        <svg
-                          className="w-3.5 h-3.5 opacity-50"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="m19.5 8.25-7.5 7.5-7.5-7.5"
-                          />
-                        </svg>
-                      </MenuButton>
-
-                      <MenuItems
-                        anchor="bottom end"
-                        data-gamepad-nav-bridge={userMenuBridgeId}
-                        className="z-60 mt-2 w-52 rounded-xl bg-surface-raised border border-border shadow-2xl p-1.5 focus:outline-none"
-                      >
-                        <MenuItem>
-                          <button
-                            data-gamepad-nav-bridge={userMenuBridgeId}
-                            onClick={() => {
-                              if (isDesktop) {
-                                void openSettingsWindow();
-                                return;
-                              }
-                              settingsDialog.openTab("account");
-                            }}
-                            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-text-secondary data-focus:bg-surface-overlay data-focus:text-text-primary transition"
-                          >
-                            <svg
-                              className="w-5 h-5 opacity-60 group-data-focus:opacity-100"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-                              />
-                            </svg>
-                            Preferences
-                          </button>
-                        </MenuItem>
-                        <div className="my-1.5 border-t border-border/40 mx-2" />
-                        <MenuItem>
-                          <button
-                            data-gamepad-nav-bridge={userMenuBridgeId}
-                            onClick={logout}
-                            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-text-muted data-focus:bg-red-500/10 data-focus:text-red-400 transition"
-                          >
-                            <svg
-                              className="w-5 h-5 opacity-60 group-data-focus:opacity-100"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15"
-                              />
-                            </svg>
-                            Sign out
-                          </button>
-                        </MenuItem>
-                      </MenuItems>
-                    </Menu>
-                  </div>
-                )}
-              </>
-            ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                />
+              </svg>
+            </button>
+            <TasksPopover />
+            {!isDesktop && (
               <Link
-                to="/login"
-                className="px-4 py-1.5 rounded-lg text-sm bg-accent hover:bg-accent-hover text-accent-foreground font-medium transition"
+                to="/admin"
+                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition"
               >
-                Sign in
+                Admin
               </Link>
             )}
+            <button
+              onClick={() => {
+                if (isDesktop) {
+                  void openSettingsWindow();
+                  return;
+                }
+                settingsDialog.open();
+              }}
+              className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
+              title="Settings"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.004.828c-.293.24-.438.613-.431.992a7.723 7.723 0 0 1 0 .255c-.007.378.138.751.431.992l1.004.827c.424.35.534.955.26 1.432l-1.296 2.247a1.125 1.125 0 0 1-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.219.128c-.332.183-.582.495-.645.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.432l1.004-.827c.293-.241.438-.614.431-.992a6.932 6.932 0 0 1 0-.255c.007-.379-.138-.752-.431-.992l-1.004-.828a1.125 1.125 0 0 1-.26-1.431l1.296-2.247a1.125 1.125 0 0 1 1.37-.49l1.217.456c.355.133.75.072 1.076-.124.072-.044.145-.086.219-.128.332-.183.582-.495.645-.869l.213-1.281Z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                />
+              </svg>
+            </button>
             {appWindow && (
               <div style={desktopHeaderRowHeight} className="flex ml-2 border-l border-border/50">
                 <button

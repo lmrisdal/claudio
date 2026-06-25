@@ -1,6 +1,5 @@
 using System.Formats.Tar;
 using System.IO.Compression;
-using System.Security.Claims;
 using System.Text;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
@@ -16,22 +15,21 @@ public static class GameEndpoints
     public static RouteGroupBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/games")
-            .WithTags("Games")
-            .RequireAuthorization();
+            .WithTags("Games");
 
         group.MapGet("/", GetAll);
         group.MapGet("/{id:int}", GetById);
         group.MapGet("/{id:int}/executables", ListExecutables);
         group.MapGet("/{id:int}/installer-inspection", InspectInstaller);
         group.MapPost("/{id:int}/download-ticket", CreateDownloadTicket);
-        group.MapGet("/{id:int}/download", Download).AllowAnonymous();
+        group.MapGet("/{id:int}/download", Download);
         group.MapGet("/{id:int}/download-files-manifest", GetDownloadFilesManifest);
         group.MapGet("/{id:int}/download-files", DownloadFile);
         group.MapGet("/{id:int}/download-file", DownloadFile);
         group.MapGet("/{id:int}/browse", BrowseGameFiles);
         group.MapGet("/{id:int}/emulation", GetEmulationInfo);
         group.MapPost("/{id:int}/emulation/session", CreateEmulationSession);
-        group.MapMethods("/{id:int}/emulation/files/{ticket}/{**path}", ["GET", "HEAD"], GetEmulationFile).AllowAnonymous();
+        group.MapMethods("/{id:int}/emulation/files/{ticket}/{**path}", ["GET", "HEAD"], GetEmulationFile);
 
         return group;
     }
@@ -111,7 +109,7 @@ public static class GameEndpoints
 
         var ticket = ticketService.CreateTicket(id);
 
-        // Legacy browser flow keeps ticket response shape. Desktop should use bearer-auth
+        // Legacy browser flow keeps ticket response shape. Desktop can use
         // /download-files-manifest and /download-files endpoints without tickets.
         var files = BuildLooseFileManifest(game);
 
@@ -138,14 +136,9 @@ public static class GameEndpoints
         [FromQuery] string? ticket,
         AppDbContext db,
         DownloadService downloadService,
-        DownloadTicketService ticketService,
-        HttpContext httpContext)
+        DownloadTicketService ticketService)
     {
-        // Require either normal auth or a valid single-use ticket
-        var isAuthenticated = httpContext.User.Identity?.IsAuthenticated == true;
-        var hasValidTicket = ticket is not null && ticketService.TryRedeem(ticket, id);
-
-        if (!isAuthenticated && !hasValidTicket)
+        if (ticket is not null && !ticketService.TryRedeem(ticket, id))
             return Results.Unauthorized();
 
         var game = await db.Games.FindAsync(id);
@@ -390,11 +383,9 @@ public static class GameEndpoints
         string ticket,
         string path,
         AppDbContext db,
-        EmulationTicketService ticketService,
-        HttpContext httpContext)
+        EmulationTicketService ticketService)
     {
-        var isAuthenticated = httpContext.User.Identity?.IsAuthenticated == true;
-        if (!isAuthenticated && !ticketService.IsValid(ticket, id))
+        if (!ticketService.IsValid(ticket, id))
             return Results.Unauthorized();
 
         var game = await db.Games.FindAsync(id);
@@ -412,12 +403,6 @@ public static class GameEndpoints
             return Results.NotFound();
 
         return Results.File(fullPath, "application/octet-stream", enableRangeProcessing: true);
-    }
-
-    private static int? GetUserId(ClaimsPrincipal principal)
-    {
-        var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        return int.TryParse(value, out var userId) ? userId : null;
     }
 
     private static EmulationInfoResponse BuildEmulationInfo(Game game)

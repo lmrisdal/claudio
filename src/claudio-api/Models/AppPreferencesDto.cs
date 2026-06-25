@@ -1,6 +1,6 @@
 namespace Claudio.Api.Models;
 
-public class UserPreferencesDto
+public class AppPreferencesDto
 {
     public LibraryPreferencesDto Library { get; set; } = new();
 }

@@ -1,13 +1,11 @@
-use crate::auth;
 use crate::models::{
     DownloadPackageInput, InstallProgress, InstallType, InstalledGame, RemoteGame,
 };
-use crate::refresh_auth_state_ui;
 use crate::registry;
 use crate::settings;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
-use reqwest::header::{AUTHORIZATION, CONTENT_DISPOSITION, HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{CONTENT_DISPOSITION, HeaderMap, HeaderName, HeaderValue};
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::io;
@@ -25,7 +23,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use zip::read::ZipArchive;
 
 mod api;
-mod auth_headers;
+mod request_headers;
 mod download;
 mod download_individual;
 mod extract;
@@ -56,9 +54,9 @@ pub use api::{
 pub use state::InstallState;
 
 #[cfg(test)]
-use auth_headers::build_headers;
-use auth_headers::{authenticated_headers_with, refreshed_headers_with};
-#[cfg(any(test, feature = "integration-tests"))]
+use request_headers::build_headers;
+use request_headers::request_headers;
+#[cfg(feature = "integration-tests")]
 use download::download_package_with;
 use download::{DownloadInfo, DownloadOptions, download_package};
 use download_individual::download_files_individually;

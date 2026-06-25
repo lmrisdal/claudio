@@ -3,12 +3,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 import { appRouter } from "./app-router";
-import AuthProvider from "./features/auth/components/auth-provider";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
-import UserPreferencesProvider from "./features/preferences/components/user-preferences-provider";
+import AppPreferencesProvider from "./features/preferences/components/app-preferences-provider";
 import "./index.css";
 
 const LOG_ATTACH_TIMEOUT_MS = 1500;
@@ -54,17 +53,15 @@ createRoot(document.querySelector("#root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ServerStatusProvider>
-        <AuthProvider>
-          <UserPreferencesProvider>
-            <InputScopeProvider>
-              <SettingsDialogProvider>
-                <main data-ui-scroll-container>
-                  <RouterProvider router={appRouter} />
-                </main>
-              </SettingsDialogProvider>
-            </InputScopeProvider>
-          </UserPreferencesProvider>
-        </AuthProvider>
+        <AppPreferencesProvider>
+          <InputScopeProvider>
+            <SettingsDialogProvider>
+              <main data-ui-scroll-container>
+                <RouterProvider router={appRouter} />
+              </main>
+            </SettingsDialogProvider>
+          </InputScopeProvider>
+        </AppPreferencesProvider>
       </ServerStatusProvider>
     </QueryClientProvider>
   </StrictMode>,

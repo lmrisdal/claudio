@@ -171,14 +171,12 @@ fn infer_filename_prefers_utf8_content_disposition_name() {
 }
 
 #[test]
-fn build_headers_ignores_forbidden_custom_headers_and_sets_bearer_token() {
-    let headers = build_headers(
-        &HashMap::from([
-            ("X-Test".to_string(), "ok".to_string()),
-            ("Authorization".to_string(), "blocked".to_string()),
-        ]),
-        Some("token-123"),
-    )
+fn build_headers_applies_custom_headers_and_ignores_forbidden_entries() {
+    let headers = build_headers(&HashMap::from([
+        ("X-Test".to_string(), "ok".to_string()),
+        ("Authorization".to_string(), "Bearer proxy-token".to_string()),
+        ("Host".to_string(), "blocked".to_string()),
+    ]))
     .expect("headers should build");
 
     assert_eq!(
@@ -187,8 +185,9 @@ fn build_headers_ignores_forbidden_custom_headers_and_sets_bearer_token() {
     );
     assert_eq!(
         headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()),
-        Some("Bearer token-123")
+        Some("Bearer proxy-token")
     );
+    assert!(headers.get("host").is_none());
     assert_eq!(headers.len(), 2);
 }
 

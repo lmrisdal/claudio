@@ -6,7 +6,6 @@ pub(super) struct DownloadInfo {
 }
 
 pub(super) struct DownloadOptions<'a> {
-    pub(super) settings: &'a settings::DesktopSettings,
     pub(super) server_url: &'a str,
     pub(super) custom_headers: &'a HashMap<String, String>,
     pub(super) speed_limit_kbs: Option<f64>,
@@ -30,7 +29,7 @@ pub(super) async fn download_package(
         |progress| {
             let _ = app.emit("install-progress", progress);
         },
-        || refresh_auth_state_ui(app, false),
+        || Ok(()),
     )
     .await
 }
@@ -42,14 +41,13 @@ pub(super) async fn download_package_with<F, G>(
     temp_root: &Path,
     control: &InstallControl,
     mut on_progress: F,
-    mut on_logged_out: G,
+    _on_logged_out: G,
 ) -> Result<DownloadInfo, String>
 where
     F: FnMut(InstallProgress),
     G: FnMut() -> Result<(), String>,
 {
     let DownloadOptions {
-        settings,
         server_url,
         custom_headers,
         speed_limit_kbs,
@@ -70,30 +68,15 @@ where
         },
     );
 
-    let auth_headers =
-        authenticated_headers_with(settings, custom_headers, &mut on_logged_out).await?;
-    let mut manifest_response = client
+    let headers = request_headers(custom_headers)?;
+    let manifest_response = client
         .get(format!(
             "{server_url}/api/games/{game_id}/download-files-manifest"
         ))
-        .headers(auth_headers.clone())
+        .headers(headers.clone())
         .send()
         .await
         .map_err(|err| err.to_string())?;
-
-    if manifest_response.status() == reqwest::StatusCode::UNAUTHORIZED
-        && let Some(refreshed_headers) =
-            refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-    {
-        manifest_response = client
-            .get(format!(
-                "{server_url}/api/games/{game_id}/download-files-manifest"
-            ))
-            .headers(refreshed_headers.clone())
-            .send()
-            .await
-            .map_err(|err| err.to_string())?;
-    }
 
     let manifest_missing = manifest_response.status() == reqwest::StatusCode::NOT_FOUND;
     let file_manifest: Option<Vec<serde_json::Value>> = if manifest_missing {
@@ -125,31 +108,19 @@ where
             temp_root,
             control,
             &mut on_progress,
-            &auth_headers,
+            &headers,
             files,
         )
         .await;
     }
 
     let mut response = if manifest_missing {
-        let mut ticket_response = client
+        let ticket_response = client
             .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-            .headers(auth_headers.clone())
+            .headers(headers.clone())
             .send()
             .await
             .map_err(|err| err.to_string())?;
-
-        if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED
-            && let Some(refreshed_headers) =
-                refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-        {
-            ticket_response = client
-                .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-                .headers(refreshed_headers.clone())
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-        }
 
         if !ticket_response.status().is_success() {
             return Err(format!(
@@ -168,70 +139,31 @@ where
             .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
             .to_owned();
 
-        let mut response = client
+        client
             .get(format!(
                 "{server_url}/api/games/{game_id}/download?ticket={ticket}"
             ))
-            .headers(auth_headers.clone())
+            .headers(headers.clone())
             .send()
             .await
-            .map_err(|err| err.to_string())?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED
-            && let Some(refreshed_headers) =
-                refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-        {
-            response = client
-                .get(format!(
-                    "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-                ))
-                .headers(refreshed_headers)
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-        }
-        response
+            .map_err(|err| err.to_string())?
     } else {
         client
             .get(format!("{server_url}/api/games/{game_id}/download"))
-            .headers(auth_headers.clone())
+            .headers(headers.clone())
             .send()
             .await
             .map_err(|err| err.to_string())?
     };
 
-    if response.status() == reqwest::StatusCode::UNAUTHORIZED
-        && let Some(refreshed_headers) =
-            refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-    {
-        response = client
-            .get(format!("{server_url}/api/games/{game_id}/download"))
-            .headers(refreshed_headers)
-            .send()
-            .await
-            .map_err(|err| err.to_string())?;
-    }
-
     if !response.status().is_success() {
         if response.status() == reqwest::StatusCode::NOT_FOUND {
-            let mut ticket_response = client
+            let ticket_response = client
                 .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-                .headers(auth_headers.clone())
+                .headers(headers.clone())
                 .send()
                 .await
                 .map_err(|err| err.to_string())?;
-
-            if ticket_response.status() == reqwest::StatusCode::UNAUTHORIZED
-                && let Some(refreshed_headers) =
-                    refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-            {
-                ticket_response = client
-                    .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-                    .headers(refreshed_headers.clone())
-                    .send()
-                    .await
-                    .map_err(|err| err.to_string())?;
-            }
 
             if !ticket_response.status().is_success() {
                 return Err(format!(
@@ -254,24 +186,10 @@ where
                 .get(format!(
                     "{server_url}/api/games/{game_id}/download?ticket={ticket}"
                 ))
-                .headers(auth_headers.clone())
+                .headers(headers.clone())
                 .send()
                 .await
                 .map_err(|err| err.to_string())?;
-
-            if response.status() == reqwest::StatusCode::UNAUTHORIZED
-                && let Some(refreshed_headers) =
-                    refreshed_headers_with(settings, custom_headers, &mut on_logged_out).await?
-            {
-                response = client
-                    .get(format!(
-                        "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-                    ))
-                    .headers(refreshed_headers)
-                    .send()
-                    .await
-                    .map_err(|err| err.to_string())?;
-            }
         }
 
         if !response.status().is_success() {

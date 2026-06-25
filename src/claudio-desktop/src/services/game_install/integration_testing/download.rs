@@ -43,7 +43,6 @@ where
 
     let download_info = download_package_with(
         &DownloadOptions {
-            settings: &settings,
             server_url: &server_url,
             custom_headers: &settings.custom_headers,
             speed_limit_kbs: settings.download_speed_limit_kbs,

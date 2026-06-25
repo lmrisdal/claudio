@@ -8,7 +8,7 @@ pub(super) async fn download_files_individually<F>(
     temp_root: &Path,
     control: &InstallControl,
     on_progress: &mut F,
-    auth_headers: &HeaderMap,
+    request_headers: &HeaderMap,
     files: &[serde_json::Value],
 ) -> Result<DownloadInfo, String>
 where
@@ -89,7 +89,7 @@ where
                     .replace('/', std::path::MAIN_SEPARATOR_STR)
                     .trim_start_matches(std::path::MAIN_SEPARATOR),
             );
-            let headers = auth_headers.clone();
+            let headers = request_headers.clone();
             let dl_bytes = Arc::clone(&downloaded_bytes);
             let progress = progress_tx.clone();
             let cancel_token = control.cancel_token.clone();

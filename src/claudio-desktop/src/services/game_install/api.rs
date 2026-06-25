@@ -115,7 +115,6 @@ async fn download_game_package_inner(
     let download_info = download_package(
         app,
         &DownloadOptions {
-            settings: &settings,
             server_url: &server_url,
             custom_headers: &settings.custom_headers,
             speed_limit_kbs: settings.download_speed_limit_kbs,

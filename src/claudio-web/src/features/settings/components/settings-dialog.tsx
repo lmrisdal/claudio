@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../../auth/hooks/use-auth";
 import {
   GAMEPAD_NAV_DOWN_EVENT,
   GAMEPAD_NAV_LEFT_EVENT,
@@ -11,7 +10,6 @@ import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import { isDesktop, ping } from "../../desktop/hooks/use-desktop";
 import { useAppSettingsForm } from "../hooks/use-app-settings-form";
 import { type SettingsTab } from "../hooks/use-settings-dialog";
-import AccountTab from "./account-tab";
 import AppDownloadsSettingsTab from "./app-downloads-settings-tab";
 import AppGeneralSettingsTab from "./app-general-settings-tab";
 import AppServerSettingsTab from "./app-server-settings-tab";
@@ -24,7 +22,6 @@ const MIN_CHECKING_STATUS_MS = 1000;
 const SETTINGS_TAB_STORAGE_KEY = "claudio_settings_active_tab";
 
 const allTabs: { id: SettingsTab; label: string }[] = [
-  { id: "account", label: "Account" },
   { id: "interface", label: "Interface" },
   { id: "app.general", label: "General" },
   { id: "app.server", label: "Server" },
@@ -49,11 +46,10 @@ export default function SettingsDialog({
     enabled: open,
   });
 
-  const { user, logout } = useAuth();
   const previousFocusReference = useRef<HTMLElement | null>(null);
   const checkingStartedAtReference = useRef<number | null>(null);
   const delayedStatusTimeoutReference = useRef<number | null>(null);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("account");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("interface");
   const [focusZone, setFocusZone] = useState<"sidebar" | "content">("sidebar");
   const [sidebarIndex, setSidebarIndex] = useState(0);
   const [contentIndex, setContentIndex] = useState(0);
@@ -80,11 +76,8 @@ export default function SettingsDialog({
   const firstAppTabIndex = visibleTabs.findIndex((tab) => tab.id.startsWith("app."));
 
   const hasCheckForUpdatesButton = isDesktop;
-  const canSignOut = Boolean(user);
   const checkForUpdatesIndex = visibleTabs.length;
-  const signOutIndex = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0);
-  const sidebarCount =
-    visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0) + (canSignOut ? 1 : 0);
+  const sidebarCount = visibleTabs.length + (hasCheckForUpdatesButton ? 1 : 0);
   const appVersionLabel =
     appVersion && /^\d+\.\d+\.\d+([-.+][0-9A-Za-z.-]+)?$/.test(appVersion)
       ? `v${appVersion}`
@@ -92,7 +85,7 @@ export default function SettingsDialog({
 
   useEffect(() => {
     if (!open) return;
-    const nextTab = visibleTabs.some((tab) => tab.id === initialTab) ? initialTab : "account";
+    const nextTab = visibleTabs.some((tab) => tab.id === initialTab) ? initialTab : "interface";
     const tabIndex = visibleTabs.findIndex((tab) => tab.id === nextTab);
     setActiveTab(nextTab);
     setFocusZone("sidebar");
@@ -428,7 +421,7 @@ export default function SettingsDialog({
 
   if (!open) return null;
 
-  // Build sidebar ref index: tabs, check updates (desktop), sign out (if auth enabled)
+  // Build sidebar ref index: tabs and check updates (desktop).
   let sidebarReferenceIndex = 0;
 
   const closeIcon = (
@@ -468,14 +461,6 @@ export default function SettingsDialog({
           <div className="flex items-start justify-between border-b border-border p-4 sm:border-b-0 sm:p-5 sm:pb-0">
             <div>
               <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="font-mono text-sm text-text-muted">{user?.username}</span>
-                {user?.role === "admin" && (
-                  <span className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                    {user.role}
-                  </span>
-                )}
-              </div>
             </div>
             <button
               onClick={onClose}
@@ -542,22 +527,6 @@ export default function SettingsDialog({
             </div>
           )}
 
-          {canSignOut && (
-            <button
-              ref={(element) => {
-                sidebarReferences.current[signOutIndex] = element;
-              }}
-              onClick={() => {
-                setFocusZone("sidebar");
-                setSidebarIndex(signOutIndex);
-                onClose();
-                void logout();
-              }}
-              className={`m-5 mt-0 hidden rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors ${embedded ? "hover:bg-(--desktop-settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-red-400 ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"} sm:block`}
-            >
-              Sign out
-            </button>
-          )}
         </nav>
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -575,7 +544,6 @@ export default function SettingsDialog({
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
-            {activeTab === "account" && <AccountTab contentRefs={contentReferences} />}
             {activeTab === "interface" && <InterfaceTab contentRefs={contentReferences} />}
             {activeTab === "app.general" && (
               <AppGeneralSettingsTab contentRefs={contentReferences} settings={appSettings} />
@@ -585,18 +553,6 @@ export default function SettingsDialog({
             )}
             {activeTab === "app.downloads" && (
               <AppDownloadsSettingsTab contentRefs={contentReferences} settings={appSettings} />
-            )}
-
-            {canSignOut && (
-              <button
-                onClick={() => {
-                  onClose();
-                  void logout();
-                }}
-                className="mt-6 w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted transition-colors hover:bg-surface-raised hover:text-red-400 sm:hidden"
-              >
-                Sign out
-              </button>
             )}
           </div>
         </div>

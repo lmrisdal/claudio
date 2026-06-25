@@ -1,17 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { useAuth } from "../../auth/hooks/use-auth";
 import { api } from "../../core/api/client";
-import type { UserPreferences } from "../../core/types/models";
-import { UserPreferencesContext } from "../hooks/user-preferences-context";
+import type { AppPreferences } from "../../core/types/models";
+import { AppPreferencesContext } from "../hooks/app-preferences-context";
 
-const DEFAULT_PREFERENCES: UserPreferences = {
+const DEFAULT_PREFERENCES: AppPreferences = {
   library: {
     platformOrder: [],
   },
 };
 
-function normalizePreferences(preferences?: UserPreferences | null): UserPreferences {
+function normalizePreferences(preferences?: AppPreferences | null): AppPreferences {
   return {
     library: {
       platformOrder: preferences?.library.platformOrder ?? [],
@@ -19,19 +18,17 @@ function normalizePreferences(preferences?: UserPreferences | null): UserPrefere
   };
 }
 
-export default function UserPreferencesProvider({ children }: { children: ReactNode }) {
+export default function AppPreferencesProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const queryKey = ["userPreferences", user?.id ?? 0];
+  const queryKey = ["preferences"];
 
   const preferencesQuery = useQuery({
-    enabled: Boolean(user),
-    queryFn: () => api.get<UserPreferences>("/preferences"),
+    queryFn: () => api.get<AppPreferences>("/preferences"),
     queryKey,
   });
 
   const savePreferencesMutation = useMutation({
-    mutationFn: (next: UserPreferences) => api.put<UserPreferences>("/preferences", next),
+    mutationFn: (next: AppPreferences) => api.put<AppPreferences>("/preferences", next),
     onError: (_error, _next, previous) => {
       if (previous) {
         queryClient.setQueryData(queryKey, previous);
@@ -39,7 +36,7 @@ export default function UserPreferencesProvider({ children }: { children: ReactN
     },
     onMutate: async (next) => {
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<UserPreferences>(queryKey);
+      const previous = queryClient.getQueryData<AppPreferences>(queryKey);
       queryClient.setQueryData(queryKey, normalizePreferences(next));
       return previous;
     },
@@ -51,7 +48,7 @@ export default function UserPreferencesProvider({ children }: { children: ReactN
   const preferences = normalizePreferences(preferencesQuery.data ?? DEFAULT_PREFERENCES);
 
   const updatePreferences = useCallback(
-    (next: UserPreferences) => {
+    (next: AppPreferences) => {
       savePreferencesMutation.mutate(normalizePreferences(next));
     },
     [savePreferencesMutation],
@@ -85,5 +82,5 @@ export default function UserPreferencesProvider({ children }: { children: ReactN
     ],
   );
 
-  return <UserPreferencesContext value={value}>{children}</UserPreferencesContext>;
+  return <AppPreferencesContext value={value}>{children}</AppPreferencesContext>;
 }

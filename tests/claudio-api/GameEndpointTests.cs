@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -29,20 +28,7 @@ public class GameEndpointTests : IAsyncDisposable
         Directory.CreateDirectory(_gamesDir);
     }
 
-    private async Task<HttpClient> CreateAuthenticatedClientAsync()
-    {
-        var client = _factory.CreateClient();
-        await client.PostAsJsonAsync("/api/auth/register", new { username = "testuser", password = "password123" });
-        var tokenResponse = await client.PostAsJsonAsync("/api/auth/token/login", new
-        {
-            username = "testuser",
-            password = "password123",
-        });
-        var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", tokenJson.GetProperty("access_token").GetString()!);
-        return client;
-    }
+    private HttpClient CreateClient() => _factory.CreateClient();
 
     private async Task SeedGameAsync(string title, string platform, string folderName, string? folderPath = null)
     {
@@ -67,7 +53,7 @@ public class GameEndpointTests : IAsyncDisposable
     {
         await SeedGameAsync("Doom", "pc", "Doom");
         await SeedGameAsync("Quake", "pc", "Quake");
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games");
 
@@ -81,7 +67,7 @@ public class GameEndpointTests : IAsyncDisposable
     {
         await SeedGameAsync("Doom", "pc", "Doom");
         await SeedGameAsync("Pokemon", "gba", "Pokemon");
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games?platform=pc");
 
@@ -95,7 +81,7 @@ public class GameEndpointTests : IAsyncDisposable
     {
         await SeedGameAsync("Doom", "pc", "Doom");
         await SeedGameAsync("Quake", "pc", "Quake");
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games?search=oom");
 
@@ -109,7 +95,7 @@ public class GameEndpointTests : IAsyncDisposable
         await SeedGameAsync("Zelda", "snes", "Zelda");
         await SeedGameAsync("Aladdin", "genesis", "Aladdin");
         await SeedGameAsync("Mario", "nes", "Mario");
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games");
 
@@ -118,13 +104,13 @@ public class GameEndpointTests : IAsyncDisposable
     }
 
     [Test]
-    public async Task GetAll_WithoutAuth_Returns401()
+    public async Task GetAll_Anonymous_ReturnsOk()
     {
-        var client = _factory.CreateClient();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     // --- GetById ---
@@ -133,7 +119,7 @@ public class GameEndpointTests : IAsyncDisposable
     public async Task GetById_ExistingGame_ReturnsGame()
     {
         await SeedGameAsync("Doom", "pc", "Doom");
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1");
 
@@ -146,7 +132,7 @@ public class GameEndpointTests : IAsyncDisposable
     [Test]
     public async Task GetById_NonexistentGame_Returns404()
     {
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/999");
 
@@ -165,7 +151,7 @@ public class GameEndpointTests : IAsyncDisposable
         Directory.CreateDirectory(Path.Combine(gameDir, "data"));
 
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/browse");
 
@@ -185,7 +171,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, ".DS_Store"), "");
 
         await SeedGameAsync("CleanGame", "pc", "CleanGame", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/browse");
 
@@ -208,7 +194,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "game.exe"), "dummy");
 
         await SeedGameAsync("TraversalGame", "pc", "TraversalGame", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/browse?path=../../etc");
 
@@ -218,7 +204,7 @@ public class GameEndpointTests : IAsyncDisposable
     [Test]
     public async Task BrowseGameFiles_NonexistentGame_Returns404()
     {
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/999/browse");
 
@@ -235,7 +221,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "pokemon.gba"), "rom-data");
 
         await SeedGameAsync("Pokemon", "gba", "Pokemon", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/emulation");
 
@@ -253,7 +239,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "doom.exe"), "exe");
 
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/emulation");
 
@@ -269,7 +255,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "readme.txt"), "no rom here");
 
         await SeedGameAsync("EmptyGame", "gba", "EmptyGame", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/emulation");
 
@@ -280,14 +266,18 @@ public class GameEndpointTests : IAsyncDisposable
     // --- Download ticket ---
 
     [Test]
-    public async Task Download_WithoutAuthOrTicket_Returns401()
+    public async Task Download_Anonymous_ReturnsOk()
     {
-        await SeedGameAsync("Doom", "pc", "Doom");
-        var client = _factory.CreateClient();
+        var archivePath = Path.Combine(_gamesDir, "pc", "doom.zip");
+        Directory.CreateDirectory(Path.GetDirectoryName(archivePath)!);
+        File.WriteAllText(archivePath, "fake-zip");
+
+        await SeedGameAsync("Doom", "pc", "doom.zip", archivePath);
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/download");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Test]
@@ -299,7 +289,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "readme.txt"), "info");
 
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.PostAsync("/api/games/1/download-ticket", null);
 
@@ -324,7 +314,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(archivePath, "fake-zip");
 
         await SeedGameAsync("ZipGame", "pc", "game.zip", archivePath);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.PostAsync("/api/games/1/download-ticket", null);
 
@@ -336,31 +326,20 @@ public class GameEndpointTests : IAsyncDisposable
     }
 
     [Test]
-    public async Task DownloadFile_WithAuth_ReturnsFile()
+    public async Task DownloadFile_ReturnsFile()
     {
         var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
         Directory.CreateDirectory(gameDir);
         File.WriteAllText(Path.Combine(gameDir, "game.exe"), "binary-content");
 
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/download-files?path=game.exe");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Be("binary-content");
-    }
-
-    [Test]
-    public async Task DownloadFile_WithoutAuth_Returns401()
-    {
-        await SeedGameAsync("Doom", "pc", "Doom");
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/api/games/1/download-files?path=game.exe");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Test]
@@ -371,7 +350,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "game.exe"), "binary-content");
 
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/download-files?path=../../etc/passwd");
 
@@ -385,7 +364,7 @@ public class GameEndpointTests : IAsyncDisposable
         Directory.CreateDirectory(gameDir);
 
         await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/download-files?path=nonexistent.exe");
 
@@ -393,7 +372,7 @@ public class GameEndpointTests : IAsyncDisposable
     }
 
     [Test]
-    public async Task DownloadFilesManifest_LooseFolder_WithAuth_ReturnsFiles()
+    public async Task DownloadFilesManifest_LooseFolder_ReturnsFiles()
     {
         var gameDir = Path.Combine(_gamesDir, "pc", "ManifestGame");
         Directory.CreateDirectory(gameDir);
@@ -401,7 +380,7 @@ public class GameEndpointTests : IAsyncDisposable
         File.WriteAllText(Path.Combine(gameDir, "readme.txt"), "hello");
 
         await SeedGameAsync("ManifestGame", "pc", "ManifestGame", gameDir);
-        var client = await CreateAuthenticatedClientAsync();
+        var client = CreateClient();
 
         var response = await client.GetAsync("/api/games/1/download-files-manifest");
 
@@ -410,17 +389,6 @@ public class GameEndpointTests : IAsyncDisposable
         json.TryGetProperty("files", out var files).Should().BeTrue();
         files.ValueKind.Should().Be(JsonValueKind.Array);
         files.GetArrayLength().Should().Be(2);
-    }
-
-    [Test]
-    public async Task DownloadFilesManifest_WithoutAuth_Returns401()
-    {
-        await SeedGameAsync("Doom", "pc", "Doom");
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/api/games/1/download-files-manifest");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     public async ValueTask DisposeAsync()

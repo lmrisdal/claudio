@@ -46,8 +46,6 @@ pub struct DesktopSettings {
     #[serde(default)]
     pub custom_headers: HashMap<String, String>,
     #[serde(default)]
-    pub allow_insecure_auth_storage: bool,
-    #[serde(default)]
     pub download_speed_limit_kbs: Option<f64>,
 }
 
@@ -65,7 +63,6 @@ impl Default for DesktopSettings {
             close_to_tray: false,
             hide_dock_icon: false,
             custom_headers: HashMap::new(),
-            allow_insecure_auth_storage: false,
             download_speed_limit_kbs: None,
         }
     }
@@ -74,7 +71,15 @@ impl Default for DesktopSettings {
 pub fn is_forbidden_custom_header(name: &str) -> bool {
     matches!(
         name.trim().to_ascii_lowercase().as_str(),
-        "authorization" | "cookie" | "proxy-authorization"
+        "host"
+            | "content-length"
+            | "connection"
+            | "transfer-encoding"
+            | "upgrade"
+            | "te"
+            | "trailer"
+            | "keep-alive"
+            | "proxy-connection"
     )
 }
 
@@ -113,10 +118,6 @@ pub(crate) fn settings_path() -> PathBuf {
 
 pub(crate) fn registry_path() -> PathBuf {
     data_dir().join("installed-games.json")
-}
-
-pub(crate) fn auth_fallback_tokens_path() -> PathBuf {
-    data_dir().join("auth-fallback.json")
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]

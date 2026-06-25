@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { useAuth } from "../../auth/hooks/use-auth";
 import { api } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
@@ -17,7 +16,6 @@ import { isPcPlatform, type BrowseResponse } from "../shared";
 
 export default function GameDetail() {
   const { id } = useParams();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isDesktop, getInstalledGame: getDesktopInstalledGame } = useDesktop();
@@ -234,7 +232,7 @@ export default function GameDetail() {
           <div className="flex-1 min-w-0">
             <GameDetailOverview
               game={displayGame}
-              isAdmin={user?.role === "admin"}
+              isAdmin={true}
               onBrowseFiles={() => setBrowsePath("")}
             >
               <GameDetailActions
