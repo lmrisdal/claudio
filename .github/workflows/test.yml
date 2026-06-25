@@ -51,6 +51,10 @@ jobs:
       matrix:
         platform: [ubuntu-22.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.platform }}
+    env:
+      CARGO_HTTP_MULTIPLEXING: "false"
+      CARGO_NET_RETRY: "10"
+      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
     steps:
       - uses: actions/checkout@v6
@@ -75,9 +79,31 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          cargo build --release -p claudio-uninstaller --target x86_64-pc-windows-msvc
+          cargo_retry() {
+            for attempt in 1 2 3; do
+              "$@" && return 0
+              status=$?
+              echo "Cargo command failed with exit code $status (attempt $attempt/3)"
+              sleep $((attempt * 10))
+            done
+            return "$status"
+          }
+
+          cargo_retry cargo build --release -p claudio-uninstaller --target x86_64-pc-windows-msvc
           mkdir -p target/release
           cp target/x86_64-pc-windows-msvc/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
 
       - name: Run desktop Rust tests
-        run: cargo test --workspace
+        shell: bash
+        run: |
+          cargo_retry() {
+            for attempt in 1 2 3; do
+              "$@" && return 0
+              status=$?
+              echo "Cargo command failed with exit code $status (attempt $attempt/3)"
+              sleep $((attempt * 10))
+            done
+            return "$status"
+          }
+
+          cargo_retry cargo test --workspace
