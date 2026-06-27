@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(dead_code))]
+
 use crate::models::InstalledGame;
 use crate::settings;
 use serde::Serialize;
@@ -81,6 +83,18 @@ pub fn run_prefix_command(
     game_id: Option<&str>,
     store: Option<&str>,
 ) -> Result<Child, String> {
+    spawn_prefix_command(prefix, proton_path, exe, extra_args, game_id, store)
+        .map(|logged| logged.child)
+}
+
+fn spawn_prefix_command(
+    prefix: &Path,
+    proton_path: &str,
+    exe: &Path,
+    extra_args: &[String],
+    game_id: Option<&str>,
+    store: Option<&str>,
+) -> Result<crate::services::process_log::LoggedChild, String> {
     let umu_run = resolve_umu_run()?;
     let working_dir = exe.parent().unwrap_or_else(|| Path::new("."));
     let mut command = Command::new(umu_run);
@@ -92,11 +106,17 @@ pub fn run_prefix_command(
         .env("PROTONPATH", proton_path)
         .env("GAMEID", game_id.unwrap_or("umu-default"))
         .env("STORE", store.unwrap_or("none"))
+        .env("UMU_LOG", "debug")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
-    command.spawn().map_err(|err| {
+    log::info!(
+        "[umu] starting {} with prefix {} and Proton {proton_path}",
+        exe.display(),
+        prefix.display()
+    );
+    crate::services::process_log::spawn_logged_child(command, "umu").map_err(|err| {
         format!(
             "Failed to start UMU for {} with prefix {}: {err}",
             exe.display(),
@@ -112,21 +132,22 @@ pub fn run_prefix_command_wait(
     extra_args: &[String],
     cancelled: impl Fn() -> bool,
 ) -> Result<(), String> {
-    let mut child = run_prefix_command(prefix, proton_path, exe, extra_args, None, None)?;
+    let mut process = spawn_prefix_command(prefix, proton_path, exe, extra_args, None, None)?;
 
     loop {
         if cancelled() {
-            let _ = child.kill();
-            let _ = child.wait();
+            let _ = process.child.kill();
+            let _ = process.child.wait();
             return Err("Install cancelled.".to_string());
         }
 
-        match child.try_wait() {
+        match process.child.try_wait() {
             Ok(Some(status)) if status.success() => return Ok(()),
             Ok(Some(status)) => {
                 return Err(format!(
-                    "UMU exited with status {status} while running {}.",
-                    exe.display()
+                    "UMU exited with status {status} while running {}.\n{}",
+                    exe.display(),
+                    crate::services::process_log::format_log_tail("UMU", &process.log_tail)
                 ));
             }
             Ok(None) => thread::sleep(Duration::from_millis(250)),
@@ -151,30 +172,37 @@ pub fn prepare_prefix(
         .env("PROTONPATH", proton_path)
         .env("GAMEID", "umu-default")
         .env("STORE", "none")
+        .env("UMU_LOG", "debug")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
-    let mut child = command.spawn().map_err(|err| {
-        format!(
-            "Failed to prepare UMU prefix {} with Proton {proton_path}: {err}",
-            prefix.display()
-        )
-    })?;
+    log::info!(
+        "[umu] preparing prefix {} with Proton {proton_path}",
+        prefix.display()
+    );
+    let mut process =
+        crate::services::process_log::spawn_logged_child(command, "umu").map_err(|err| {
+            format!(
+                "Failed to prepare UMU prefix {} with Proton {proton_path}: {err}",
+                prefix.display()
+            )
+        })?;
 
     loop {
         if cancelled() {
-            let _ = child.kill();
-            let _ = child.wait();
+            let _ = process.child.kill();
+            let _ = process.child.wait();
             return Err("Install cancelled.".to_string());
         }
 
-        match child.try_wait() {
+        match process.child.try_wait() {
             Ok(Some(status)) if status.success() => return Ok(()),
             Ok(Some(status)) => {
                 return Err(format!(
-                    "UMU exited with status {status} while preparing prefix {}.",
-                    prefix.display()
+                    "UMU exited with status {status} while preparing prefix {}.\n{}",
+                    prefix.display(),
+                    crate::services::process_log::format_log_tail("UMU", &process.log_tail)
                 ));
             }
             Ok(None) => thread::sleep(Duration::from_millis(250)),

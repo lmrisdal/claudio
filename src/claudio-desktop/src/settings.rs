@@ -254,7 +254,7 @@ pub fn default_proton_path() -> String {
     "UMU-Latest".to_string()
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 pub fn resolve_proton_path(settings: &DesktopSettings) -> String {
     settings
         .default_proton_path
