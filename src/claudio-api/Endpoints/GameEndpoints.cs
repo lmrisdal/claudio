@@ -14,8 +14,10 @@ namespace Claudio.Api.Endpoints;
 
 public static class GameEndpoints
 {
-    private const int DownloadBufferSize = 1024 * 1024;
+    private const int DownloadBufferSize = 256 * 1024;
     private const string BytesUnit = "bytes";
+    private const long DownloadProgressLogIntervalBytes = 64L * 1024 * 1024;
+    private static readonly TimeSpan DownloadChunkTimeout = TimeSpan.FromSeconds(30);
 
     public static RouteGroupBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
@@ -414,6 +416,9 @@ public static class GameEndpoints
     {
         public async Task ExecuteAsync(HttpContext httpContext)
         {
+            var logger = httpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger("GameDownload");
             var fileInfo = new FileInfo(path);
             if (!fileInfo.Exists)
             {
@@ -441,6 +446,7 @@ public static class GameEndpoints
             httpContext.Response.ContentType = contentType;
             httpContext.Response.ContentLength = contentLength;
             httpContext.Response.Headers.AcceptRanges = BytesUnit;
+            httpContext.Response.Headers.Connection = "close";
             httpContext.Response.Headers.LastModified = fileInfo.LastWriteTimeUtc.ToString("R", CultureInfo.InvariantCulture);
 
             if (range.Requested)
@@ -452,35 +458,102 @@ public static class GameEndpoints
             if (HttpMethods.IsHead(httpContext.Request.Method) || contentLength == 0)
                 return;
 
-            await using var stream = new FileStream(path, new FileStreamOptions
+            try
             {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.Read,
-                BufferSize = DownloadBufferSize,
-                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
-            });
+                logger.LogInformation(
+                    "Download started: {Path} ({Start}-{End}/{Length})",
+                    path,
+                    start,
+                    end,
+                    length);
+                httpContext.Response.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>()?.DisableBuffering();
 
-            stream.Seek(start, SeekOrigin.Begin);
-            await CopyExactBytesAsync(stream, httpContext.Response.Body, contentLength, httpContext.RequestAborted);
+                await using var stream = new FileStream(path, new FileStreamOptions
+                {
+                    Mode = FileMode.Open,
+                    Access = FileAccess.Read,
+                    Share = FileShare.Read,
+                    BufferSize = DownloadBufferSize,
+                    Options = FileOptions.Asynchronous | FileOptions.RandomAccess,
+                });
+
+                stream.Seek(start, SeekOrigin.Begin);
+                var copied = await CopyExactBytesAsync(
+                    stream,
+                    httpContext.Response.Body,
+                    contentLength,
+                    httpContext.RequestAborted,
+                    bytesCopied => logger.LogInformation(
+                        "Download progress: {Path} {BytesCopied}/{ContentLength} bytes",
+                        path,
+                        bytesCopied,
+                        contentLength));
+
+                logger.LogInformation(
+                    "Download finished: {Path} {BytesCopied}/{ContentLength} bytes",
+                    path,
+                    copied,
+                    contentLength);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation("Download cancelled by client: {Path}", path);
+            }
+            catch (IOException ex)
+            {
+                logger.LogWarning(ex, "Download failed due to I/O error: {Path}", path);
+            }
+            catch (TimeoutException ex)
+            {
+                logger.LogWarning(ex, "Download timed out due to no read/write progress: {Path}", path);
+                httpContext.Abort();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Download failed unexpectedly: {Path}", path);
+                if (!httpContext.Response.HasStarted)
+                    httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            }
         }
 
-        private static async Task CopyExactBytesAsync(Stream source, Stream destination, long bytesToCopy, CancellationToken cancellationToken)
+        private static async Task<long> CopyExactBytesAsync(
+            Stream source,
+            Stream destination,
+            long bytesToCopy,
+            CancellationToken cancellationToken,
+            Action<long> onProgress)
         {
             var buffer = ArrayPool<byte>.Shared.Rent(DownloadBufferSize);
             try
             {
                 var remaining = bytesToCopy;
+                var copied = 0L;
+                var nextProgressAt = Math.Min(DownloadProgressLogIntervalBytes, bytesToCopy);
                 while (remaining > 0)
                 {
                     var readSize = (int)Math.Min(buffer.Length, remaining);
-                    var read = await source.ReadAsync(buffer.AsMemory(0, readSize), cancellationToken);
+                    var read = await source
+                        .ReadAsync(buffer.AsMemory(0, readSize), cancellationToken)
+                        .AsTask()
+                        .WaitAsync(DownloadChunkTimeout, cancellationToken);
                     if (read == 0)
                         break;
 
-                    await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    await destination
+                        .WriteAsync(buffer.AsMemory(0, read), cancellationToken)
+                        .AsTask()
+                        .WaitAsync(DownloadChunkTimeout, cancellationToken);
                     remaining -= read;
+                    copied += read;
+
+                    if (copied >= nextProgressAt && copied < bytesToCopy)
+                    {
+                        onProgress(copied);
+                        nextProgressAt += DownloadProgressLogIntervalBytes;
+                    }
                 }
+
+                return copied;
             }
             finally
             {
