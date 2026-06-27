@@ -1,5 +1,7 @@
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Buffers;
+using System.Globalization;
 using System.Text;
 using Claudio.Api.Data;
 using Claudio.Api.Services;
@@ -12,6 +14,9 @@ namespace Claudio.Api.Endpoints;
 
 public static class GameEndpoints
 {
+    private const int DownloadBufferSize = 1024 * 1024;
+    private const string BytesUnit = "bytes";
+
     public static RouteGroupBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/games")
@@ -153,11 +158,10 @@ public static class GameEndpoints
             var ext = System.IO.Path.GetExtension(game.FolderPath).ToLowerInvariant();
             var contentType = ext == ".zip" ? "application/zip" : ext == ".iso" ? "application/x-iso9660-image" : "application/x-tar";
             var fileName = $"{game.Title}{ext}";
-            return Results.File(
+            return StreamPhysicalFile(
                 game.FolderPath,
-                contentType: contentType,
-                fileDownloadName: fileName,
-                enableRangeProcessing: true);
+                contentType,
+                fileName);
         }
 
         // If the folder contains a single archive, serve it directly
@@ -167,21 +171,19 @@ public static class GameEndpoints
             var ext = System.IO.Path.GetExtension(singleArchive).ToLowerInvariant();
             var contentType = ext == ".zip" ? "application/zip" : "application/x-tar";
             var fileName = ext == ".zip" ? $"{game.Title}.zip" : $"{game.Title}.tar";
-            return Results.File(
+            return StreamPhysicalFile(
                 singleArchive,
-                contentType: contentType,
-                fileDownloadName: fileName,
-                enableRangeProcessing: true);
+                contentType,
+                fileName);
         }
 
         // Create tar on the fly and serve it
         var tarPath = await downloadService.CreateTarAsync(game);
 
-        return Results.File(
+        return StreamPhysicalFile(
             tarPath,
-            contentType: "application/x-tar",
-            fileDownloadName: $"{game.Title}.tar",
-            enableRangeProcessing: true);
+            "application/x-tar",
+            $"{game.Title}.tar");
     }
 
     private static async Task<IResult> DownloadFile(
@@ -199,7 +201,7 @@ public static class GameEndpoints
         if (!TryResolveGameFilePath(game, normalizedPath, out var fullPath))
             return Results.NotFound();
 
-        return Results.File(fullPath, "application/octet-stream", enableRangeProcessing: true);
+        return StreamPhysicalFile(fullPath, "application/octet-stream");
     }
 
     private static List<DownloadFileManifestEntry>? BuildLooseFileManifest(Game game)
@@ -402,7 +404,145 @@ public static class GameEndpoints
         if (!TryResolveGameFilePath(game, normalizedPath, out var fullPath))
             return Results.NotFound();
 
-        return Results.File(fullPath, "application/octet-stream", enableRangeProcessing: true);
+        return StreamPhysicalFile(fullPath, "application/octet-stream");
+    }
+
+    private static IResult StreamPhysicalFile(string path, string contentType, string? fileDownloadName = null)
+        => new StreamingPhysicalFileResult(path, contentType, fileDownloadName);
+
+    private sealed class StreamingPhysicalFileResult(string path, string contentType, string? fileDownloadName) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            var fileInfo = new FileInfo(path);
+            if (!fileInfo.Exists)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var length = fileInfo.Length;
+            var rangeHeader = httpContext.Request.Headers.Range.ToString();
+            var range = ParseRange(rangeHeader, length);
+            if (range.Invalid)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status416RangeNotSatisfiable;
+                httpContext.Response.Headers.ContentRange = $"{BytesUnit} */{length}";
+                return;
+            }
+
+            var start = range.Start ?? 0;
+            var end = range.End ?? Math.Max(length - 1, 0);
+            var contentLength = length == 0 ? 0 : end - start + 1;
+
+            httpContext.Response.StatusCode = range.Requested
+                ? StatusCodes.Status206PartialContent
+                : StatusCodes.Status200OK;
+            httpContext.Response.ContentType = contentType;
+            httpContext.Response.ContentLength = contentLength;
+            httpContext.Response.Headers.AcceptRanges = BytesUnit;
+            httpContext.Response.Headers.LastModified = fileInfo.LastWriteTimeUtc.ToString("R", CultureInfo.InvariantCulture);
+
+            if (range.Requested)
+                httpContext.Response.Headers.ContentRange = $"{BytesUnit} {start}-{end}/{length}";
+
+            if (!string.IsNullOrWhiteSpace(fileDownloadName))
+                httpContext.Response.Headers.ContentDisposition = BuildContentDisposition(fileDownloadName);
+
+            if (HttpMethods.IsHead(httpContext.Request.Method) || contentLength == 0)
+                return;
+
+            await using var stream = new FileStream(path, new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                BufferSize = DownloadBufferSize,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+            });
+
+            stream.Seek(start, SeekOrigin.Begin);
+            await CopyExactBytesAsync(stream, httpContext.Response.Body, contentLength, httpContext.RequestAborted);
+        }
+
+        private static async Task CopyExactBytesAsync(Stream source, Stream destination, long bytesToCopy, CancellationToken cancellationToken)
+        {
+            var buffer = ArrayPool<byte>.Shared.Rent(DownloadBufferSize);
+            try
+            {
+                var remaining = bytesToCopy;
+                while (remaining > 0)
+                {
+                    var readSize = (int)Math.Min(buffer.Length, remaining);
+                    var read = await source.ReadAsync(buffer.AsMemory(0, readSize), cancellationToken);
+                    if (read == 0)
+                        break;
+
+                    await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    remaining -= read;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+
+        private static DownloadRange ParseRange(string rangeHeader, long length)
+        {
+            if (string.IsNullOrWhiteSpace(rangeHeader))
+                return DownloadRange.NotRequested;
+
+            if (!rangeHeader.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+                return DownloadRange.InvalidRange;
+
+            var rangeValue = rangeHeader["bytes=".Length..].Trim();
+            if (rangeValue.Contains(','))
+                return DownloadRange.InvalidRange;
+
+            var parts = rangeValue.Split('-', 2);
+            if (parts.Length != 2)
+                return DownloadRange.InvalidRange;
+
+            if (parts[0].Length == 0)
+            {
+                if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var suffixLength) || suffixLength <= 0)
+                    return DownloadRange.InvalidRange;
+
+                if (length == 0)
+                    return DownloadRange.InvalidRange;
+
+                var suffixStart = Math.Max(length - suffixLength, 0);
+                return new DownloadRange(true, false, suffixStart, length - 1);
+            }
+
+            if (!long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var start) || start < 0)
+                return DownloadRange.InvalidRange;
+
+            var end = length - 1;
+            if (parts[1].Length > 0 &&
+                (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out end) || end < start))
+                return DownloadRange.InvalidRange;
+
+            if (length == 0 || start >= length)
+                return DownloadRange.InvalidRange;
+
+            return new DownloadRange(true, false, start, Math.Min(end, length - 1));
+        }
+
+        private static string BuildContentDisposition(string fileName)
+        {
+            var asciiName = fileName
+                .Replace("\\", "_", StringComparison.Ordinal)
+                .Replace("\"", "_", StringComparison.Ordinal);
+            return $"attachment; filename=\"{asciiName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
+        }
+
+        private readonly record struct DownloadRange(bool Requested, bool Invalid, long? Start, long? End)
+        {
+            public static DownloadRange NotRequested { get; } = new(false, false, null, null);
+            public static DownloadRange InvalidRange { get; } = new(false, true, null, null);
+        }
     }
 
     private static EmulationInfoResponse BuildEmulationInfo(Game game)

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -278,6 +279,25 @@ public class GameEndpointTests : IAsyncDisposable
         var response = await client.GetAsync("/api/games/1/download");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task Download_StandaloneArchive_SupportsRangeRequests()
+    {
+        var archivePath = Path.Combine(_gamesDir, "pc", "doom.tar");
+        Directory.CreateDirectory(Path.GetDirectoryName(archivePath)!);
+        await File.WriteAllTextAsync(archivePath, "0123456789");
+
+        await SeedGameAsync("Doom", "pc", "doom.tar", archivePath);
+        var client = CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/games/1/download");
+        request.Headers.Range = new RangeHeaderValue(2, 5);
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.PartialContent);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Be("2345");
     }
 
     [Test]
