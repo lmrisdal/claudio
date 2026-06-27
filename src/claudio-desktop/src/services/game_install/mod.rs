@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+use crate::models::LinuxRuntimeBackend;
 use crate::models::{
     DownloadPackageInput, InstallProgress, InstallType, InstalledGame, RemoteGame,
 };
@@ -51,7 +53,8 @@ pub use api::{
     cancel_install, cleanup_failed_install, download_game_package, get_installed_game,
     install_game, list_game_executables, list_installed_games, open_install_folder,
     resolve_default_download_root_path, resolve_download_path, resolve_install_path,
-    restart_install_interactive, set_game_exe, uninstall_game, validate_install_target,
+    restart_install_interactive, retry_cached_install, set_game_exe, uninstall_game,
+    validate_install_target,
 };
 pub use state::InstallState;
 
@@ -66,7 +69,7 @@ use file_ops::{
     apply_scene_overrides, clear_existing_path, collect_matching_files, copy_dir_contents,
     move_visible_entries_into_dir, normalize_into_final_dir, sanitize_segment,
 };
-use install::{install_game_inner, urlencoding_encode};
+use install::{install_game_from_cached_package_inner, install_game_inner, urlencoding_encode};
 #[cfg(any(test, all(feature = "integration-tests", target_os = "windows")))]
 use installer_cleanup::cleanup_failed_installer_state;
 use installer_cleanup::{cleanup_directory, cleanup_partial_install_dir};

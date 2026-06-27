@@ -25,8 +25,6 @@ pub(crate) fn write_steam_shortcut(
     installed: &InstalledGame,
     umu_run: &Path,
 ) -> Result<(), String> {
-    let shortcut_path = steam_shortcuts_path()
-        .ok_or_else(|| "No Steam userdata folder was found for shortcut creation.".to_string())?;
     let exe = installed
         .game_exe
         .as_deref()
@@ -35,13 +33,36 @@ pub(crate) fn write_steam_shortcut(
         .wine_prefix
         .as_deref()
         .ok_or_else(|| "No Wine prefix is set.".to_string())?;
+    let proton = installed.proton_path.as_deref().unwrap_or("UMU-Latest");
+    write_steam_shortcut_command(
+        installed,
+        "\"/usr/bin/env\"".to_string(),
+        format!(
+            "WINEPREFIX={} PROTONPATH={} GAMEID=umu-default STORE=none {} {}",
+            steam_quote(prefix),
+            steam_quote(proton),
+            steam_quote_path(umu_run),
+            steam_quote(exe)
+        ),
+    )
+}
+
+pub(crate) fn write_steam_shortcut_command(
+    installed: &InstalledGame,
+    exe_command: String,
+    launch_options: String,
+) -> Result<(), String> {
+    let shortcut_path = steam_shortcuts_path()
+        .ok_or_else(|| "No Steam userdata folder was found for shortcut creation.".to_string())?;
+    let exe = installed
+        .game_exe
+        .as_deref()
+        .unwrap_or(installed.install_path.as_str());
     let start_dir = Path::new(exe)
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .to_string_lossy()
         .into_owned();
-    let proton = installed.proton_path.as_deref().unwrap_or("UMU-Latest");
-
     let mut root = load_shortcuts(&shortcut_path)?;
     let shortcuts = ensure_object(&mut root, "shortcuts");
     let entry_key = shortcuts
@@ -67,21 +88,11 @@ pub(crate) fn write_steam_shortcut(
     insert_string(&mut entry, "AppName", installed.title.clone());
     insert_i32(&mut entry, "Devkit", 0);
     insert_string(&mut entry, "DevkitGameID", String::new());
-    insert_string(&mut entry, "Exe", "\"/usr/bin/env\"".to_string());
+    insert_string(&mut entry, "Exe", exe_command);
     insert_string(&mut entry, "FlatpakAppID", String::new());
     insert_i32(&mut entry, "IsHidden", 0);
     insert_i32(&mut entry, "LastPlayTime", 0);
-    insert_string(
-        &mut entry,
-        "LaunchOptions",
-        format!(
-            "WINEPREFIX={} PROTONPATH={} GAMEID=umu-default STORE=none {} {}",
-            steam_quote(prefix),
-            steam_quote(proton),
-            steam_quote_path(umu_run),
-            steam_quote(exe)
-        ),
-    );
+    insert_string(&mut entry, "LaunchOptions", launch_options);
     insert_i32(&mut entry, "OpenVR", 0);
     insert_string(&mut entry, "ShortcutPath", String::new());
     insert_string(&mut entry, "StartDir", start_dir);

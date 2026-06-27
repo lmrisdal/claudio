@@ -1,9 +1,21 @@
-use crate::models::{DownloadPackageInput, InstalledGame, RemoteGame, RunningGameInfo};
+use crate::models::{
+    DownloadPackageInput, InstalledGame, LinuxRuntimeBackend, RemoteGame, RunningGameInfo,
+};
 use crate::services::game_install::{self, InstallState};
 use crate::services::game_runtime::{self, RunningGamesState};
 #[cfg(target_os = "linux")]
 use crate::services::linux_proton::ProtonVersionOption;
+use serde::Serialize;
 use tauri::{AppHandle, State};
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinuxRuntimeBackendOption {
+    pub label: String,
+    pub value: LinuxRuntimeBackend,
+    pub available: bool,
+    pub detail: Option<String>,
+}
 
 pub(crate) async fn list_installed_games_command() -> Result<Vec<InstalledGame>, String> {
     tokio::task::spawn_blocking(game_install::list_installed_games)
@@ -91,6 +103,40 @@ pub(crate) fn list_proton_versions_command() -> Vec<serde_json::Value> {
     Vec::new()
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) fn list_linux_runtime_backends_command() -> Vec<LinuxRuntimeBackendOption> {
+    let bottles_available = crate::services::linux_bottles::is_installed();
+    let umu_available = crate::services::linux_umu::is_installed();
+
+    vec![
+        LinuxRuntimeBackendOption {
+            label: "Bottles".to_string(),
+            value: LinuxRuntimeBackend::Bottles,
+            available: bottles_available,
+            detail: if bottles_available {
+                None
+            } else {
+                Some("Install Bottles or the Bottles Flatpak to use this backend.".to_string())
+            },
+        },
+        LinuxRuntimeBackendOption {
+            label: "UMU Launcher".to_string(),
+            value: LinuxRuntimeBackend::Umu,
+            available: umu_available,
+            detail: if umu_available {
+                None
+            } else {
+                Some("Install umu-launcher or place umu-run in Claudio's tools folder.".to_string())
+            },
+        },
+    ]
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn list_linux_runtime_backends_command() -> Vec<LinuxRuntimeBackendOption> {
+    Vec::new()
+}
+
 #[tauri::command]
 pub async fn install_game(
     app: AppHandle,
@@ -98,6 +144,15 @@ pub async fn install_game(
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
     game_install::install_game(app, state, game).await
+}
+
+#[tauri::command]
+pub async fn retry_cached_install(
+    app: AppHandle,
+    state: State<'_, InstallState>,
+    game: RemoteGame,
+) -> Result<InstalledGame, String> {
+    game_install::retry_cached_install(app, state, game).await
 }
 
 #[tauri::command]
@@ -204,4 +259,9 @@ pub fn resolve_download_path(game_title: String) -> String {
 #[tauri::command]
 pub fn list_proton_versions() -> serde_json::Value {
     serde_json::to_value(list_proton_versions_command()).unwrap_or_else(|_| serde_json::json!([]))
+}
+
+#[tauri::command]
+pub fn list_linux_runtime_backends() -> Vec<LinuxRuntimeBackendOption> {
+    list_linux_runtime_backends_command()
 }

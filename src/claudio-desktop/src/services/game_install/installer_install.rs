@@ -6,10 +6,19 @@ pub(super) async fn install_installer(
     target_dir: &Path,
     package_path: &Path,
     control: &InstallControl,
+    _allow_existing_runtime: bool,
 ) -> Result<InstalledGame, String> {
     #[cfg(target_os = "linux")]
     {
-        return install_installer_linux(app, game, target_dir, package_path, control).await;
+        return install_installer_linux(
+            app,
+            game,
+            target_dir,
+            package_path,
+            control,
+            _allow_existing_runtime,
+        )
+        .await;
     }
 
     if !cfg!(target_os = "windows") {
@@ -221,6 +230,8 @@ pub(super) async fn install_installer(
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
         wine_prefix: None,
+        linux_runtime_backend: None,
+        bottle_name: None,
         proton_path: None,
         installed_at: current_timestamp(),
         summary: game.summary.clone(),

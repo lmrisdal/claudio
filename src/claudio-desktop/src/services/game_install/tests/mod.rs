@@ -29,6 +29,8 @@ fn installed_game(remote_game_id: i32, title: &str, install_path: &Path) -> Inst
         install_path: install_path.to_string_lossy().into_owned(),
         game_exe: None,
         wine_prefix: None,
+        linux_runtime_backend: None,
+        bottle_name: None,
         proton_path: None,
         installed_at: "1".to_string(),
         summary: None,

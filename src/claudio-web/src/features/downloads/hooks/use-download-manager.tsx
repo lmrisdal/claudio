@@ -7,6 +7,7 @@ import {
   installGame,
   isDesktop,
   listenToInstallProgress,
+  retryCachedInstall,
   restartInstallInteractive,
   type DesktopInstallGameInput,
   type DownloadPackageInput,
@@ -412,7 +413,7 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
 
       try {
         if (existing.kind === "install") {
-          await installGame(existing.game);
+          await retryCachedInstall(existing.game);
           setActiveDownloads((previous) => {
             const next = new Map(previous);
             next.delete(gameId);

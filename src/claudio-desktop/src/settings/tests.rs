@@ -45,6 +45,7 @@ fn save_and_load_use_overridden_data_dir() {
             server_url: Some("https://example.com".to_string()),
             default_install_path: Some("/tmp/games".to_string()),
             default_download_path: Some("/tmp/downloads".to_string()),
+            default_linux_runtime_backend: Some(LinuxRuntimeBackend::Bottles),
             custom_headers: HashMap::from([
                 ("X-Test".to_string(), "ok".to_string()),
                 ("Authorization".to_string(), "allowed".to_string()),
@@ -61,6 +62,10 @@ fn save_and_load_use_overridden_data_dir() {
         assert_eq!(
             loaded.default_download_path.as_deref(),
             Some("/tmp/downloads")
+        );
+        assert_eq!(
+            loaded.default_linux_runtime_backend,
+            Some(LinuxRuntimeBackend::Bottles)
         );
         assert_eq!(
             loaded.custom_headers.get("X-Test").map(String::as_str),

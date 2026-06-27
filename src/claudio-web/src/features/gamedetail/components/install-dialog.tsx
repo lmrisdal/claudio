@@ -5,7 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../core/api/client";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isLinux, isWindows } from "../../core/utils/os";
-import { listProtonVersions } from "../../desktop/hooks/use-desktop";
+import {
+  listLinuxRuntimeBackends,
+  listProtonVersions,
+  type LinuxRuntimeBackend,
+} from "../../desktop/hooks/use-desktop";
 import ExeListbox from "./exe-listbox";
 
 /** Must match `INDIVIDUAL_FILE_THRESHOLD` in `game_install/download.rs`. */
@@ -21,12 +25,27 @@ interface DownloadFilesManifestResponse {
   files: { path: string; size: number }[] | null;
 }
 
+const DEFAULT_LINUX_RUNTIME_BACKEND: LinuxRuntimeBackend = "umu";
+
+function resolveAvailableRuntimeBackend(
+  preferred: LinuxRuntimeBackend | null | undefined,
+  options: { value: LinuxRuntimeBackend; available: boolean }[],
+): LinuxRuntimeBackend {
+  const available = options.filter((option) => option.available);
+  if (preferred && available.some((option) => option.value === preferred)) {
+    return preferred;
+  }
+
+  return available[0]?.value ?? preferred ?? DEFAULT_LINUX_RUNTIME_BACKEND;
+}
+
 interface InstallDialogProperties {
   open: boolean;
   gameId: number;
   title: string;
   defaultPath: string;
   defaultProtonPath?: string;
+  defaultLinuxRuntimeBackend?: LinuxRuntimeBackend | null;
   isPortable?: boolean;
   exeLabel?: string;
   exeOptions?: string[];
@@ -38,6 +57,7 @@ interface InstallDialogProperties {
   onConfirm: (
     path: string | undefined,
     exe?: string,
+    linuxRuntimeBackend?: LinuxRuntimeBackend,
     protonPath?: string,
     desktopShortcut?: boolean,
     appMenuShortcut?: boolean,
@@ -54,6 +74,7 @@ export default function InstallDialog({
   title,
   defaultPath,
   defaultProtonPath = "UMU-Latest",
+  defaultLinuxRuntimeBackend,
   isPortable = false,
   exeLabel,
   exeOptions = [],
@@ -76,6 +97,9 @@ export default function InstallDialog({
   const [desktopShortcut, setDesktopShortcut] = useState(true);
   const [appMenuShortcut, setAppMenuShortcut] = useState(true);
   const [steamShortcut, setSteamShortcut] = useState(false);
+  const [linuxRuntimeBackend, setLinuxRuntimeBackend] = useState<LinuxRuntimeBackend>(
+    defaultLinuxRuntimeBackend ?? DEFAULT_LINUX_RUNTIME_BACKEND,
+  );
   const [protonPath, setProtonPath] = useState(defaultProtonPath);
   const [runAsAdministratorOverrides, setRunAsAdministratorOverrides] = useState<
     Record<string, boolean>
@@ -107,6 +131,11 @@ export default function InstallDialog({
   const { data: protonOptions = [] } = useQuery({
     queryKey: ["protonVersions"],
     queryFn: listProtonVersions,
+    enabled: open && !downloadMode && isLinux,
+  });
+  const { data: linuxRuntimeOptions = [] } = useQuery({
+    queryKey: ["linuxRuntimeBackends"],
+    queryFn: listLinuxRuntimeBackends,
     enabled: open && !downloadMode && isLinux,
   });
 
@@ -146,6 +175,13 @@ export default function InstallDialog({
     }
   }, [open, defaultProtonPath]);
   useEffect(() => {
+    if (open && !downloadMode && isLinux) {
+      setLinuxRuntimeBackend(
+        resolveAvailableRuntimeBackend(defaultLinuxRuntimeBackend, linuxRuntimeOptions),
+      );
+    }
+  }, [open, downloadMode, defaultLinuxRuntimeBackend, linuxRuntimeOptions]);
+  useEffect(() => {
     if (
       open &&
       protonOptions.length > 0 &&
@@ -163,6 +199,21 @@ export default function InstallDialog({
     : (runAsAdministratorOverrides[effectiveInstallerKey] ??
       installerInspection?.requestsElevation ??
       false);
+  const selectedRuntimeOption = linuxRuntimeOptions.find(
+    (option) => option.value === linuxRuntimeBackend,
+  );
+  const visibleLinuxRuntimeOptions =
+    linuxRuntimeOptions.length > 0
+      ? linuxRuntimeOptions
+      : [
+          {
+            label: "Checking runtimes...",
+            value: linuxRuntimeBackend,
+            available: false,
+            detail: null,
+          },
+        ];
+  const canUseLinuxRuntime = downloadMode || !isLinux || selectedRuntimeOption?.available === true;
 
   async function handleBrowse() {
     try {
@@ -285,28 +336,63 @@ export default function InstallDialog({
               {!downloadMode && isLinux && (
                 <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-raised/45 p-3">
                   <div>
-                    <label
-                      htmlFor="install-proton-version"
-                      className="mb-1.5 block text-sm font-medium text-text-primary"
-                    >
-                      Proton version
-                    </label>
-                    <select
-                      id="install-proton-version"
-                      value={protonPath}
-                      onChange={(event) => setProtonPath(event.target.value)}
-                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-focus-ring"
-                    >
-                      {(protonOptions.length > 0
-                        ? protonOptions
-                        : [{ label: "UMU Latest", value: "UMU-Latest" }]
-                      ).map((option) => (
-                        <option key={option.value} value={option.value}>
+                    <span className="mb-1.5 block text-sm font-medium text-text-primary">
+                      Linux runtime
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {visibleLinuxRuntimeOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setLinuxRuntimeBackend(option.value)}
+                          disabled={!option.available}
+                          title={option.detail ?? option.label}
+                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-focus-ring ${
+                            linuxRuntimeBackend === option.value
+                              ? "border-accent bg-accent/15 text-accent"
+                              : "border-border bg-bg text-text-secondary hover:text-text-primary"
+                          } ${
+                            option.available
+                              ? ""
+                              : "cursor-not-allowed border-border/70 text-text-muted opacity-60 hover:text-text-muted"
+                          }`}
+                        >
                           {option.label}
-                        </option>
+                        </button>
                       ))}
-                    </select>
+                    </div>
+                    {selectedRuntimeOption?.available === false && selectedRuntimeOption.detail && (
+                      <p className="mt-1.5 text-xs text-text-muted">
+                        {selectedRuntimeOption.detail}
+                      </p>
+                    )}
                   </div>
+
+                  {linuxRuntimeBackend === "umu" && (
+                    <div>
+                      <label
+                        htmlFor="install-proton-version"
+                        className="mb-1.5 block text-sm font-medium text-text-primary"
+                      >
+                        Proton version
+                      </label>
+                      <select
+                        id="install-proton-version"
+                        value={protonPath}
+                        onChange={(event) => setProtonPath(event.target.value)}
+                        className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                      >
+                        {(protonOptions.length > 0
+                          ? protonOptions
+                          : [{ label: "UMU Latest", value: "UMU-Latest" }]
+                        ).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="grid gap-2 sm:grid-cols-3">
                     <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
@@ -436,7 +522,10 @@ export default function InstallDialog({
                 void onConfirm(
                   installPath || undefined,
                   exe || undefined,
-                  downloadMode || !isLinux ? undefined : protonPath,
+                  downloadMode || !isLinux ? undefined : linuxRuntimeBackend,
+                  downloadMode || !isLinux || linuxRuntimeBackend !== "umu"
+                    ? undefined
+                    : protonPath,
                   downloadMode || (!isLinux && !isPortable) ? undefined : desktopShortcut,
                   downloadMode || !isLinux ? undefined : appMenuShortcut,
                   downloadMode || !isLinux ? undefined : steamShortcut,
@@ -445,7 +534,7 @@ export default function InstallDialog({
                   downloadMode ? (showExtractOption ? extract : false) : undefined,
                 )
               }
-              disabled={downloadMode ? false : !canInstall}
+              disabled={downloadMode ? false : !canInstall || !canUseLinuxRuntime}
               className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
               {downloadMode ? "Download" : "Install"}

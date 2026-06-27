@@ -15,6 +15,7 @@ import {
   uninstallGame,
   validateInstallTarget,
   type InstalledGame,
+  type LinuxRuntimeBackend,
   type RunningGame,
 } from "../../desktop/hooks/use-desktop";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
@@ -70,6 +71,8 @@ export default function GameDetailActions({
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
   const [defaultInstallPath, setDefaultInstallPath] = useState("");
   const [defaultProtonPath, setDefaultProtonPath] = useState("UMU-Latest");
+  const [defaultLinuxRuntimeBackend, setDefaultLinuxRuntimeBackend] =
+    useState<LinuxRuntimeBackend | null>(null);
   const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
   const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(null);
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
@@ -96,6 +99,7 @@ export default function GameDetailActions({
         desktopShortcut?: boolean;
         appMenuShortcut?: boolean;
         steamShortcut?: boolean;
+        linuxRuntimeBackend?: "umu" | "bottles" | null;
         protonPath?: string | null;
         runAsAdministrator?: boolean;
         forceInteractive?: boolean;
@@ -112,6 +116,7 @@ export default function GameDetailActions({
         desktopShortcut: input.desktopShortcut,
         appMenuShortcut: input.appMenuShortcut,
         steamShortcut: input.steamShortcut,
+        linuxRuntimeBackend: input.linuxRuntimeBackend ?? null,
         protonPath: input.protonPath ?? null,
         runAsAdministrator: input.runAsAdministrator,
         forceInteractive: input.forceInteractive,
@@ -249,6 +254,7 @@ export default function GameDetailActions({
       ]);
       setDefaultInstallPath(fullPath);
       setDefaultProtonPath(settings.defaultProtonPath ?? "UMU-Latest");
+      setDefaultLinuxRuntimeBackend(settings.defaultLinuxRuntimeBackend ?? null);
       setShowInstallConfirm(true);
     } catch (error) {
       setInstallError(
@@ -630,6 +636,7 @@ export default function GameDetailActions({
         title={displayGame.title}
         defaultPath={defaultInstallPath}
         defaultProtonPath={defaultProtonPath}
+        defaultLinuxRuntimeBackend={defaultLinuxRuntimeBackend}
         isPortable={displayGame.installType === "portable"}
         exeLabel={installExeLabel}
         exeOptions={exeList ?? []}
@@ -646,6 +653,7 @@ export default function GameDetailActions({
         onConfirm={async (
           path,
           exe,
+          linuxRuntimeBackend,
           protonPath,
           desktopShortcut,
           appMenuShortcut,
@@ -691,6 +699,7 @@ export default function GameDetailActions({
             desktopShortcut,
             appMenuShortcut,
             steamShortcut,
+            linuxRuntimeBackend: linuxRuntimeBackend ?? null,
             protonPath: protonPath ?? null,
             runAsAdministrator,
             forceInteractive,

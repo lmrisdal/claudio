@@ -1,15 +1,34 @@
 use super::*;
+use serde::{Deserialize, Serialize};
 
 pub(super) async fn install_game_inner(
     app: &AppHandle,
     game: RemoteGame,
     control: &InstallControl,
 ) -> Result<InstalledGame, String> {
+    install_game_inner_with_options(app, game, control, false).await
+}
+
+pub(super) async fn install_game_from_cached_package_inner(
+    app: &AppHandle,
+    game: RemoteGame,
+    control: &InstallControl,
+) -> Result<InstalledGame, String> {
+    install_game_inner_with_options(app, game, control, true).await
+}
+
+async fn install_game_inner_with_options(
+    app: &AppHandle,
+    game: RemoteGame,
+    control: &InstallControl,
+    reuse_cached_package: bool,
+) -> Result<InstalledGame, String> {
     log::info!(
-        "Starting install for '{}' (id={}, install_type={:?})",
+        "Starting install for '{}' (id={}, install_type={:?}, reuse_cached_package={})",
         game.title,
         game.id,
-        game.install_type
+        game.install_type,
+        reuse_cached_package
     );
     emit_progress(
         app,
@@ -20,11 +39,6 @@ pub(super) async fn install_game_inner(
     );
 
     let settings = settings::load();
-    let server_url = settings
-        .server_url
-        .clone()
-        .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
-
     let target_dir = match game.install_path.as_deref() {
         Some(path) => PathBuf::from(path),
         None => {
@@ -34,58 +48,114 @@ pub(super) async fn install_game_inner(
     };
     log::info!("Install target: {}", target_dir.display());
 
+    #[cfg(target_os = "linux")]
+    let linux_runtime_backend = selected_linux_runtime_backend(&game)?;
+    #[cfg(target_os = "linux")]
+    let is_bottles_installer = linux_runtime_backend == LinuxRuntimeBackend::Bottles
+        && matches!(game.install_type, InstallType::Installer);
+
     if target_dir.exists() {
-        return Err(format!(
-            "Install target already exists: {}",
-            target_dir.display()
-        ));
+        if reuse_cached_package && matches!(game.install_type, InstallType::Portable) {
+            fs::remove_dir_all(&target_dir).map_err(|err| {
+                log_io_failure("remove failed portable install target", &target_dir, &err);
+                format_install_io_error("clean the failed install target", &target_dir, &err)
+            })?;
+        } else if !reuse_cached_package {
+            #[cfg(target_os = "linux")]
+            if is_bottles_installer {
+                // Bottles owns the actual prefix for installer installs; the selected
+                // Claudio target is kept only as the user's intent from the install dialog.
+            } else {
+                return Err(format!(
+                    "Install target already exists: {}",
+                    target_dir.display()
+                ));
+            }
+            #[cfg(not(target_os = "linux"))]
+            return Err(format!(
+                "Install target already exists: {}",
+                target_dir.display()
+            ));
+        }
     }
 
-    validate_install_target_path(&target_dir)?;
+    if !target_dir.exists() {
+        validate_install_target_path(&target_dir)?;
+    }
 
     let downloads_root = settings::resolve_download_root(&settings)?;
     let temp_root = install_download_root(&downloads_root, &game);
-    if temp_root.exists() {
-        fs::remove_dir_all(&temp_root).map_err(|err| {
-            log_io_failure("remove stale install download directory", &temp_root, &err);
-            format_install_io_error("clean the temporary download directory", &temp_root, &err)
+    let download_info = if reuse_cached_package {
+        emit_progress(
+            app,
+            game.id,
+            "starting",
+            Some(0.0),
+            Some("Reusing downloaded package"),
+        );
+        read_cached_download_info(&temp_root)?
+    } else {
+        if temp_root.exists() {
+            fs::remove_dir_all(&temp_root).map_err(|err| {
+                log_io_failure("remove stale install download directory", &temp_root, &err);
+                format_install_io_error("clean the temporary download directory", &temp_root, &err)
+            })?;
+        }
+        fs::create_dir_all(&temp_root).map_err(|err| {
+            log_io_failure("create install download directory", &temp_root, &err);
+            format_install_io_error("create the temporary download directory", &temp_root, &err)
         })?;
-    }
-    fs::create_dir_all(&temp_root).map_err(|err| {
-        log_io_failure("create install download directory", &temp_root, &err);
-        format_install_io_error("create the temporary download directory", &temp_root, &err)
-    })?;
+        let server_url = settings
+            .server_url
+            .clone()
+            .ok_or_else(|| "Desktop server URL is not configured.".to_string())?;
 
-    let download_info = download_package(
-        app,
-        &DownloadOptions {
-            server_url: &server_url,
-            custom_headers: &settings.custom_headers,
-            speed_limit_kbs: settings.download_speed_limit_kbs,
-            progress_scale: 60.0,
-        },
-        game.id,
-        game.title.as_str(),
-        &temp_root,
-        control,
-    )
-    .await?;
-    log::info!("Download complete: {}", download_info.file_path.display());
+        let download_info = download_package(
+            app,
+            &DownloadOptions {
+                server_url: &server_url,
+                custom_headers: &settings.custom_headers,
+                speed_limit_kbs: settings.download_speed_limit_kbs,
+                progress_scale: 60.0,
+            },
+            game.id,
+            game.title.as_str(),
+            &temp_root,
+            control,
+        )
+        .await?;
+        write_cached_download_info(&temp_root, &download_info)?;
+        log::info!("Download complete: {}", download_info.file_path.display());
+        download_info
+    };
 
     let install_result = match game.install_type {
         InstallType::Portable => {
-            install_portable(app, &game, &target_dir, &download_info.file_path, control).await
+            install_portable(
+                app,
+                &game,
+                &target_dir,
+                &download_info.file_path,
+                control,
+                reuse_cached_package,
+            )
+            .await
         }
         InstallType::Installer => {
-            install_installer(app, &game, &target_dir, &download_info.file_path, control).await
+            install_installer(
+                app,
+                &game,
+                &target_dir,
+                &download_info.file_path,
+                control,
+                reuse_cached_package,
+            )
+            .await
         }
     };
 
     if let Err(ref err) = install_result {
         log::error!("Install failed for '{}': {}", game.title, err);
-        if !matches!(game.install_type, InstallType::Installer) {
-            let _ = fs::remove_dir_all(&temp_root);
-        }
     }
 
     let installed = install_result?;
@@ -94,7 +164,7 @@ pub(super) async fn install_game_inner(
     #[cfg(target_os = "windows")]
     crate::windows_integration::register(app, &installed, game.desktop_shortcut.unwrap_or(false));
     #[cfg(target_os = "linux")]
-    crate::services::linux_umu::sync_shortcuts(
+    sync_linux_shortcuts(
         &installed,
         game.desktop_shortcut.unwrap_or(false),
         game.app_menu_shortcut.unwrap_or(false),
@@ -115,6 +185,86 @@ pub(super) async fn install_game_inner(
         Some("Install complete"),
     );
     Ok(installed)
+}
+
+#[cfg(target_os = "linux")]
+fn sync_linux_shortcuts(
+    installed: &InstalledGame,
+    desktop_shortcut: bool,
+    app_menu_shortcut: bool,
+    steam_shortcut: bool,
+) {
+    match installed.linux_runtime_backend {
+        Some(LinuxRuntimeBackend::Bottles) => crate::services::linux_bottles::sync_shortcuts(
+            installed,
+            desktop_shortcut,
+            app_menu_shortcut,
+            steam_shortcut,
+        ),
+        _ => crate::services::linux_umu::sync_shortcuts(
+            installed,
+            desktop_shortcut,
+            app_menu_shortcut,
+            steam_shortcut,
+        ),
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CachedDownloadInfo {
+    file_path: String,
+    is_individual: bool,
+}
+
+fn cached_download_marker_path(temp_root: &Path) -> PathBuf {
+    temp_root.join(".claudio-download-complete.json")
+}
+
+fn write_cached_download_info(
+    temp_root: &Path,
+    download_info: &DownloadInfo,
+) -> Result<(), String> {
+    let marker = CachedDownloadInfo {
+        file_path: download_info.file_path.to_string_lossy().into_owned(),
+        is_individual: download_info.is_individual,
+    };
+    let json = serde_json::to_string_pretty(&marker).map_err(|err| err.to_string())?;
+    fs::write(cached_download_marker_path(temp_root), json).map_err(|err| {
+        log_io_failure("write cached install download marker", temp_root, &err);
+        format_install_io_error("remember the completed download for retry", temp_root, &err)
+    })
+}
+
+fn read_cached_download_info(temp_root: &Path) -> Result<DownloadInfo, String> {
+    let marker_path = cached_download_marker_path(temp_root);
+    let contents = fs::read_to_string(&marker_path).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            return "The downloaded package is no longer available. Start the install again to download it.".to_string();
+        }
+        format!(
+            "Failed to read cached download marker {}: {err}",
+            marker_path.display()
+        )
+    })?;
+    let marker: CachedDownloadInfo = serde_json::from_str(&contents).map_err(|err| {
+        format!(
+            "Cached download marker {} is invalid: {err}",
+            marker_path.display()
+        )
+    })?;
+    let file_path = PathBuf::from(marker.file_path);
+    if !file_path.exists() {
+        return Err(format!(
+            "The downloaded package is no longer available at {}. Start the install again to download it.",
+            file_path.display()
+        ));
+    }
+
+    Ok(DownloadInfo {
+        file_path,
+        is_individual: marker.is_individual,
+    })
 }
 
 pub(super) fn urlencoding_encode(input: &str) -> String {
@@ -149,6 +299,7 @@ pub(super) async fn install_portable(
     target_dir: &Path,
     package_path: &Path,
     control: &InstallControl,
+    _allow_existing_runtime: bool,
 ) -> Result<InstalledGame, String> {
     emit_progress(
         app,
@@ -225,36 +376,11 @@ pub(super) async fn install_portable(
     .map_err(|err| format!("Extract task failed: {err}"))??;
 
     #[cfg(target_os = "linux")]
-    let (wine_prefix, proton_path) = {
-        let prefix = crate::services::linux_umu::default_prefix_path(game.id, &game.title);
-        let proton_path =
-            crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
-        let control = control.clone();
-        let prefix_for_task = prefix.clone();
-        let proton_for_task = proton_path.clone();
-        emit_progress_indeterminate(
-            app,
-            game.id,
-            "preparing-prefix",
-            Some(97.0),
-            Some("Preparing Proton prefix..."),
-            true,
-        );
-        tokio::task::spawn_blocking(move || {
-            crate::services::linux_umu::prepare_prefix(&prefix_for_task, &proton_for_task, || {
-                control.is_cancelled()
-            })
-        })
-        .await
-        .map_err(|err| format!("Prefix setup task failed: {err}"))??;
-        (
-            Some(prefix.to_string_lossy().into_owned()),
-            Some(proton_path),
-        )
-    };
+    let (wine_prefix, linux_runtime_backend, bottle_name, proton_path) =
+        prepare_linux_runtime(app, game, control, _allow_existing_runtime).await?;
 
     #[cfg(not(target_os = "linux"))]
-    let (wine_prefix, proton_path) = (None, None);
+    let (wine_prefix, linux_runtime_backend, bottle_name, proton_path) = (None, None, None, None);
 
     Ok(InstalledGame {
         remote_game_id: game.id,
@@ -264,6 +390,8 @@ pub(super) async fn install_portable(
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
         wine_prefix,
+        linux_runtime_backend,
+        bottle_name,
         proton_path,
         installed_at: current_timestamp(),
         summary: game.summary.clone(),
@@ -278,4 +406,140 @@ pub(super) async fn install_portable(
         franchise: game.franchise.clone(),
         game_engine: game.game_engine.clone(),
     })
+}
+
+#[cfg(target_os = "linux")]
+async fn prepare_linux_runtime(
+    app: &AppHandle,
+    game: &RemoteGame,
+    control: &InstallControl,
+    allow_existing_runtime: bool,
+) -> Result<
+    (
+        Option<String>,
+        Option<LinuxRuntimeBackend>,
+        Option<String>,
+        Option<String>,
+    ),
+    String,
+> {
+    match selected_linux_runtime_backend(game)? {
+        LinuxRuntimeBackend::Umu => {
+            let prefix = crate::services::linux_umu::default_prefix_path(game.id, &game.title);
+            let proton_path =
+                crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
+            let control = control.clone();
+            let prefix_for_task = prefix.clone();
+            let proton_for_task = proton_path.clone();
+            emit_progress_indeterminate(
+                app,
+                game.id,
+                "preparing-prefix",
+                Some(97.0),
+                Some("Preparing Proton prefix..."),
+                true,
+            );
+            tokio::task::spawn_blocking(move || {
+                crate::services::linux_umu::prepare_prefix(
+                    &prefix_for_task,
+                    &proton_for_task,
+                    || control.is_cancelled(),
+                )
+            })
+            .await
+            .map_err(|err| format!("Prefix setup task failed: {err}"))??;
+            Ok((
+                Some(prefix.to_string_lossy().into_owned()),
+                Some(LinuxRuntimeBackend::Umu),
+                None,
+                Some(proton_path),
+            ))
+        }
+        LinuxRuntimeBackend::Bottles => {
+            let bottle_name =
+                crate::services::linux_bottles::default_bottle_name(game.id, &game.title);
+            let control = control.clone();
+            let bottle_for_task = bottle_name.clone();
+            emit_progress_indeterminate(
+                app,
+                game.id,
+                "preparing-prefix",
+                Some(97.0),
+                Some("Preparing Bottles bottle..."),
+                true,
+            );
+            tokio::task::spawn_blocking(move || {
+                crate::services::linux_bottles::prepare_bottle(
+                    &bottle_for_task,
+                    allow_existing_runtime,
+                    || control.is_cancelled(),
+                )
+            })
+            .await
+            .map_err(|err| format!("Bottles setup task failed: {err}"))??;
+            Ok((
+                None,
+                Some(LinuxRuntimeBackend::Bottles),
+                Some(bottle_name),
+                None,
+            ))
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn selected_linux_runtime_backend(game: &RemoteGame) -> Result<LinuxRuntimeBackend, String> {
+    game.linux_runtime_backend.clone().ok_or_else(|| {
+        "Choose either Bottles or UMU Launcher as the Linux runtime backend.".to_string()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "claudio-install-{name}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn cached_download_info_round_trips_completed_package() {
+        let temp_root = unique_temp_dir("cache-round-trip");
+        fs::create_dir_all(&temp_root).expect("temp root should be created");
+        let package_path = temp_root.join("game.tar");
+        fs::write(&package_path, b"package").expect("package should be written");
+        let download_info = DownloadInfo {
+            file_path: package_path.clone(),
+            is_individual: false,
+        };
+
+        write_cached_download_info(&temp_root, &download_info)
+            .expect("cache marker should be written");
+        let cached = read_cached_download_info(&temp_root).expect("cache marker should load");
+
+        assert_eq!(cached.file_path, package_path);
+        let _ = fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn cached_download_info_fails_when_marker_is_missing() {
+        let temp_root = unique_temp_dir("cache-missing");
+        fs::create_dir_all(&temp_root).expect("temp root should be created");
+
+        let error = match read_cached_download_info(&temp_root) {
+            Ok(_) => panic!("missing marker should not be reusable"),
+            Err(error) => error,
+        };
+
+        assert!(error.contains("downloaded package is no longer available"));
+        let _ = fs::remove_dir_all(temp_root);
+    }
 }

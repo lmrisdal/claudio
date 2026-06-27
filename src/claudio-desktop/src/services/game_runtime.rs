@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+use crate::models::LinuxRuntimeBackend;
 use crate::models::RunningGameInfo;
 use crate::registry;
 use std::collections::HashMap;
@@ -89,6 +91,25 @@ pub fn launch_game(state: &RunningGamesState, remote_game_id: i32) -> Result<(),
     let exe = game
         .game_exe
         .ok_or_else(|| "No executable is set for this game.".to_string())?;
+
+    #[cfg(target_os = "linux")]
+    if game.linux_runtime_backend == Some(LinuxRuntimeBackend::Bottles) {
+        let bottle_name = game
+            .bottle_name
+            .as_deref()
+            .ok_or_else(|| "No Bottles bottle is set for this game.".to_string())?;
+        let child =
+            crate::services::linux_bottles::run_bottle_command(bottle_name, Path::new(&exe), &[])?;
+
+        state.upsert(RunningGameInfo {
+            game_id: remote_game_id,
+            pid: child.id(),
+            exe_path: exe,
+            started_at: current_timestamp(),
+        })?;
+
+        return Ok(());
+    }
 
     #[cfg(target_os = "linux")]
     if let Some(prefix) = game.wine_prefix.as_deref() {

@@ -100,6 +100,40 @@ export default function AppDownloadsSettingsTab({
         </select>
       </div>
 
+      {settings.linuxRuntimeOptions.length > 0 && (
+        <div>
+          <label
+            htmlFor="settings-linux-runtime"
+            className="mb-1.5 block text-sm font-medium text-text-secondary"
+          >
+            Default Linux runtime
+          </label>
+          <select
+            ref={(element) => setIndexedReference(contentRefs, 4, element)}
+            id="settings-linux-runtime"
+            value={settings.linuxRuntimeBackend}
+            onChange={(event) =>
+              settings.setLinuxRuntimeBackend(event.target.value as "umu" | "bottles")
+            }
+            onBlur={() => void settings.handleSave()}
+            className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
+          >
+            {settings.linuxRuntimeOptions.map((option) => (
+              <option key={option.value} value={option.value} disabled={!option.available}>
+                {option.available ? option.label : `${option.label} (not installed)`}
+              </option>
+            ))}
+          </select>
+          {settings.linuxRuntimeOptions
+            .filter((option) => !option.available && option.detail)
+            .map((option) => (
+              <p key={option.value} className="mt-1 text-xs text-text-muted">
+                {option.detail}
+              </p>
+            ))}
+        </div>
+      )}
+
       {settings.saveMessage && (
         <p className="text-sm text-red-400" role="alert">
           {settings.saveMessage}

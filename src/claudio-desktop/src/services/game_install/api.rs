@@ -27,6 +27,33 @@ pub async fn install_game(
     result
 }
 
+pub async fn retry_cached_install(
+    app: AppHandle,
+    state: State<'_, InstallState>,
+    game: RemoteGame,
+) -> Result<InstalledGame, String> {
+    let control = state.start(game.id)?;
+    let game_id = game.id;
+    let game_title = game.title.clone();
+    let result = install_game_from_cached_package_inner(&app, game, &control).await;
+    if let Err(error) = &result
+        && !control.is_cancelled()
+    {
+        emit_progress(
+            &app,
+            game_id,
+            "failed",
+            None,
+            Some(&format!("Retry failed for {game_title}: {error}")),
+        );
+    }
+    state.finish(game_id);
+    if control.is_cancelled() {
+        return Err("Install cancelled.".to_string());
+    }
+    result
+}
+
 pub async fn download_game_package(
     app: AppHandle,
     state: State<'_, InstallState>,
@@ -419,6 +446,14 @@ fn executable_search_roots(game: &InstalledGame) -> Vec<PathBuf> {
         if !drive_c.starts_with(&install_path) && !roots.iter().any(|root| root == &drive_c) {
             roots.push(drive_c);
         }
+    }
+    #[cfg(target_os = "linux")]
+    if let Some(bottle_name) = game.bottle_name.as_deref()
+        && let Ok(drive_c) = crate::services::linux_bottles::bottle_drive_c_path(bottle_name)
+        && !drive_c.starts_with(&install_path)
+        && !roots.iter().any(|root| root == &drive_c)
+    {
+        roots.push(drive_c);
     }
 
     roots

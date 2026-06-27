@@ -15,6 +15,10 @@ pub fn default_prefix_path(game_id: i32, title: &str) -> PathBuf {
         .join(format!("{game_id}-{}", sanitize_segment(title)))
 }
 
+pub fn is_installed() -> bool {
+    resolve_umu_run().is_ok()
+}
+
 pub fn run_prefix_command(
     prefix: &Path,
     proton_path: &str,
