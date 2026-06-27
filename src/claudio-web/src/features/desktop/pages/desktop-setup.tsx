@@ -66,9 +66,7 @@ export default function DesktopSetup({
       const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
       if (forbiddenHeaders.length > 0) {
         setTestResult("error");
-        setError(
-          `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
-        );
+        setError(`These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`);
         return;
       }
 
@@ -103,9 +101,7 @@ export default function DesktopSetup({
 
     const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
     if (forbiddenHeaders.length > 0) {
-      setError(
-        `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
-      );
+      setError(`These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`);
       return;
     }
 

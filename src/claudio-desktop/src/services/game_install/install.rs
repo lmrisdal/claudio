@@ -228,7 +228,7 @@ pub(super) async fn install_portable(
     let (wine_prefix, proton_path) = {
         let prefix = crate::services::linux_umu::default_prefix_path(game.id, &game.title);
         let proton_path =
-            crate::services::linux_umu::selected_proton_path(game.proton_path.as_deref());
+            crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
         let control = control.clone();
         let prefix_for_task = prefix.clone();
         let proton_for_task = proton_path.clone();

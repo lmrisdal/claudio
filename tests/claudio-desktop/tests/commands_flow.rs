@@ -55,10 +55,11 @@ async fn command_registry_flow_lists_gets_updates_uninstalls_and_resolves_instal
             .expect("command executable list should succeed");
         assert_eq!(executables, vec!["alt.exe", "game.exe"]);
 
+        let expected_alt_exe = install_dir.join("alt.exe").to_string_lossy().into_owned();
         let updated = command_set_game_exe(31, "alt.exe".to_string())
             .await
             .expect("command set game exe should succeed");
-        assert_eq!(updated.game_exe.as_deref(), Some("alt.exe"));
+        assert_eq!(updated.game_exe.as_deref(), Some(expected_alt_exe.as_str()));
 
         let resolved = command_resolve_install_path(" Halo: Reach / GOTY?* ");
         assert_eq!(

@@ -27,7 +27,8 @@ pub(super) async fn install_installer_linux(
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
     let prefix = target_dir.to_path_buf();
-    let proton_path = crate::services::linux_umu::selected_proton_path(game.proton_path.as_deref());
+    let proton_path =
+        crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
     let control_for_task = control.clone();
     let proton_for_task = proton_path.clone();
 

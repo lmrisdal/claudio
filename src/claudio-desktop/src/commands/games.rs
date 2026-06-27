@@ -2,7 +2,7 @@ use crate::models::{DownloadPackageInput, InstalledGame, RemoteGame, RunningGame
 use crate::services::game_install::{self, InstallState};
 use crate::services::game_runtime::{self, RunningGamesState};
 #[cfg(target_os = "linux")]
-use crate::services::linux_umu::ProtonVersionOption;
+use crate::services::linux_proton::ProtonVersionOption;
 use tauri::{AppHandle, State};
 
 pub(crate) async fn list_installed_games_command() -> Result<Vec<InstalledGame>, String> {
@@ -83,7 +83,7 @@ pub(crate) fn resolve_download_path_command(game_title: String) -> String {
 
 #[cfg(target_os = "linux")]
 pub(crate) fn list_proton_versions_command() -> Vec<ProtonVersionOption> {
-    crate::services::linux_umu::list_proton_versions()
+    crate::services::linux_proton::list_proton_versions()
 }
 
 #[cfg(not(target_os = "linux"))]

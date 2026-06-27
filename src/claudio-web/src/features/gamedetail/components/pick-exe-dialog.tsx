@@ -26,6 +26,7 @@ export default function PickExeDialog({
   });
 
   const [exe, setExe] = useState(exeOptions[0] ?? "");
+  const selectedExe = exeOptions.includes(exe) ? exe : (exeOptions[0] ?? "");
 
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
@@ -40,7 +41,12 @@ export default function PickExeDialog({
           </p>
 
           {exeOptions.length > 0 ? (
-            <ExeListbox label="Executable" value={exe} onChange={setExe} options={exeOptions} />
+            <ExeListbox
+              label="Executable"
+              value={selectedExe}
+              onChange={setExe}
+              options={exeOptions}
+            />
           ) : (
             <p className="text-sm text-text-muted bg-surface-raised rounded-lg px-3 py-2 border border-border">
               No executables found in the install directory.
@@ -57,9 +63,9 @@ export default function PickExeDialog({
             </button>
             <button
               type="button"
-              disabled={!exe}
+              disabled={!selectedExe}
               onClick={() => {
-                if (exe) onConfirm(exe);
+                if (selectedExe) onConfirm(selectedExe);
               }}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition enabled:hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
             >

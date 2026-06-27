@@ -229,6 +229,36 @@ fn build_install_dir_uses_sanitized_title() {
 }
 
 #[test]
+fn list_game_executables_includes_wine_prefix_drive_c() {
+    crate::settings::with_test_data_dir(unique_test_dir("prefix-executables"), || {
+        let install_dir = crate::settings::data_dir().join("installed");
+        let prefix_dir = crate::settings::data_dir().join("prefix");
+        let exe_path = prefix_dir
+            .join("pfx")
+            .join("drive_c")
+            .join("Games")
+            .join("Launcher")
+            .join("game.exe");
+        fs::create_dir_all(&install_dir).expect("install dir should exist");
+        fs::create_dir_all(exe_path.parent().expect("exe parent should exist"))
+            .expect("prefix exe parent should exist");
+        fs::write(&exe_path, b"binary").expect("prefix exe should exist");
+
+        let mut game = installed_game(44, "Prefix Game", &install_dir);
+        game.wine_prefix = Some(prefix_dir.to_string_lossy().into_owned());
+        crate::registry::upsert(game).expect("installed game should save");
+
+        let executables = list_game_executables(44).expect("executables should load");
+        assert_eq!(executables, vec!["Games/Launcher/game.exe"]);
+
+        let expected_exe = exe_path.to_string_lossy().into_owned();
+        let updated = set_game_exe(44, "Games/Launcher/game.exe".to_string())
+            .expect("prefix executable should save");
+        assert_eq!(updated.game_exe.as_deref(), Some(expected_exe.as_str()));
+    });
+}
+
+#[test]
 fn install_download_root_uses_configured_download_root_and_sanitized_title() {
     let game = RemoteGame {
         id: 9,

@@ -1,3 +1,4 @@
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -257,6 +258,11 @@ export default function GameDetailActions({
   }
 
   async function promptExecutableSelection() {
+    if (isLinux && installedGame) {
+      await promptLinuxExecutableSelection(installedGame);
+      return;
+    }
+
     try {
       const exes = await listGameExecutables(displayGame.id);
       setPickExeOptions(exes);
@@ -264,6 +270,43 @@ export default function GameDetailActions({
     } catch (error) {
       setInstallError(error instanceof Error ? error.message : "Could not list game executables.");
     }
+  }
+
+  async function promptLinuxExecutableSelection(gameToUpdate: InstalledGame) {
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: false,
+        title: "Select Game Executable",
+        defaultPath: linuxExecutableBrowseRoot(gameToUpdate),
+      });
+
+      if (selected === null) {
+        return;
+      }
+
+      const executable = Array.isArray(selected) ? selected[0] : selected;
+      if (!executable) {
+        return;
+      }
+
+      await setAndLaunchExecutable(executable);
+    } catch (error) {
+      setLaunchingGameId(null);
+      setInstallError(error instanceof Error ? error.message : "Could not launch game.");
+    }
+  }
+
+  async function setAndLaunchExecutable(exe: string) {
+    const updated = await setGameExe(displayGame.id, exe);
+    queryClient.setQueryData(["installedGame", gameId], updated);
+    void queryClient.invalidateQueries({ queryKey: ["installedGames"] });
+    setLaunchingGameId(displayGame.id);
+    setInstallError(null);
+    await launchGame(displayGame.id);
+    await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
+    await refetchInstalledGame();
+    setLaunchingGameId(null);
   }
 
   async function handlePlayButtonClick() {
@@ -695,13 +738,7 @@ export default function GameDetailActions({
           }
 
           try {
-            const separator = isLinux ? "/" : "\\";
-            const fullExe = `${installedGame.installPath}${separator}${exe}`;
-            await setGameExe(displayGame.id, fullExe);
-            setLaunchingGameId(displayGame.id);
-            setInstallError(null);
-            await launchGame(displayGame.id);
-            await queryClient.invalidateQueries({ queryKey: ["runningGames"] });
+            await setAndLaunchExecutable(exe);
           } catch (error) {
             setLaunchingGameId(null);
             setInstallError(error instanceof Error ? error.message : "Could not launch game.");
@@ -741,6 +778,12 @@ export default function GameDetailActions({
       )}
     </>
   );
+}
+
+function linuxExecutableBrowseRoot(installedGame: InstalledGame) {
+  return installedGame.winePrefix
+    ? `${installedGame.winePrefix}/pfx/drive_c`
+    : installedGame.installPath;
 }
 
 async function fetchExecutables(gameId: string) {

@@ -1,8 +1,5 @@
 import { useContext } from "react";
-import {
-  AppPreferencesContext,
-  type AppPreferencesContextValue,
-} from "./app-preferences-context";
+import { AppPreferencesContext, type AppPreferencesContextValue } from "./app-preferences-context";
 
 export function useAppPreferences(): AppPreferencesContextValue {
   const context = useContext(AppPreferencesContext);

@@ -2,71 +2,11 @@
 
 use crate::models::InstalledGame;
 use crate::settings;
-use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::Duration;
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProtonVersionOption {
-    pub label: String,
-    pub value: String,
-}
-
-pub fn list_proton_versions() -> Vec<ProtonVersionOption> {
-    let mut versions = vec![
-        ProtonVersionOption {
-            label: "UMU Latest".to_string(),
-            value: "UMU-Latest".to_string(),
-        },
-        ProtonVersionOption {
-            label: "GE-Proton Latest".to_string(),
-            value: "GE-Proton".to_string(),
-        },
-        ProtonVersionOption {
-            label: "GE Latest".to_string(),
-            value: "GE-Latest".to_string(),
-        },
-        ProtonVersionOption {
-            label: "UMU Sniper".to_string(),
-            value: "umu-sniper".to_string(),
-        },
-    ];
-
-    for dir in compatibility_tool_dirs() {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_dir() || !path.join("toolmanifest.vdf").is_file() {
-                    continue;
-                }
-                let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
-                    continue;
-                };
-                if versions.iter().any(|version| version.value == name) {
-                    continue;
-                }
-                versions.push(ProtonVersionOption {
-                    label: name.to_string(),
-                    value: name.to_string(),
-                });
-            }
-        }
-    }
-
-    versions
-}
-
-pub fn selected_proton_path(requested: Option<&str>) -> String {
-    requested
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .unwrap_or_else(|| settings::resolve_proton_path(&settings::load()))
-}
 
 pub fn default_prefix_path(game_id: i32, title: &str) -> PathBuf {
     let settings = settings::load();
@@ -257,15 +197,6 @@ fn find_in_path(binary: &str) -> Option<PathBuf> {
             .map(|path| path.join(binary))
             .find(|path| path.is_file())
     })
-}
-
-fn compatibility_tool_dirs() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-    if let Some(data_dir) = dirs::data_dir() {
-        dirs.push(data_dir.join("Steam").join("compatibilitytools.d"));
-        dirs.push(data_dir.join("umu").join("compatibilitytools"));
-    }
-    dirs
 }
 
 enum ShortcutKind {

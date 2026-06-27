@@ -357,32 +357,78 @@ pub fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
 pub fn set_game_exe(remote_game_id: i32, game_exe: String) -> Result<InstalledGame, String> {
     let mut game =
         registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
-    game.game_exe = Some(game_exe);
+    game.game_exe = Some(resolve_game_exe_path(&game, &game_exe)?);
     registry::upsert(game)
 }
 
 pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String> {
     let game =
         registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
-    let root = PathBuf::from(&game.install_path);
+    let mut exes = BTreeSet::new();
+    for root in executable_search_roots(&game) {
+        let mut matches = Vec::new();
+        collect_matching_files(&root, &mut matches, is_windows_executable);
+        for path in matches {
+            if let Ok(relative) = path.strip_prefix(&root) {
+                exes.insert(relative.to_string_lossy().into_owned());
+            }
+        }
+    }
 
-    let mut exes = Vec::new();
-    collect_matching_files(&root, &mut exes, |path| {
-        path.extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| ext.eq_ignore_ascii_case("exe"))
-            .unwrap_or(false)
-    });
-    exes.sort();
+    Ok(exes.into_iter().collect())
+}
 
-    Ok(exes
-        .into_iter()
-        .filter_map(|path| {
-            path.strip_prefix(&root)
-                .ok()
-                .map(|rel| rel.to_string_lossy().into_owned())
-        })
-        .collect())
+fn resolve_game_exe_path(game: &InstalledGame, game_exe: &str) -> Result<String, String> {
+    let requested = PathBuf::from(game_exe);
+    if requested.is_absolute() {
+        return validate_game_exe_path(requested);
+    }
+
+    for root in executable_search_roots(game) {
+        let candidate = root.join(game_exe);
+        if candidate.exists() {
+            return validate_game_exe_path(candidate);
+        }
+    }
+
+    Err("Selected executable no longer exists.".to_string())
+}
+
+fn validate_game_exe_path(path: PathBuf) -> Result<String, String> {
+    if !path.is_file() {
+        return Err("Selected executable no longer exists.".to_string());
+    }
+
+    if !is_windows_executable(&path) {
+        return Err("Selected file is not a Windows executable.".to_string());
+    }
+
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn executable_search_roots(game: &InstalledGame) -> Vec<PathBuf> {
+    let install_path = PathBuf::from(&game.install_path);
+    #[cfg(any(target_os = "linux", test))]
+    let mut roots = vec![install_path.clone()];
+    #[cfg(not(any(target_os = "linux", test)))]
+    let roots = vec![install_path.clone()];
+
+    #[cfg(any(target_os = "linux", test))]
+    if let Some(prefix) = game.wine_prefix.as_deref() {
+        let drive_c = PathBuf::from(prefix).join("pfx").join("drive_c");
+        if !drive_c.starts_with(&install_path) && !roots.iter().any(|root| root == &drive_c) {
+            roots.push(drive_c);
+        }
+    }
+
+    roots
+}
+
+fn is_windows_executable(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.eq_ignore_ascii_case("exe"))
+        .unwrap_or(false)
 }
 
 fn open_path_command(path: &Path) -> std::process::Command {

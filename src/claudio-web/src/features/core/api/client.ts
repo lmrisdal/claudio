@@ -66,10 +66,7 @@ function toHeaderRecord(headers?: HeadersInit): Record<string, string> {
   return normalized;
 }
 
-function buildRequestHeaders(
-  init: RequestInit | undefined,
-  isFormData: boolean,
-): HeadersInit {
+function buildRequestHeaders(init: RequestInit | undefined, isFormData: boolean): HeadersInit {
   return {
     ...(isDesktop ? {} : getCustomHeaders()),
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
