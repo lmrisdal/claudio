@@ -39,6 +39,7 @@ pub struct DesktopSettings {
     pub window_y: Option<f64>,
     pub default_install_path: Option<String>,
     pub default_download_path: Option<String>,
+    pub default_proton_path: Option<String>,
     #[serde(default)]
     pub close_to_tray: bool,
     #[serde(default)]
@@ -60,6 +61,7 @@ impl Default for DesktopSettings {
             window_y: None,
             default_install_path: None,
             default_download_path: None,
+            default_proton_path: Some(default_proton_path()),
             close_to_tray: false,
             hide_dock_icon: false,
             custom_headers: HashMap::new(),
@@ -246,6 +248,19 @@ pub fn default_install_root(settings: &DesktopSettings) -> PathBuf {
         .as_deref()
         .map(PathBuf::from)
         .unwrap_or_else(os_default_games_dir)
+}
+
+pub fn default_proton_path() -> String {
+    "UMU-Latest".to_string()
+}
+
+#[cfg(target_os = "linux")]
+pub fn resolve_proton_path(settings: &DesktopSettings) -> String {
+    settings
+        .default_proton_path
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(default_proton_path)
 }
 
 pub fn resolve_install_root(settings: &DesktopSettings) -> Result<PathBuf, String> {

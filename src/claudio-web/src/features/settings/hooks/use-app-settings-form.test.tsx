@@ -9,11 +9,13 @@ const getSettingsMock = vi.fn();
 const resolveDefaultDownloadRootMock = vi.fn();
 const updateSettingsMock = vi.fn();
 const desktopCheckServerConnectionMock = vi.fn();
+const listProtonVersionsMock = vi.fn();
 
 vi.mock("../../desktop/hooks/use-desktop", () => ({
   desktopCheckServerConnection: (...arguments_: unknown[]) =>
     desktopCheckServerConnectionMock(...arguments_),
   getSettings: (...arguments_: unknown[]) => getSettingsMock(...arguments_),
+  listProtonVersions: (...arguments_: unknown[]) => listProtonVersionsMock(...arguments_),
   resolveDefaultDownloadRoot: (...arguments_: unknown[]) =>
     resolveDefaultDownloadRootMock(...arguments_),
   updateSettings: (...arguments_: unknown[]) => updateSettingsMock(...arguments_),
@@ -83,6 +85,7 @@ const baseSettings = {
   windowY: null,
   defaultInstallPath: "C:/Games",
   defaultDownloadPath: "C:/Games/downloads",
+  defaultProtonPath: "UMU-Latest",
   closeToTray: false,
   hideDockIcon: false,
   customHeaders: {},
@@ -97,8 +100,10 @@ describe("useAppSettingsForm", () => {
     resolveDefaultDownloadRootMock.mockReset();
     updateSettingsMock.mockReset();
     desktopCheckServerConnectionMock.mockReset();
+    listProtonVersionsMock.mockReset();
     getSettingsMock.mockResolvedValue(baseSettings);
     resolveDefaultDownloadRootMock.mockResolvedValue(appDefaultDownloads);
+    listProtonVersionsMock.mockResolvedValue([{ label: "UMU Latest", value: "UMU-Latest" }]);
     desktopCheckServerConnectionMock.mockResolvedValue({ ok: true, status: 200 });
   });
 

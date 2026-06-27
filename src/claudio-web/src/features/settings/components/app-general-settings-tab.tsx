@@ -6,7 +6,7 @@ export default function AppGeneralSettingsTab({
   contentRefs,
   settings,
 }: {
-  contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
+  contentRefs: React.RefObject<(HTMLElement | null)[]>;
   settings: AppSettingsFormState;
 }) {
   return (

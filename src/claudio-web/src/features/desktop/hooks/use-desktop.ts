@@ -12,6 +12,7 @@ interface DesktopSettings {
   windowY: number | null;
   defaultInstallPath: string | null;
   defaultDownloadPath: string | null;
+  defaultProtonPath: string | null;
   closeToTray: boolean;
   hideDockIcon: boolean;
   customHeaders: Record<string, string>;
@@ -44,6 +45,9 @@ interface DesktopInstallGameInput {
   gameExe?: string | null;
   installPath?: string | null;
   desktopShortcut?: boolean;
+  appMenuShortcut?: boolean;
+  steamShortcut?: boolean;
+  protonPath?: string | null;
   runAsAdministrator?: boolean;
   forceInteractive?: boolean;
   summary?: string | null;
@@ -68,6 +72,8 @@ interface InstalledGame {
   installType: "portable" | "installer";
   installPath: string;
   gameExe?: string | null;
+  winePrefix?: string | null;
+  protonPath?: string | null;
   installedAt: string;
   summary?: string | null;
   genre?: string | null;
@@ -101,6 +107,11 @@ interface RunningGame {
   startedAt: string;
 }
 
+interface ProtonVersionOption {
+  label: string;
+  value: string;
+}
+
 export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
 }
@@ -127,6 +138,10 @@ export async function openSettingsWindow(): Promise<void> {
 
 export async function installGame(game: DesktopInstallGameInput): Promise<InstalledGame> {
   return invoke<InstalledGame>("install_game", { game });
+}
+
+export async function listProtonVersions(): Promise<ProtonVersionOption[]> {
+  return invoke<ProtonVersionOption[]>("list_proton_versions");
 }
 
 export async function downloadGamePackage(input: DownloadPackageInput): Promise<string> {
@@ -214,6 +229,7 @@ export function useDesktop() {
     updateSettings,
     openSettingsWindow,
     installGame,
+    listProtonVersions,
     validateInstallTarget,
     getInstalledGame,
     listInstalledGames,
@@ -226,6 +242,7 @@ export type {
   DesktopInstallGameInput,
   DownloadPackageInput,
   DesktopSettings,
+  ProtonVersionOption,
   InstalledGame,
   InstallProgress,
   PingResponse,

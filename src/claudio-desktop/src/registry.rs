@@ -80,6 +80,8 @@ mod tests {
             install_type: InstallType::Portable,
             install_path: install_path.to_string_lossy().into_owned(),
             game_exe: None,
+            wine_prefix: None,
+            proton_path: None,
             installed_at: "1".to_string(),
             summary: None,
             genre: None,

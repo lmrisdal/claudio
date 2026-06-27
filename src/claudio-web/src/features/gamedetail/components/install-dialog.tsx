@@ -4,7 +4,8 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../core/api/client";
 import { useInputScope } from "../../core/hooks/use-input-scope";
-import { isWindows } from "../../core/utils/os";
+import { isLinux, isWindows } from "../../core/utils/os";
+import { listProtonVersions } from "../../desktop/hooks/use-desktop";
 import ExeListbox from "./exe-listbox";
 
 /** Must match `INDIVIDUAL_FILE_THRESHOLD` in `game_install/download.rs`. */
@@ -25,6 +26,7 @@ interface InstallDialogProperties {
   gameId: number;
   title: string;
   defaultPath: string;
+  defaultProtonPath?: string;
   isPortable?: boolean;
   exeLabel?: string;
   exeOptions?: string[];
@@ -36,7 +38,10 @@ interface InstallDialogProperties {
   onConfirm: (
     path: string | undefined,
     exe?: string,
+    protonPath?: string,
     desktopShortcut?: boolean,
+    appMenuShortcut?: boolean,
+    steamShortcut?: boolean,
     runAsAdministrator?: boolean,
     forceInteractive?: boolean,
     extract?: boolean,
@@ -48,6 +53,7 @@ export default function InstallDialog({
   gameId,
   title,
   defaultPath,
+  defaultProtonPath = "UMU-Latest",
   isPortable = false,
   exeLabel,
   exeOptions = [],
@@ -68,6 +74,9 @@ export default function InstallDialog({
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
   const [desktopShortcut, setDesktopShortcut] = useState(true);
+  const [appMenuShortcut, setAppMenuShortcut] = useState(true);
+  const [steamShortcut, setSteamShortcut] = useState(false);
+  const [protonPath, setProtonPath] = useState(defaultProtonPath);
   const [runAsAdministratorOverrides, setRunAsAdministratorOverrides] = useState<
     Record<string, boolean>
   >({});
@@ -94,6 +103,11 @@ export default function InstallDialog({
         `/games/${gameId}/installer-inspection?path=${encodeURIComponent(effectiveInstallerPath!)}`,
       ),
     enabled: open && !downloadMode && !isPortable && !!effectiveInstallerPath,
+  });
+  const { data: protonOptions = [] } = useQuery({
+    queryKey: ["protonVersions"],
+    queryFn: listProtonVersions,
+    enabled: open && !downloadMode && isLinux,
   });
 
   const {
@@ -126,6 +140,20 @@ export default function InstallDialog({
       setExtract(false);
     }
   }, [open, downloadMode, showExtractOption]);
+  useEffect(() => {
+    if (open) {
+      setProtonPath(defaultProtonPath);
+    }
+  }, [open, defaultProtonPath]);
+  useEffect(() => {
+    if (
+      open &&
+      protonOptions.length > 0 &&
+      !protonOptions.some((option) => option.value === protonPath)
+    ) {
+      setProtonPath(protonOptions[0].value);
+    }
+  }, [open, protonOptions, protonPath]);
   const effectiveInstallerKey = effectiveInstallerPath ?? "";
   const requiresAdministrator =
     installerInspection?.installerType === "exe" && installerInspection.requestsElevation;
@@ -254,6 +282,64 @@ export default function InstallDialog({
                 </label>
               )}
 
+              {!downloadMode && isLinux && (
+                <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-raised/45 p-3">
+                  <div>
+                    <label
+                      htmlFor="install-proton-version"
+                      className="mb-1.5 block text-sm font-medium text-text-primary"
+                    >
+                      Proton version
+                    </label>
+                    <select
+                      id="install-proton-version"
+                      value={protonPath}
+                      onChange={(event) => setProtonPath(event.target.value)}
+                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                    >
+                      {(protonOptions.length > 0
+                        ? protonOptions
+                        : [{ label: "UMU Latest", value: "UMU-Latest" }]
+                      ).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
+                      <input
+                        type="checkbox"
+                        checked={desktopShortcut}
+                        onChange={(event) => setDesktopShortcut(event.target.checked)}
+                        className="h-4 w-4 rounded accent-accent"
+                      />
+                      Desktop
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
+                      <input
+                        type="checkbox"
+                        checked={appMenuShortcut}
+                        onChange={(event) => setAppMenuShortcut(event.target.checked)}
+                        className="h-4 w-4 rounded accent-accent"
+                      />
+                      App menu
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
+                      <input
+                        type="checkbox"
+                        checked={steamShortcut}
+                        onChange={(event) => setSteamShortcut(event.target.checked)}
+                        className="h-4 w-4 rounded accent-accent"
+                      />
+                      Steam
+                    </label>
+                  </div>
+                </div>
+              )}
+
               {!downloadMode && isPortable && isWindows && (
                 <label className="mt-4 flex items-center gap-2.5 cursor-pointer select-none w-fit">
                   <input
@@ -266,7 +352,7 @@ export default function InstallDialog({
                 </label>
               )}
 
-              {downloadMode || isPortable ? null : (
+              {downloadMode || isPortable || !isWindows ? null : (
                 <>
                   <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
                     <input
@@ -350,7 +436,10 @@ export default function InstallDialog({
                 void onConfirm(
                   installPath || undefined,
                   exe || undefined,
-                  downloadMode || !isPortable ? undefined : desktopShortcut,
+                  downloadMode || !isLinux ? undefined : protonPath,
+                  downloadMode || (!isLinux && !isPortable) ? undefined : desktopShortcut,
+                  downloadMode || !isLinux ? undefined : appMenuShortcut,
+                  downloadMode || !isLinux ? undefined : steamShortcut,
                   downloadMode || isPortable ? undefined : runAsAdministrator,
                   downloadMode || isPortable ? undefined : forceInteractive,
                   downloadMode ? (showExtractOption ? extract : false) : undefined,

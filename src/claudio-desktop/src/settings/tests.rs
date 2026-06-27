@@ -67,7 +67,10 @@ fn save_and_load_use_overridden_data_dir() {
             Some("ok")
         );
         assert_eq!(
-            loaded.custom_headers.get("Authorization").map(String::as_str),
+            loaded
+                .custom_headers
+                .get("Authorization")
+                .map(String::as_str),
             Some("allowed")
         );
         assert!(!loaded.custom_headers.contains_key("Host"));

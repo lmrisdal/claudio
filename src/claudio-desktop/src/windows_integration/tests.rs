@@ -20,6 +20,8 @@ fn installed_game(remote_game_id: i32, install_path: &Path, exe_path: &Path) -> 
         install_type: InstallType::Portable,
         install_path: install_path.to_string_lossy().into_owned(),
         game_exe: Some(exe_path.to_string_lossy().into_owned()),
+        wine_prefix: None,
+        proton_path: None,
         installed_at: "1".to_string(),
         summary: None,
         genre: None,

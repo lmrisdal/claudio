@@ -10,7 +10,7 @@ import {
 export default function InterfaceTab({
   contentRefs,
 }: {
-  contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
+  contentRefs: React.RefObject<(HTMLElement | null)[]>;
 }) {
   const [fullscreenOn, setFullscreenOn] = useState(isEmulatorFullscreenEnabled);
   const { theme, setTheme } = useTheme();

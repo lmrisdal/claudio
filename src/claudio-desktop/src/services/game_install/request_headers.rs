@@ -1,8 +1,6 @@
 use super::*;
 
-pub(super) fn build_headers(
-    custom_headers: &HashMap<String, String>,
-) -> Result<HeaderMap, String> {
+pub(super) fn build_headers(custom_headers: &HashMap<String, String>) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
     for (name, value) in custom_headers {
         if settings::is_forbidden_custom_header(name) {
@@ -19,7 +17,6 @@ pub(super) fn build_headers(
 
 pub(super) fn request_headers(
     custom_headers: &HashMap<String, String>,
-) -> Result<HeaderMap, String>
-{
+) -> Result<HeaderMap, String> {
     build_headers(custom_headers)
 }

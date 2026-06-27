@@ -60,7 +60,7 @@ export default function SettingsDialog({
   const [showSidebarFocusRing, setShowSidebarFocusRing] = useState(false);
 
   const sidebarReferences = useRef<(HTMLButtonElement | null)[]>([]);
-  const contentReferences = useRef<(HTMLButtonElement | HTMLInputElement | null)[]>([]);
+  const contentReferences = useRef<(HTMLElement | null)[]>([]);
   const panelReference = useRef<HTMLDivElement>(null);
   const appSettings = useAppSettingsForm(open && activeTab.startsWith("app."));
 
@@ -526,7 +526,6 @@ export default function SettingsDialog({
               </button>
             </div>
           )}
-
         </nav>
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">

@@ -15,7 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::CloseHandle;
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Threading::{
-    GetExitCodeProcess, OpenProcess, CREATE_NO_WINDOW, PROCESS_QUERY_LIMITED_INFORMATION,
+    CREATE_NO_WINDOW, GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 
 #[cfg(target_os = "windows")]
@@ -89,6 +89,32 @@ pub fn launch_game(state: &RunningGamesState, remote_game_id: i32) -> Result<(),
     let exe = game
         .game_exe
         .ok_or_else(|| "No executable is set for this game.".to_string())?;
+
+    #[cfg(target_os = "linux")]
+    if let Some(prefix) = game.wine_prefix.as_deref() {
+        let proton_path = game
+            .proton_path
+            .as_deref()
+            .unwrap_or("UMU-Latest")
+            .to_string();
+        let child = crate::services::linux_umu::run_prefix_command(
+            Path::new(prefix),
+            &proton_path,
+            Path::new(&exe),
+            &[],
+            None,
+            None,
+        )?;
+
+        state.upsert(RunningGameInfo {
+            game_id: remote_game_id,
+            pid: child.id(),
+            exe_path: exe,
+            started_at: current_timestamp(),
+        })?;
+
+        return Ok(());
+    }
 
     let exe_path = Path::new(&exe);
     let working_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
@@ -329,10 +355,12 @@ mod tests {
             .ensure_not_running(8)
             .expect("stale process should be removed");
 
-        assert!(state
-            .remove(8)
-            .expect("state lookup should succeed")
-            .is_none());
+        assert!(
+            state
+                .remove(8)
+                .expect("state lookup should succeed")
+                .is_none()
+        );
     }
 
     #[test]
@@ -349,10 +377,12 @@ mod tests {
 
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].game_id, 1);
-        assert!(state
-            .remove(2)
-            .expect("state lookup should succeed")
-            .is_none());
+        assert!(
+            state
+                .remove(2)
+                .expect("state lookup should succeed")
+                .is_none()
+        );
     }
 
     #[test]
@@ -370,9 +400,11 @@ mod tests {
 
         let _ = waiter.join().expect("waiter thread should join");
         assert!(!is_process_running(pid));
-        assert!(state
-            .remove(99)
-            .expect("state lookup should succeed")
-            .is_none());
+        assert!(
+            state
+                .remove(99)
+                .expect("state lookup should succeed")
+                .is_none()
+        );
     }
 }

@@ -19,6 +19,10 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
 
+vi.mock("../../desktop/hooks/use-desktop", () => ({
+  listProtonVersions: () => Promise.resolve([{ label: "UMU Latest", value: "UMU-Latest" }]),
+}));
+
 const apiGet = vi.mocked(api.get);
 
 function renderWithQuery(ui: ReactNode) {
@@ -95,7 +99,7 @@ describe("InstallDialog download mode", () => {
     const call = onConfirm.mock.calls[0]!;
     expect(call[0]).toContain("Games");
     expect(call[0]).toContain("Test");
-    expect(call[5]).toBe(false);
+    expect(call[8]).toBe(false);
   });
 
   it("shows extract option when manifest files is null (archive download)", async () => {

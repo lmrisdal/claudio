@@ -5,7 +5,7 @@ export default function AppServerSettingsTab({
   contentRefs,
   settings,
 }: {
-  contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
+  contentRefs: React.RefObject<(HTMLElement | null)[]>;
   settings: AppSettingsFormState;
 }) {
   const addHeaderIndex = 2 + settings.headers.length * 3;

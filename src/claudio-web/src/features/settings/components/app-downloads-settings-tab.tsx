@@ -5,7 +5,7 @@ export default function AppDownloadsSettingsTab({
   contentRefs,
   settings,
 }: {
-  contentRefs: React.RefObject<(HTMLButtonElement | HTMLInputElement | null)[]>;
+  contentRefs: React.RefObject<(HTMLElement | null)[]>;
   settings: AppSettingsFormState;
 }) {
   return (
@@ -72,6 +72,32 @@ export default function AppDownloadsSettingsTab({
           />
           <span className="shrink-0 text-sm text-text-muted">KB/s</span>
         </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="settings-proton-version"
+          className="mb-1.5 block text-sm font-medium text-text-secondary"
+        >
+          Default Proton version
+        </label>
+        <select
+          ref={(element) => setIndexedReference(contentRefs, 3, element)}
+          id="settings-proton-version"
+          value={settings.protonPath}
+          onChange={(event) => settings.setProtonPath(event.target.value)}
+          onBlur={() => void settings.handleSave()}
+          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus-ring"
+        >
+          {(settings.protonOptions.length > 0
+            ? settings.protonOptions
+            : [{ label: "UMU Latest", value: "UMU-Latest" }]
+          ).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {settings.saveMessage && (

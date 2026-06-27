@@ -23,7 +23,6 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use zip::read::ZipArchive;
 
 mod api;
-mod request_headers;
 mod download;
 mod download_individual;
 mod extract;
@@ -36,11 +35,14 @@ mod installer_elevated;
 #[cfg(target_os = "windows")]
 mod installer_innoextract;
 mod installer_install;
+#[cfg(target_os = "linux")]
+mod installer_install_linux;
 mod installer_run;
 #[cfg(feature = "integration-tests")]
 pub(crate) mod integration_testing;
 mod paths;
 mod progress;
+mod request_headers;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -53,9 +55,6 @@ pub use api::{
 };
 pub use state::InstallState;
 
-#[cfg(test)]
-use request_headers::build_headers;
-use request_headers::request_headers;
 #[cfg(feature = "integration-tests")]
 use download::download_package_with;
 use download::{DownloadInfo, DownloadOptions, download_package};
@@ -83,6 +82,8 @@ use installer_detect::{InstallerType, detect_installer_type, stream_requests_ele
 #[cfg(all(feature = "integration-tests", target_os = "windows"))]
 use installer_innoextract::run_innoextract_with_binary;
 use installer_install::install_installer;
+#[cfg(target_os = "linux")]
+use installer_install_linux::install_installer_linux;
 use installer_run::{confirm_installer_elevation, run_installer, run_installer_with_retries};
 use paths::{
     build_install_dir, download_workspace_root, format_install_io_error,
@@ -92,4 +93,7 @@ use paths::{
 use progress::{
     current_timestamp, emit_progress, emit_progress_indeterminate, emit_progress_with_bytes_to,
 };
+#[cfg(test)]
+use request_headers::build_headers;
+use request_headers::request_headers;
 use state::InstallControl;

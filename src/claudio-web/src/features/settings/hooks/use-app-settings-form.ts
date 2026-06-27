@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   desktopCheckServerConnection,
   getSettings,
+  listProtonVersions,
   resolveDefaultDownloadRoot,
   updateSettings,
   type DesktopSettings,
+  type ProtonVersionOption,
 } from "../../desktop/hooks/use-desktop";
 import { getConnectionErrorMessage } from "../../desktop/utils/connection-check";
 import { buildDesktopCustomHeaders } from "../../desktop/utils/custom-headers";
@@ -33,6 +35,9 @@ export interface AppSettingsFormState {
   setHideDockIcon: (value: boolean) => void;
   speedLimit: string;
   setSpeedLimit: (value: string) => void;
+  protonPath: string;
+  setProtonPath: (value: string) => void;
+  protonOptions: ProtonVersionOption[];
   headers: HeaderField[];
   setHeaders: (value: HeaderField[]) => void;
   showHeaders: boolean;
@@ -54,6 +59,8 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [closeToTray, setCloseToTray] = useState(false);
   const [hideDockIcon, setHideDockIcon] = useState(false);
   const [speedLimit, setSpeedLimit] = useState("");
+  const [protonPath, setProtonPath] = useState("UMU-Latest");
+  const [protonOptions, setProtonOptions] = useState<ProtonVersionOption[]>([]);
   const [headers, setHeaders] = useState<HeaderField[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -74,7 +81,10 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       if (cancelled) return;
 
       const loadedInstallPath = loadedSettings.defaultInstallPath ?? "";
-      const effectiveDefaultDownloadRoot = await resolveDefaultDownloadRoot().catch(() => "");
+      const [effectiveDefaultDownloadRoot, loadedProtonOptions] = await Promise.all([
+        resolveDefaultDownloadRoot().catch(() => ""),
+        listProtonVersions().catch(() => []),
+      ]);
       const fallbackDownloadPath =
         effectiveDefaultDownloadRoot || deriveDownloadPathFromInstallPath(loadedInstallPath);
       if (cancelled) return;
@@ -93,6 +103,8 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       setSpeedLimit(
         loadedSettings.downloadSpeedLimitKbs ? String(loadedSettings.downloadSpeedLimitKbs) : "",
       );
+      setProtonPath(loadedSettings.defaultProtonPath ?? "UMU-Latest");
+      setProtonOptions(loadedProtonOptions);
 
       const customHeaders = loadedSettings.customHeaders ?? {};
       const entries = Object.entries(customHeaders).map(([name, value]) => ({
@@ -174,9 +186,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
 
       const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
       if (forbiddenHeaders.length > 0) {
-        setSaveMessage(
-          `These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`,
-        );
+        setSaveMessage(`These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`);
         return;
       }
 
@@ -198,6 +208,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         serverUrl: trimmedUrl,
         defaultInstallPath: normalizedInstallPath || null,
         defaultDownloadPath: normalizedDownloadPath || null,
+        defaultProtonPath: protonPath.trim() || null,
         closeToTray,
         hideDockIcon,
         customHeaders,
@@ -272,6 +283,9 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     setHideDockIcon: handleHideDockIconChange,
     speedLimit,
     setSpeedLimit,
+    protonPath,
+    setProtonPath,
+    protonOptions,
     headers,
     setHeaders,
     showHeaders,

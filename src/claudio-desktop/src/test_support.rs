@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct TestRequest {
     pub method: String,
     pub path: String,

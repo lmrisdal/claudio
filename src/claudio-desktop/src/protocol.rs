@@ -20,16 +20,14 @@ pub async fn handle_request(
 
     match forward_request(app, request).await {
         Ok(response) => response,
-        Err(message) => {
-            cors_response(
-                &http::Request::new(Vec::new()),
-                http::Response::builder()
-                    .status(http::StatusCode::BAD_GATEWAY)
-                    .header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
-            )
-            .body(Cow::Owned(message.into_bytes()))
-            .unwrap()
-        }
+        Err(message) => cors_response(
+            &http::Request::new(Vec::new()),
+            http::Response::builder()
+                .status(http::StatusCode::BAD_GATEWAY)
+                .header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+        )
+        .body(Cow::Owned(message.into_bytes()))
+        .unwrap(),
     }
 }
 
@@ -68,10 +66,7 @@ where
     }
 
     log::debug!("desktop proxy {} {}", method, target);
-    let response = builder
-        .send()
-        .await
-        .map_err(|error| error.to_string())?;
+    let response = builder.send().await.map_err(|error| error.to_string())?;
     log_proxy_response(&target, response.status(), false);
 
     let status = http::StatusCode::from_u16(response.status().as_u16())

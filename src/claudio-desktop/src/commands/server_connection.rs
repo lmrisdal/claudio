@@ -104,7 +104,10 @@ mod tests {
     async fn desktop_check_server_connection_uses_override_headers() {
         let server = TestServer::spawn(|request| {
             assert_eq!(request.path, "/health");
-            assert_eq!(request.headers.get("x-test").map(String::as_str), Some("ok"));
+            assert_eq!(
+                request.headers.get("x-test").map(String::as_str),
+                Some("ok")
+            );
             TestResponse::json(200, r#"{"providers":[]}"#)
         });
 
@@ -127,7 +130,10 @@ mod tests {
     async fn desktop_check_server_connection_uses_saved_settings_when_overrides_missing() {
         let server = TestServer::spawn(|request| {
             assert_eq!(request.path, "/health");
-            assert_eq!(request.headers.get("x-saved").map(String::as_str), Some("ok"));
+            assert_eq!(
+                request.headers.get("x-saved").map(String::as_str),
+                Some("ok")
+            );
             TestResponse::text(200, "ok")
         });
 

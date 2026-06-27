@@ -93,6 +93,13 @@ pub(super) async fn install_game_inner(
 
     #[cfg(target_os = "windows")]
     crate::windows_integration::register(app, &installed, game.desktop_shortcut.unwrap_or(false));
+    #[cfg(target_os = "linux")]
+    crate::services::linux_umu::sync_shortcuts(
+        &installed,
+        game.desktop_shortcut.unwrap_or(false),
+        game.app_menu_shortcut.unwrap_or(false),
+        game.steam_shortcut.unwrap_or(false),
+    );
 
     let _ = fs::remove_dir_all(&temp_root);
     log::info!(
@@ -217,6 +224,38 @@ pub(super) async fn install_portable(
     .await
     .map_err(|err| format!("Extract task failed: {err}"))??;
 
+    #[cfg(target_os = "linux")]
+    let (wine_prefix, proton_path) = {
+        let prefix = crate::services::linux_umu::default_prefix_path(game.id, &game.title);
+        let proton_path =
+            crate::services::linux_umu::selected_proton_path(game.proton_path.as_deref());
+        let control = control.clone();
+        let prefix_for_task = prefix.clone();
+        let proton_for_task = proton_path.clone();
+        emit_progress_indeterminate(
+            app,
+            game.id,
+            "preparing-prefix",
+            Some(97.0),
+            Some("Preparing Proton prefix..."),
+            true,
+        );
+        tokio::task::spawn_blocking(move || {
+            crate::services::linux_umu::prepare_prefix(&prefix_for_task, &proton_for_task, || {
+                control.is_cancelled()
+            })
+        })
+        .await
+        .map_err(|err| format!("Prefix setup task failed: {err}"))??;
+        (
+            Some(prefix.to_string_lossy().into_owned()),
+            Some(proton_path),
+        )
+    };
+
+    #[cfg(not(target_os = "linux"))]
+    let (wine_prefix, proton_path) = (None, None);
+
     Ok(InstalledGame {
         remote_game_id: game.id,
         title: game.title.clone(),
@@ -224,6 +263,8 @@ pub(super) async fn install_portable(
         install_type: game.install_type.clone(),
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
+        wine_prefix,
+        proton_path,
         installed_at: current_timestamp(),
         summary: game.summary.clone(),
         genre: game.genre.clone(),

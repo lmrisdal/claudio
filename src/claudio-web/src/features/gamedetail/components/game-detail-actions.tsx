@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import type { Game } from "../../core/types/models";
+import { isLinux } from "../../core/utils/os";
 import {
   launchGame,
   listGameExecutables,
@@ -67,6 +68,7 @@ export default function GameDetailActions({
   const [installError, setInstallError] = useState<string | null>(null);
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
   const [defaultInstallPath, setDefaultInstallPath] = useState("");
+  const [defaultProtonPath, setDefaultProtonPath] = useState("UMU-Latest");
   const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
   const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(null);
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
@@ -91,6 +93,9 @@ export default function GameDetailActions({
       input: Game & {
         installPath?: string;
         desktopShortcut?: boolean;
+        appMenuShortcut?: boolean;
+        steamShortcut?: boolean;
+        protonPath?: string | null;
         runAsAdministrator?: boolean;
         forceInteractive?: boolean;
       },
@@ -104,6 +109,9 @@ export default function GameDetailActions({
         gameExe: input.gameExe ?? null,
         installPath: input.installPath ?? null,
         desktopShortcut: input.desktopShortcut,
+        appMenuShortcut: input.appMenuShortcut,
+        steamShortcut: input.steamShortcut,
+        protonPath: input.protonPath ?? null,
         runAsAdministrator: input.runAsAdministrator,
         forceInteractive: input.forceInteractive,
         summary: input.summary ?? null,
@@ -233,9 +241,13 @@ export default function GameDetailActions({
     try {
       setInstallError(null);
 
-      const { resolveInstallPath } = await import("../../desktop/hooks/use-desktop");
-      const fullPath = await resolveInstallPath(displayGame.title);
+      const { getSettings, resolveInstallPath } = await import("../../desktop/hooks/use-desktop");
+      const [fullPath, settings] = await Promise.all([
+        resolveInstallPath(displayGame.title),
+        getSettings(),
+      ]);
       setDefaultInstallPath(fullPath);
+      setDefaultProtonPath(settings.defaultProtonPath ?? "UMU-Latest");
       setShowInstallConfirm(true);
     } catch (error) {
       setInstallError(
@@ -574,6 +586,7 @@ export default function GameDetailActions({
         gameId={displayGame.id}
         title={displayGame.title}
         defaultPath={defaultInstallPath}
+        defaultProtonPath={defaultProtonPath}
         isPortable={displayGame.installType === "portable"}
         exeLabel={installExeLabel}
         exeOptions={exeList ?? []}
@@ -590,7 +603,10 @@ export default function GameDetailActions({
         onConfirm={async (
           path,
           exe,
+          protonPath,
           desktopShortcut,
+          appMenuShortcut,
+          steamShortcut,
           runAsAdministrator,
           forceInteractive,
           extract,
@@ -630,6 +646,9 @@ export default function GameDetailActions({
             ...game,
             installPath: path,
             desktopShortcut,
+            appMenuShortcut,
+            steamShortcut,
+            protonPath: protonPath ?? null,
             runAsAdministrator,
             forceInteractive,
             installerExe: needsInstallerExe ? exe : game.installerExe,
@@ -676,7 +695,8 @@ export default function GameDetailActions({
           }
 
           try {
-            const fullExe = `${installedGame.installPath}\\${exe}`;
+            const separator = isLinux ? "/" : "\\";
+            const fullExe = `${installedGame.installPath}${separator}${exe}`;
             await setGameExe(displayGame.id, fullExe);
             setLaunchingGameId(displayGame.id);
             setInstallError(null);

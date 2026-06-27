@@ -174,7 +174,10 @@ fn infer_filename_prefers_utf8_content_disposition_name() {
 fn build_headers_applies_custom_headers_and_ignores_forbidden_entries() {
     let headers = build_headers(&HashMap::from([
         ("X-Test".to_string(), "ok".to_string()),
-        ("Authorization".to_string(), "Bearer proxy-token".to_string()),
+        (
+            "Authorization".to_string(),
+            "Bearer proxy-token".to_string(),
+        ),
         ("Host".to_string(), "blocked".to_string()),
     ]))
     .expect("headers should build");
@@ -202,6 +205,9 @@ fn build_install_dir_uses_sanitized_title() {
         game_exe: None,
         install_path: None,
         desktop_shortcut: None,
+        app_menu_shortcut: None,
+        steam_shortcut: None,
+        proton_path: None,
         run_as_administrator: None,
         force_interactive: None,
         summary: None,
@@ -233,6 +239,9 @@ fn install_download_root_uses_configured_download_root_and_sanitized_title() {
         game_exe: None,
         install_path: None,
         desktop_shortcut: None,
+        app_menu_shortcut: None,
+        steam_shortcut: None,
+        proton_path: None,
         run_as_administrator: None,
         force_interactive: None,
         summary: None,

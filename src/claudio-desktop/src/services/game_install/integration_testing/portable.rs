@@ -160,6 +160,8 @@ where
         install_type: game.install_type.clone(),
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
+        wine_prefix: None,
+        proton_path: None,
         installed_at: current_timestamp(),
         summary: game.summary.clone(),
         genre: game.genre.clone(),
