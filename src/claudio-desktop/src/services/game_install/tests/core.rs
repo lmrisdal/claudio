@@ -248,12 +248,16 @@ fn list_game_executables_includes_wine_prefix_drive_c() {
         game.wine_prefix = Some(prefix_dir.to_string_lossy().into_owned());
         crate::registry::upsert(game).expect("installed game should save");
 
+        let relative_exe = PathBuf::from("Games")
+            .join("Launcher")
+            .join("game.exe")
+            .to_string_lossy()
+            .into_owned();
         let executables = list_game_executables(44).expect("executables should load");
-        assert_eq!(executables, vec!["Games/Launcher/game.exe"]);
+        assert_eq!(executables, vec![relative_exe.clone()]);
 
         let expected_exe = exe_path.to_string_lossy().into_owned();
-        let updated = set_game_exe(44, "Games/Launcher/game.exe".to_string())
-            .expect("prefix executable should save");
+        let updated = set_game_exe(44, relative_exe).expect("prefix executable should save");
         assert_eq!(updated.game_exe.as_deref(), Some(expected_exe.as_str()));
     });
 }
