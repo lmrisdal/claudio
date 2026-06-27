@@ -154,7 +154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, windows-latest, macos-latest]
+        platform: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.platform }}
     env:
       CARGO_HTTP_MULTIPLEXING: "false"
@@ -231,9 +231,6 @@ jobs:
             args: --target x86_64-pc-windows-msvc --features devtools
             rust-targets: ""
             uninstaller-target: x86_64-pc-windows-msvc
-          - platform: macos-latest
-            args: --target universal-apple-darwin --features devtools
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
 
