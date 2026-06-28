@@ -15,6 +15,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://+:{port}");
 builder.Logging.SetMinimumLevel(ParseLogLevel(config.Server.LogLevel));
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Game downloads can be large and the client legitimately reads slowly
+    // (throttling, slow target disk). Disable the minimum data rate so Kestrel
+    // never aborts an in-progress download for being "too slow". The default
+    // response buffer is kept so a slow client simply applies backpressure
+    // (the server's WriteAsync awaits) rather than buffering unboundedly.
+    options.Limits.MinResponseDataRate = null;
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>

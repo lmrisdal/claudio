@@ -17,7 +17,10 @@ public static class GameEndpoints
     private const int DownloadBufferSize = 256 * 1024;
     private const string BytesUnit = "bytes";
     private const long DownloadProgressLogIntervalBytes = 64L * 1024 * 1024;
-    private static readonly TimeSpan DownloadChunkTimeout = TimeSpan.FromSeconds(30);
+    // Generous timeout for a single read from the source disk. The source is
+    // often a spinning NAS drive, which under concurrent access can take many
+    // seconds to return a chunk; only a truly stuck read should fail.
+    private static readonly TimeSpan DownloadReadTimeout = TimeSpan.FromSeconds(120);
 
     public static RouteGroupBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
@@ -446,7 +449,6 @@ public static class GameEndpoints
             httpContext.Response.ContentType = contentType;
             httpContext.Response.ContentLength = contentLength;
             httpContext.Response.Headers.AcceptRanges = BytesUnit;
-            httpContext.Response.Headers.Connection = "close";
             httpContext.Response.Headers.LastModified = fileInfo.LastWriteTimeUtc.ToString("R", CultureInfo.InvariantCulture);
 
             if (range.Requested)
@@ -505,7 +507,7 @@ public static class GameEndpoints
             }
             catch (TimeoutException ex)
             {
-                logger.LogWarning(ex, "Download timed out due to no read/write progress: {Path}", path);
+                logger.LogWarning(ex, "Download timed out waiting for a read from the source: {Path}", path);
                 httpContext.Abort();
             }
             catch (Exception ex)
@@ -535,14 +537,16 @@ public static class GameEndpoints
                     var read = await source
                         .ReadAsync(buffer.AsMemory(0, readSize), cancellationToken)
                         .AsTask()
-                        .WaitAsync(DownloadChunkTimeout, cancellationToken);
+                        .WaitAsync(DownloadReadTimeout, cancellationToken);
                     if (read == 0)
                         break;
 
+                    // No timeout on the write to the client: a momentarily slow
+                    // client must not abort the whole transfer. Kestrel's own
+                    // (disabled) minimum data rate and the request cancellation
+                    // token are the only things that end a stalled write.
                     await destination
-                        .WriteAsync(buffer.AsMemory(0, read), cancellationToken)
-                        .AsTask()
-                        .WaitAsync(DownloadChunkTimeout, cancellationToken);
+                        .WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                     remaining -= read;
                     copied += read;
 
