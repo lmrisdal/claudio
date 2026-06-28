@@ -235,3 +235,50 @@ jobs:
           releaseBody: See the assets below to download and install Claudio for your platform.
           releaseDraft: false
           prerelease: false
+
+  # The Linux AppImage is built on an older base than the systems it runs on, so
+  # linuxdeploy bundles libwayland-* alongside WebKitGTK. On a newer host those
+  # stale libs shadow the host's, the host libEGL fails (EGL_BAD_PARAMETER), and
+  # the window renders blank white. Strip them post-build and re-sign so the
+  # updater signature in latest.json stays valid. Runs after the whole desktop
+  # matrix so it never races other platforms updating latest.json.
+  patch-linux-appimage:
+    needs: desktop
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install squashfs-tools
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "22"
+          working-directory: src/claudio-web
+          cache: true
+          run-install: true
+
+      - name: Strip bundled libwayland and re-sign AppImage
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" -p "*.AppImage" -p "*.AppImage.sig" -p "latest.json"
+          appimage="$(ls ./*.AppImage)"
+
+          bash scripts/strip-appimage-libs.sh "$appimage"
+
+          # Re-sign the repacked AppImage (key/password come from env).
+          src/claudio-web/node_modules/.bin/tauri signer sign "$appimage"
+
+          signature="$(cat "$appimage.sig")"
+          jq --arg sig "$signature" \
+            '.platforms["linux-x86_64"].signature = $sig' latest.json > latest.json.tmp
+          mv latest.json.tmp latest.json
+
+          gh release upload "$TAG" "$appimage" "$appimage.sig" latest.json --clobber
