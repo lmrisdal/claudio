@@ -468,7 +468,6 @@ fn sanitize_segment(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::OsString;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_temp_dir(name: &str) -> PathBuf {
@@ -498,7 +497,8 @@ mod tests {
 
     #[test]
     fn binary_search_dirs_keep_path_entries_before_fallbacks() {
-        let path_env = OsString::from("/custom/bin:/usr/bin");
+        let path_env = std::env::join_paths(["/custom/bin", "/usr/bin"])
+            .expect("path entries should join into a PATH value");
         let dirs = binary_search_dirs(Some(&path_env));
 
         assert_eq!(dirs.first(), Some(&PathBuf::from("/custom/bin")));
