@@ -205,6 +205,7 @@ pub fn run() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            commands::games::add_steam_shortcut,
             commands::games::cancel_install,
             commands::games::cleanup_failed_install,
             commands::games::download_game_package,
@@ -213,6 +214,7 @@ pub fn run() {
             commands::games::launch_game,
             commands::games::list_game_executables,
             commands::games::list_installed_games,
+            commands::games::list_linux_bottles,
             commands::games::list_linux_runtime_backends,
             commands::games::list_proton_versions,
             commands::games::list_running_games,

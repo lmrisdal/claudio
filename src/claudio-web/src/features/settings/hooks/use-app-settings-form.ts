@@ -67,7 +67,7 @@ export interface AppSettingsFormState {
   connectionMessage: string;
   saveMessage: string;
   handleTest: () => Promise<void>;
-  handleSave: () => Promise<void>;
+  handleSave: (overrideBackend?: LinuxRuntimeBackend) => Promise<void>;
 }
 
 export function useAppSettingsForm(active: boolean): AppSettingsFormState {
@@ -204,9 +204,11 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     }
   }
 
-  async function handleSave() {
+  async function handleSave(overrideBackend?: LinuxRuntimeBackend) {
     try {
       if (!settings) return;
+
+      const effectiveBackend = overrideBackend ?? linuxRuntimeBackend;
 
       const trimmedUrl = serverUrl.trim().replace(/\/+$/, "");
       if (!trimmedUrl) {
@@ -220,7 +222,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         return;
       }
       const selectedRuntimeOption = linuxRuntimeOptions.find(
-        (option) => option.value === linuxRuntimeBackend,
+        (option) => option.value === effectiveBackend,
       );
       if (selectedRuntimeOption && !selectedRuntimeOption.available) {
         setSaveMessage(`${selectedRuntimeOption.label} is not installed.`);
@@ -246,7 +248,7 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         defaultInstallPath: normalizedInstallPath || null,
         defaultDownloadPath: normalizedDownloadPath || null,
         defaultProtonPath: protonPath.trim() || null,
-        defaultLinuxRuntimeBackend: linuxRuntimeBackend,
+        defaultLinuxRuntimeBackend: effectiveBackend,
         closeToTray,
         hideDockIcon,
         customHeaders,

@@ -22,6 +22,7 @@ pub fn portable_remote_game(id: i32, title: &str, install_path: String) -> Remot
         app_menu_shortcut: None,
         steam_shortcut: None,
         linux_runtime_backend: None,
+        bottle_name: None,
         proton_path: None,
         run_as_administrator: None,
         force_interactive: None,

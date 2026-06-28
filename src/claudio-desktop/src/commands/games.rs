@@ -17,6 +17,13 @@ pub struct LinuxRuntimeBackendOption {
     pub detail: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinuxBottleOption {
+    pub label: String,
+    pub value: String,
+}
+
 pub(crate) async fn list_installed_games_command() -> Result<Vec<InstalledGame>, String> {
     tokio::task::spawn_blocking(game_install::list_installed_games)
         .await
@@ -110,7 +117,6 @@ pub(crate) fn list_proton_versions_command() -> Vec<serde_json::Value> {
 #[cfg(target_os = "linux")]
 pub(crate) fn list_linux_runtime_backends_command() -> Vec<LinuxRuntimeBackendOption> {
     let bottles_available = crate::services::linux_bottles::is_installed();
-    let umu_available = crate::services::linux_umu::is_installed();
 
     vec![
         LinuxRuntimeBackendOption {
@@ -124,16 +130,28 @@ pub(crate) fn list_linux_runtime_backends_command() -> Vec<LinuxRuntimeBackendOp
             },
         },
         LinuxRuntimeBackendOption {
-            label: "UMU Launcher".to_string(),
+            label: "Proton".to_string(),
             value: LinuxRuntimeBackend::Umu,
-            available: umu_available,
-            detail: if umu_available {
-                None
-            } else {
-                Some("Install umu-launcher or place umu-run in Claudio's tools folder.".to_string())
-            },
+            available: true,
+            detail: None,
         },
     ]
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn list_linux_bottles_command() -> Result<Vec<LinuxBottleOption>, String> {
+    Ok(crate::services::linux_bottles::list_bottles()?
+        .into_iter()
+        .map(|name| LinuxBottleOption {
+            label: name.clone(),
+            value: name,
+        })
+        .collect())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn list_linux_bottles_command() -> Result<Vec<LinuxBottleOption>, String> {
+    Ok(Vec::new())
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -181,6 +199,13 @@ pub async fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledG
 #[tauri::command]
 pub async fn open_install_folder(remote_game_id: i32) -> Result<(), String> {
     tokio::task::spawn_blocking(move || game_install::open_install_folder(remote_game_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn add_steam_shortcut(remote_game_id: i32) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || game_install::add_steam_shortcut(remote_game_id))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -273,4 +298,30 @@ pub fn list_proton_versions() -> serde_json::Value {
 #[tauri::command]
 pub fn list_linux_runtime_backends() -> Vec<LinuxRuntimeBackendOption> {
     list_linux_runtime_backends_command()
+}
+
+#[tauri::command]
+pub fn list_linux_bottles() -> Result<Vec<LinuxBottleOption>, String> {
+    list_linux_bottles_command()
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(target_os = "linux")]
+    use super::*;
+    #[cfg(target_os = "linux")]
+    use crate::models::LinuxRuntimeBackend;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn list_linux_runtime_backends_command_keeps_umu_selectable_without_preflight() {
+        let options = list_linux_runtime_backends_command();
+
+        let umu = options
+            .iter()
+            .find(|option| option.value == LinuxRuntimeBackend::Umu)
+            .expect("Proton option should be present");
+
+        assert!(umu.available);
+    }
 }

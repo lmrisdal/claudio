@@ -156,7 +156,7 @@ export default function AppServerSettingsTab({
         <button
           ref={(element) => setIndexedReference(contentRefs, saveButtonIndex, element)}
           type="button"
-          onClick={settings.handleSave}
+          onClick={() => void settings.handleSave()}
           disabled={settings.saving}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent-hover disabled:opacity-60"
         >

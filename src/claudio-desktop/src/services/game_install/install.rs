@@ -51,14 +51,34 @@ async fn install_game_inner_with_options(
     #[cfg(target_os = "linux")]
     let linux_runtime_backend = selected_linux_runtime_backend(&game)?;
     #[cfg(target_os = "linux")]
+    let bottles_portable_target = if linux_runtime_backend == LinuxRuntimeBackend::Bottles
+        && matches!(game.install_type, InstallType::Portable)
+    {
+        Some(resolve_bottles_portable_target(&game)?)
+    } else {
+        None
+    };
+    #[cfg(target_os = "linux")]
+    let effective_target_dir = bottles_portable_target.as_deref().unwrap_or(&target_dir);
+    #[cfg(not(target_os = "linux"))]
+    let effective_target_dir = target_dir.as_path();
+    #[cfg(target_os = "linux")]
     let is_bottles_installer = linux_runtime_backend == LinuxRuntimeBackend::Bottles
         && matches!(game.install_type, InstallType::Installer);
 
-    if target_dir.exists() {
+    if effective_target_dir.exists() {
         if reuse_cached_package && matches!(game.install_type, InstallType::Portable) {
-            fs::remove_dir_all(&target_dir).map_err(|err| {
-                log_io_failure("remove failed portable install target", &target_dir, &err);
-                format_install_io_error("clean the failed install target", &target_dir, &err)
+            fs::remove_dir_all(effective_target_dir).map_err(|err| {
+                log_io_failure(
+                    "remove failed portable install target",
+                    effective_target_dir,
+                    &err,
+                );
+                format_install_io_error(
+                    "clean the failed install target",
+                    effective_target_dir,
+                    &err,
+                )
             })?;
         } else if !reuse_cached_package {
             #[cfg(target_os = "linux")]
@@ -68,19 +88,19 @@ async fn install_game_inner_with_options(
             } else {
                 return Err(format!(
                     "Install target already exists: {}",
-                    target_dir.display()
+                    effective_target_dir.display()
                 ));
             }
             #[cfg(not(target_os = "linux"))]
             return Err(format!(
                 "Install target already exists: {}",
-                target_dir.display()
+                effective_target_dir.display()
             ));
         }
     }
 
-    if !target_dir.exists() {
-        validate_install_target_path(&target_dir)?;
+    if !effective_target_dir.exists() {
+        validate_install_target_path(effective_target_dir)?;
     }
 
     let downloads_root = settings::resolve_download_root(&settings)?;
@@ -134,7 +154,7 @@ async fn install_game_inner_with_options(
             install_portable(
                 app,
                 &game,
-                &target_dir,
+                effective_target_dir,
                 &download_info.file_path,
                 control,
                 reuse_cached_package,
@@ -185,6 +205,13 @@ async fn install_game_inner_with_options(
         Some("Install complete"),
     );
     Ok(installed)
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_bottles_portable_target(game: &RemoteGame) -> Result<PathBuf, String> {
+    let bottle_name = selected_bottle_name(game)?;
+    let drive_c = crate::services::linux_bottles::bottle_drive_c_path(bottle_name)?;
+    Ok(drive_c.join(sanitize_segment(&game.title)))
 }
 
 #[cfg(target_os = "linux")]
@@ -309,10 +336,20 @@ pub(super) async fn install_portable(
         Some("Extracting game"),
     );
 
+    #[cfg(target_os = "linux")]
+    let prepared_umu_runtime = prepare_portable_umu_runtime(app, game, target_dir, control).await?;
+    #[cfg(target_os = "linux")]
+    let payload_dir = prepared_umu_runtime
+        .as_ref()
+        .map(|runtime| runtime.payload_dir.clone())
+        .unwrap_or_else(|| target_dir.to_path_buf());
+    #[cfg(not(target_os = "linux"))]
+    let payload_dir = target_dir.to_path_buf();
+
     let app_handle = app.clone();
     let gid = game.id;
     let extract_root = target_dir.with_extension("extracting");
-    let target_dir_owned = target_dir.to_path_buf();
+    let payload_dir_owned = payload_dir.clone();
     let package_path_owned = package_path.to_path_buf();
     let game_exe_hint = game.game_exe.clone();
     let cancel_token = control.cancel_token.clone();
@@ -356,18 +393,26 @@ pub(super) async fn install_portable(
             Some(96.0),
             Some("Moving files…"),
         );
-        normalize_into_final_dir(&extract_root, &target_dir_owned)?;
+        if payload_dir_owned.exists() {
+            move_visible_entries_into_dir(&extract_root, &payload_dir_owned)?;
+            fs::remove_dir_all(&extract_root).map_err(|err| {
+                log_io_failure("remove extraction staging root", &extract_root, &err);
+                format_install_io_error("clean the extraction staging folder", &extract_root, &err)
+            })?;
+        } else {
+            normalize_into_final_dir(&extract_root, &payload_dir_owned)?;
+        }
 
         let exe = game_exe_hint
             .as_ref()
             .and_then(|entry| {
-                let candidate = target_dir_owned.join(entry);
+                let candidate = payload_dir_owned.join(entry);
                 candidate
                     .exists()
                     .then(|| candidate.to_string_lossy().into_owned())
             })
             .or_else(|| {
-                detect_windows_executable(&target_dir_owned)
+                detect_windows_executable(&payload_dir_owned)
                     .map(|path| path.to_string_lossy().into_owned())
             });
         Ok(exe)
@@ -377,7 +422,16 @@ pub(super) async fn install_portable(
 
     #[cfg(target_os = "linux")]
     let (wine_prefix, linux_runtime_backend, bottle_name, proton_path) =
-        prepare_linux_runtime(app, game, control, _allow_existing_runtime).await?;
+        if let Some(runtime) = prepared_umu_runtime {
+            (
+                Some(runtime.wine_prefix),
+                Some(LinuxRuntimeBackend::Umu),
+                None,
+                Some(runtime.proton_path),
+            )
+        } else {
+            prepare_linux_runtime(app, game, control, _allow_existing_runtime).await?
+        };
 
     #[cfg(not(target_os = "linux"))]
     let (wine_prefix, linux_runtime_backend, bottle_name, proton_path) = (None, None, None, None);
@@ -406,6 +460,59 @@ pub(super) async fn install_portable(
         franchise: game.franchise.clone(),
         game_engine: game.game_engine.clone(),
     })
+}
+
+#[cfg(target_os = "linux")]
+struct PreparedUmuPortableRuntime {
+    payload_dir: PathBuf,
+    wine_prefix: String,
+    proton_path: String,
+}
+
+#[cfg(target_os = "linux")]
+async fn prepare_portable_umu_runtime(
+    app: &AppHandle,
+    game: &RemoteGame,
+    target_dir: &Path,
+    control: &InstallControl,
+) -> Result<Option<PreparedUmuPortableRuntime>, String> {
+    if selected_linux_runtime_backend(game)? != LinuxRuntimeBackend::Umu {
+        return Ok(None);
+    }
+
+    let prefix = target_dir.to_path_buf();
+    let proton_path =
+        crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
+    let control = control.clone();
+    let prefix_for_task = prefix.clone();
+    let proton_for_task = proton_path.clone();
+    emit_progress_indeterminate(
+        app,
+        game.id,
+        "preparing-prefix",
+        Some(60.0),
+        Some("Preparing Proton prefix..."),
+        true,
+    );
+    tokio::task::spawn_blocking(move || {
+        crate::services::linux_umu::prepare_prefix(&prefix_for_task, &proton_for_task, || {
+            control.is_cancelled()
+        })
+    })
+    .await
+    .map_err(|err| format!("Prefix setup task failed: {err}"))??;
+
+    let payload_dir = prefix.join("pfx").join("drive_c");
+    fs::create_dir_all(&payload_dir).map_err(|err| {
+        log_io_failure("create UMU drive_c install directory", &payload_dir, &err);
+        format_install_io_error("create the UMU drive_c folder", &payload_dir, &err)
+    })?;
+
+    Ok(Some(PreparedUmuPortableRuntime {
+        payload_dir,
+        wine_prefix: prefix.to_string_lossy().into_owned(),
+        proton_path,
+    }))
 }
 
 #[cfg(target_os = "linux")]
@@ -456,8 +563,7 @@ async fn prepare_linux_runtime(
             ))
         }
         LinuxRuntimeBackend::Bottles => {
-            let bottle_name =
-                crate::services::linux_bottles::default_bottle_name(game.id, &game.title);
+            let bottle_name = selected_bottle_name(game)?.to_string();
             let control = control.clone();
             let bottle_for_task = bottle_name.clone();
             emit_progress_indeterminate(
@@ -469,11 +575,11 @@ async fn prepare_linux_runtime(
                 true,
             );
             tokio::task::spawn_blocking(move || {
-                crate::services::linux_bottles::prepare_bottle(
-                    &bottle_for_task,
-                    allow_existing_runtime,
-                    || control.is_cancelled(),
-                )
+                let _ = allow_existing_runtime;
+                if control.is_cancelled() {
+                    return Err("Install cancelled.".to_string());
+                }
+                crate::services::linux_bottles::existing_bottle_path(&bottle_for_task)
             })
             .await
             .map_err(|err| format!("Bottles setup task failed: {err}"))??;
@@ -489,9 +595,18 @@ async fn prepare_linux_runtime(
 
 #[cfg(target_os = "linux")]
 fn selected_linux_runtime_backend(game: &RemoteGame) -> Result<LinuxRuntimeBackend, String> {
-    game.linux_runtime_backend.clone().ok_or_else(|| {
-        "Choose either Bottles or UMU Launcher as the Linux runtime backend.".to_string()
-    })
+    game.linux_runtime_backend
+        .clone()
+        .ok_or_else(|| "Choose either Bottles or Proton as the Linux runtime backend.".to_string())
+}
+
+#[cfg(target_os = "linux")]
+fn selected_bottle_name(game: &RemoteGame) -> Result<&str, String> {
+    game.bottle_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| "Choose an existing Bottles bottle for this install.".to_string())
 }
 
 #[cfg(test)]

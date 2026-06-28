@@ -51,6 +51,7 @@ interface DesktopInstallGameInput {
   appMenuShortcut?: boolean;
   steamShortcut?: boolean;
   linuxRuntimeBackend?: "umu" | "bottles" | null;
+  bottleName?: string | null;
   protonPath?: string | null;
   runAsAdministrator?: boolean;
   forceInteractive?: boolean;
@@ -125,6 +126,11 @@ interface LinuxRuntimeBackendOption {
   detail?: string | null;
 }
 
+interface LinuxBottleOption {
+  label: string;
+  value: string;
+}
+
 export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
 }
@@ -165,6 +171,10 @@ export async function listLinuxRuntimeBackends(): Promise<LinuxRuntimeBackendOpt
   return invoke<LinuxRuntimeBackendOption[]>("list_linux_runtime_backends");
 }
 
+export async function listLinuxBottles(): Promise<LinuxBottleOption[]> {
+  return invoke<LinuxBottleOption[]>("list_linux_bottles");
+}
+
 export async function downloadGamePackage(input: DownloadPackageInput): Promise<string> {
   return invoke<string>("download_game_package", { input });
 }
@@ -199,6 +209,10 @@ export async function listInstalledGames(): Promise<InstalledGame[]> {
 
 export async function openInstallFolder(remoteGameId: number): Promise<void> {
   return invoke<void>("open_install_folder", { remoteGameId });
+}
+
+export async function addSteamShortcut(remoteGameId: number): Promise<void> {
+  return invoke<void>("add_steam_shortcut", { remoteGameId });
 }
 
 export async function cancelInstall(gameId: number): Promise<void> {
@@ -254,6 +268,7 @@ export function useDesktop() {
     updateSettings,
     openSettingsWindow,
     installGame,
+    listLinuxBottles,
     listLinuxRuntimeBackends,
     listProtonVersions,
     validateInstallTarget,
@@ -270,6 +285,7 @@ export type {
   DesktopSettings,
   LinuxRuntimeBackend,
   LinuxRuntimeBackendOption,
+  LinuxBottleOption,
   ProtonVersionOption,
   InstalledGame,
   InstallProgress,

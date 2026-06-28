@@ -28,10 +28,19 @@ pub(super) async fn install_installer_linux(
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
     let runtime_backend = game.linux_runtime_backend.clone().ok_or_else(|| {
-        "Choose either Bottles or UMU Launcher as the Linux runtime backend.".to_string()
+        "Choose either Bottles or Proton as the Linux runtime backend.".to_string()
     })?;
     let prefix = target_dir.to_path_buf();
-    let bottle_name = crate::services::linux_bottles::default_bottle_name(game.id, &game.title);
+    let bottle_name = if runtime_backend == LinuxRuntimeBackend::Bottles {
+        game.bottle_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| "Choose an existing Bottles bottle for this install.".to_string())?
+            .to_string()
+    } else {
+        String::new()
+    };
     let proton_path = (runtime_backend == LinuxRuntimeBackend::Umu)
         .then(|| crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref()));
     let control_for_task = control.clone();
@@ -100,11 +109,9 @@ pub(super) async fn install_installer_linux(
                     prefix.join("pfx").join("drive_c")
                 }
                 LinuxRuntimeBackend::Bottles => {
-                    let bottle_path = crate::services::linux_bottles::prepare_bottle(
-                        &bottle_for_task,
-                        allow_existing_runtime,
-                        || control_for_task.is_cancelled(),
-                    )?;
+                    let _ = allow_existing_runtime;
+                    let bottle_path =
+                        crate::services::linux_bottles::existing_bottle_path(&bottle_for_task)?;
                     crate::services::linux_bottles::run_bottle_command_wait(
                         &bottle_for_task,
                         &installer,
@@ -116,11 +123,14 @@ pub(super) async fn install_installer_linux(
             };
 
             let _ = cleanup_directory(&staging_dir, "installer staging directory");
+            // Setup-based installers scatter the real game executable across the
+            // prefix in ways we can't reliably guess. Only honor an explicit hint;
+            // otherwise leave it unset so the user picks the executable the first
+            // time they click Play.
             let exe = game_exe_hint
                 .as_ref()
                 .map(|entry| search_root.join(entry))
                 .filter(|path| path.exists())
-                .or_else(|| detect_windows_executable(&search_root))
                 .map(|path| path.to_string_lossy().into_owned());
 
             let install_path = match runtime_for_task {

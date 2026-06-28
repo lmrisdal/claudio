@@ -7,6 +7,7 @@ import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isLinux, isWindows } from "../../core/utils/os";
 import {
   listLinuxRuntimeBackends,
+  listLinuxBottles,
   listProtonVersions,
   resolveInstallBrowseRoot,
   type LinuxRuntimeBackend,
@@ -63,6 +64,10 @@ function resolveAvailableRuntimeBackend(
     return preferred;
   }
 
+  if (available.some((option) => option.value === DEFAULT_LINUX_RUNTIME_BACKEND)) {
+    return DEFAULT_LINUX_RUNTIME_BACKEND;
+  }
+
   return available[0]?.value ?? preferred ?? DEFAULT_LINUX_RUNTIME_BACKEND;
 }
 
@@ -85,6 +90,7 @@ interface InstallDialogProperties {
     path: string | undefined,
     exe?: string,
     linuxRuntimeBackend?: LinuxRuntimeBackend,
+    bottleName?: string,
     protonPath?: string,
     desktopShortcut?: boolean,
     appMenuShortcut?: boolean,
@@ -121,12 +127,12 @@ export default function InstallDialog({
 
   const [installPath, setInstallPath] = useState(defaultPath);
   const [exe, setExe] = useState("");
-  const [desktopShortcut, setDesktopShortcut] = useState(true);
-  const [appMenuShortcut, setAppMenuShortcut] = useState(true);
-  const [steamShortcut, setSteamShortcut] = useState(false);
+  const [desktopShortcut, setDesktopShortcut] = useState(false);
+  const [appMenuShortcut, setAppMenuShortcut] = useState(false);
   const [linuxRuntimeBackend, setLinuxRuntimeBackend] = useState<LinuxRuntimeBackend>(
     defaultLinuxRuntimeBackend ?? DEFAULT_LINUX_RUNTIME_BACKEND,
   );
+  const [bottleName, setBottleName] = useState("");
   const [protonPath, setProtonPath] = useState(defaultProtonPath);
   const [runAsAdministratorOverrides, setRunAsAdministratorOverrides] = useState<
     Record<string, boolean>
@@ -135,6 +141,7 @@ export default function InstallDialog({
   const [extract, setExtract] = useState(true);
 
   const showExePicker = exeLabel !== undefined && exeOptions.length > 0;
+  const usesBottlesRuntime = !downloadMode && isLinux && linuxRuntimeBackend === "bottles";
   const canInstall = !showExePicker || exe !== "";
   const effectiveInstallerPath = useMemo(() => {
     if (isPortable) {
@@ -164,6 +171,11 @@ export default function InstallDialog({
     queryKey: ["linuxRuntimeBackends"],
     queryFn: listLinuxRuntimeBackends,
     enabled: open && !downloadMode && isLinux,
+  });
+  const { data: bottleOptions = [] } = useQuery({
+    queryKey: ["linuxBottles"],
+    queryFn: listLinuxBottles,
+    enabled: open && !downloadMode && isLinux && linuxRuntimeBackend === "bottles",
   });
 
   const {
@@ -209,6 +221,11 @@ export default function InstallDialog({
     }
   }, [open, downloadMode, defaultLinuxRuntimeBackend, linuxRuntimeOptions]);
   useEffect(() => {
+    if (open && linuxRuntimeBackend === "bottles") {
+      setBottleName((current) => current || bottleOptions[0]?.value || "");
+    }
+  }, [open, linuxRuntimeBackend, bottleOptions]);
+  useEffect(() => {
     if (
       open &&
       protonOptions.length > 0 &&
@@ -241,6 +258,8 @@ export default function InstallDialog({
           },
         ];
   const canUseLinuxRuntime = downloadMode || !isLinux || selectedRuntimeOption?.available === true;
+  const canUseSelectedBottle =
+    downloadMode || !isLinux || linuxRuntimeBackend !== "bottles" || bottleName !== "";
 
   async function handleBrowse() {
     try {
@@ -314,35 +333,42 @@ export default function InstallDialog({
                   : "Choose where you want to install this game."}
               </p>
 
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  {downloadMode ? "Download Location" : "Install Location"}
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={installPath}
-                    onChange={(e) => {
-                      setInstallPath(e.target.value);
-                      onPathChange?.();
-                    }}
-                    placeholder="e.g. C:\Games\My Game"
-                    className="flex-1 rounded-lg bg-surface-raised border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-focus-ring transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleBrowse}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-surface-raised border border-border hover:bg-surface-overlay transition text-text-primary"
-                  >
-                    Browse…
-                  </button>
+              {!usesBottlesRuntime && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">
+                    {downloadMode ? "Download Location" : "Install Location"}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={installPath}
+                      onChange={(e) => {
+                        setInstallPath(e.target.value);
+                        onPathChange?.();
+                      }}
+                      placeholder="e.g. C:\Games\My Game"
+                      className="flex-1 rounded-lg bg-surface-raised border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-focus-ring transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleBrowse}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-surface-raised border border-border hover:bg-surface-overlay transition text-text-primary"
+                    >
+                      Browse…
+                    </button>
+                  </div>
+                  {errorMessage && (
+                    <p className="mt-2 text-sm text-red-400" role="alert">
+                      {errorMessage}
+                    </p>
+                  )}
                 </div>
-                {errorMessage && (
-                  <p className="mt-2 text-sm text-red-400" role="alert">
-                    {errorMessage}
-                  </p>
-                )}
-              </div>
+              )}
+              {usesBottlesRuntime && errorMessage && (
+                <p className="mt-4 text-sm text-red-400" role="alert">
+                  {errorMessage}
+                </p>
+              )}
 
               {showExePicker && !downloadMode && (
                 <div className="mt-4">
@@ -402,6 +428,30 @@ export default function InstallDialog({
                     )}
                   </div>
 
+                  {linuxRuntimeBackend === "bottles" && (
+                    <div>
+                      <label
+                        htmlFor="install-bottle"
+                        className="mb-1.5 block text-sm font-medium text-text-primary"
+                      >
+                        Bottle
+                      </label>
+                      <select
+                        id="install-bottle"
+                        value={bottleName}
+                        onChange={(event) => setBottleName(event.target.value)}
+                        className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                      >
+                        <option value="">Select a bottle</option>
+                        {bottleOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {linuxRuntimeBackend === "umu" && (
                     <div>
                       <label
@@ -428,7 +478,7 @@ export default function InstallDialog({
                     </div>
                   )}
 
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
                       <input
                         type="checkbox"
@@ -446,15 +496,6 @@ export default function InstallDialog({
                         className="h-4 w-4 rounded accent-accent"
                       />
                       App menu
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
-                      <input
-                        type="checkbox"
-                        checked={steamShortcut}
-                        onChange={(event) => setSteamShortcut(event.target.checked)}
-                        className="h-4 w-4 rounded accent-accent"
-                      />
-                      Steam
                     </label>
                   </div>
                 </div>
@@ -554,21 +595,26 @@ export default function InstallDialog({
             <button
               onClick={() =>
                 void onConfirm(
-                  installPath || undefined,
+                  usesBottlesRuntime ? undefined : installPath || undefined,
                   exe || undefined,
                   downloadMode || !isLinux ? undefined : linuxRuntimeBackend,
+                  downloadMode || !isLinux || linuxRuntimeBackend !== "bottles"
+                    ? undefined
+                    : bottleName,
                   downloadMode || !isLinux || linuxRuntimeBackend !== "umu"
                     ? undefined
                     : protonPath,
                   downloadMode || (!isLinux && !isPortable) ? undefined : desktopShortcut,
                   downloadMode || !isLinux ? undefined : appMenuShortcut,
-                  downloadMode || !isLinux ? undefined : steamShortcut,
+                  undefined,
                   downloadMode || isPortable ? undefined : runAsAdministrator,
                   downloadMode || isPortable ? undefined : forceInteractive,
                   downloadMode ? (showExtractOption ? extract : false) : undefined,
                 )
               }
-              disabled={downloadMode ? false : !canInstall || !canUseLinuxRuntime}
+              disabled={
+                downloadMode ? false : !canInstall || !canUseLinuxRuntime || !canUseSelectedBottle
+              }
               className="px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
             >
               {downloadMode ? "Download" : "Install"}

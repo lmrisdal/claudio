@@ -19,14 +19,6 @@ pub fn list_proton_versions() -> Vec<ProtonVersionOption> {
             value: "UMU-Latest".to_string(),
         },
         ProtonVersionOption {
-            label: "GE-Proton Latest".to_string(),
-            value: "GE-Proton".to_string(),
-        },
-        ProtonVersionOption {
-            label: "GE Latest".to_string(),
-            value: "GE-Latest".to_string(),
-        },
-        ProtonVersionOption {
             label: "UMU Sniper".to_string(),
             value: "umu-sniper".to_string(),
         },
@@ -81,9 +73,6 @@ fn is_builtin_proton_option(value: &str) -> bool {
     matches!(
         value,
         "UMU-Latest"
-            | "GE-Proton"
-            | "GE-Latest"
-            | "UMU-Proton"
             | "umu-scout"
             | "umu-soldier"
             | "umu-sniper"
@@ -127,4 +116,19 @@ fn compatibility_tool_dirs() -> Vec<PathBuf> {
         dirs.push(data_dir.join("umu").join("compatibilitytools"));
     }
     dirs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selected_proton_path_falls_back_for_uninstalled_ge_alias() {
+        assert_eq!(selected_proton_path(Some("GE-Latest")), "UMU-Latest");
+    }
+
+    #[test]
+    fn selected_proton_path_keeps_umu_latest_alias() {
+        assert_eq!(selected_proton_path(Some("UMU-Latest")), "UMU-Latest");
+    }
 }

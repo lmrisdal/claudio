@@ -28,6 +28,7 @@ pub struct RemoteGame {
     pub app_menu_shortcut: Option<bool>,
     pub steam_shortcut: Option<bool>,
     pub linux_runtime_backend: Option<LinuxRuntimeBackend>,
+    pub bottle_name: Option<String>,
     pub proton_path: Option<String>,
     pub run_as_administrator: Option<bool>,
     pub force_interactive: Option<bool>,

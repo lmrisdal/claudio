@@ -2,21 +2,20 @@
 
 use crate::models::InstalledGame;
 use crate::settings;
+use std::ffi::OsStr;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+const MANAGED_UMU_VERSION: &str = "1.4.0";
+const MANAGED_UMU_ARCHIVE_MEMBER: &str = "umu/umu-run";
+
 pub fn default_prefix_path(game_id: i32, title: &str) -> PathBuf {
     let settings = settings::load();
-    settings::default_install_root(&settings)
-        .join(".prefixes")
-        .join(format!("{game_id}-{}", sanitize_segment(title)))
-}
-
-pub fn is_installed() -> bool {
-    resolve_umu_run().is_ok()
+    settings::default_install_root(&settings).join(format!("{game_id}-{}", sanitize_segment(title)))
 }
 
 pub fn run_prefix_command(
@@ -40,13 +39,15 @@ fn spawn_prefix_command(
     store: Option<&str>,
 ) -> Result<crate::services::process_log::LoggedChild, String> {
     let umu_run = resolve_umu_run()?;
+    let runtime_prefix = crate::services::linux_host_paths::nested_runtime_path(prefix);
+    let runtime_exe = crate::services::linux_host_paths::nested_runtime_path(exe);
     let working_dir = exe.parent().unwrap_or_else(|| Path::new("."));
     let mut command = Command::new(umu_run);
     command
-        .arg(exe)
+        .arg(&runtime_exe)
         .args(extra_args)
         .current_dir(working_dir)
-        .env("WINEPREFIX", prefix)
+        .env("WINEPREFIX", &runtime_prefix)
         .env("PROTONPATH", proton_path)
         .env("GAMEID", game_id.unwrap_or("umu-default"))
         .env("STORE", store.unwrap_or("none"))
@@ -57,14 +58,14 @@ fn spawn_prefix_command(
 
     log::info!(
         "[umu] starting {} with prefix {} and Proton {proton_path}",
-        exe.display(),
-        prefix.display()
+        runtime_exe.display(),
+        runtime_prefix.display()
     );
     crate::services::process_log::spawn_logged_child(command, "umu").map_err(|err| {
         format!(
             "Failed to start UMU for {} with prefix {}: {err}",
-            exe.display(),
-            prefix.display()
+            runtime_exe.display(),
+            runtime_prefix.display()
         )
     })
 }
@@ -108,11 +109,12 @@ pub fn prepare_prefix(
     fs::create_dir_all(prefix)
         .map_err(|err| format!("Failed to create Wine prefix {}: {err}", prefix.display()))?;
     let umu_run = resolve_umu_run()?;
+    let runtime_prefix = crate::services::linux_host_paths::nested_runtime_path(prefix);
     let mut command = Command::new(umu_run);
     command
         .arg("")
         .current_dir(prefix)
-        .env("WINEPREFIX", prefix)
+        .env("WINEPREFIX", &runtime_prefix)
         .env("PROTONPATH", proton_path)
         .env("GAMEID", "umu-default")
         .env("STORE", "none")
@@ -123,13 +125,13 @@ pub fn prepare_prefix(
 
     log::info!(
         "[umu] preparing prefix {} with Proton {proton_path}",
-        prefix.display()
+        runtime_prefix.display()
     );
     let mut process =
         crate::services::process_log::spawn_logged_child(command, "umu").map_err(|err| {
             format!(
                 "Failed to prepare UMU prefix {} with Proton {proton_path}: {err}",
-                prefix.display()
+                runtime_prefix.display()
             )
         })?;
 
@@ -145,7 +147,7 @@ pub fn prepare_prefix(
             Ok(Some(status)) => {
                 return Err(format!(
                     "UMU exited with status {status} while preparing prefix {}.\n{}",
-                    prefix.display(),
+                    runtime_prefix.display(),
                     crate::services::process_log::format_log_tail("UMU", &process.log_tail)
                 ));
             }
@@ -179,28 +181,178 @@ pub fn sync_shortcuts(
     }
 }
 
-fn resolve_umu_run() -> Result<PathBuf, String> {
-    let bundled = settings::tools_dir().join("umu-run");
-    if bundled.is_file() {
-        return Ok(bundled);
-    }
+pub fn add_steam_shortcut(installed: &InstalledGame) -> Result<(), String> {
+    let umu_run = resolve_umu_run()?;
+    crate::services::linux_steam_shortcuts::write_steam_shortcut(installed, &umu_run)
+}
 
-    if let Some(path) = find_in_path("umu-run") {
+fn resolve_umu_run() -> Result<PathBuf, String> {
+    if let Some(path) = cached_managed_umu_run() {
         return Ok(path);
     }
 
-    Err(
-        "umu-run was not found. Install umu-launcher or place umu-run in Claudio's tools folder."
-            .to_string(),
+    let managed_error = match install_managed_umu_run() {
+        Ok(path) => return Ok(path),
+        Err(error) => error,
+    };
+
+    for path in binary_candidates("umu-run") {
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    Err(format!(
+        "umu-run was not found and Claudio could not install UMU Launcher {MANAGED_UMU_VERSION}: {managed_error}"
+    ))
+}
+
+fn cached_managed_umu_run() -> Option<PathBuf> {
+    let target = managed_umu_run_path();
+    let version = fs::read_to_string(managed_umu_version_path()).ok()?;
+    (target.is_file() && version.trim() == MANAGED_UMU_VERSION).then_some(target)
+}
+
+fn install_managed_umu_run() -> Result<PathBuf, String> {
+    let target = managed_umu_run_path();
+    let parent = target
+        .parent()
+        .ok_or_else(|| format!("Could not determine parent folder for {}", target.display()))?;
+    fs::create_dir_all(parent).map_err(|err| {
+        format!(
+            "Failed to create UMU tools folder {}: {err}",
+            parent.display()
+        )
+    })?;
+
+    let bytes = reqwest::blocking::Client::builder()
+        .user_agent("Claudio/1.0")
+        .build()
+        .map_err(|err| err.to_string())?
+        .get(managed_umu_download_url())
+        .send()
+        .map_err(|err| format!("Failed to download UMU Launcher: {err}"))?
+        .error_for_status()
+        .map_err(|err| format!("Failed to download UMU Launcher: {err}"))?
+        .bytes()
+        .map_err(|err| format!("Failed to read UMU Launcher download: {err}"))?;
+
+    let cursor = io::Cursor::new(bytes.as_ref());
+    let mut archive = tar::Archive::new(cursor);
+    for entry in archive.entries().map_err(|err| err.to_string())? {
+        let mut entry = entry.map_err(|err| err.to_string())?;
+        let path = entry.path().map_err(|err| err.to_string())?;
+        if path.as_ref() == Path::new(MANAGED_UMU_ARCHIVE_MEMBER) {
+            let temp_target = target.with_extension("download");
+            let mut out = fs::File::create(&temp_target).map_err(|err| {
+                format!(
+                    "Failed to create UMU Launcher file {}: {err}",
+                    temp_target.display()
+                )
+            })?;
+            io::copy(&mut entry, &mut out)
+                .map_err(|err| format!("Failed to write UMU Launcher: {err}"))?;
+            drop(out);
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&temp_target, fs::Permissions::from_mode(0o755)).map_err(
+                    |err| {
+                        format!(
+                            "Failed to mark UMU Launcher executable {}: {err}",
+                            temp_target.display()
+                        )
+                    },
+                )?;
+            }
+
+            fs::rename(&temp_target, &target).map_err(|err| {
+                format!(
+                    "Failed to install UMU Launcher from {} to {}: {err}",
+                    temp_target.display(),
+                    target.display()
+                )
+            })?;
+            fs::write(
+                managed_umu_version_path(),
+                format!("{MANAGED_UMU_VERSION}\n"),
+            )
+            .map_err(|err| format!("Failed to write UMU Launcher version marker: {err}"))?;
+            return Ok(target);
+        }
+    }
+
+    Err(format!(
+        "{MANAGED_UMU_ARCHIVE_MEMBER} was not found in UMU Launcher archive"
+    ))
+}
+
+fn managed_umu_run_path() -> PathBuf {
+    managed_umu_dir().join("umu-run")
+}
+
+fn managed_umu_version_path() -> PathBuf {
+    managed_umu_dir().join("VERSION")
+}
+
+fn managed_umu_dir() -> PathBuf {
+    settings::tools_dir()
+        .join("umu-launcher")
+        .join(MANAGED_UMU_VERSION)
+}
+
+fn managed_umu_download_url() -> String {
+    format!(
+        "https://github.com/Open-Wine-Components/umu-launcher/releases/download/{MANAGED_UMU_VERSION}/umu-launcher-{MANAGED_UMU_VERSION}-zipapp.tar"
     )
 }
 
-fn find_in_path(binary: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH").and_then(|paths| {
-        std::env::split_paths(&paths)
-            .map(|path| path.join(binary))
-            .find(|path| path.is_file())
-    })
+fn binary_candidates(binary: &str) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    push_unique_path(&mut candidates, settings::tools_dir().join(binary));
+
+    for dir in binary_search_dirs(std::env::var_os("PATH").as_deref()) {
+        push_unique_path(&mut candidates, dir.join(binary));
+    }
+
+    candidates
+}
+
+fn binary_search_dirs(path_env: Option<&OsStr>) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Some(paths) = path_env {
+        for path in std::env::split_paths(paths) {
+            push_unique_path(&mut dirs, path);
+        }
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        push_unique_path(&mut dirs, home.join(".local/bin"));
+        push_unique_path(&mut dirs, home.join("bin"));
+    }
+
+    for path in [
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/var/lib/flatpak/exports/bin",
+        "/run/host/usr/local/bin",
+        "/run/host/usr/bin",
+        "/run/host/bin",
+        "/run/host/var/lib/flatpak/exports/bin",
+    ] {
+        push_unique_path(&mut dirs, PathBuf::from(path));
+    }
+
+    dirs
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if !paths.iter().any(|existing| existing == &path) {
+        paths.push(path);
+    }
 }
 
 enum ShortcutKind {
@@ -310,5 +462,82 @@ fn sanitize_segment(input: &str) -> String {
         "game".to_string()
     } else {
         sanitized
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsString;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "claudio-umu-{name}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after UNIX epoch")
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn binary_search_dirs_include_standard_linux_locations_without_path_env() {
+        let dirs = binary_search_dirs(None);
+
+        assert!(dirs.contains(&PathBuf::from("/usr/bin")));
+    }
+
+    #[test]
+    fn binary_search_dirs_include_distrobox_host_locations_without_path_env() {
+        let dirs = binary_search_dirs(None);
+
+        assert!(dirs.contains(&PathBuf::from("/run/host/usr/bin")));
+    }
+
+    #[test]
+    fn binary_search_dirs_keep_path_entries_before_fallbacks() {
+        let path_env = OsString::from("/custom/bin:/usr/bin");
+        let dirs = binary_search_dirs(Some(&path_env));
+
+        assert_eq!(dirs.first(), Some(&PathBuf::from("/custom/bin")));
+    }
+
+    #[test]
+    fn managed_umu_download_url_uses_pinned_version() {
+        assert!(managed_umu_download_url().contains(MANAGED_UMU_VERSION));
+    }
+
+    #[test]
+    fn cached_managed_umu_run_returns_pinned_cached_zipapp() {
+        let temp_dir = unique_temp_dir("managed-cache");
+
+        crate::settings::with_test_data_dir(temp_dir, || {
+            let umu_run = managed_umu_run_path();
+            fs::create_dir_all(umu_run.parent().expect("managed path should have parent"))
+                .expect("managed UMU folder should be created");
+            fs::write(&umu_run, b"umu").expect("cached umu-run should be written");
+            fs::write(managed_umu_version_path(), MANAGED_UMU_VERSION)
+                .expect("version marker should be written");
+
+            assert_eq!(cached_managed_umu_run(), Some(umu_run));
+        });
+    }
+
+    #[test]
+    fn default_prefix_path_uses_install_root_without_prefixes_folder() {
+        let temp_dir = unique_temp_dir("default-prefix");
+
+        crate::settings::with_test_data_dir(temp_dir, || {
+            let prefix = default_prefix_path(12, "Halo: Reach");
+
+            assert!(
+                !prefix
+                    .components()
+                    .any(|part| part.as_os_str() == ".prefixes")
+            );
+            assert!(prefix.ends_with("12-Halo_ Reach"));
+        });
     }
 }

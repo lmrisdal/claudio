@@ -10,7 +10,11 @@ use std::time::Duration;
 
 const FLATPAK_APP_ID: &str = "com.usebottles.bottles";
 
-pub fn default_bottle_name(game_id: i32, title: &str) -> String {
+pub fn default_bottle_name(_game_id: i32, title: &str) -> String {
+    sanitize_segment(title)
+}
+
+pub fn legacy_bottle_name(game_id: i32, title: &str) -> String {
     format!("claudio-{game_id}-{}", sanitize_segment(title))
 }
 
@@ -18,33 +22,28 @@ pub fn is_installed() -> bool {
     bottles_command().is_ok()
 }
 
-pub fn prepare_bottle(
-    bottle_name: &str,
-    allow_existing: bool,
-    cancelled: impl Fn() -> bool,
-) -> Result<PathBuf, String> {
-    if allow_existing && bottle_exists(bottle_name)? {
-        return bottle_path(bottle_name);
+pub fn list_bottles() -> Result<Vec<String>, String> {
+    let mut command = bottles_command()?;
+    command.args(["--json", "list", "bottles"]);
+    let output = command
+        .output()
+        .map_err(|err| format!("Failed to list Bottles bottles: {err}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Bottles failed to list bottles: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
 
-    let mut command = bottles_command()?;
-    command.args([
-        "new",
-        "--bottle-name",
-        bottle_name,
-        "--environment",
-        "gaming",
-        "--arch",
-        "win64",
-    ]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    parse_bottle_list(stdout.trim())
+}
 
-    wait_logged_command(
-        command,
-        "creating Bottles bottle",
-        bottle_name,
-        "Bottles bottle creation",
-        cancelled,
-    )?;
+pub fn existing_bottle_path(bottle_name: &str) -> Result<PathBuf, String> {
+    if !bottle_exists(bottle_name)? {
+        return Err(format!("Bottles bottle '{bottle_name}' does not exist."));
+    }
+
     bottle_path(bottle_name)
 }
 
@@ -90,6 +89,28 @@ pub fn bottle_drive_c_path(bottle_name: &str) -> Result<PathBuf, String> {
     Ok(bottle_path(bottle_name)?.join("drive_c"))
 }
 
+pub fn bottle_root_candidates(bottle_name: &str) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(path) = bottle_path(bottle_name) {
+        push_unique_candidate(&mut candidates, path);
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        push_unique_candidate(
+            &mut candidates,
+            home.join(".local/share/bottles/bottles").join(bottle_name),
+        );
+        push_unique_candidate(
+            &mut candidates,
+            home.join(".var/app/com.usebottles.bottles/data/bottles/bottles")
+                .join(bottle_name),
+        );
+    }
+
+    candidates
+}
+
 pub fn sync_shortcuts(
     installed: &InstalledGame,
     desktop_shortcut: bool,
@@ -116,6 +137,15 @@ pub fn sync_shortcuts(
     {
         log::warn!("[linux shortcut] failed to write Bottles Steam shortcut: {error}");
     }
+}
+
+pub fn add_steam_shortcut(installed: &InstalledGame) -> Result<(), String> {
+    let launch_options = steam_shortcut_command(installed)?;
+    crate::services::linux_steam_shortcuts::write_steam_shortcut_command(
+        installed,
+        "\"/usr/bin/env\"".to_string(),
+        launch_options,
+    )
 }
 
 fn spawn_bottle_command(
@@ -150,69 +180,27 @@ fn spawn_bottle_command(
     })
 }
 
-fn wait_logged_command(
-    mut command: Command,
-    action: &str,
-    label: &str,
-    error_prefix: &str,
-    cancelled: impl Fn() -> bool,
-) -> Result<(), String> {
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    log::info!("[bottles] {action} {label}");
-    let mut process = crate::services::process_log::spawn_logged_child(command, "bottles")
-        .map_err(|err| format!("Failed to start Bottles while {action} {label}: {err}"))?;
-
-    loop {
-        if cancelled() {
-            let _ = process.child.kill();
-            let _ = process.child.wait();
-            return Err("Install cancelled.".to_string());
-        }
-
-        match process.child.try_wait() {
-            Ok(Some(status)) if status.success() => return Ok(()),
-            Ok(Some(status)) => {
-                return Err(format!(
-                    "{error_prefix} failed for {label} with status {status}.\n{}",
-                    crate::services::process_log::format_log_tail("Bottles", &process.log_tail)
-                ));
-            }
-            Ok(None) => thread::sleep(Duration::from_millis(250)),
-            Err(err) => return Err(format!("Failed waiting for Bottles: {err}")),
-        }
-    }
+fn bottle_exists(bottle_name: &str) -> Result<bool, String> {
+    Ok(list_bottles()?.iter().any(|name| name == bottle_name))
 }
 
-fn bottle_exists(bottle_name: &str) -> Result<bool, String> {
-    let mut command = bottles_command()?;
-    command.args(["--json", "list", "bottles"]);
-    let output = command
-        .output()
-        .map_err(|err| format!("Failed to list Bottles bottles: {err}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "Bottles failed to list bottles: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let value: Value = serde_json::from_str(stdout.trim()).map_err(|err| {
+fn parse_bottle_list(output: &str) -> Result<Vec<String>, String> {
+    let value: Value = serde_json::from_str(output).map_err(|err| {
         format!(
             "Bottles returned invalid JSON while listing bottles: {err}. Output: {}",
-            stdout.trim()
+            output
         )
     })?;
-    Ok(match value {
+    let mut bottles = match value {
         Value::Array(values) => values
             .iter()
-            .any(|value| value.as_str() == Some(bottle_name)),
-        Value::Object(map) => map.contains_key(bottle_name),
-        _ => false,
-    })
+            .filter_map(|value| value.as_str().map(ToString::to_string))
+            .collect::<Vec<_>>(),
+        Value::Object(map) => map.keys().cloned().collect(),
+        _ => Vec::new(),
+    };
+    bottles.sort();
+    Ok(bottles)
 }
 
 fn bottle_path(bottle_name: &str) -> Result<PathBuf, String> {
@@ -270,6 +258,12 @@ fn find_in_path(binary: &str) -> Option<PathBuf> {
             .map(|path| path.join(binary))
             .find(|path| path.is_file())
     })
+}
+
+fn push_unique_candidate(candidates: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if !candidates.iter().any(|path| path == &candidate) {
+        candidates.push(candidate);
+    }
 }
 
 enum ShortcutKind {
@@ -453,10 +447,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_bottle_name_uses_claudio_prefix_and_sanitized_title() {
+    fn default_bottle_name_uses_sanitized_title() {
         assert_eq!(
             default_bottle_name(42, "Halo: Reach / GOTY?"),
+            "Halo_ Reach _ GOTY_"
+        );
+    }
+
+    #[test]
+    fn legacy_bottle_name_keeps_claudio_prefix_and_game_id() {
+        assert_eq!(
+            legacy_bottle_name(42, "Halo: Reach / GOTY?"),
             "claudio-42-Halo_ Reach _ GOTY_"
+        );
+    }
+
+    #[test]
+    fn parse_bottle_list_accepts_array_output() {
+        assert_eq!(
+            parse_bottle_list(r#"["Gaming","Utilities"]"#).expect("array should parse"),
+            vec!["Gaming".to_string(), "Utilities".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_bottle_list_accepts_object_output() {
+        assert_eq!(
+            parse_bottle_list(r#"{"Utilities":{},"Gaming":{}}"#).expect("object should parse"),
+            vec!["Gaming".to_string(), "Utilities".to_string()]
         );
     }
 }

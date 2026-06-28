@@ -1,11 +1,12 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import type { Game } from "../../core/types/models";
 import { isLinux } from "../../core/utils/os";
 import {
+  addSteamShortcut,
   launchGame,
   listGameExecutables,
   listRunningGames,
@@ -88,6 +89,13 @@ export default function GameDetailActions({
   const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
   const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(null);
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
+  const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
+  const [optionsMenuPosition, setOptionsMenuPosition] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
   const [launchingGameId, setLaunchingGameId] = useState<number | null>(null);
   const [stoppingGameId, setStoppingGameId] = useState<number | null>(null);
 
@@ -112,6 +120,7 @@ export default function GameDetailActions({
         appMenuShortcut?: boolean;
         steamShortcut?: boolean;
         linuxRuntimeBackend?: "umu" | "bottles" | null;
+        bottleName?: string | null;
         protonPath?: string | null;
         runAsAdministrator?: boolean;
         forceInteractive?: boolean;
@@ -129,6 +138,7 @@ export default function GameDetailActions({
         appMenuShortcut: input.appMenuShortcut,
         steamShortcut: input.steamShortcut,
         linuxRuntimeBackend: input.linuxRuntimeBackend ?? null,
+        bottleName: input.bottleName ?? null,
         protonPath: input.protonPath ?? null,
         runAsAdministrator: input.runAsAdministrator,
         forceInteractive: input.forceInteractive,
@@ -355,6 +365,65 @@ export default function GameDetailActions({
     await promptExecutableSelection();
   }
 
+  useLayoutEffect(() => {
+    if (!optionsMenuOpen) {
+      setOptionsMenuPosition(null);
+      return;
+    }
+
+    function place() {
+      const button = optionsButtonRef.current;
+      const menu = optionsMenuRef.current;
+      if (!button || !menu) {
+        return;
+      }
+
+      const margin = 8;
+      const buttonRect = button.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+
+      let left = buttonRect.right - menuRect.width;
+      left = Math.min(left, window.innerWidth - menuRect.width - margin);
+      left = Math.max(margin, left);
+
+      let top = buttonRect.bottom + margin;
+      if (top + menuRect.height > window.innerHeight - margin) {
+        const above = buttonRect.top - margin - menuRect.height;
+        top =
+          above >= margin
+            ? above
+            : Math.max(margin, window.innerHeight - menuRect.height - margin);
+      }
+
+      setOptionsMenuPosition({ left, top });
+    }
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [optionsMenuOpen]);
+
+  function handleOpenInstallFolder() {
+    openInstallFolder(displayGame.id).catch((error) => {
+      setInstallError(installErrorMessage(error, "Could not open the install folder."));
+    });
+  }
+
+  async function handleAddSteamShortcut() {
+    try {
+      setInstallError(null);
+      await addSteamShortcut(displayGame.id);
+    } catch (error) {
+      setInstallError(
+        error instanceof Error ? error.message : "Could not add a Steam shortcut.",
+      );
+    }
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
@@ -442,53 +511,116 @@ export default function GameDetailActions({
                       : "Play"}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowUninstallConfirm(true)}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-text-secondary ring-1 ring-border hover:text-red-400 hover:ring-red-400/30 transition outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
+              <div>
+                <button
+                  ref={optionsButtonRef}
+                  type="button"
+                  aria-label="More options"
+                  aria-haspopup="menu"
+                  aria-expanded={optionsMenuOpen}
+                  onClick={() => setOptionsMenuOpen((open) => !open)}
+                  className="inline-flex items-center justify-center rounded-lg px-3 py-3 text-text-secondary ring-1 ring-border hover:text-text-primary hover:ring-border/80 transition outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                  />
-                </svg>
-                Uninstall
-              </button>
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.6" />
+                    <circle cx="12" cy="12" r="1.6" />
+                    <circle cx="12" cy="19" r="1.6" />
+                  </svg>
+                </button>
 
-              <button
-                type="button"
-                aria-label="Open install folder"
-                onClick={() => {
-                  openInstallFolder(displayGame.id).catch((error) => {
-                    setInstallError(
-                      error instanceof Error ? error.message : "Could not open the install folder.",
-                    );
-                  });
-                }}
-                className="inline-flex items-center justify-center rounded-lg px-3 py-3 text-text-secondary ring-1 ring-border hover:text-text-primary hover:ring-border/80 transition outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                  />
-                </svg>
-              </button>
+                {optionsMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOptionsMenuOpen(false)} />
+                    <div
+                      ref={optionsMenuRef}
+                      role="menu"
+                      style={{
+                        position: "fixed",
+                        left: optionsMenuPosition?.left ?? 0,
+                        top: optionsMenuPosition?.top ?? 0,
+                        visibility: optionsMenuPosition ? "visible" : "hidden",
+                      }}
+                      className="z-50 min-w-52 rounded-lg border border-border bg-surface-overlay py-1 shadow-xl animate-[fadeIn_100ms_ease-out]"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setOptionsMenuOpen(false);
+                          handleOpenInstallFolder();
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-text-secondary transition hover:bg-surface-raised hover:text-text-primary"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                          />
+                        </svg>
+                        Browse local files
+                      </button>
+                      {isLinux && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setOptionsMenuOpen(false);
+                            void handleAddSteamShortcut();
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-text-secondary transition hover:bg-surface-raised hover:text-text-primary"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          Add shortcut to Steam
+                        </button>
+                      )}
+                      <div className="mx-2 my-1 border-t border-border" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setOptionsMenuOpen(false);
+                          setShowUninstallConfirm(true);
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-red-400 transition hover:bg-surface-raised"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                          />
+                        </svg>
+                        Uninstall
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ) : game ? (
             <div className="flex items-center gap-2">
@@ -666,6 +798,7 @@ export default function GameDetailActions({
           path,
           exe,
           linuxRuntimeBackend,
+          bottleName,
           protonPath,
           desktopShortcut,
           appMenuShortcut,
@@ -693,23 +826,29 @@ export default function GameDetailActions({
             return;
           }
 
-          const installTarget = path ?? defaultInstallPath;
-          try {
-            await validateInstallTarget(installTarget);
-          } catch (error) {
-            setInstallError(installErrorMessage(error, "Could not validate the install location."));
-            return;
+          const usesBottlesRuntime = linuxRuntimeBackend === "bottles";
+          if (!usesBottlesRuntime) {
+            const installTarget = path ?? defaultInstallPath;
+            try {
+              await validateInstallTarget(installTarget);
+            } catch (error) {
+              setInstallError(
+                installErrorMessage(error, "Could not validate the install location."),
+              );
+              return;
+            }
           }
 
           setShowInstallConfirm(false);
           setInstallerDownloadOverride(false);
           installMutation.mutate({
             ...game,
-            installPath: path,
+            installPath: usesBottlesRuntime ? undefined : path,
             desktopShortcut,
             appMenuShortcut,
             steamShortcut,
             linuxRuntimeBackend: linuxRuntimeBackend ?? null,
+            bottleName: bottleName ?? null,
             protonPath: protonPath ?? null,
             runAsAdministrator,
             forceInteractive,

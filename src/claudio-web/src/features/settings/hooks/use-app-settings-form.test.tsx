@@ -128,7 +128,7 @@ describe("useAppSettingsForm", () => {
     listProtonVersionsMock.mockResolvedValue([{ label: "UMU Latest", value: "UMU-Latest" }]);
     listLinuxRuntimeBackendsMock.mockResolvedValue([
       { label: "Bottles", value: "bottles", available: true, detail: null },
-      { label: "UMU Launcher", value: "umu", available: true, detail: null },
+      { label: "Proton", value: "umu", available: true, detail: null },
     ]);
     desktopCheckServerConnectionMock.mockResolvedValue({ ok: true, status: 200 });
   });

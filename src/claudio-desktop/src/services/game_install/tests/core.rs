@@ -226,6 +226,7 @@ fn build_install_dir_uses_sanitized_title() {
         app_menu_shortcut: None,
         steam_shortcut: None,
         linux_runtime_backend: None,
+        bottle_name: None,
         proton_path: None,
         run_as_administrator: None,
         force_interactive: None,
@@ -282,6 +283,38 @@ fn list_game_executables_includes_wine_prefix_drive_c() {
 }
 
 #[test]
+fn list_game_executables_uses_drive_c_when_install_path_is_wine_prefix() {
+    crate::settings::with_test_data_dir(unique_test_dir("prefix-install-executables"), || {
+        let prefix_dir = crate::settings::data_dir().join("prefix");
+        let exe_path = prefix_dir
+            .join("pfx")
+            .join("drive_c")
+            .join("Games")
+            .join("Launcher")
+            .join("game.exe");
+        fs::create_dir_all(exe_path.parent().expect("exe parent should exist"))
+            .expect("prefix exe parent should exist");
+        fs::write(&exe_path, b"binary").expect("prefix exe should exist");
+
+        let mut game = installed_game(45, "Prefix Install Game", &prefix_dir);
+        game.wine_prefix = Some(prefix_dir.to_string_lossy().into_owned());
+        crate::registry::upsert(game).expect("installed game should save");
+
+        let relative_exe = PathBuf::from("Games")
+            .join("Launcher")
+            .join("game.exe")
+            .to_string_lossy()
+            .into_owned();
+        let executables = list_game_executables(45).expect("executables should load");
+        assert_eq!(executables, vec![relative_exe.clone()]);
+
+        let expected_exe = exe_path.to_string_lossy().into_owned();
+        let updated = set_game_exe(45, relative_exe).expect("prefix executable should save");
+        assert_eq!(updated.game_exe.as_deref(), Some(expected_exe.as_str()));
+    });
+}
+
+#[test]
 fn install_download_root_uses_configured_download_root_and_sanitized_title() {
     let game = RemoteGame {
         id: 9,
@@ -295,6 +328,7 @@ fn install_download_root_uses_configured_download_root_and_sanitized_title() {
         app_menu_shortcut: None,
         steam_shortcut: None,
         linux_runtime_backend: None,
+        bottle_name: None,
         proton_path: None,
         run_as_administrator: None,
         force_interactive: None,
