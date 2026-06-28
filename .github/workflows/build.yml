@@ -154,7 +154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, windows-latest]
+        platform: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.platform }}
     env:
       CARGO_HTTP_MULTIPLEXING: "false"
@@ -171,7 +171,7 @@ jobs:
           workspaces: . -> target
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -225,7 +225,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             args: --features devtools
             rust-targets: ""
           - platform: windows-latest
@@ -269,7 +269,7 @@ jobs:
           cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
