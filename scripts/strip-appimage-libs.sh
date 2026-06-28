@@ -18,6 +18,8 @@ set -euo pipefail
 
 APPIMAGE="${1:?usage: strip-appimage-libs.sh <AppImage>}"
 APPIMAGE="$(readlink -f "$APPIMAGE")"
+# A freshly downloaded AppImage (e.g. via `gh release download`) is not executable.
+chmod +x "$APPIMAGE"
 
 # Libraries that must defer to the host. These are on the upstream AppImage
 # excludelist (https://github.com/AppImage/pkg2appimage/blob/master/excludelist).
