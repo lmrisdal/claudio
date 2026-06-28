@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -26,9 +27,12 @@ vi.mock("../../desktop/hooks/use-desktop", () => ({
       { label: "UMU Launcher", value: "umu", available: true, detail: null },
     ]),
   listProtonVersions: () => Promise.resolve([{ label: "UMU Latest", value: "UMU-Latest" }]),
+  resolveInstallBrowseRoot: (targetPath: string) =>
+    Promise.resolve(targetPath.replace(/[\\/][^\\/]+$/, "")),
 }));
 
 const apiGet = vi.mocked(api.get);
+const openDialogMock = vi.mocked(openDialog);
 
 function renderWithQuery(ui: ReactNode) {
   const queryClient = new QueryClient({
@@ -54,6 +58,7 @@ function dialogSurface(): HTMLElement {
 
 beforeEach(() => {
   apiGet.mockReset();
+  openDialogMock.mockReset();
 });
 
 afterEach(() => {
@@ -159,5 +164,38 @@ describe("InstallDialog download mode", () => {
     await flushQueries();
 
     expect(dialogSurface().textContent).toContain("Extract downloaded archive");
+  });
+});
+
+describe("InstallDialog browse", () => {
+  it("keeps the game folder leaf when selecting an existing parent directory", async () => {
+    apiGet.mockRejectedValue(new Error("unexpected api call"));
+    openDialogMock.mockResolvedValue("/run/host/mnt/games/Claudio");
+    const onConfirm = vi.fn();
+
+    renderWithQuery(
+      <InstallDialog
+        open
+        gameId={1}
+        title="Test Game"
+        defaultPath="/run/host/mnt/games/Claudio/Test Game"
+        isPortable
+        onClose={() => {}}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const browseButton = [...dialogSurface().querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("Browse"),
+    );
+    await act(async () => {
+      browseButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const input = dialogSurface().querySelector<HTMLInputElement>("input[type='text']");
+
+    expect(input?.value).toBe("/run/host/mnt/games/Claudio/Test Game");
   });
 });

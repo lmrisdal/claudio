@@ -85,6 +85,10 @@ pub(crate) fn validate_install_target_command(target_path: String) -> Result<(),
     game_install::validate_install_target(&target_path)
 }
 
+pub(crate) fn resolve_install_browse_root_command(target_path: String) -> Option<String> {
+    game_install::resolve_install_browse_root(&target_path)
+}
+
 pub(crate) fn resolve_default_download_root_command() -> String {
     game_install::resolve_default_download_root_path()
 }
@@ -244,6 +248,11 @@ pub fn resolve_install_path(game_title: String) -> String {
 #[tauri::command]
 pub fn validate_install_target(target_path: String) -> Result<(), String> {
     validate_install_target_command(target_path)
+}
+
+#[tauri::command]
+pub fn resolve_install_browse_root(target_path: String) -> Option<String> {
+    resolve_install_browse_root_command(target_path)
 }
 
 #[tauri::command]

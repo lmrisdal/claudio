@@ -98,8 +98,8 @@ export default function DesktopSidebar({
       label: "Downloads",
       badge: activeCount > 0 ? activeCount : undefined,
     },
+    { to: "/admin", icon: AdminIcon, label: "Admin" },
   ];
-  navItems.push({ to: "/admin", icon: AdminIcon, label: "Admin" });
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 

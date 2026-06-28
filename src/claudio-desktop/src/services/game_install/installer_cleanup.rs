@@ -54,6 +54,7 @@ pub(super) fn cleanup_directory(path: &Path, label: &str) -> Result<(), String> 
     ))
 }
 
+#[cfg(any(target_os = "windows", test, feature = "integration-tests"))]
 pub(super) fn cleanup_partial_install_dir(target_dir: &Path) -> Result<(), String> {
     cleanup_directory(target_dir, "partial install directory")
 }

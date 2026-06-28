@@ -294,6 +294,16 @@ pub fn validate_install_target(target_path: &str) -> Result<(), String> {
     validate_install_target_path(Path::new(trimmed))
 }
 
+pub fn resolve_install_browse_root(target_path: &str) -> Option<String> {
+    let trimmed = target_path.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    resolve_install_browse_root_path(Path::new(trimmed))
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
 pub fn resolve_default_download_root_path() -> String {
     let settings = settings::load();
     settings::default_download_root(&settings)

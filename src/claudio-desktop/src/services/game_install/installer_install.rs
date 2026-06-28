@@ -10,7 +10,7 @@ pub(super) async fn install_installer(
 ) -> Result<InstalledGame, String> {
     #[cfg(target_os = "linux")]
     {
-        return install_installer_linux(
+        install_installer_linux(
             app,
             game,
             target_dir,
@@ -18,37 +18,35 @@ pub(super) async fn install_installer(
             control,
             _allow_existing_runtime,
         )
-        .await;
+        .await
     }
 
-    if !cfg!(target_os = "windows") {
-        return Err("Installer-based PC installs are only supported on Windows.".to_string());
-    }
+    #[cfg(target_os = "windows")]
+    {
+        emit_progress(
+            app,
+            game.id,
+            "extracting",
+            Some(60.0),
+            Some("Extracting game"),
+        );
 
-    emit_progress(
-        app,
-        game.id,
-        "extracting",
-        Some(60.0),
-        Some("Extracting game"),
-    );
+        let app_handle = app.clone();
+        let gid = game.id;
+        let staging_root = package_path
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| target_dir.to_path_buf());
+        let staging_dir = installer_staging_dir(&staging_root);
+        let target_dir_owned = target_dir.to_path_buf();
+        let package_path_owned = package_path.to_path_buf();
+        let installer_exe_hint = game.installer_exe.clone();
+        let game_exe_hint = game.game_exe.clone();
+        let initial_run_as_administrator = game.run_as_administrator.unwrap_or(false);
+        let initial_force_interactive = game.force_interactive.unwrap_or(false);
+        let control = control.clone();
 
-    let app_handle = app.clone();
-    let gid = game.id;
-    let staging_root = package_path
-        .parent()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| target_dir.to_path_buf());
-    let staging_dir = installer_staging_dir(&staging_root);
-    let target_dir_owned = target_dir.to_path_buf();
-    let package_path_owned = package_path.to_path_buf();
-    let installer_exe_hint = game.installer_exe.clone();
-    let game_exe_hint = game.game_exe.clone();
-    let initial_run_as_administrator = game.run_as_administrator.unwrap_or(false);
-    let initial_force_interactive = game.force_interactive.unwrap_or(false);
-    let control = control.clone();
-
-    let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+        let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
         let mut progress_cb = |p: f64| {
             emit_progress(
                 &app_handle,
@@ -222,28 +220,34 @@ pub(super) async fn install_installer(
     .await
     .map_err(|err| format!("Install task failed: {err}"))??;
 
-    Ok(InstalledGame {
-        remote_game_id: game.id,
-        title: game.title.clone(),
-        platform: game.platform.clone(),
-        install_type: game.install_type.clone(),
-        install_path: target_dir.to_string_lossy().into_owned(),
-        game_exe,
-        wine_prefix: None,
-        linux_runtime_backend: None,
-        bottle_name: None,
-        proton_path: None,
-        installed_at: current_timestamp(),
-        summary: game.summary.clone(),
-        genre: game.genre.clone(),
-        release_year: game.release_year,
-        cover_url: game.cover_url.clone(),
-        hero_url: game.hero_url.clone(),
-        developer: game.developer.clone(),
-        publisher: game.publisher.clone(),
-        game_mode: game.game_mode.clone(),
-        series: game.series.clone(),
-        franchise: game.franchise.clone(),
-        game_engine: game.game_engine.clone(),
-    })
+        Ok(InstalledGame {
+            remote_game_id: game.id,
+            title: game.title.clone(),
+            platform: game.platform.clone(),
+            install_type: game.install_type.clone(),
+            install_path: target_dir.to_string_lossy().into_owned(),
+            game_exe,
+            wine_prefix: None,
+            linux_runtime_backend: None,
+            bottle_name: None,
+            proton_path: None,
+            installed_at: current_timestamp(),
+            summary: game.summary.clone(),
+            genre: game.genre.clone(),
+            release_year: game.release_year,
+            cover_url: game.cover_url.clone(),
+            hero_url: game.hero_url.clone(),
+            developer: game.developer.clone(),
+            publisher: game.publisher.clone(),
+            game_mode: game.game_mode.clone(),
+            series: game.series.clone(),
+            franchise: game.franchise.clone(),
+            game_engine: game.game_engine.clone(),
+        })
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+        Err("Installer-based PC installs are only supported on Windows and Linux.".to_string())
+    }
 }

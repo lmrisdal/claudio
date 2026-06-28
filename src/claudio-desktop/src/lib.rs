@@ -218,6 +218,7 @@ pub fn run() {
             commands::games::list_running_games,
             commands::games::restart_install_interactive,
             commands::games::resolve_install_path,
+            commands::games::resolve_install_browse_root,
             commands::games::retry_cached_install,
             commands::games::validate_install_target,
             commands::games::resolve_default_download_root,

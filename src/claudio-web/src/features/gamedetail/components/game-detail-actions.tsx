@@ -25,6 +25,18 @@ import InstallDialog from "./install-dialog";
 import PickExeDialog from "./pick-exe-dialog";
 import PlayContextMenu from "./play-context-menu";
 
+function installErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+}
+
 interface GameDetailActionsProperties {
   gameId: string;
   game?: Game;
@@ -685,9 +697,7 @@ export default function GameDetailActions({
           try {
             await validateInstallTarget(installTarget);
           } catch (error) {
-            setInstallError(
-              error instanceof Error ? error.message : "Could not validate the install location.",
-            );
+            setInstallError(installErrorMessage(error, "Could not validate the install location."));
             return;
           }
 

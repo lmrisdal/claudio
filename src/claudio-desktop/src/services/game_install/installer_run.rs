@@ -68,11 +68,6 @@ fn apply_run_as_invoker_env(cmd: &mut std::process::Command) {
     cmd.env("__COMPAT_LAYER", "RunAsInvoker");
 }
 
-#[cfg(not(target_os = "windows"))]
-pub(super) fn confirm_installer_elevation(_app: &AppHandle) -> bool {
-    false
-}
-
 #[cfg(target_os = "windows")]
 pub(super) fn run_installer(
     path: &Path,

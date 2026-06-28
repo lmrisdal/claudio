@@ -60,14 +60,17 @@ pub(super) enum InstallerType {
     Unknown,
 }
 
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+#[cfg(any(target_os = "windows", test, feature = "integration-tests"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum InstallerLaunchKind {
+    #[cfg(any(target_os = "windows", feature = "integration-tests"))]
     Exe,
+    #[cfg(any(target_os = "windows", feature = "integration-tests"))]
     Msi,
     Unknown,
 }
 
+#[cfg(any(target_os = "windows", test, feature = "integration-tests"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct InstallerAttemptConfig {
     pub(super) force_interactive: bool,
@@ -125,6 +128,7 @@ pub(super) fn installer_launch_kind(path: &Path) -> InstallerLaunchKind {
     }
 }
 
+#[cfg(any(target_os = "windows", feature = "integration-tests"))]
 pub(super) fn installer_attempt_config(
     force_interactive: bool,
     run_as_administrator: bool,
@@ -137,7 +141,7 @@ pub(super) fn installer_attempt_config(
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), any(test, feature = "integration-tests")))]
 pub(super) fn installer_launch_kind(_path: &Path) -> InstallerLaunchKind {
     InstallerLaunchKind::Unknown
 }
@@ -190,7 +194,7 @@ pub(super) fn stream_requests_elevation(reader: &mut impl Read) -> Result<bool, 
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), feature = "integration-tests"))]
 pub(super) fn file_requests_elevation(_path: &Path) -> Result<bool, String> {
     Ok(false)
 }

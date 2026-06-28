@@ -132,6 +132,7 @@ pub(super) fn visible_entries(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(entries)
 }
 
+#[cfg(target_os = "windows")]
 const SCENE_GROUP_FOLDERS: &[&str] = &[
     "skidrow",
     "codex",
@@ -154,6 +155,7 @@ const SCENE_GROUP_FOLDERS: &[&str] = &[
     "kirigiri",
 ];
 
+#[cfg(target_os = "windows")]
 pub(super) fn apply_scene_overrides(source_dir: &Path, target_dir: &Path) -> Result<(), String> {
     let entries = match fs::read_dir(source_dir) {
         Ok(e) => e,

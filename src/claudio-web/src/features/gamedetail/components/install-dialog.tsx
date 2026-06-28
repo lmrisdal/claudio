@@ -8,6 +8,7 @@ import { isLinux, isWindows } from "../../core/utils/os";
 import {
   listLinuxRuntimeBackends,
   listProtonVersions,
+  resolveInstallBrowseRoot,
   type LinuxRuntimeBackend,
 } from "../../desktop/hooks/use-desktop";
 import ExeListbox from "./exe-listbox";
@@ -26,6 +27,32 @@ interface DownloadFilesManifestResponse {
 }
 
 const DEFAULT_LINUX_RUNTIME_BACKEND: LinuxRuntimeBackend = "umu";
+
+function pathLeaf(path: string): string {
+  const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const part = parts[index];
+    if (part) {
+      return part;
+    }
+  }
+
+  return "";
+}
+
+function joinPath(parent: string, leaf: string): string {
+  const separator = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
+  return `${parent.replace(/[\\/]+$/, "")}${separator}${leaf}`;
+}
+
+function resolveBrowsedInstallTarget(selectedPath: string, currentPath: string): string {
+  const leaf = pathLeaf(currentPath);
+  if (!leaf || pathLeaf(selectedPath) === leaf) {
+    return selectedPath;
+  }
+
+  return joinPath(selectedPath, leaf);
+}
 
 function resolveAvailableRuntimeBackend(
   preferred: LinuxRuntimeBackend | null | undefined,
@@ -218,9 +245,11 @@ export default function InstallDialog({
   async function handleBrowse() {
     try {
       const currentPath = installPath || defaultPath || undefined;
-      // Open the parent directory so the user picks/confirms the game folder name
-      const browseRoot = currentPath
+      const fallbackBrowseRoot = currentPath
         ? currentPath.replace(/[\\/][^\\/]+$/, "") || currentPath
+        : undefined;
+      const browseRoot = currentPath
+        ? ((await resolveInstallBrowseRoot(currentPath).catch(() => null)) ?? fallbackBrowseRoot)
         : undefined;
       const selected = await openDialog({
         directory: true,
@@ -230,7 +259,12 @@ export default function InstallDialog({
       });
 
       if (selected !== null) {
-        setInstallPath(Array.isArray(selected) ? selected[0] : selected);
+        const selectedPath = Array.isArray(selected) ? selected[0] : selected;
+        setInstallPath(
+          currentPath && !downloadMode
+            ? resolveBrowsedInstallTarget(selectedPath, currentPath)
+            : selectedPath,
+        );
         onPathChange?.();
       }
     } catch (error) {

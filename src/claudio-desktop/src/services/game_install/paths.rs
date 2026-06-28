@@ -89,6 +89,20 @@ pub(super) fn validate_install_target_path(target_dir: &Path) -> Result<(), Stri
     validation
 }
 
+pub(super) fn resolve_install_browse_root_path(target_dir: &Path) -> Option<PathBuf> {
+    let mut current = target_dir.parent().or(Some(target_dir));
+
+    while let Some(candidate) = current {
+        if candidate.is_dir() && fs::read_dir(candidate).is_ok() {
+            return Some(candidate.to_path_buf());
+        }
+
+        current = candidate.parent();
+    }
+
+    None
+}
+
 pub(super) fn log_io_failure(operation: &str, path: &Path, error: &io::Error) {
     log::error!(
         "[installer] {operation} failed for {}: {} (raw_os_error={:?})",
@@ -122,8 +136,15 @@ pub(super) fn format_install_io_error(operation: &str, path: &Path, error: &io::
     }
 
     if error.kind() == io::ErrorKind::PermissionDenied || matches!(error.raw_os_error(), Some(5)) {
+        #[cfg(target_os = "windows")]
         return format!(
             "Claudio couldn't write to {} while trying to {operation}. Choose a folder you can write to or run Claudio as administrator.",
+            path.display()
+        );
+
+        #[cfg(not(target_os = "windows"))]
+        return format!(
+            "Claudio couldn't write to {} while trying to {operation}. Choose a folder your user can write to or change the folder ownership/permissions.",
             path.display()
         );
     }
@@ -145,8 +166,16 @@ pub(super) fn format_install_io_error_pair(
     }
 
     if error.kind() == io::ErrorKind::PermissionDenied || matches!(error.raw_os_error(), Some(5)) {
+        #[cfg(target_os = "windows")]
         return format!(
             "Claudio couldn't move files from {} to {} while trying to {operation}. Choose a folder you can write to or run Claudio as administrator.",
+            source.display(),
+            destination.display()
+        );
+
+        #[cfg(not(target_os = "windows"))]
+        return format!(
+            "Claudio couldn't move files from {} to {} while trying to {operation}. Choose a folder your user can write to or change the destination folder ownership/permissions.",
             source.display(),
             destination.display()
         );

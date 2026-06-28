@@ -109,13 +109,31 @@ fn validate_install_target_path_allows_writable_parent() {
 }
 
 #[test]
+fn resolve_install_browse_root_path_uses_nearest_readable_parent() {
+    let root = unique_test_dir("browse-root");
+    let target = root.join("Claudio").join("Game");
+
+    fs::create_dir_all(&root).expect("root directory should be created");
+
+    assert_eq!(
+        resolve_install_browse_root_path(&target),
+        Some(root.clone())
+    );
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn format_install_io_error_maps_access_denied_to_friendly_message() {
     let error = io::Error::from_raw_os_error(5);
     let message =
         format_install_io_error("create the install folder", Path::new("D:\\Games"), &error);
 
     assert!(message.contains("Claudio couldn't write to"));
+    #[cfg(target_os = "windows")]
     assert!(message.contains("run Claudio as administrator"));
+    #[cfg(not(target_os = "windows"))]
+    assert!(message.contains("folder ownership/permissions"));
 }
 
 #[test]

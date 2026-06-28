@@ -177,6 +177,10 @@ export async function validateInstallTarget(targetPath: string): Promise<void> {
   return invoke<void>("validate_install_target", { targetPath });
 }
 
+export async function resolveInstallBrowseRoot(targetPath: string): Promise<string | null> {
+  return invoke<string | null>("resolve_install_browse_root", { targetPath });
+}
+
 export async function resolveDefaultDownloadRoot(): Promise<string> {
   return invoke<string>("resolve_default_download_root");
 }
