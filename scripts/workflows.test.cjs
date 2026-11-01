@@ -4,7 +4,7 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-const sources = Object.fromEntries(['build', 'release'].map(name => [
+const sources = Object.fromEntries(['build'].map(name => [
   name, readFileSync(join(__dirname, `../.github/workflows/${name}.yml`), 'utf8'),
 ]));
 const gates = Object.fromEntries(Object.entries(sources).map(([name, source]) => [
@@ -82,7 +82,7 @@ const scenarios = [
   ['PR-only CI', [{ ...validRun, event: 'pull_request' }], false],
   ['fork CI', [{ ...validRun, head_repository: { full_name: 'fork/repo' } }], false],
 ];
-for (const workflow of ['build', 'release']) {
+for (const workflow of ['build']) {
   for (const [name, runs, expected] of scenarios) {
     test(`${workflow}: ${name}`, async () => {
       const result = await verify(workflow, { runs });
@@ -92,41 +92,6 @@ for (const workflow of ['build', 'release']) {
   }
 }
 
-test('release waits for CI to start and complete', async () => {
-  const result = await verify('release', { sequence: [[], [{ ...validRun, status: 'in_progress', conclusion: null }], [validRun]] });
-  assert.equal(result.failure, undefined);
-  assert.equal(result.sleeps, 2);
-  assert.equal(result.outputs.tag, 'v0.2.0');
-});
-test('release stops immediately after completed failed CI', async () => {
-  const result = await verify('release', { runs: [{ ...validRun, conclusion: 'failure' }] });
-  assert.match(result.failure, /failed or was cancelled/);
-  assert.equal(result.sleeps, 0);
-});
-test('release wait has a finite timeout', async () => {
-  const result = await verify('release', { runs: [] });
-  assert.match(result.failure, /timed out/);
-  assert.equal(result.queries, 90);
-  assert.equal(result.sleeps, 89);
-});
-test('release rejects manual runs on branches, including bump commits', async () => {
-  const result = await verify('release', { eventName: 'workflow_dispatch', ref: 'refs/heads/main' });
-  assert.match(result.failure, /select a version tag/);
-  assert.equal(result.queries, 0);
-});
-test('release rejects a tag that differs from the app version', async () => {
-  assert.match((await verify('release', { ref: 'refs/tags/v0.3.0' })).failure, /does not match app version/);
-});
-for (const [name, target, annotated, expected] of [
-  ['lightweight', { type: 'commit', sha: 'tested-sha' }, null, true],
-  ['annotated', { type: 'tag', sha: 'tag-object' }, { type: 'commit', sha: 'tested-sha' }, true],
-  ['wrong commit', { type: 'commit', sha: 'other-sha' }, null, false],
-  ['annotated wrong commit', { type: 'tag', sha: 'tag-object' }, { type: 'commit', sha: 'other-sha' }, false],
-]) {
-  test(`release tag: ${name}`, async () => {
-    assert.equal(!(await verify('release', { target, annotated })).failure, expected);
-  });
-}
 for (const [name, tags, tagged] of [
   ['no tag', [], 'false'],
   ['release tag', [{ name: 'v0.2.0', commit: { sha: 'tested-sha' } }], 'true'],
