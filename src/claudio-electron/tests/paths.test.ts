@@ -2,50 +2,50 @@ import path from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 import { resolvePaths } from "../src/main/paths";
 
-const base = {
-  isPackaged: false,
-  resourcesPath: "/opt/Claudio/resources",
-  appPath: "/repo/src/claudio-electron",
-  env: {},
-  platform: "linux" as NodeJS.Platform,
-};
+const repoRoot = path.resolve("/repo");
+const resourcesPath = path.resolve("/opt/Claudio/resources");
 
-describe("resolvePaths", () => {
+describe.each(["linux", "win32"] as const)("resolvePaths (%s)", (platform) => {
+  const executable = platform === "win32" ? "claudio-core.exe" : "claudio-core";
+  const base = {
+    isPackaged: false,
+    resourcesPath,
+    appPath: path.join(repoRoot, "src", "claudio-electron"),
+    env: {},
+    platform,
+  };
+
   it("finds the cargo build and web dist relative to the repo in development", () => {
     const paths = resolvePaths(base);
 
-    expect(paths.coreBinary).toBe("/repo/target/debug/claudio-core");
-    expect(paths.resourceDir).toBe("/repo/target/debug");
-    expect(paths.webRoot).toBe("/repo/src/claudio-web/dist");
+    expect(paths.coreBinary).toBe(path.join(repoRoot, "target", "debug", executable));
+    expect(paths.resourceDir).toBe(path.join(repoRoot, "target", "debug"));
+    expect(paths.webRoot).toBe(path.join(repoRoot, "src", "claudio-web", "dist"));
     expect(paths.preload).toBe(path.join(base.appPath, "dist", "preload", "index.cjs"));
     expect(paths.trayIcons).toEqual({
-      onDarkPanel: "/repo/src/claudio-electron/resources/tray-icon-white.png",
-      onLightPanel: "/repo/src/claudio-electron/resources/tray-icon-black.png",
+      onDarkPanel: path.join(base.appPath, "resources", "tray-icon-white.png"),
+      onLightPanel: path.join(base.appPath, "resources", "tray-icon-black.png"),
     });
   });
 
-  it("uses the release profile and .exe suffix when asked", () => {
+  it("uses the release profile and platform-specific executable name", () => {
     const paths = resolvePaths({
       ...base,
-      platform: "win32",
       env: { CLAUDIO_CORE_PROFILE: "release" },
     });
 
-    expect(paths.coreBinary).toBe(path.join("/repo", "target", "release", "claudio-core.exe"));
+    expect(paths.coreBinary).toBe(path.join(repoRoot, "target", "release", executable));
   });
 
   it("reads everything from the resources directory when packaged", () => {
-    const paths = resolvePaths({
-      ...base,
-      isPackaged: true,
-      appPath: "/opt/Claudio/resources/app.asar",
-    });
+    const appPath = path.join(resourcesPath, "app.asar");
+    const paths = resolvePaths({ ...base, isPackaged: true, appPath });
 
-    expect(paths.coreBinary).toBe("/opt/Claudio/resources/claudio-core");
-    expect(paths.resourceDir).toBe("/opt/Claudio/resources");
-    expect(paths.webRoot).toBe("/opt/Claudio/resources/web");
-    expect(paths.windowIcon).toBe("/opt/Claudio/resources/icon.png");
-    expect(paths.preload).toBe("/opt/Claudio/resources/app.asar/dist/preload/index.cjs");
+    expect(paths.coreBinary).toBe(path.join(resourcesPath, executable));
+    expect(paths.resourceDir).toBe(resourcesPath);
+    expect(paths.webRoot).toBe(path.join(resourcesPath, "web"));
+    expect(paths.windowIcon).toBe(path.join(resourcesPath, "icon.png"));
+    expect(paths.preload).toBe(path.join(appPath, "dist", "preload", "index.cjs"));
   });
 
   it("lets environment variables override each location", () => {

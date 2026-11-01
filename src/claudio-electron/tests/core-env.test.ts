@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 import { buildCoreEnv } from "../src/main/core/core-env";
 
@@ -32,10 +33,10 @@ describe("buildCoreEnv", () => {
     const env = buildCoreEnv({
       APPIMAGE: "/a/Claudio.AppImage",
       APPDIR: "/tmp/.mount_x",
-      PATH: "/tmp/.mount_x/usr/bin:/usr/bin:/bin",
+      PATH: ["/tmp/.mount_x/usr/bin", "/usr/bin", "/bin"].join(path.delimiter),
     });
 
-    expect(env.PATH).toBe("/usr/bin:/bin");
+    expect(env.PATH).toBe(["/usr/bin", "/bin"].join(path.delimiter));
   });
 
   it("does not mutate the source environment", () => {
