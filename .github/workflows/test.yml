@@ -49,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-24.04, windows-latest, macos-latest]
+        platform: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.platform }}
     env:
       CARGO_HTTP_MULTIPLEXING: "false"
@@ -64,16 +64,6 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: . -> target
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
 
       - name: Build uninstaller (Windows)
         if: matrix.platform == 'windows-latest'
@@ -107,3 +97,24 @@ jobs:
           }
 
           cargo_retry cargo test --workspace
+
+  desktop-shell-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "22"
+          working-directory: src/claudio-electron
+          cache: true
+          run-install: true
+
+      - name: Check shell
+        working-directory: src/claudio-electron
+        run: vp check
+
+      - name: Test shell
+        working-directory: src/claudio-electron
+        run: vp test

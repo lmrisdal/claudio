@@ -2,18 +2,22 @@
   "name": "claudio-electron",
   "version": "0.1.9",
   "private": true,
+  "description": "Claudio desktop client",
+  "author": "Claudio",
   "type": "module",
   "main": "dist/main/index.cjs",
   "scripts": {
     "build": "vp pack",
     "start": "electron .",
     "dev": "vp pack && electron .",
+    "package": "vp pack && electron-builder",
     "test": "vp test",
     "check": "vp check"
   },
   "devDependencies": {
     "@types/node": "^24.12.0",
     "electron": "45.2.1",
+    "electron-builder": "26.18.0",
     "typescript": "~5.9.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.1.15",
     "vite-plus": "0.1.15"

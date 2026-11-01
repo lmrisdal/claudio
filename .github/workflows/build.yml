@@ -7,6 +7,7 @@ on:
     paths:
       - "src/claudio-api/**"
       - "src/claudio-desktop/**"
+      - "src/claudio-electron/**"
       - "src/claudio-uninstaller/**"
       - "tests/**"
       - "src/claudio-web/**"
@@ -49,6 +50,7 @@ jobs:
               - "Cargo.lock"
             desktop-build:
               - "src/claudio-desktop/**"
+              - "src/claudio-electron/**"
               - "src/claudio-uninstaller/**"
               - "src/claudio-web/**"
               - "Cargo.toml"
@@ -172,16 +174,6 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
       - name: Build uninstaller (Windows)
         if: matrix.platform == 'windows-latest'
         shell: bash
@@ -219,19 +211,20 @@ jobs:
     needs: [detect-changes, desktop-tests]
     if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true'
     permissions:
-      contents: write
+      contents: read
     env:
       CLAUDIO_COMMIT_SHA: ${{ github.sha }}
+      CARGO_HTTP_MULTIPLEXING: "false"
+      CARGO_NET_RETRY: "10"
+      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: ubuntu-24.04
-            args: --features devtools
-            rust-targets: ""
+            builder-args: --linux AppImage
           - platform: windows-latest
-            args: --target x86_64-pc-windows-msvc --features devtools
-            rust-targets: ""
+            builder-args: --win nsis
             uninstaller-target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
@@ -248,15 +241,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Rust cross-compilation targets
-        if: matrix.rust-targets != ''
-        shell: bash
-        run: |
-          IFS=',' read -ra TARGETS <<< "${{ matrix.rust-targets }}"
-          for target in "${TARGETS[@]}"; do
-            rustup target add "$target"
-          done
-
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: . -> target
@@ -269,31 +253,34 @@ jobs:
           mkdir -p target/release
           cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
+      - name: Install shell dependencies
+        working-directory: src/claudio-electron
+        run: vp install
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build claudio-core
+        shell: bash
+        run: cargo build --release -p claudio-desktop --bin claudio-core
+
+      - name: Build web app for desktop
+        working-directory: src/claudio-web
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CLAUDIO_DESKTOP_BUILD: "1"
+        run: vp build
+
+      - name: Bundle shell
+        working-directory: src/claudio-electron
+        run: vp pack
+
+      - name: Package
+        working-directory: src/claudio-electron
+        run: vp exec electron-builder ${{ matrix.builder-args }} --publish never
+
+      - uses: actions/upload-artifact@v4
         with:
-          projectPath: src/claudio-desktop
-          tauriScript: ../claudio-web/node_modules/.bin/tauri
-          args: ${{ matrix.args }}
-          tagName: dev
-          releaseName: Claudio Dev Build
-          releaseBody: "Latest development build from main. Commit: ${{ github.sha }}"
-          # Per-commit tags (creates a separate draft for each commit):
-          # tagName: dev-${{ github.sha }}
-          # releaseName: "Claudio Dev Build (${{ github.sha }})"
-          # releaseBody: "Development build from commit ${{ github.sha }}"
-          releaseDraft: true
-          prerelease: true
+          name: claudio-${{ matrix.platform }}
+          path: |
+            src/claudio-electron/release/*.AppImage
+            src/claudio-electron/release/*.exe
+            src/claudio-electron/release/latest*.yml
+          if-no-files-found: error
+          retention-days: 14

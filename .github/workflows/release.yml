@@ -97,7 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-24.04, windows-latest, macos-latest]
+        platform: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.platform }}
     env:
       CARGO_HTTP_MULTIPLEXING: "false"
@@ -112,16 +112,6 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: . -> target
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
 
       - name: Build uninstaller (Windows)
         if: matrix.platform == 'windows-latest'
@@ -156,20 +146,59 @@ jobs:
 
           cargo_retry cargo test --workspace
 
-  desktop:
+  create-release:
     needs: desktop-tests
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve release tag
+        id: version
+        run: |
+          version="$(node -p "require('./src/claudio-electron/package.json').version")"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "${{ steps.version.outputs.tag }}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match app version ${{ steps.version.outputs.tag }}"
+            exit 1
+          fi
+
+      - name: Create release
+        run: |
+          if ! gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            gh release create "${{ steps.version.outputs.tag }}" \
+              --target "$GITHUB_SHA" \
+              --title "Claudio ${{ steps.version.outputs.tag }}" \
+              --notes "See the assets below to download and install Claudio for your platform."
+          fi
+
+  desktop:
+    needs: create-release
+    permissions:
+      contents: write
+    env:
+      CARGO_HTTP_MULTIPLEXING: "false"
+      CARGO_NET_RETRY: "10"
+      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: ubuntu-24.04
-            args: ""
-            rust-targets: ""
+            builder-args: --linux AppImage
           - platform: windows-latest
-            args: --target x86_64-pc-windows-msvc
-            rust-targets: ""
+            builder-args: --win nsis
             uninstaller-target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
@@ -186,15 +215,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Rust cross-compilation targets
-        if: matrix.rust-targets != ''
-        shell: bash
-        run: |
-          IFS=',' read -ra TARGETS <<< "${{ matrix.rust-targets }}"
-          for target in "${TARGETS[@]}"; do
-            rustup target add "$target"
-          done
-
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: . -> target
@@ -207,27 +227,24 @@ jobs:
           mkdir -p target/release
           cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
+      - name: Install shell dependencies
+        working-directory: src/claudio-electron
+        run: vp install
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build claudio-core
+        shell: bash
+        run: cargo build --release -p claudio-desktop --bin claudio-core
+
+      - name: Build web app for desktop
+        working-directory: src/claudio-web
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: src/claudio-desktop
-          tauriScript: ../claudio-web/node_modules/.bin/tauri
-          args: ${{ matrix.args }}
-          tagName: v__VERSION__
-          releaseName: Claudio v__VERSION__
-          releaseBody: See the assets below to download and install Claudio for your platform.
-          releaseDraft: false
-          prerelease: false
+          CLAUDIO_DESKTOP_BUILD: "1"
+        run: vp build
+
+      - name: Bundle shell
+        working-directory: src/claudio-electron
+        run: vp pack
+
+      - name: Package and publish
+        working-directory: src/claudio-electron
+        run: vp exec electron-builder ${{ matrix.builder-args }} --publish always
