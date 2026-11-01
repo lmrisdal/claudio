@@ -1,24 +1,63 @@
 use crate::models::InstalledGame;
 use crate::settings;
+use std::fmt::Display;
 use std::fs;
+use std::io::{self, Write};
 use std::path::Path;
+use std::sync::{Mutex, MutexGuard, PoisonError};
+
+static REGISTRY_LOCK: Mutex<()> = Mutex::new(());
+
+fn lock_registry() -> MutexGuard<'static, ()> {
+    REGISTRY_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn registry_failure(operation: &str, path: &Path, err: impl Display) -> String {
+    log::error!(
+        "[registry] {operation} failed for {}: {err}",
+        path.display()
+    );
+    format!(
+        "Failed to {operation} the installed games list {}: {err}",
+        path.display()
+    )
+}
 
 fn load_all() -> Result<Vec<InstalledGame>, String> {
     let path = settings::registry_path();
-    match fs::read_to_string(path) {
-        Ok(contents) => serde_json::from_str(&contents).map_err(|err| err.to_string()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(err) => Err(err.to_string()),
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) => return Err(registry_failure("read", &path, err)),
+    };
+    if contents.trim().is_empty() {
+        log::warn!(
+            "[registry] {} is empty, treating it as no installed games",
+            path.display()
+        );
+        return Ok(Vec::new());
     }
+    serde_json::from_str(&contents).map_err(|err| registry_failure("parse", &path, err))
+}
+
+fn write_synced(path: &Path, contents: &[u8]) -> io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    file.write_all(contents)?;
+    file.sync_all()
 }
 
 fn save_all(games: &[InstalledGame]) -> Result<(), String> {
     let path = settings::registry_path();
-    let json = serde_json::to_string_pretty(games).map_err(|err| err.to_string())?;
-    fs::write(path, json).map_err(|err| err.to_string())
+    let json = serde_json::to_string_pretty(games)
+        .map_err(|err| registry_failure("encode", &path, err))?;
+    let temp_path = path.with_extension("json.tmp");
+    write_synced(&temp_path, json.as_bytes())
+        .map_err(|err| registry_failure("write", &temp_path, err))?;
+    fs::rename(&temp_path, &path).map_err(|err| registry_failure("replace", &path, err))
 }
 
 pub fn list() -> Result<Vec<InstalledGame>, String> {
+    let _guard = lock_registry();
     let mut games = load_all()?;
     games.retain(|game| Path::new(&game.install_path).exists());
     save_all(&games)?;
@@ -26,6 +65,7 @@ pub fn list() -> Result<Vec<InstalledGame>, String> {
 }
 
 pub fn get(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
+    let _guard = lock_registry();
     let mut games = load_all()?;
     games.retain(|game| Path::new(&game.install_path).exists());
     save_all(&games)?;
@@ -36,6 +76,7 @@ pub fn get(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
 }
 
 pub fn upsert(installed: InstalledGame) -> Result<InstalledGame, String> {
+    let _guard = lock_registry();
     let mut games = load_all()?;
     games.retain(|game| game.remote_game_id != installed.remote_game_id);
     games.push(installed.clone());
@@ -45,6 +86,7 @@ pub fn upsert(installed: InstalledGame) -> Result<InstalledGame, String> {
 }
 
 pub fn remove(remote_game_id: i32) -> Result<Option<InstalledGame>, String> {
+    let _guard = lock_registry();
     let mut games = load_all()?;
     let removed = games
         .iter()
@@ -135,6 +177,68 @@ mod tests {
                 .expect("registry file should exist after prune");
             assert!(persisted.contains("Keep"));
             assert!(!persisted.contains("Missing"));
+        });
+    }
+
+    #[test]
+    fn upsert_recovers_from_empty_registry_file() {
+        settings::with_test_data_dir(unique_test_dir("empty"), || {
+            let install_path = settings::data_dir().join("game");
+            fs::create_dir_all(&install_path).expect("install path should exist");
+            fs::write(settings::registry_path(), "").expect("empty registry should be written");
+
+            upsert(installed_game(1, "Game", &install_path)).expect("game should be saved");
+
+            let games = list().expect("games should load");
+            assert_eq!(games.len(), 1);
+            assert_eq!(games[0].title, "Game");
+        });
+    }
+
+    #[test]
+    fn corrupt_registry_is_reported_and_left_in_place() {
+        settings::with_test_data_dir(unique_test_dir("corrupt"), || {
+            let install_path = settings::data_dir().join("game");
+            fs::create_dir_all(&install_path).expect("install path should exist");
+            fs::write(settings::registry_path(), "[{").expect("corrupt registry should be written");
+
+            let error = match upsert(installed_game(1, "Game", &install_path)) {
+                Ok(_) => panic!("corrupt registry should not be overwritten"),
+                Err(error) => error,
+            };
+
+            assert!(error.contains("installed-games.json"));
+            let persisted = fs::read_to_string(settings::registry_path())
+                .expect("registry file should still exist");
+            assert_eq!(persisted, "[{");
+        });
+    }
+
+    #[test]
+    fn concurrent_list_and_upsert_keep_every_game() {
+        settings::with_test_data_dir(unique_test_dir("concurrent"), || {
+            let install_path = settings::data_dir().join("game");
+            fs::create_dir_all(&install_path).expect("install path should exist");
+            upsert(installed_game(0, "Seed", &install_path)).expect("seed should be saved");
+
+            std::thread::scope(|scope| {
+                for _ in 0..4 {
+                    scope.spawn(|| {
+                        for _ in 0..200 {
+                            list().expect("list should not observe a partial registry");
+                        }
+                    });
+                }
+                for id in 1..=50 {
+                    let install_path = install_path.clone();
+                    scope.spawn(move || {
+                        upsert(installed_game(id, "Game", &install_path))
+                            .expect("upsert should not observe a partial registry");
+                    });
+                }
+            });
+
+            assert_eq!(list().expect("games should load").len(), 51);
         });
     }
 
