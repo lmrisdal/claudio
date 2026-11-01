@@ -13,6 +13,8 @@ on:
       - "docker/**"
       - "Directory.Build.props"
       - "Directory.Packages.props"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
 jobs:
   detect-changes:
