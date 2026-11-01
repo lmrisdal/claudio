@@ -6,14 +6,16 @@ import { buildDesktopCustomHeaders } from "../utils/custom-headers";
 
 export default function DesktopSetup({
   onConnected,
+  initialError = "",
 }: {
   onConnected: (serverUrl: string) => void;
+  initialError?: string;
 }) {
   const { getSettings, updateSettings, desktopCheckServerConnection } = useDesktop();
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState<{ name: string; value: string }[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [testResult, setTestResult] = useState<"success" | "error" | "">("");
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -107,6 +109,20 @@ export default function DesktopSetup({
 
     setSaving(true);
     try {
+      try {
+        const result = await desktopCheckServerConnection({
+          serverUrl: trimmed,
+          customHeaders,
+          path: "/health",
+        });
+        if (!result.ok) {
+          setError(getConnectionErrorMessage(result.status));
+          return;
+        }
+      } catch {
+        setError(getConnectionErrorMessage());
+        return;
+      }
       const settings = await getSettings();
       await updateSettings({ ...settings, serverUrl: trimmed, customHeaders });
       localStorage.setItem("claudio_custom_headers", JSON.stringify(customHeaders));

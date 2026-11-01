@@ -33,18 +33,26 @@ function renderWithQuery(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return renderInDom(
+  renderInDom(
     <QueryClientProvider client={queryClient}>
       <InputScopeProvider>{ui}</InputScopeProvider>
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
-async function flushQueries() {
+async function flushQueryNotifications() {
   await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve));
   });
+}
+
+async function settleQueries(queryClient: QueryClient) {
+  await vi.waitFor(async () => {
+    await flushQueryNotifications();
+    expect(queryClient.isFetching()).toBe(0);
+  });
+  await flushQueryNotifications();
 }
 
 function dialogSurface(): HTMLElement {
@@ -75,7 +83,7 @@ describe("InstallDialog download mode", () => {
     });
 
     const onConfirm = vi.fn();
-    renderWithQuery(
+    const queryClient = renderWithQuery(
       <InstallDialog
         open
         gameId={1}
@@ -87,7 +95,7 @@ describe("InstallDialog download mode", () => {
       />,
     );
 
-    await flushQueries();
+    await settleQueries(queryClient);
 
     expect(dialogSurface().textContent).not.toContain("Extract downloaded archive");
 
@@ -115,7 +123,7 @@ describe("InstallDialog download mode", () => {
       return Promise.reject(new Error(`unexpected: ${path}`));
     });
 
-    renderWithQuery(
+    const queryClient = renderWithQuery(
       <InstallDialog
         open
         gameId={1}
@@ -127,7 +135,7 @@ describe("InstallDialog download mode", () => {
       />,
     );
 
-    await flushQueries();
+    await settleQueries(queryClient);
 
     expect(dialogSurface().textContent).toContain("Extract downloaded archive");
   });
@@ -144,7 +152,7 @@ describe("InstallDialog download mode", () => {
       return Promise.reject(new Error(`unexpected: ${path}`));
     });
 
-    renderWithQuery(
+    const queryClient = renderWithQuery(
       <InstallDialog
         open
         gameId={1}
@@ -156,7 +164,7 @@ describe("InstallDialog download mode", () => {
       />,
     );
 
-    await flushQueries();
+    await settleQueries(queryClient);
 
     expect(dialogSurface().textContent).toContain("Extract downloaded archive");
   });

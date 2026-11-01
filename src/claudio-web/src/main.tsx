@@ -6,6 +6,7 @@ import { appRouter } from "./app-router";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
 import { forwardRendererLogs } from "./features/desktop/hooks/desktop-log";
+import { DesktopGate } from "./features/desktop/components/desktop-gate";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import AppPreferencesProvider from "./features/preferences/components/app-preferences-provider";
@@ -34,17 +35,19 @@ const queryClient = new QueryClient({
 createRoot(document.querySelector("#root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ServerStatusProvider>
-        <AppPreferencesProvider>
-          <InputScopeProvider>
-            <SettingsDialogProvider>
-              <main data-ui-scroll-container>
-                <RouterProvider router={appRouter} />
-              </main>
-            </SettingsDialogProvider>
-          </InputScopeProvider>
-        </AppPreferencesProvider>
-      </ServerStatusProvider>
+      <DesktopGate>
+        <ServerStatusProvider>
+          <AppPreferencesProvider>
+            <InputScopeProvider>
+              <SettingsDialogProvider>
+                <main data-ui-scroll-container>
+                  <RouterProvider router={appRouter} />
+                </main>
+              </SettingsDialogProvider>
+            </InputScopeProvider>
+          </AppPreferencesProvider>
+        </ServerStatusProvider>
+      </DesktopGate>
     </QueryClientProvider>
   </StrictMode>,
 );

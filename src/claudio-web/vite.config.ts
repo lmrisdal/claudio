@@ -298,4 +298,7 @@ export default defineConfig({
           "/images": "http://localhost:8080",
         },
   },
+  test: {
+    execArgv: ["--no-experimental-webstorage"],
+  },
 });
