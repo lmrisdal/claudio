@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,6 +19,13 @@ const child = spawn(executable, [...extraArgs, `--remote-debugging-port=${port}`
 let exited = false;
 
 function killGroup(signal) {
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
   try {
     process.kill(-child.pid, signal);
   } catch {
@@ -85,7 +92,7 @@ try {
   const page = await findPage(deadline);
   await waitFor(page, 'typeof window.claudioDesktop?.invoke === "function"', deadline);
   const ping = await evaluate(page, 'window.claudioDesktop.invoke("ping")');
-  if (ping?.platform !== process.platform)
+  if (ping?.platform !== (process.platform === "win32" ? "windows" : process.platform))
     throw new Error(`unexpected ping: ${JSON.stringify(ping)}`);
   await waitFor(page, 'document.querySelector("#root")?.childElementCount > 0', deadline);
   console.log(`smoke test passed: ${JSON.stringify(ping)}`);
@@ -96,6 +103,6 @@ try {
   killGroup("SIGTERM");
   await sleep(1000);
   killGroup("SIGKILL");
-  rmSync(dataHome, { recursive: true, force: true });
+  rmSync(dataHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
 process.exit(failure ? 1 : 0);

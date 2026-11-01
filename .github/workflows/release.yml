@@ -1,195 +1,210 @@
-name: Release Artifacts
+name: Release
 
 on:
-  workflow_dispatch:
   push:
-    tags: ["v*"]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  web:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build smoke test image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          load: true
-          platforms: linux/amd64
-          tags: claudio:smoke
-
-      - name: Smoke test container startup
-        run: |
-          docker run -d --rm --name claudio-smoke -p 18080:8080 \
-            -e CLAUDIO_DISABLE_AUTH=true \
-            claudio:smoke
-
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:18080/health >/dev/null; then
-              exit 0
-            fi
-
-            if ! docker ps --format '{{.Names}}' | grep -qx 'claudio-smoke'; then
-              docker logs claudio-smoke
-              exit 1
-            fi
-
-            sleep 2
-          done
-
-          docker logs claudio-smoke
-          exit 1
-
-      - name: Stop smoke test container
-        if: always()
-        run: docker rm -f claudio-smoke || true
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=semver,value=${{ github.ref_name }},pattern={{version}}
-            type=semver,value=${{ github.ref_name }},pattern={{major}}.{{minor}}
-            type=semver,value=${{ github.ref_name }},pattern={{major}}
-          labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  create-release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+  version:
+    name: Validate version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
-      tag: ${{ github.ref_name }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_TAG: ${{ github.ref_name }}
-      RELEASE_SHA: ${{ github.sha }}
-
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          ref: ${{ github.sha }}
+          node-version: '22'
+      - id: version
+        run: node scripts/release-version.cjs
 
-      - name: Create release
-        run: |
-          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release create "${RELEASE_TAG}" \
-              --target "$RELEASE_SHA" \
-              --title "Claudio ${RELEASE_TAG}" \
-              --notes "See the assets below to download and install Claudio for your platform."
-          fi
+  ci:
+    name: Validate release commit
+    needs: version
+    uses: ./.github/workflows/ci.yml
 
   desktop:
-    needs: create-release
-    permissions:
-      contents: write
-    env:
-      CARGO_HTTP_MULTIPLEXING: "false"
-      CARGO_NET_RETRY: "10"
-      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    name: Package desktop (${{ matrix.os }})
+    needs: ci
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-24.04
-            builder-args: --linux AppImage
-          - platform: windows-latest
-            builder-args: --win nsis portable
-            uninstaller-target: x86_64-pc-windows-msvc
-
-    runs-on: ${{ matrix.platform }}
-
+          - os: ubuntu-24.04
+            platform: linux
+            args: --linux AppImage --x64
+          - os: windows-2025
+            platform: windows
+            args: --win nsis portable --x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      CLAUDIO_COMMIT_SHA: ${{ github.sha }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build sidecar
+        run: cargo build --release --locked -p claudio-core --bin claudio-core
+      - name: Build Windows uninstaller
+        if: runner.os == 'Windows'
+        run: cargo build --release --locked -p claudio-uninstaller
       - uses: voidzero-dev/setup-vp@v1
         with:
-          node-version: "22"
+          node-version: '22'
           working-directory: src/claudio-web
           cache: true
-          run-install: true
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: . -> target
-
-      - name: Build uninstaller (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          cargo build --release -p claudio-uninstaller --target ${{ matrix.uninstaller-target }}
-          mkdir -p target/release
-          cp target/${{ matrix.uninstaller-target }}/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
-
-      - name: Install shell dependencies
-        working-directory: src/claudio-electron
-        run: vp install
-
-      - name: Build claudio-core
-        shell: bash
-        run: cargo build --release -p claudio-core --bin claudio-core
-
-      - name: Build web app for desktop
+          run-install: |
+            args: ['--frozen-lockfile']
+      - name: Build desktop frontend
         working-directory: src/claudio-web
         env:
-          CLAUDIO_DESKTOP_BUILD: "1"
-        run: vp build
-
+          CLAUDIO_DESKTOP_BUILD: '1'
+        run: vp run build
+      - name: Install shell dependencies
+        working-directory: src/claudio-electron
+        run: vp install --frozen-lockfile
       - name: Bundle shell
         working-directory: src/claudio-electron
         run: vp pack
-
       - name: Package
         working-directory: src/claudio-electron
-        run: vp exec electron-builder ${{ matrix.builder-args }} --publish never
-
-      - name: Smoke test AppImage
-        if: matrix.platform == 'ubuntu-24.04'
+        run: vp exec electron-builder ${{ matrix.args }} --publish never
+      - name: Smoke-test AppImage
+        if: runner.os == 'Linux'
         working-directory: src/claudio-electron
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install --no-install-recommends -y xvfb
+          chmod +x release/*.AppImage
           xvfb-run -a node scripts/smoke.mjs release/*.AppImage --appimage-extract-and-run --no-sandbox
-
-      - name: Publish
+      - name: Smoke-test packaged Windows app
+        if: runner.os == 'Windows'
         working-directory: src/claudio-electron
-        run: vp exec electron-builder ${{ matrix.builder-args }} --publish always
+        run: node scripts/smoke.mjs release/win-unpacked/Claudio.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+          path: |
+            src/claudio-electron/release/*.AppImage
+            src/claudio-electron/release/*.exe
+            src/claudio-electron/release/*.blockmap
+            src/claudio-electron/release/*.yml
+            !src/claudio-electron/release/builder-*.yml
+
+  container:
+    name: Package container (${{ matrix.arch }})
+    needs: ci
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.arch == 'arm64'
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: claudio:release-${{ matrix.arch }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=container-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=container-${{ matrix.arch }}
+      - name: Verify server and frontend
+        run: bash scripts/smoke-container.sh claudio:release-${{ matrix.arch }}
+      - name: Export tested image
+        run: docker save claudio:release-${{ matrix.arch }} | gzip > container-${{ matrix.arch }}.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-${{ matrix.arch }}
+          path: container-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    name: Publish release
+    if: github.event_name == 'push'
+    needs: [version, desktop, container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: container-*
+          path: images
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload tested assets to draft release
+        run: |
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Claudio $RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" release/* --clobber
+      - name: Publish tested container images
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for arch in amd64 arm64; do
+            docker load --input "images/container-${arch}.tar.gz"
+            docker tag "claudio:release-${arch}" "${image}:sha-${GITHUB_SHA}-${arch}"
+            docker push "${image}:sha-${GITHUB_SHA}-${arch}"
+          done
+          tags=(--tag "${image}:${VERSION}")
+          if [ "$PRERELEASE" = false ]; then
+            tags+=(--tag "${image}:latest")
+          fi
+          docker buildx imagetools create "${tags[@]}" \
+            "${image}:sha-${GITHUB_SHA}-amd64" \
+            "${image}:sha-${GITHUB_SHA}-arm64"
+      - name: Publish GitHub release
+        run: |
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi

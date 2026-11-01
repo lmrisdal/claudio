@@ -155,15 +155,53 @@ Then run either of these from the repo root:
 
 These scripts cross-check or cross-build `claudio-core` and the bundled uninstaller for `x86_64-pc-windows-msvc`. They do not replace the real Windows packaging/release flow, which still runs on Windows for the NSIS installer.
 
-### Desktop release versioning
+### CI and releases
 
-Use a single Makefile helper to bump desktop version, commit, and tag in one step:
+GitHub Actions has three workflows:
+
+- **CI** runs on every PR to `main` and every merge. It checks the API, web app,
+  Linux/Windows desktop code, and server container. Configure branch protection to
+  require **CI passed**, replacing any checks from the old Tests workflow.
+- **Release** runs when a `v*` tag is pushed. It validates the application versions,
+  runs CI on that commit, and packages the desktop app and amd64/arm64 server
+  images. Both container architectures and the packaged Linux/Windows apps are
+  smoke-tested. Publishing uploads those tested artifacts without rebuilding.
+- **Docs** deploys documentation changes on `main` to GitHub Pages. Pages must use
+  GitHub Actions as its deployment source in repository settings.
+
+Prepare a release in a feature branch, then merge the version changes through a PR:
 
 ```bash
-make bump 0.1.1
+node scripts/bump_version.cjs 0.3.0
+cargo check --workspace
 ```
 
-This updates `src/claudio-electron/package.json`, `src/claudio-core/Cargo.toml`, and `src/claudio-web/package.json` to the same version before committing and tagging.
+Commit the three updated application version files and `Cargo.lock`. After the PR
+is merged, tag the resulting commit on the latest `main`:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git tag -a v0.3.0 -m "Claudio 0.3.0"
+git push origin v0.3.0
+```
+
+The tag must match the Electron, frontend, and Rust sidecar versions. Stable
+releases publish a GitHub release and GHCR images tagged `0.3.0` and `latest`.
+Prerelease versions such as `0.3.0-beta.1` publish a GitHub prerelease and a matching
+container tag, leaving `latest` unchanged. Build metadata (`+...`) is not supported
+for releases because it cannot be used in a container tag.
+
+To test packaging without publishing, run **Release → Run workflow** on the
+selected branch. Download the desktop packages and compressed Docker image
+archives from that run's artifacts; they are retained for 14 days. Load an image
+with `docker load --input container-amd64.tar.gz`. Merges do not publish dev
+releases or update container tags.
+
+Publishing needs only the workflow's GitHub token with `contents: write` and
+`packages: write`; PR checks have read-only repository access. A failed publish
+can be retried using **Re-run failed jobs**: built artifacts are reused and the
+GitHub release stays in draft until the container images have been published.
 
 ## Tech Stack
 

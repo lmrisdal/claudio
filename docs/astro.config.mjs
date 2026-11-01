@@ -40,13 +40,6 @@ export default defineConfig({
             { label: "Proxy Authentication", slug: "authentication/proxy-auth" },
           ],
         },
-        {
-          label: "Development",
-          items: [
-            { label: "Setup", slug: "development/setup" },
-            { label: "Architecture", slug: "development/architecture" },
-          ],
-        },
       ],
     }),
   ],
