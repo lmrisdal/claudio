@@ -75,7 +75,7 @@ jobs:
       ${{ always() && !cancelled()
       && needs.detect-changes.result == 'success'
       && needs.web-tests.result != 'failure'
-      && inputs.build-web-image != false
+      && (github.event_name != 'workflow_dispatch' || inputs.build-web-image)
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -152,7 +152,7 @@ jobs:
   web-tests:
     needs: detect-changes
     if: >-
-      ${{ inputs.run-tests != false
+      ${{ (github.event_name != 'workflow_dispatch' || inputs.run-tests)
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -175,7 +175,7 @@ jobs:
   desktop-tests:
     needs: detect-changes
     if: >-
-      ${{ inputs.run-tests != false
+      ${{ (github.event_name != 'workflow_dispatch' || inputs.run-tests)
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-tests == 'true') }}
     strategy:
       fail-fast: false
@@ -235,7 +235,7 @@ jobs:
       ${{ always() && !cancelled()
       && needs.detect-changes.result == 'success'
       && needs.desktop-tests.result != 'failure'
-      && inputs.build-desktop != false
+      && (github.event_name != 'workflow_dispatch' || inputs.build-desktop)
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -272,7 +272,7 @@ jobs:
       && needs.detect-changes.result == 'success'
       && needs.desktop-tests.result != 'failure'
       && needs.dev-release.result == 'success'
-      && inputs.build-desktop != false
+      && (github.event_name != 'workflow_dispatch' || inputs.build-desktop)
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
     permissions:
       contents: write
