@@ -625,9 +625,9 @@ public static class GameEndpoints
 
         private static string BuildContentDisposition(string fileName)
         {
-            var asciiName = fileName
-                .Replace("\\", "_", StringComparison.Ordinal)
-                .Replace("\"", "_", StringComparison.Ordinal);
+            // HTTP headers require an ASCII fallback; filename* preserves the Unicode name.
+            var asciiName = string.Concat(fileName.Select(c =>
+                c is >= ' ' and <= '~' && c is not ('\\' or '"') ? c : '_'));
             return $"attachment; filename=\"{asciiName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
         }
 
