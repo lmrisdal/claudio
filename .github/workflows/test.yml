@@ -4,6 +4,22 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - "src/claudio-api/**"
+      - "src/claudio-desktop/**"
+      - "src/claudio-electron/**"
+      - "src/claudio-uninstaller/**"
+      - "src/claudio-web/**"
+      - "tests/**"
+      - "docker/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "Claudio.slnx"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/**"
+      - "scripts/build-changes.cjs"
+      - "scripts/workflows.test.cjs"
   pull_request:
     branches: [main]
 
@@ -17,6 +33,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Record push range for artifact change detection
+        if: github.event_name == 'push'
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          node -e 'require("node:fs").writeFileSync("build-context.json", JSON.stringify({before: process.env.PUSH_BEFORE, sha: process.env.PUSH_SHA}))'
+      - name: Upload push range
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-context
+          path: build-context.json
       - name: Test build and release CI gates
         run: node --test scripts/workflows.test.cjs
 

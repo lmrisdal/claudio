@@ -22,14 +22,14 @@ jobs:
       ${{ github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.head_repository.full_name == github.repository
-      && !startsWith(github.event.workflow_run.head_commit.message, 'chore(release): bump version to ')
-      && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event)) }}
+      && github.event.workflow_run.event == 'push') }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
     outputs:
       sha: ${{ steps.verify.outputs.sha }}
+      tagged: ${{ steps.verify.outputs.tagged }}
     steps:
       - name: Require successful CI for the build commit
         id: verify
@@ -57,12 +57,51 @@ jobs:
               );
               return;
             }
+            let tagged = false;
+            if (context.eventName === 'workflow_run') {
+              const tags = await github.paginate(github.rest.repos.listTags, {
+                ...context.repo,
+                per_page: 100,
+              });
+              tagged = tags.some(tag => tag.name.startsWith('v') && tag.commit.sha === sha);
+            }
+            core.setOutput('tagged', String(tagged));
             core.setOutput('sha', sha);
             core.info(`Verified successful CI: ${run.html_url}`);
 
-  web-image:
+  detect-changes:
     needs: verify-tests
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build-web-image }}
+    if: needs.verify-tests.outputs.tagged != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      web: ${{ github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true' }}
+      desktop: ${{ github.event_name == 'workflow_dispatch' || steps.changes.outputs.desktop == 'true' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify-tests.outputs.sha }}
+          fetch-depth: 0
+      - name: Download tested push range
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: build-context
+          path: ${{ runner.temp }}/build-context
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Detect artifact source changes
+        if: github.event_name == 'workflow_run'
+        id: changes
+        env:
+          BUILD_SHA: ${{ needs.verify-tests.outputs.sha }}
+        run: node scripts/build-changes.cjs "$RUNNER_TEMP/build-context/build-context.json"
+
+  web-image:
+    needs: [verify-tests, detect-changes]
+    if: ${{ needs.verify-tests.outputs.tagged != 'true' && needs.detect-changes.outputs.web == 'true' && (github.event_name != 'workflow_dispatch' || inputs.build-web-image) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -140,8 +179,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   dev-release:
-    needs: verify-tests
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build-desktop }}
+    needs: [verify-tests, detect-changes]
+    if: ${{ needs.verify-tests.outputs.tagged != 'true' && needs.detect-changes.outputs.desktop == 'true' && (github.event_name != 'workflow_dispatch' || inputs.build-desktop) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -172,8 +211,8 @@ jobs:
           echo "id=${id}" >> "$GITHUB_OUTPUT"
 
   desktop:
-    needs: [verify-tests, dev-release]
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build-desktop }}
+    needs: [verify-tests, detect-changes, dev-release]
+    if: ${{ needs.verify-tests.outputs.tagged != 'true' && needs.detect-changes.outputs.desktop == 'true' && (github.event_name != 'workflow_dispatch' || inputs.build-desktop) }}
     permissions:
       contents: write
     env:
