@@ -14,7 +14,7 @@ export interface AppPaths {
   webRoot: string;
   preload: string;
   windowIcon: string;
-  trayIcon: string;
+  trayIcons: { onDarkPanel: string; onLightPanel: string };
 }
 
 export function resolvePaths(inputs: PathInputs): AppPaths {
@@ -43,6 +43,9 @@ export function resolvePaths(inputs: PathInputs): AppPaths {
     webRoot,
     preload: path.join(appPath, "dist", "preload", "index.cjs"),
     windowIcon: path.join(assets, "icon.png"),
-    trayIcon: path.join(assets, "tray-icon.png"),
+    trayIcons: {
+      onDarkPanel: path.join(assets, "tray-icon-white.png"),
+      onLightPanel: path.join(assets, "tray-icon-black.png"),
+    },
   };
 }

@@ -18,7 +18,10 @@ describe("resolvePaths", () => {
     expect(paths.resourceDir).toBe("/repo/target/debug");
     expect(paths.webRoot).toBe("/repo/src/claudio-web/dist");
     expect(paths.preload).toBe(path.join(base.appPath, "dist", "preload", "index.cjs"));
-    expect(paths.trayIcon).toBe("/repo/src/claudio-electron/resources/tray-icon.png");
+    expect(paths.trayIcons).toEqual({
+      onDarkPanel: "/repo/src/claudio-electron/resources/tray-icon-white.png",
+      onLightPanel: "/repo/src/claudio-electron/resources/tray-icon-black.png",
+    });
   });
 
   it("uses the release profile and .exe suffix when asked", () => {

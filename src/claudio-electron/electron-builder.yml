@@ -12,8 +12,10 @@ extraResources:
     to: web
   - from: resources/icon.png
     to: icon.png
-  - from: resources/tray-icon.png
-    to: tray-icon.png
+  - from: resources/tray-icon-white.png
+    to: tray-icon-white.png
+  - from: resources/tray-icon-black.png
+    to: tray-icon-black.png
 linux:
   target:
     - AppImage

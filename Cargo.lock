@@ -115,7 +115,6 @@ dependencies = [
  "dirs",
  "flate2",
  "futures-util",
- "http",
  "log",
  "mslnk",
  "reqwest",

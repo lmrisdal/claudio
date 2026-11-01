@@ -17,7 +17,6 @@ integration-tests = []
 
 [dependencies]
 base64 = "0.22"
-http = "1"
 log = "0.4"
 dirs = "6"
 flate2 = "1"

@@ -174,7 +174,7 @@ async function start(): Promise<void> {
   });
 
   Menu.setApplicationMenu(null);
-  createTray(paths.trayIcon, {
+  createTray(paths.trayIcons, {
     show: () => windows.restoreMain(),
     checkForUpdates,
     quit: () => void exit.requestExit(),

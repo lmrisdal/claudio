@@ -1,6 +1,16 @@
 # Electron Migration Plan
 
-Status: proposed, 2026-11-01. Nothing here has been implemented.
+Status: implementation in progress on `feature/electron-migration` (2026-11-01). Phases 0–5 and 8 are implemented. Phase 6 (updates) is stubbed and Phase 7 (test matrix) is open.
+
+## Changes made during implementation
+
+- macOS is no longer a target. All macOS code paths, the app menu, the dock setting and the macOS CI jobs were removed.
+- Settings is an in-app dialog; there is no second window, so the window-role plumbing was dropped.
+- The core writes `claudio.log` itself, so the shell forwards only non-log stderr lines (panics) to avoid duplicate entries.
+- Dev builds from `main` are uploaded as workflow artifacts instead of a rolling `dev` draft release.
+- `protocol.rs` had no tests, so nothing was ported before deleting it. Its behaviour is covered by `src/claudio-electron/tests/api-proxy.test.ts`.
+- electron-builder 26.18.0 uses the legacy AppImage runtime by default: it needs `libfuse2` (or `--appimage-extract-and-run`) and its generated desktop entry launches with `--no-sandbox`. The static runtime (`toolsets.appimage`) is still marked beta in 26.18.0, so it was not adopted.
+- CI smoke test: `src/claudio-electron/scripts/smoke.mjs` launches the packaged AppImage under xvfb and checks for a window and a successful `ping`.
 
 ## Goal
 
@@ -21,7 +31,7 @@ Chromium has not yet been measured on that machine, and the cause of the jank is
 | API proxy (`claudio://`) | Port to the Electron main process | It needs streaming, and binary bodies over a JSON pipe would be slow. |
 | Renderer security | `sandbox` and `contextIsolation` on, `nodeIntegration` off, preload allowlist | Electron defaults and recommended practice. |
 | Versions | `electron` 45.2.1, `electron-builder` 26.18.0, `electron-updater` 6.8.11 | Current `latest` on npm as of 2026-11-01. Pin exact versions. |
-| Release targets | Linux AppImage and Windows NSIS | Same as `tauri.conf.json` and `release.yml` today. macOS stays buildable for development, with its code paths kept, but is not released. |
+| Release targets | Linux AppImage and Windows NSIS | Same as the Tauri build. macOS is not supported. |
 | Cutover | Hard cut on one feature branch, `feature/electron-migration` | No users to carry over. Tauri is removed as part of the migration. |
 
 ### Trap: electron-builder docs

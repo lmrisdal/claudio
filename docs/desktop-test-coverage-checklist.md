@@ -17,7 +17,7 @@ This checklist is the implementation reference for expanding test coverage in `s
   - `src/auth.rs`: JWT/session parsing tests
   - `src/settings.rs`: log-level normalization tests
   - `src/services/game_install.rs`: one cleanup test
-- Desktop CI currently builds/packages on Windows, macOS, and Linux.
+- Desktop CI currently builds/packages on Windows and Linux.
 - Desktop CI does not currently run `cargo test` for `src/claudio-desktop`.
 
 ## Risk Priorities
@@ -27,7 +27,7 @@ This checklist is the implementation reference for expanding test coverage in `s
 - `src/claudio-desktop/src/services/game_install.rs`
 - `src/claudio-desktop/src/services/game_runtime.rs`
 - `src/claudio-desktop/src/auth.rs`
-- `src/claudio-desktop/src/protocol.rs`
+- `src/claudio-electron/src/main/protocol/api-proxy.ts`
 
 ### Medium Priority
 
@@ -69,7 +69,7 @@ These are the first refactors to make before trying to add broad coverage.
 ### 2. Extract Progress/Event Sink
 
 - Move `emit_progress`, `emit_progress_indeterminate`, and `emit_progress_with_bytes` behind a small trait or callback adapter.
-- Keep the Tauri `AppHandle` emission at the outer edge.
+- Keep event emission behind the `Host` abstraction (`src/claudio-desktop/src/host.rs`).
 - Outcome:
   - install tests can assert progress states directly
   - no real app event bus required for most tests
@@ -113,7 +113,7 @@ These are the first refactors to make before trying to add broad coverage.
 
 ### 6. Reduce Hardwired HTTP Construction
 
-- Keep request building and response handling testable without requiring live Tauri state.
+- Keep request building and response handling testable without requiring a live shell.
 - Extract pure helpers for:
   - header shaping
   - route classification
@@ -370,7 +370,7 @@ Inline unit/helper tests that already exist in `src/claudio-desktop` should stay
 - secure storage recovery invalidates plaintext fallback and forces reauth
 - plaintext fallback file path is used only when insecure storage is enabled
 
-### `src/protocol.rs`
+### `src/claudio-electron/src/main/protocol/api-proxy.ts` (formerly `protocol.rs`)
 
 #### Unit Tests
 

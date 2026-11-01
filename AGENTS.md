@@ -21,11 +21,18 @@ npx tsc --noEmit                          # type-check without emitting
 vp lint .                                 # ESLint
 ```
 
-### Desktop (Tauri)
+### Desktop (Electron + Rust sidecar)
 
 ```bash
-./scripts/check-windows-xwin.sh           # cross-check Windows desktop + uninstaller via cargo-xwin
-./scripts/build-windows-xwin.sh           # cross-build Windows desktop + uninstaller via cargo-xwin
+cargo build -p claudio-desktop --bin claudio-core   # headless sidecar used by the shell
+cd src/claudio-electron
+vp install
+vp run dev                                         # bundles the shell and starts Electron
+vp run package                                     # AppImage / NSIS installer into release/
+vp check && vp test                                # lint, type-check and unit tests
+
+./scripts/check-windows-xwin.sh           # cross-check Windows claudio-core + uninstaller via cargo-xwin
+./scripts/build-windows-xwin.sh           # cross-build Windows claudio-core + uninstaller via cargo-xwin
 ```
 
 ### Docker
@@ -36,12 +43,14 @@ docker compose -f docker/docker-compose.yml up --build
 
 ## Architecture
 
-Monorepo with a Rust API, Tauri desktop client, and a React frontend:
+Monorepo with a Rust API, an Electron desktop client backed by a Rust sidecar, and a React frontend:
 
 - **`src/claudio-api`** — Axum-based Rust API. Serves the SPA as static files and provides REST endpoints.
-- **`src/claudio-desktop`** — Tauri desktop client.
+- **`src/claudio-desktop`** — Headless Rust sidecar (`claudio-core`) for the desktop app: installs, game launching, Proton/umu. JSON lines over stdio, no UI dependencies.
+- **`src/claudio-electron`** — Electron shell: windows, tray, `claudio-app://` and `claudio://api` protocols, auto-updates, packaging with electron-builder.
 - **`src/claudio-web/`** — React 19 SPA built with Vite. Output goes to `src/claudio-api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
 - **`tests/claudio-api-rs/`** — Rust integration test crate for API behavior.
+- **`tests/claudio-desktop/`** — Rust integration tests for the sidecar.
 
 ### Backend structure
 
@@ -173,6 +182,7 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 ## Key Conventions
 
 - The SPA is served by the Rust API from `wwwroot` with an `index.html` fallback.
+- Desktop-only code in the SPA talks to the shell through `src/claudio-web/src/features/desktop/hooks/desktop-bridge.ts` (`window.claudioDesktop`). Do not import Electron or Node APIs in the SPA.
 - Game downloads use streaming with `enableRangeProcessing` for resume support.
 - IGDB integration authenticates via Twitch OAuth (client credentials flow).
 

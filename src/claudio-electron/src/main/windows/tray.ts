@@ -1,4 +1,5 @@
-import { Menu, Tray, nativeImage } from "electron";
+import { Menu, Tray, nativeImage, nativeTheme } from "electron";
+import { selectTrayIcon, type TrayIcons } from "./tray-icon";
 
 export interface TrayActions {
   show: () => void;
@@ -6,9 +7,11 @@ export interface TrayActions {
   quit: () => void;
 }
 
-export function createTray(iconPath: string, actions: TrayActions): Tray {
-  const icon = nativeImage.createFromPath(iconPath);
-  const tray = new Tray(icon);
+export function createTray(icons: TrayIcons, actions: TrayActions): Tray {
+  const currentIcon = () =>
+    nativeImage.createFromPath(selectTrayIcon(icons, process.platform, nativeTheme));
+  const tray = new Tray(currentIcon());
+  nativeTheme.on("updated", () => tray.setImage(currentIcon()));
   tray.setToolTip("Claudio");
   tray.setContextMenu(
     Menu.buildFromTemplate([

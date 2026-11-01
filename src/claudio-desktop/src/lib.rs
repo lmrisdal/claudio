@@ -5,8 +5,6 @@ mod http_client;
 pub mod integration_test_api;
 pub mod logging;
 pub mod models;
-#[cfg(feature = "integration-tests")]
-mod protocol;
 mod registry;
 pub mod rpc;
 pub mod services;
