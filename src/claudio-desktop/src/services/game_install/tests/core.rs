@@ -249,6 +249,28 @@ fn build_install_dir_uses_sanitized_title() {
 }
 
 #[test]
+fn list_game_executables_includes_bat_files_and_excludes_shell_scripts() {
+    crate::settings::with_test_data_dir(unique_test_dir("bat-executables"), || {
+        let install_dir = crate::settings::data_dir().join("installed");
+        fs::create_dir_all(&install_dir).expect("install dir should exist");
+        for name in ["game.exe", "RUN.BAT", "start.sh", "readme.txt"] {
+            fs::write(install_dir.join(name), b"binary").expect("file should exist");
+        }
+        crate::registry::upsert(installed_game(45, "Bat Game", &install_dir))
+            .expect("installed game should save");
+
+        let executables = list_game_executables(45).expect("executables should load");
+        assert_eq!(executables, vec!["RUN.BAT", "game.exe"]);
+
+        let expected_exe = install_dir.join("RUN.BAT").to_string_lossy().into_owned();
+        let updated = set_game_exe(45, "RUN.BAT".to_string()).expect("bat executable should save");
+        assert_eq!(updated.game_exe.as_deref(), Some(expected_exe.as_str()));
+
+        set_game_exe(45, "start.sh".to_string()).expect_err("shell script should be rejected");
+    });
+}
+
+#[test]
 fn list_game_executables_includes_wine_prefix_drive_c() {
     crate::settings::with_test_data_dir(unique_test_dir("prefix-executables"), || {
         let install_dir = crate::settings::data_dir().join("installed");

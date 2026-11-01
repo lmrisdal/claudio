@@ -265,10 +265,19 @@ public static class GameEndpoints
         IsArchive = IsStandaloneArchive(game) || (Directory.Exists(game.FolderPath) && FindSingleArchive(game.FolderPath) is not null),
     };
 
+    // Older games often ship upper-case names like RUN.BAT, and globbing is case-sensitive on Linux.
+    private static readonly EnumerationOptions ExecutableSearchOptions = new()
+    {
+        RecurseSubdirectories = true,
+        MatchCasing = MatchCasing.CaseInsensitive,
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+    };
+
     internal static List<string> ListGameExecutables(Game game)
     {
         var exes = new List<string>();
-        string[] extensions = [".exe", ".iso"];
+        string[] extensions = [".exe", ".bat", ".iso"];
 
         var archivePath = IsStandaloneArchive(game)
             ? game.FolderPath
@@ -286,7 +295,7 @@ public static class GameEndpoints
             foreach (var ext in extensions)
             {
                 exes.AddRange(
-                    Directory.GetFiles(game.FolderPath, $"*{ext}", SearchOption.AllDirectories)
+                    Directory.GetFiles(game.FolderPath, $"*{ext}", ExecutableSearchOptions)
                         .Select(f => Path.GetRelativePath(game.FolderPath, f).Replace('\\', '/')));
             }
         }

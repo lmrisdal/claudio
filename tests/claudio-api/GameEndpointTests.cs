@@ -290,6 +290,23 @@ public class GameEndpointTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task GetExecutables_LooseFiles_IncludesBatFilesInAnyCase()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Loose");
+        Directory.CreateDirectory(Path.Combine(gameDir, "bin"));
+        File.WriteAllText(Path.Combine(gameDir, "game.exe"), "dummy");
+        File.WriteAllText(Path.Combine(gameDir, "RUN.BAT"), "dummy");
+        File.WriteAllText(Path.Combine(gameDir, "bin", "setup.bat"), "dummy");
+        File.WriteAllText(Path.Combine(gameDir, "start.sh"), "dummy");
+        await SeedGameAsync("Loose", "pc", "Loose", gameDir);
+        var client = CreateClient();
+
+        var executables = await client.GetFromJsonAsync<List<string>>("/api/games/1/executables");
+
+        executables.Should().BeEquivalentTo("RUN.BAT", "bin/setup.bat", "game.exe");
+    }
+
+    [Test]
     public async Task GetExecutables_CorruptSevenZip_ReturnsEmptyList()
     {
         var gameDir = Path.Combine(_gamesDir, "pc", "Broken");

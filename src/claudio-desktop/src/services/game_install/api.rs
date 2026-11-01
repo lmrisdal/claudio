@@ -640,7 +640,7 @@ fn executable_search_roots(game: &InstalledGame) -> Vec<PathBuf> {
 fn is_windows_executable(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("exe"))
+        .map(|ext| ext.eq_ignore_ascii_case("exe") || ext.eq_ignore_ascii_case("bat"))
         .unwrap_or(false)
 }
 
