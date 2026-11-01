@@ -183,8 +183,8 @@ committing or tagging.
 
 The tag must match the Electron, frontend, and Rust sidecar versions. Stable
 releases publish a GitHub release and GHCR images tagged `0.2.2` and `latest`.
-Prerelease versions such as `0.3.0-beta.1` publish a GitHub prerelease and a matching
-container tag, leaving `latest` unchanged. Build metadata (`+...`) is not supported
+Prerelease versions such as `0.3.0-beta.1` publish a GitHub prerelease and container
+images tagged `0.3.0-beta.1` and `dev`, leaving `latest` unchanged. Build metadata (`+...`) is not supported
 for releases because it cannot be used in a container tag.
 
 To test packaging without publishing, run **Release → Run workflow** on the

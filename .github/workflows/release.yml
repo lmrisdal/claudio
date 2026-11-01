@@ -195,7 +195,9 @@ jobs:
             docker push "${image}:sha-${GITHUB_SHA}-${arch}"
           done
           tags=(--tag "${image}:${VERSION}")
-          if [ "$PRERELEASE" = false ]; then
+          if [ "$PRERELEASE" = true ]; then
+            tags+=(--tag "${image}:dev")
+          else
             tags+=(--tag "${image}:latest")
           fi
           docker buildx imagetools create "${tags[@]}" \
