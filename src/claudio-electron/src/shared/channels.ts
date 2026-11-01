@@ -52,6 +52,7 @@ export const CORE_METHODS = [
   "get_installed_game",
   "list_game_executables",
   "set_game_exe",
+  "update_game_launch_settings",
   "add_steam_shortcut",
   "launch_game",
   "stop_game",

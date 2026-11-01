@@ -8,6 +8,7 @@ use zip::write::SimpleFileOptions;
 mod core;
 mod extract;
 mod installer;
+mod launch_settings;
 
 fn unique_test_dir(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -22,6 +23,7 @@ fn unique_test_dir(name: &str) -> PathBuf {
 
 fn installed_game(remote_game_id: i32, title: &str, install_path: &Path) -> InstalledGame {
     InstalledGame {
+        launch_options: Default::default(),
         remote_game_id,
         title: title.to_string(),
         platform: "windows".to_string(),

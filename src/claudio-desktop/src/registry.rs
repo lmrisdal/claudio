@@ -74,6 +74,7 @@ mod tests {
 
     fn installed_game(remote_game_id: i32, title: &str, install_path: &Path) -> InstalledGame {
         InstalledGame {
+            launch_options: Default::default(),
             remote_game_id,
             title: title.to_string(),
             platform: "windows".to_string(),
@@ -146,6 +147,10 @@ mod tests {
         settings::with_test_data_dir(root.join("data"), || {
             let mut entry = serde_json::to_value(installed_game(9, "Legacy Game", &install_dir))
                 .expect("entry should serialize");
+            entry
+                .as_object_mut()
+                .expect("entry should be an object")
+                .remove("launchOptions");
             entry["linuxRuntimeBackend"] = serde_json::json!("bottles");
             entry["bottleName"] = serde_json::json!("Gaming");
             fs::write(
@@ -159,6 +164,8 @@ mod tests {
                 .expect("legacy entry should be present");
 
             assert_eq!(game.title, "Legacy Game");
+            assert!(game.launch_options.parameters.is_empty());
+            assert!(!game.launch_options.run_as_administrator);
         });
 
         let _ = fs::remove_dir_all(&root);

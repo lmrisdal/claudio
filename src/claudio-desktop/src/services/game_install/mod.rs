@@ -40,6 +40,7 @@ mod installer_install_linux;
 mod installer_run;
 #[cfg(feature = "integration-tests")]
 pub(crate) mod integration_testing;
+mod launch_settings;
 mod paths;
 mod progress;
 mod request_headers;
@@ -54,6 +55,7 @@ pub use api::{
     resolve_install_browse_root, resolve_install_path, restart_install_interactive,
     retry_cached_install, set_game_exe, uninstall_game, validate_install_target,
 };
+pub use launch_settings::update_game_launch_settings;
 pub use state::InstallState;
 
 #[cfg(feature = "integration-tests")]

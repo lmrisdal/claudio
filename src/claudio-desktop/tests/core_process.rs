@@ -198,3 +198,20 @@ fn no_subprocess_inherits_the_protocol_stdout() {
         "Stdio::inherit found in {offenders:?}"
     );
 }
+
+#[test]
+fn launch_passes_saved_arguments_without_shell_expansion() {
+    let mut core = Core::start("arguments");
+    let install = core.install_script_game(3, "#!/bin/sh\nprintf '%s\\n' \"$@\" > arguments\n");
+    let registry_path = core.data_home.join("claudio/installed-games.json");
+    let mut registry: Value =
+        serde_json::from_str(&fs::read_to_string(&registry_path).expect("registry")).expect("json");
+    registry[0]["launchOptions"] = json!({"parameters": "-name \"Player One\" $HOME ;"});
+    fs::write(&registry_path, registry.to_string()).expect("save arguments");
+    let launched = core.call(1, "launch_game", json!({"remoteGameId": 3}));
+    assert!(launched.get("error").is_none(), "{launched}");
+    assert_eq!(
+        wait_for_file(&install.join("arguments")),
+        "-name\nPlayer One\n$HOME\n;\n"
+    );
+}

@@ -89,6 +89,19 @@ pub(super) async fn dispatch(ctx: &Context, method: &str, params: Value) -> Resu
             let args: RemoteGameIdArgs = parse(method, params)?;
             to_value(games::list_game_executables(args.remote_game_id).await?)
         }
+        "update_game_launch_settings" => {
+            let args: super::params::GameLaunchSettingsArgs = parse(method, params)?;
+            blocking(move || {
+                crate::services::game_install::update_game_launch_settings(
+                    args.remote_game_id,
+                    args.game_exe,
+                    args.proton_path,
+                    args.options,
+                )
+            })
+            .await?
+            .and_then(to_value)
+        }
         "set_game_exe" => {
             let args: SetGameExeArgs = parse(method, params)?;
             to_value(games::set_game_exe(args.remote_game_id, args.game_exe).await?)

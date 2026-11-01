@@ -100,6 +100,7 @@ pub(super) async fn install_installer_linux(
     .map_err(|err| format!("Linux installer task failed: {err}"))??;
 
     Ok(InstalledGame {
+        launch_options: Default::default(),
         remote_game_id: game.id,
         title: game.title.clone(),
         platform: game.platform.clone(),

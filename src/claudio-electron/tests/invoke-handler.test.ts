@@ -50,9 +50,9 @@ describe("runInvoke", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("exposes exactly the 26 documented core commands", () => {
-    expect(CORE_METHODS).toHaveLength(26);
-    expect(new Set(CORE_METHODS).size).toBe(26);
+  it("exposes exactly the 27 documented core commands", () => {
+    expect(CORE_METHODS).toHaveLength(27);
+    expect(new Set(CORE_METHODS).size).toBe(27);
   });
 
   it("routes shell-owned commands to the shell instead of the core", async () => {

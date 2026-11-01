@@ -476,7 +476,10 @@ pub fn list_game_executables(remote_game_id: i32) -> Result<Vec<String>, String>
     Ok(exes.into_iter().collect())
 }
 
-fn resolve_game_exe_path(game: &InstalledGame, game_exe: &str) -> Result<String, String> {
+pub(super) fn resolve_game_exe_path(
+    game: &InstalledGame,
+    game_exe: &str,
+) -> Result<String, String> {
     let requested = PathBuf::from(game_exe);
     if requested.is_absolute() {
         return validate_game_exe_path(requested);

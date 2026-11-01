@@ -340,6 +340,7 @@ pub(super) async fn install_portable(
     let (wine_prefix, proton_path) = (None, None);
 
     Ok(InstalledGame {
+        launch_options: Default::default(),
         remote_game_id: game.id,
         title: game.title.clone(),
         platform: game.platform.clone(),

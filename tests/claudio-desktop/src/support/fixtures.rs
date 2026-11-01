@@ -59,6 +59,7 @@ pub fn installed_game(
     game_exe: Option<String>,
 ) -> InstalledGame {
     InstalledGame {
+        launch_options: Default::default(),
         remote_game_id,
         title: title.to_string(),
         platform: std::env::consts::OS.to_string(),

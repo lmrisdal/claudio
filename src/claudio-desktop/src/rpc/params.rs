@@ -82,3 +82,12 @@ pub(super) struct LogArgs {
     pub message: String,
     pub source: Option<String>,
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct GameLaunchSettingsArgs {
+    pub remote_game_id: i32,
+    pub game_exe: Option<String>,
+    pub proton_path: Option<String>,
+    pub options: crate::models::GameLaunchOptions,
+}

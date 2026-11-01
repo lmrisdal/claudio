@@ -21,6 +21,7 @@ import {
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import CompressionProgress from "./compression-progress";
 import DownloadButton from "./download-button";
+import GameSettingsButton from "./game-settings-button";
 import InstallDialog from "./install-dialog";
 import PickExeDialog from "./pick-exe-dialog";
 import PlayContextMenu from "./play-context-menu";
@@ -491,6 +492,7 @@ export default function GameDetailActions({
                       : "Play"}
               </button>
 
+              <GameSettingsButton game={installedGame} />
               <div>
                 <button
                   ref={optionsButtonRef}

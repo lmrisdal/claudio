@@ -24,6 +24,7 @@ export default function ExeListbox({
       <Listbox value={value} onChange={onChange}>
         <div className="relative mt-1">
           <ListboxButton
+            aria-label={label}
             data-gamepad-nav-bridge={bridgeId}
             className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:border-focus-ring transition flex items-center justify-between gap-2"
           >

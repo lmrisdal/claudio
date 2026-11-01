@@ -63,7 +63,14 @@ interface DesktopInstallGameInput {
   igdbSlug?: string | null;
 }
 
+interface GameLaunchOptions {
+  parameters: string;
+  runAsAdministrator: boolean;
+  umuGameId: string | null;
+}
+
 interface InstalledGame {
+  launchOptions?: GameLaunchOptions;
   remoteGameId: number;
   title: string;
   platform: string;
@@ -214,6 +221,20 @@ export async function setGameExe(remoteGameId: number, gameExe: string): Promise
   return invoke<InstalledGame>("set_game_exe", { remoteGameId, gameExe });
 }
 
+export async function updateGameLaunchSettings(
+  remoteGameId: number,
+  gameExe: string | null,
+  protonPath: string | null,
+  options: GameLaunchOptions,
+): Promise<InstalledGame> {
+  return invoke<InstalledGame>("update_game_launch_settings", {
+    remoteGameId,
+    gameExe,
+    protonPath,
+    options,
+  });
+}
+
 export async function listGameExecutables(remoteGameId: number): Promise<string[]> {
   return invoke<string[]>("list_game_executables", { remoteGameId });
 }
@@ -242,6 +263,7 @@ export function useDesktop() {
 }
 
 export type {
+  GameLaunchOptions,
   DesktopInstallGameInput,
   DownloadPackageInput,
   DesktopSettings,

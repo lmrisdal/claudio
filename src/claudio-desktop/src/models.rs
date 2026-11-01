@@ -39,6 +39,8 @@ pub struct RemoteGame {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledGame {
+    #[serde(default)]
+    pub launch_options: GameLaunchOptions,
     pub remote_game_id: i32,
     pub title: String,
     pub platform: String,
@@ -89,4 +91,12 @@ pub struct RunningGameInfo {
     pub pid: u32,
     pub exe_path: String,
     pub started_at: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GameLaunchOptions {
+    pub parameters: String,
+    pub run_as_administrator: bool,
+    pub umu_game_id: Option<String>,
 }
