@@ -198,7 +198,7 @@ jobs:
           - platform: ubuntu-24.04
             builder-args: --linux AppImage
           - platform: windows-latest
-            builder-args: --win nsis
+            builder-args: --win nsis portable
             uninstaller-target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
