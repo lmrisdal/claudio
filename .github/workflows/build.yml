@@ -3,18 +3,18 @@ name: Build Artifacts
 on:
   workflow_dispatch:
     inputs:
-      skip-tests:
-        description: Skip the API and desktop test jobs
+      run-tests:
+        description: Run tests
         type: boolean
-        default: false
-      skip-web-image:
-        description: Skip building and pushing the web Docker image
+        default: true
+      build-web-image:
+        description: Build and push docker image
         type: boolean
-        default: false
-      skip-desktop:
-        description: Skip building the desktop app and updating the dev release
+        default: true
+      build-desktop:
+        description: Build desktop app
         type: boolean
-        default: false
+        default: true
   push:
     branches: [main]
     paths:
@@ -75,7 +75,7 @@ jobs:
       ${{ always() && !cancelled()
       && needs.detect-changes.result == 'success'
       && needs.web-tests.result != 'failure'
-      && inputs.skip-web-image != true
+      && inputs.build-web-image != false
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -152,7 +152,7 @@ jobs:
   web-tests:
     needs: detect-changes
     if: >-
-      ${{ inputs.skip-tests != true
+      ${{ inputs.run-tests != false
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -175,7 +175,7 @@ jobs:
   desktop-tests:
     needs: detect-changes
     if: >-
-      ${{ inputs.skip-tests != true
+      ${{ inputs.run-tests != false
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-tests == 'true') }}
     strategy:
       fail-fast: false
@@ -235,7 +235,7 @@ jobs:
       ${{ always() && !cancelled()
       && needs.detect-changes.result == 'success'
       && needs.desktop-tests.result != 'failure'
-      && inputs.skip-desktop != true
+      && inputs.build-desktop != false
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -272,7 +272,7 @@ jobs:
       && needs.detect-changes.result == 'success'
       && needs.desktop-tests.result != 'failure'
       && needs.dev-release.result == 'success'
-      && inputs.skip-desktop != true
+      && inputs.build-desktop != false
       && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
     permissions:
       contents: write
