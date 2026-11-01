@@ -1,24 +1,26 @@
 .PHONY: bump
 
 bump:
-	@version="$(word 2,$(MAKECMDGOALS))"; \
-	push_flag="$(word 3,$(MAKECMDGOALS))"; \
+	@set -e; \
+	version="$(word 2,$(MAKECMDGOALS))"; \
+	push_flag="$(push)"; \
 	if [ -z "$$version" ]; then \
 		echo "Usage: make bump 0.1.1 [push=true]"; \
 		exit 1; \
 	fi; \
 	node scripts/bump_version.cjs "$$version"; \
-	git add src/claudio-electron/package.json src/claudio-core/Cargo.toml src/claudio-web/package.json; \
+	cargo check --workspace; \
+	git add src/claudio-electron/package.json src/claudio-core/Cargo.toml src/claudio-web/package.json Cargo.lock; \
 	git commit -m "chore(release): bump version to $$version"; \
-	git tag "v$$version"; \
+	git tag -a "v$$version" -m "Claudio $$version"; \
 	case "$$push_flag" in \
-		push=true|push=yes|push=1) git push origin HEAD --tags ;; \
+		true|yes|1) git push origin HEAD "refs/tags/v$$version" ;; \
 		*) \
 			printf "Push commit and tag now (y/N)? "; \
 			read -r confirm; \
 			case "$$confirm" in \
-				[yY]|[yY][eE][sS]) git push origin HEAD --tags ;; \
-				*) echo "Created commit + tag v$$version. Push later with: git push origin HEAD --tags" ;; \
+				[yY]|[yY][eE][sS]) git push origin HEAD "refs/tags/v$$version" ;; \
+				*) echo "Created commit + tag v$$version. Push later with: git push origin HEAD refs/tags/v$$version" ;; \
 			esac ;; \
 	esac
 

@@ -169,25 +169,20 @@ GitHub Actions has three workflows:
 - **Docs** deploys documentation changes on `main` to GitHub Pages. Pages must use
   GitHub Actions as its deployment source in repository settings.
 
-Prepare a release in a feature branch, then merge the version changes through a PR:
+To publish a release from the current branch:
 
 ```bash
-node scripts/bump_version.cjs 0.3.0
-cargo check --workspace
+make bump 0.2.2
 ```
 
-Commit the three updated application version files and `Cargo.lock`. After the PR
-is merged, tag the resulting commit on the latest `main`:
-
-```bash
-git switch main
-git pull --ff-only origin main
-git tag -a v0.3.0 -m "Claudio 0.3.0"
-git push origin v0.3.0
-```
+This updates the three application versions, runs `cargo check --workspace` to
+refresh `Cargo.lock`, commits all four version files, and creates the annotated
+`v0.2.2` tag. It asks before pushing the commit and that tag. To push without the
+prompt, use `make bump 0.2.2 push=true`. If validation fails, it stops before
+committing or tagging.
 
 The tag must match the Electron, frontend, and Rust sidecar versions. Stable
-releases publish a GitHub release and GHCR images tagged `0.3.0` and `latest`.
+releases publish a GitHub release and GHCR images tagged `0.2.2` and `latest`.
 Prerelease versions such as `0.3.0-beta.1` publish a GitHub prerelease and a matching
 container tag, leaving `latest` unchanged. Build metadata (`+...`) is not supported
 for releases because it cannot be used in a container tag.

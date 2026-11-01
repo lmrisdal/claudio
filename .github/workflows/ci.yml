@@ -50,8 +50,6 @@ jobs:
       - run: vp check
       - run: vp test
       - run: vp run build
-      - name: Test release validation
-        run: node --test ../../scripts/workflows.test.cjs
 
   desktop:
     name: Desktop (${{ matrix.os }})
@@ -85,6 +83,9 @@ jobs:
         working-directory: src/claudio-electron
       - run: vp pack
         working-directory: src/claudio-electron
+      - name: Test release helpers
+        if: runner.os == 'Linux'
+        run: node --test scripts/*.test.cjs
 
   container:
     name: Container
