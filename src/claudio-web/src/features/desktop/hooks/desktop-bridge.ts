@@ -1,5 +1,3 @@
-export type WindowRole = "main" | "settings";
-
 export interface DesktopDownloadEvent {
   event: "Started" | "Progress" | "Finished";
   data?: { contentLength?: number | null; chunkLength?: number };
@@ -14,7 +12,6 @@ export interface ClaudioDesktopBridge {
   invoke: (method: string, params?: unknown) => Promise<unknown>;
   onEvent: (handler: (event: string, payload: unknown) => void) => () => void;
   window: {
-    role: WindowRole;
     minimize: () => Promise<void>;
     toggleMaximize: () => Promise<void>;
     close: () => Promise<void>;

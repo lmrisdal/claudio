@@ -130,10 +130,6 @@ export async function updateSettings(settings: DesktopSettings): Promise<void> {
   return invoke<void>("update_settings", { settings });
 }
 
-export async function openSettingsWindow(): Promise<void> {
-  return invoke<void>("open_settings_window");
-}
-
 export async function installGame(game: DesktopInstallGameInput): Promise<InstalledGame> {
   return invoke<InstalledGame>("install_game", { game });
 }
@@ -235,7 +231,6 @@ export function useDesktop() {
     ping,
     getSettings,
     updateSettings,
-    openSettingsWindow,
     installGame,
     listProtonVersions,
     validateInstallTarget,

@@ -89,7 +89,7 @@ async function start(): Promise<void> {
     command: paths.coreBinary,
     args: ["--resource-dir", paths.resourceDir],
     env: buildCoreEnv(process.env),
-    onEvent: (event, payload) => windows.broadcast(CHANNELS.event, { event, payload }),
+    onEvent: (event, payload) => windows.send(CHANNELS.event, { event, payload }),
     onConfirm: async ({ title, message, okLabel, cancelLabel }) => {
       const { response } = await dialog.showMessageBox({
         type: "warning",
@@ -154,14 +154,14 @@ async function start(): Promise<void> {
 
   const checkForUpdates = () => {
     windows.restoreMain();
-    windows.sendToMain(CHANNELS.event, { event: "check-for-updates", payload: null });
+    windows.send(CHANNELS.event, { event: "check-for-updates", payload: null });
   };
 
   registerIpc({
     core,
     logger,
     updates: createDisabledUpdateService(),
-    broadcast: (channel, payload) => windows.broadcast(channel, payload),
+    send: (channel, payload) => windows.send(channel, payload),
     onSettingsUpdated: () => void refreshProxySettings(),
     shell: {
       restart_app: () => {
@@ -170,7 +170,6 @@ async function start(): Promise<void> {
         app.relaunch(appImage ? { execPath: appImage } : undefined);
         app.exit(0);
       },
-      open_settings_window: () => windows.openSettings(),
     },
   });
 

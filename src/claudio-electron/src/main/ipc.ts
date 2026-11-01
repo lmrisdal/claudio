@@ -13,7 +13,7 @@ import type { UpdateService } from "./updates/update-service";
 export interface IpcDeps extends InvokeDeps {
   logger: Logger;
   updates: UpdateService;
-  broadcast: (channel: string, payload?: unknown) => void;
+  send: (channel: string, payload?: unknown) => void;
 }
 
 const LOG_LEVELS = new Set<Level>(["error", "warn", "info", "debug"]);
@@ -67,7 +67,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CHANNELS.updatesDownload, async (event) => {
     if (!trusted(event)) throw new Error("Untrusted sender.");
     await deps.updates.download((progress) =>
-      deps.broadcast(CHANNELS.event, { event: UPDATE_DOWNLOAD_EVENT, payload: progress }),
+      deps.send(CHANNELS.event, { event: UPDATE_DOWNLOAD_EVENT, payload: progress }),
     );
   });
 

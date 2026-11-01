@@ -12,9 +12,7 @@ export const CHANNELS = {
 export const APP_SCHEME = "claudio-app";
 export const API_SCHEME = "claudio";
 export const APP_ORIGIN = `${APP_SCHEME}://app`;
-export const WINDOW_ROLE_ARG_PREFIX = "--claudio-window-role=";
 
-export type WindowRole = "main" | "settings";
 export type WindowControl = "minimize" | "toggleMaximize" | "close";
 export type InvokeResult = { ok: true; value: unknown } | { ok: false; error: string };
 
@@ -65,4 +63,4 @@ export const CORE_METHODS = [
   "desktop_check_server_connection",
 ] as const;
 
-export const SHELL_METHODS = ["restart_app", "open_settings_window"] as const;
+export const SHELL_METHODS = ["restart_app"] as const;

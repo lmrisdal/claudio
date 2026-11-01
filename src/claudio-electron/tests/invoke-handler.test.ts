@@ -11,7 +11,7 @@ function deps(invoke: InvokeMock = vi.fn(async () => "value")) {
     value: {
       core: { invoke },
       onSettingsUpdated: vi.fn(),
-      shell: { restart_app: vi.fn(), open_settings_window: vi.fn() },
+      shell: { restart_app: vi.fn() },
     },
   };
 }
@@ -58,10 +58,8 @@ describe("runInvoke", () => {
   it("routes shell-owned commands to the shell instead of the core", async () => {
     const { value, invoke } = deps();
 
-    expect(await runInvoke(value, "open_settings_window", null)).toEqual({ ok: true, value: null });
     expect(await runInvoke(value, "restart_app", null)).toEqual({ ok: true, value: null });
 
-    expect(value.shell.open_settings_window).toHaveBeenCalledOnce();
     expect(value.shell.restart_app).toHaveBeenCalledOnce();
     expect(invoke).not.toHaveBeenCalled();
   });

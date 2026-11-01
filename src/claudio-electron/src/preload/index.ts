@@ -4,16 +4,10 @@ import {
   UPDATE_DOWNLOAD_EVENT,
   type UpdateDownloadEvent,
   type UpdateInfo,
-  WINDOW_ROLE_ARG_PREFIX,
   type InvokeResult,
   type OpenDialogOptions,
   type WindowControl,
-  type WindowRole,
 } from "../shared/channels";
-
-const roleArg = process.argv.find((arg) => arg.startsWith(WINDOW_ROLE_ARG_PREFIX));
-const role: WindowRole =
-  roleArg?.slice(WINDOW_ROLE_ARG_PREFIX.length) === "settings" ? "settings" : "main";
 
 type EventHandler = (event: string, payload: unknown) => void;
 
@@ -32,7 +26,6 @@ contextBridge.exposeInMainWorld("claudioDesktop", {
     return () => ipcRenderer.removeListener(CHANNELS.event, listener);
   },
   window: {
-    role,
     minimize: () => ipcRenderer.invoke(CHANNELS.windowControl, "minimize" satisfies WindowControl),
     toggleMaximize: () =>
       ipcRenderer.invoke(CHANNELS.windowControl, "toggleMaximize" satisfies WindowControl),

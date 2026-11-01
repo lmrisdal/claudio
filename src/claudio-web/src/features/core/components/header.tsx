@@ -10,7 +10,7 @@ import {
   minimizeWindow,
   toggleMaximizeWindow,
 } from "../../desktop/hooks/desktop-window";
-import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
+import { isDesktop } from "../../desktop/hooks/use-desktop";
 import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
 import { useNavigation } from "../hooks/use-navigation";
 import { useServerStatus } from "../hooks/use-server-status";
@@ -176,13 +176,7 @@ export default function Header() {
               </Link>
             )}
             <button
-              onClick={() => {
-                if (isDesktop) {
-                  void openSettingsWindow();
-                  return;
-                }
-                settingsDialog.open();
-              }}
+              onClick={settingsDialog.open}
               className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
               title="Settings"
             >

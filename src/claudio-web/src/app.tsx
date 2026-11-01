@@ -3,22 +3,13 @@ import { Outlet } from "react-router";
 import NavigationProvider from "./features/core/components/navigation-provider";
 import { useTheme } from "./features/core/hooks/use-theme";
 
-import { getWindowRole } from "./features/desktop/hooks/desktop-window";
-import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import { DownloadManagerProvider } from "./features/downloads/hooks/use-download-manager";
 
 import { DesktopGate } from "./features/desktop/components/desktop-gate";
 import UpdateToast from "./features/desktop/components/update-toast";
-import SettingsWindow from "./features/settings/components/settings-window";
 
 export default function AppShell() {
   useTheme(); // keeps OS colour-scheme subscription alive for the lifetime of the app
-
-  const isDesktopSettingsWindow = isDesktop && getWindowRole() === "settings";
-
-  if (isDesktopSettingsWindow) {
-    return <SettingsWindow />;
-  }
 
   return (
     <div className="min-h-dvh bg-grid flex flex-col">

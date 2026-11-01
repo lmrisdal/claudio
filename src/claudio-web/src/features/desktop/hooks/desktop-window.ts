@@ -1,12 +1,4 @@
-import { getBridge, type WindowRole } from "./desktop-bridge";
-
-export function getWindowRole(): WindowRole {
-  try {
-    return getBridge().window.role;
-  } catch {
-    return "main";
-  }
-}
+import { getBridge } from "./desktop-bridge";
 
 export function minimizeWindow(): Promise<void> {
   return getBridge().window.minimize();
