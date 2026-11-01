@@ -43,8 +43,6 @@ pub struct DesktopSettings {
     #[serde(default)]
     pub close_to_tray: bool,
     #[serde(default)]
-    pub hide_dock_icon: bool,
-    #[serde(default)]
     pub custom_headers: HashMap<String, String>,
     #[serde(default)]
     pub download_speed_limit_kbs: Option<f64>,
@@ -63,7 +61,6 @@ impl Default for DesktopSettings {
             default_download_path: None,
             default_proton_path: Some(default_proton_path()),
             close_to_tray: false,
-            hide_dock_icon: false,
             custom_headers: HashMap::new(),
             download_speed_limit_kbs: None,
         }
@@ -162,7 +159,7 @@ pub fn save(settings: &DesktopSettings) -> Result<(), String> {
 }
 
 fn default_data_dir() -> PathBuf {
-    let folder = if cfg!(any(target_os = "windows", target_os = "macos")) {
+    let folder = if cfg!(target_os = "windows") {
         "Claudio"
     } else {
         "claudio"

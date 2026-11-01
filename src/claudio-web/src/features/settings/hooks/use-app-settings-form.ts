@@ -31,8 +31,6 @@ export interface AppSettingsFormState {
   setDownloadPath: (value: string) => void;
   closeToTray: boolean;
   setCloseToTray: (value: boolean) => void;
-  hideDockIcon: boolean;
-  setHideDockIcon: (value: boolean) => void;
   speedLimit: string;
   setSpeedLimit: (value: string) => void;
   protonPath: string;
@@ -57,7 +55,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [downloadPath, setDownloadPathState] = useState("");
   const [resolvedDefaultDownloadRoot, setResolvedDefaultDownloadRoot] = useState("");
   const [closeToTray, setCloseToTray] = useState(false);
-  const [hideDockIcon, setHideDockIcon] = useState(false);
   const [speedLimit, setSpeedLimit] = useState("");
   const [protonPath, setProtonPath] = useState("UMU-Latest");
   const [protonOptions, setProtonOptions] = useState<ProtonVersionOption[]>([]);
@@ -99,7 +96,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         setDownloadPathState(loadedSettings.defaultDownloadPath ?? fallbackDownloadPath);
       }
       setCloseToTray(loadedSettings.closeToTray ?? false);
-      setHideDockIcon(loadedSettings.hideDockIcon ?? false);
       setSpeedLimit(
         loadedSettings.downloadSpeedLimitKbs ? String(loadedSettings.downloadSpeedLimitKbs) : "",
       );
@@ -210,7 +206,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         defaultDownloadPath: normalizedDownloadPath || null,
         defaultProtonPath: protonPath.trim() || null,
         closeToTray,
-        hideDockIcon,
         customHeaders,
         downloadSpeedLimitKbs: parsedLimit > 0 ? parsedLimit : null,
       };
@@ -255,18 +250,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     saveGeneralSettings({
       ...settings,
       closeToTray: value,
-      hideDockIcon,
-    });
-  }
-
-  function handleHideDockIconChange(value: boolean) {
-    setHideDockIcon(value);
-    if (!settings) return;
-
-    saveGeneralSettings({
-      ...settings,
-      closeToTray,
-      hideDockIcon: value,
     });
   }
 
@@ -279,8 +262,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     setDownloadPath,
     closeToTray,
     setCloseToTray: handleCloseToTrayChange,
-    hideDockIcon,
-    setHideDockIcon: handleHideDockIconChange,
     speedLimit,
     setSpeedLimit,
     protonPath,

@@ -1,16 +1,8 @@
 use super::shell_dirs::{desktop_shortcut_path, start_menu_shortcut_path};
 use super::*;
 
-pub(super) fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {
-    let resource_dir = match app.path().resource_dir() {
-        Ok(dir) => dir,
-        Err(err) => {
-            log::warn!("Could not resolve resource dir for '{}': {err}", game.title);
-            return;
-        }
-    };
-
-    register_from_resource_dir(&resource_dir, game, desktop_shortcut);
+pub(super) fn register(app: &Host, game: &InstalledGame, desktop_shortcut: bool) {
+    register_from_resource_dir(&app.resource_dir(), game, desktop_shortcut);
 }
 
 pub(crate) fn register_from_resource_dir(

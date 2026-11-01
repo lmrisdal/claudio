@@ -1,10 +1,10 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useQuery } from "@tanstack/react-query";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../core/api/client";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isLinux, isWindows } from "../../core/utils/os";
+import { selectPath } from "../../desktop/hooks/desktop-dialog";
 import { listProtonVersions, resolveInstallBrowseRoot } from "../../desktop/hooks/use-desktop";
 import ExeListbox from "./exe-listbox";
 
@@ -198,19 +198,17 @@ export default function InstallDialog({
       const browseRoot = currentPath
         ? ((await resolveInstallBrowseRoot(currentPath).catch(() => null)) ?? fallbackBrowseRoot)
         : undefined;
-      const selected = await openDialog({
+      const selected = await selectPath({
         directory: true,
-        multiple: false,
         title: "Select Install Location",
         defaultPath: browseRoot,
       });
 
       if (selected !== null) {
-        const selectedPath = Array.isArray(selected) ? selected[0] : selected;
         setInstallPath(
           currentPath && !downloadMode
-            ? resolveBrowsedInstallTarget(selectedPath, currentPath)
-            : selectedPath,
+            ? resolveBrowsedInstallTarget(selected, currentPath)
+            : selected,
         );
         onPathChange?.();
       }

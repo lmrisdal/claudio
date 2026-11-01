@@ -1,9 +1,9 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Suspense } from "react";
 import { Outlet } from "react-router";
 import NavigationProvider from "./features/core/components/navigation-provider";
 import { useTheme } from "./features/core/hooks/use-theme";
 
+import { getWindowRole } from "./features/desktop/hooks/desktop-window";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import { DownloadManagerProvider } from "./features/downloads/hooks/use-download-manager";
 
@@ -14,15 +14,7 @@ import SettingsWindow from "./features/settings/components/settings-window";
 export default function AppShell() {
   useTheme(); // keeps OS colour-scheme subscription alive for the lifetime of the app
 
-  const isDesktopSettingsWindow =
-    isDesktop &&
-    (() => {
-      try {
-        return getCurrentWindow().label === "settings";
-      } catch {
-        return false;
-      }
-    })();
+  const isDesktopSettingsWindow = isDesktop && getWindowRole() === "settings";
 
   if (isDesktopSettingsWindow) {
     return <SettingsWindow />;

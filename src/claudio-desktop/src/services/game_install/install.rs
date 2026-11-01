@@ -2,7 +2,7 @@ use super::*;
 use serde::{Deserialize, Serialize};
 
 pub(super) async fn install_game_inner(
-    app: &AppHandle,
+    app: &Host,
     game: RemoteGame,
     control: &InstallControl,
 ) -> Result<InstalledGame, String> {
@@ -10,7 +10,7 @@ pub(super) async fn install_game_inner(
 }
 
 pub(super) async fn install_game_from_cached_package_inner(
-    app: &AppHandle,
+    app: &Host,
     game: RemoteGame,
     control: &InstallControl,
 ) -> Result<InstalledGame, String> {
@@ -18,7 +18,7 @@ pub(super) async fn install_game_from_cached_package_inner(
 }
 
 async fn install_game_inner_with_options(
-    app: &AppHandle,
+    app: &Host,
     game: RemoteGame,
     control: &InstallControl,
     reuse_cached_package: bool,
@@ -238,7 +238,7 @@ pub(super) fn urlencoding_encode(input: &str) -> String {
 }
 
 pub(super) async fn install_portable(
-    app: &AppHandle,
+    app: &Host,
     game: &RemoteGame,
     target_dir: &Path,
     package_path: &Path,
@@ -372,7 +372,7 @@ struct PreparedUmuPortableRuntime {
 
 #[cfg(target_os = "linux")]
 async fn prepare_portable_umu_runtime(
-    app: &AppHandle,
+    app: &Host,
     game: &RemoteGame,
     target_dir: &Path,
     control: &InstallControl,

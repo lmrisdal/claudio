@@ -1,25 +1,6 @@
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 
-function getDesktopTransportBase(): string {
-  const convertFileSrc = (
-    globalThis.window as typeof globalThis.window & {
-      __TAURI_INTERNALS__?: { convertFileSrc?: (filePath: string, protocol?: string) => string };
-    }
-  ).__TAURI_INTERNALS__?.convertFileSrc;
-
-  if (typeof convertFileSrc === "function") {
-    try {
-      const sample = new URL(convertFileSrc("", "claudio"));
-      if (sample.protocol === "http:" || sample.protocol === "https:") {
-        return `${sample.protocol}//claudio.api`;
-      }
-    } catch {
-      return "claudio://api";
-    }
-  }
-
-  return "claudio://api";
-}
+const DESKTOP_TRANSPORT_BASE = "claudio://api";
 
 function getServerBase(): string {
   const serverUrl = localStorage.getItem("claudio_server_url");
@@ -32,7 +13,7 @@ function getServerOrigin(): string {
 }
 
 function getApiBase(): string {
-  return isDesktop ? getDesktopTransportBase() : getServerBase();
+  return isDesktop ? DESKTOP_TRANSPORT_BASE : getServerBase();
 }
 
 export function resolveServerUrl(path: string): string {

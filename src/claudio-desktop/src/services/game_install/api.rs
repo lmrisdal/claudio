@@ -1,8 +1,8 @@
 use super::*;
 
 pub async fn install_game(
-    app: AppHandle,
-    state: State<'_, InstallState>,
+    app: Host,
+    state: &InstallState,
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
     let control = state.start(game.id)?;
@@ -28,8 +28,8 @@ pub async fn install_game(
 }
 
 pub async fn retry_cached_install(
-    app: AppHandle,
-    state: State<'_, InstallState>,
+    app: Host,
+    state: &InstallState,
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
     let control = state.start(game.id)?;
@@ -55,8 +55,8 @@ pub async fn retry_cached_install(
 }
 
 pub async fn download_game_package(
-    app: AppHandle,
-    state: State<'_, InstallState>,
+    app: Host,
+    state: &InstallState,
     input: DownloadPackageInput,
 ) -> Result<String, String> {
     let control = state.start(input.id)?;
@@ -91,7 +91,7 @@ pub async fn download_game_package(
 }
 
 async fn download_game_package_inner(
-    app: &AppHandle,
+    app: &Host,
     input: &DownloadPackageInput,
     control: &InstallControl,
 ) -> Result<String, String> {
@@ -327,12 +327,12 @@ pub fn get_installed_game(remote_game_id: i32) -> Result<Option<InstalledGame>, 
     registry::get(remote_game_id)
 }
 
-pub fn cancel_install(app: &AppHandle, state: &InstallState, game_id: i32) -> Result<(), String> {
+pub fn cancel_install(app: &Host, state: &InstallState, game_id: i32) -> Result<(), String> {
     state.cancel(app, game_id)
 }
 
 pub fn restart_install_interactive(
-    app: &AppHandle,
+    app: &Host,
     state: &InstallState,
     game_id: i32,
 ) -> Result<(), String> {
@@ -534,8 +534,6 @@ fn is_windows_executable(path: &Path) -> bool {
 }
 
 fn open_path_command(path: &Path) -> std::process::Command {
-    #[cfg(target_os = "macos")]
-    let mut command = std::process::Command::new("open");
     #[cfg(target_os = "linux")]
     let mut command = std::process::Command::new("xdg-open");
     #[cfg(target_os = "windows")]

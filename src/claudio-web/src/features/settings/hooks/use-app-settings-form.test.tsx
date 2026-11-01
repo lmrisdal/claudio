@@ -87,7 +87,6 @@ const baseSettings = {
   defaultDownloadPath: "C:/Games/downloads",
   defaultProtonPath: "UMU-Latest",
   closeToTray: false,
-  hideDockIcon: false,
   customHeaders: {},
   downloadSpeedLimitKbs: null,
 };

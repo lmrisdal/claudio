@@ -5,24 +5,11 @@ import { RouterProvider } from "react-router/dom";
 import { appRouter } from "./app-router";
 import ServerStatusProvider from "./features/core/components/server-status-provider";
 import { InputScopeProvider } from "./features/core/hooks/use-input-scope";
+import { forwardRendererLogs } from "./features/desktop/hooks/desktop-log";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import SettingsDialogProvider from "./features/settings/components/settings-dialog-provider";
 import AppPreferencesProvider from "./features/preferences/components/app-preferences-provider";
 import "./index.css";
-
-const LOG_ATTACH_TIMEOUT_MS = 1500;
-
-async function attachDesktopLogBridgeWithTimeout() {
-  const { attachConsole } = await import("@tauri-apps/plugin-log");
-  await Promise.race([
-    attachConsole(),
-    new Promise<never>((_, reject) => {
-      globalThis.setTimeout(() => {
-        reject(new Error("Timed out attaching desktop log bridge"));
-      }, LOG_ATTACH_TIMEOUT_MS);
-    }),
-  ]);
-}
 
 if (isDesktop) {
   document.documentElement.dataset.desktop = "";
@@ -30,12 +17,7 @@ if (isDesktop) {
     event.preventDefault();
   });
 
-  try {
-    await attachDesktopLogBridgeWithTimeout();
-    console.info("Desktop log bridge attached");
-  } catch (error) {
-    console.error("Failed to attach desktop log bridge", error);
-  }
+  forwardRendererLogs();
 }
 
 const queryClient = new QueryClient({

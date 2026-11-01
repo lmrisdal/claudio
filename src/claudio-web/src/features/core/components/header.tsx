@@ -1,4 +1,3 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
@@ -6,11 +5,15 @@ import {
   HEADER_HEIGHT,
   TOGGLE_SIDEBAR_EVENT,
 } from "../../desktop/components/desktop-sidebar";
+import {
+  closeWindow,
+  minimizeWindow,
+  toggleMaximizeWindow,
+} from "../../desktop/hooks/desktop-window";
 import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
 import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
 import { useNavigation } from "../hooks/use-navigation";
 import { useServerStatus } from "../hooks/use-server-status";
-import { isMac } from "../utils/os";
 import Logo from "./logo";
 import SearchDialog from "./search-dialog";
 import TasksPopover from "./tasks-popover";
@@ -23,7 +26,6 @@ export default function Header() {
   );
   const { searchOpen, closeSearch, toggleSearch, canGoBack, canGoForward } = useNavigation();
   const settingsDialog = useSettingsDialog();
-  const appWindow = isDesktop && !isMac ? getCurrentWindow() : null;
   const desktopHeaderRowHeight = isDesktop ? { height: HEADER_HEIGHT } : undefined;
   const headerBackdropClass = isDesktop ? "desktop-header-backdrop" : "bg-bg-blur";
 
@@ -42,27 +44,21 @@ export default function Header() {
 
   return (
     <>
-      <header
-        data-tauri-drag-region={isDesktop || undefined}
-        className="z-50 fixed top-0 inset-x-0"
-      >
+      <header className="z-50 fixed top-0 inset-x-0">
         <div
           aria-hidden="true"
           style={{ viewTransitionName: "app-header-backdrop" }}
           className={`app-blur-surface border-b ${isDesktop ? "border-border/50" : "border-border"} ${headerBackdropClass} absolute inset-0 pointer-events-none`}
         />
         <div
-          data-tauri-drag-region={isDesktop || undefined}
           style={{
             ...desktopHeaderRowHeight,
             viewTransitionName: "app-header-content",
           }}
-          className={`${isDesktop ? (isMac ? "w-full px-6" : "w-full pl-1") : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} relative flex items-center justify-between gap-4`}
+          className={`${isDesktop ? "desktop-drag w-full pl-1" : "max-w-7xl mx-auto px-6"} ${isDesktop ? "" : "h-14"} relative flex items-center justify-between gap-4`}
         >
           {isDesktop ? (
-            <div
-              className={`desktop-no-drag mt-0.5 flex items-center gap-0.5 min-w-0 ${isMac ? "ml-18" : "ml-2"}`}
-            >
+            <div className={`desktop-no-drag mt-0.5 flex items-center gap-0.5 min-w-0 ml-2`}>
               <button
                 onClick={() => globalThis.dispatchEvent(new CustomEvent(TOGGLE_SIDEBAR_EVENT))}
                 className="rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text-primary transition-colors flex items-center justify-center"
@@ -209,10 +205,10 @@ export default function Header() {
                 />
               </svg>
             </button>
-            {appWindow && (
+            {isDesktop && (
               <div style={desktopHeaderRowHeight} className="flex ml-2 border-l border-border/50">
                 <button
-                  onClick={() => appWindow.minimize()}
+                  onClick={() => minimizeWindow()}
                   className="w-12 h-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
                   aria-label="Minimize"
                 >
@@ -227,7 +223,7 @@ export default function Header() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => appWindow.toggleMaximize()}
+                  onClick={() => toggleMaximizeWindow()}
                   className="w-12 h-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-raised transition"
                   aria-label="Maximize"
                 >
@@ -244,7 +240,7 @@ export default function Header() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => appWindow.close()}
+                  onClick={() => closeWindow()}
                   className="w-12 h-full flex items-center justify-center text-text-muted hover:text-white hover:bg-red-600 transition"
                   aria-label="Close"
                 >

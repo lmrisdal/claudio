@@ -9,7 +9,7 @@ pub use crate::models::{
 };
 pub use crate::settings::DesktopSettings;
 pub use crate::test_support::{TestRequest, TestResponse, TestServer};
-pub use tauri::http;
+pub use http;
 
 #[derive(Clone)]
 pub struct InstallController(

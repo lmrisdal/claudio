@@ -10,7 +10,6 @@ pub struct DesktopServerConnectionResult {
     pub status: Option<u16>,
 }
 
-#[tauri::command]
 pub async fn desktop_check_server_connection(
     server_url: Option<String>,
     custom_headers: Option<HashMap<String, String>>,

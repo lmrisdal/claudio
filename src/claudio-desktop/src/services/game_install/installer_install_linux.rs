@@ -2,7 +2,7 @@ use super::*;
 
 #[cfg(target_os = "linux")]
 pub(super) async fn install_installer_linux(
-    app: &AppHandle,
+    app: &Host,
     game: &RemoteGame,
     target_dir: &Path,
     package_path: &Path,

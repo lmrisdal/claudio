@@ -1,3 +1,4 @@
+use crate::host::Host;
 use crate::models::{
     DownloadPackageInput, InstallProgress, InstallType, InstalledGame, RemoteGame,
 };
@@ -17,9 +18,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Archive;
-use tauri::{AppHandle, Emitter, State};
-#[cfg(target_os = "windows")]
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use zip::read::ZipArchive;
 
 mod api;

@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) async fn install_installer(
-    app: &AppHandle,
+    app: &Host,
     game: &RemoteGame,
     target_dir: &Path,
     package_path: &Path,

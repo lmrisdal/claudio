@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { closeWindow } from "../../desktop/hooks/desktop-window";
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 import UpdateToast from "../../desktop/components/update-toast";
 import type { SettingsTab } from "../hooks/use-settings-dialog";
@@ -20,7 +20,7 @@ function getInitialSettingsTab(): SettingsTab {
 
 function closeSettingsWindow(): void {
   if (!isDesktop) return;
-  void getCurrentWindow().close();
+  void closeWindow();
 }
 
 export default function SettingsWindow() {

@@ -6,7 +6,6 @@ import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
 import { useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game } from "../../core/types/models";
-import { isMac } from "../../core/utils/os";
 import { useDesktop, type InstalledGame } from "../../desktop/hooks/use-desktop";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import BrowseFilesDialog from "../components/browse-files-dialog";
@@ -90,10 +89,7 @@ export default function GameDetail() {
   });
 
   const displayGame = useMemo(() => mergeDisplayGame(game, installedGame), [game, installedGame]);
-  const isDesktopPcGame =
-    isDesktop && !isMac && !!displayGame && isPcPlatform(displayGame.platform);
-  const isDesktopPcDownload =
-    isDesktop && isMac && !!displayGame && isPcPlatform(displayGame.platform);
+  const isDesktopPcGame = isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
   const needsInstallerExe = game?.installType === "installer" && !game.installerExe;
   const needsGameExe = game?.installType === "portable" && !game.gameExe;
   const installExeLabel = needsInstallerExe
@@ -243,7 +239,6 @@ export default function GameDetail() {
                 isInstalledGameLoading={isInstalledGameLoading}
                 isDesktop={isDesktop}
                 isDesktopPcGame={isDesktopPcGame}
-                isDesktopPcDownload={isDesktopPcDownload}
                 emulationSupported={!!emulation?.supported}
                 installExeLabel={installExeLabel}
                 needsInstallerExe={needsInstallerExe}

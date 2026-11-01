@@ -1,7 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type UnlistenFn } from "./desktop-bridge";
 
-export const isDesktop = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis;
+export const isDesktop = globalThis.window !== undefined && "claudioDesktop" in globalThis;
 
 interface DesktopSettings {
   serverUrl: string | null;
@@ -14,7 +13,6 @@ interface DesktopSettings {
   defaultDownloadPath: string | null;
   defaultProtonPath: string | null;
   closeToTray: boolean;
-  hideDockIcon: boolean;
   customHeaders: Record<string, string>;
   downloadSpeedLimitKbs: number | null;
 }
@@ -227,9 +225,7 @@ export async function listGameExecutables(remoteGameId: number): Promise<string[
 export async function listenToInstallProgress(
   handler: (progress: InstallProgress) => void,
 ): Promise<UnlistenFn> {
-  return listen<InstallProgress>("install-progress", (event) => {
-    handler(event.payload);
-  });
+  return listen<InstallProgress>("install-progress", handler);
 }
 
 export function useDesktop() {

@@ -1,10 +1,10 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { closeWindow } from "../../desktop/hooks/desktop-window";
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 
 function closeSettingsWindow(): void {
   if (!isDesktop) return;
-  void getCurrentWindow().close();
+  void closeWindow();
 }
 
 interface SettingsWindowErrorBoundaryState {

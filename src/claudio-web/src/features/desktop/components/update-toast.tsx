@@ -1,7 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listen, type DesktopDownloadEvent } from "../hooks/desktop-bridge";
+import { checkForUpdate, type Update } from "../hooks/desktop-updater";
 import { isDesktop } from "../hooks/use-desktop";
 
 const PENDING_UPDATE_VERSION_KEY = "claudio_pending_update_version";
@@ -12,11 +11,6 @@ const UPDATE_CHECK_TIMEOUT_MS = 15_000;
 
 type ToastMode = "update-available" | "up-to-date" | "installing" | "error";
 type CheckSource = "startup" | "settings" | "native";
-
-type DownloadEvent =
-  | { event: "Started"; data: { contentLength?: number | null } }
-  | { event: "Progress"; data: { chunkLength: number } }
-  | { event: "Finished" };
 
 function toErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
@@ -89,16 +83,16 @@ export default function UpdateToast() {
     setIsDownloading(true);
 
     const downloadTask = update
-      .download((event: DownloadEvent) => {
+      .download((event: DesktopDownloadEvent) => {
         if (event.event === "Started") {
-          contentLength = event.data.contentLength ?? 0;
+          contentLength = event.data?.contentLength ?? 0;
           downloadedBytes = 0;
           setDownloadProgress(contentLength > 0 ? 0 : null);
           return;
         }
 
         if (event.event === "Progress") {
-          downloadedBytes += event.data.chunkLength;
+          downloadedBytes += event.data?.chunkLength ?? 0;
           if (contentLength > 0) {
             setDownloadProgress(Math.min(100, Math.round((downloadedBytes / contentLength) * 100)));
           }
@@ -135,8 +129,6 @@ export default function UpdateToast() {
       try {
         await startDownload(update);
         await update.install();
-        localStorage.removeItem(PENDING_UPDATE_VERSION_KEY);
-        await invoke("restart_app");
       } catch (error) {
         setMode("error");
         setToastTitle("Update failed");
@@ -174,7 +166,7 @@ export default function UpdateToast() {
 
       try {
         const update = await withTimeout(
-          check(),
+          checkForUpdate(),
           UPDATE_CHECK_TIMEOUT_MS,
           "Update check timed out. Please try again.",
         );

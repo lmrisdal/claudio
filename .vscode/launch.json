@@ -47,19 +47,34 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "name": "Tauri Dev",
+      "name": "Electron Dev",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}/src/claudio-web",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "tauri:dev"],
-      "console": "integratedTerminal"
+      "preLaunchTask": "build desktop",
+      "cwd": "${workspaceFolder}/src/claudio-electron",
+      "runtimeExecutable": "${workspaceFolder}/src/claudio-electron/node_modules/.bin/electron",
+      "runtimeArgs": ["."],
+      "noDebug": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Electron Main (Debug)",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "build desktop",
+      "cwd": "${workspaceFolder}/src/claudio-electron",
+      "runtimeExecutable": "${workspaceFolder}/src/claudio-electron/node_modules/.bin/electron",
+      "runtimeArgs": ["."],
+      "outFiles": ["${workspaceFolder}/src/claudio-electron/dist/**/*.cjs"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ],
   "compounds": [
     {
-      "name": "API + Tauri",
-      "configurations": ["Claudio API (No Debug)", "Tauri Dev"]
+      "name": "API + Electron",
+      "configurations": ["Claudio API (No Debug)", "Electron Dev"]
     }
   ]
 }

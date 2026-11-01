@@ -19,8 +19,8 @@ pub(super) fn run_innoextract_with_binary(
         .arg("--gog")
         .arg(installer)
         .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .map_err(|err| format!("Failed to run innoextract: {err}"))?;
 
@@ -53,6 +53,7 @@ pub(super) fn run_innoextract_with_binary(
 pub(super) fn ensure_innoextract() -> Result<PathBuf, String> {
     if std::process::Command::new("innoextract")
         .arg("--version")
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()

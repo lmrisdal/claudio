@@ -2,41 +2,6 @@ use crate::http_client::desktop_http_client;
 use crate::settings;
 use reqwest::Method;
 use std::borrow::Cow;
-use tauri::AppHandle;
-use tauri::http;
-
-pub async fn handle_request(
-    app: &AppHandle,
-    request: http::Request<Vec<u8>>,
-) -> http::Response<Cow<'static, [u8]>> {
-    if request.method() == http::Method::OPTIONS {
-        return cors_response(
-            &request,
-            http::Response::builder().status(http::StatusCode::NO_CONTENT),
-        )
-        .body(Cow::Borrowed(&[] as &[u8]))
-        .unwrap();
-    }
-
-    match forward_request(app, request).await {
-        Ok(response) => response,
-        Err(message) => cors_response(
-            &http::Request::new(Vec::new()),
-            http::Response::builder()
-                .status(http::StatusCode::BAD_GATEWAY)
-                .header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
-        )
-        .body(Cow::Owned(message.into_bytes()))
-        .unwrap(),
-    }
-}
-
-async fn forward_request(
-    _app: &AppHandle,
-    request: http::Request<Vec<u8>>,
-) -> Result<http::Response<Cow<'static, [u8]>>, String> {
-    forward_request_with(request, || Ok(())).await
-}
 
 async fn forward_request_with<F>(
     request: http::Request<Vec<u8>>,

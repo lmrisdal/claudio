@@ -10,8 +10,7 @@ export function DesktopGate({ children }: { children: React.ReactNode }) {
   const dragRegion = isDesktop ? (
     <div
       aria-hidden="true"
-      data-tauri-drag-region
-      className="fixed inset-x-0 top-0 z-40"
+      className="desktop-drag fixed inset-x-0 top-0 z-40"
       style={{ height: HEADER_HEIGHT }}
     />
   ) : null;

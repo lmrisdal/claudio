@@ -50,16 +50,13 @@ where
 }
 
 #[cfg(target_os = "windows")]
-pub(super) fn confirm_installer_elevation(app: &AppHandle) -> bool {
-    app.dialog()
-        .message("This installer requires administrator privileges. Continue?")
-        .title("Administrator Privileges Required")
-        .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            "Continue".to_string(),
-            "Cancel".to_string(),
-        ))
-        .blocking_show()
+pub(super) fn confirm_installer_elevation(app: &Host) -> bool {
+    app.confirm(
+        "Administrator Privileges Required",
+        "This installer requires administrator privileges. Continue?",
+        "Continue",
+        "Cancel",
+    )
 }
 
 #[cfg(target_os = "windows")]
