@@ -20,6 +20,86 @@ fn extract_archive_or_copy_extracts_zip_archives() {
     let _ = fs::remove_dir_all(root);
 }
 
+const SEVEN_ZIP_FIXTURE_BASE64: &str = "N3q8ryccAARQnH/DpQAAAAAAAAAiAAAAAAAAAKzMYEIBABNoZWxsb01aLWdhbWVNWi1zZXR1cAAAAIEzB64Pz4CuDA/r6py/Nj3+cG8h8glczghOgiqan2/W4uIIwjB6BunJYMdywoHLFMAJFsUZKbQdKQAROCpxhOfxQl1SQWKndmqWLZOQFdn0dKjmqbPvu1nx8j8gmAolifguMb5gU4STpqAvyaAQOGBgTqQHgm7aWjGrjWX0N2tR6wr1u1CXKAAAAAAXBhgBCYCNAAcLAQABIwMBAQVdABAAAAyBCgoBPFio1QAA";
+
+fn write_7z_fixture(path: &Path) {
+    let bytes = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        SEVEN_ZIP_FIXTURE_BASE64,
+    )
+    .expect("fixture should decode");
+    fs::write(path, bytes).expect("fixture should be written");
+}
+
+#[test]
+fn extract_archive_or_copy_extracts_7z_archives() {
+    let root = unique_test_dir("extract-7z");
+    let archive_path = root.join("game.7z");
+    let destination = root.join("out");
+    fs::create_dir_all(&root).expect("root should be created");
+    write_7z_fixture(&archive_path);
+    let mut last_progress = 0.0;
+
+    extract_archive_or_copy(
+        &archive_path,
+        &destination,
+        &Arc::new(AtomicBool::new(false)),
+        |value| last_progress = value,
+    )
+    .expect("7z archive should extract");
+
+    assert_eq!(
+        fs::read(destination.join("Game").join("game.exe")).expect("game.exe should exist"),
+        b"MZ-game"
+    );
+    assert_eq!(
+        fs::read(destination.join("Game").join("data").join("readme.txt"))
+            .expect("readme should exist"),
+        b"hello"
+    );
+    assert_eq!(last_progress, 1.0);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn extract_archive_or_copy_stops_7z_extraction_when_cancelled() {
+    let root = unique_test_dir("extract-7z-cancel");
+    let archive_path = root.join("game.7z");
+    let destination = root.join("out");
+    fs::create_dir_all(&root).expect("root should be created");
+    write_7z_fixture(&archive_path);
+
+    let error = extract_archive_or_copy(
+        &archive_path,
+        &destination,
+        &Arc::new(AtomicBool::new(true)),
+        |_| {},
+    )
+    .expect_err("cancelled extraction should fail");
+
+    assert_eq!(error, "Install cancelled.");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn extract_archive_or_copy_reports_corrupt_7z_archives() {
+    let root = unique_test_dir("extract-7z-corrupt");
+    let archive_path = root.join("game.7z");
+    fs::create_dir_all(&root).expect("root should be created");
+    fs::write(&archive_path, b"not a 7z archive").expect("fixture should be written");
+
+    let error = extract_archive_or_copy(
+        &archive_path,
+        &root.join("out"),
+        &Arc::new(AtomicBool::new(false)),
+        |_| {},
+    )
+    .expect_err("corrupt archive should fail");
+
+    assert!(error.contains("game.7z"), "unexpected error: {error}");
+    let _ = fs::remove_dir_all(root);
+}
+
 #[test]
 fn extract_archive_or_copy_extracts_tar_gz_archives() {
     let root = unique_test_dir("extract-targz");

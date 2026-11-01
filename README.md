@@ -6,7 +6,7 @@ A self-hosted game library manager for organizing, browsing, and downloading you
 
 - **Library management** — Automatically scans configured directories and organizes games by platform
 - **IGDB integration** — Auto-matches games against IGDB for metadata including covers, summaries, genres, developers, and more
-- **File browsing** — Browse game folder contents directly in the browser, including inside zip/tar/tar.gz archives
+- **File browsing** — Browse game folder contents directly in the browser, including inside zip/7z/tar/tar.gz archives
 - **Downloads** — Download games as tar bundles with resume support; pre-zipped games are served directly
 - **Search** — Global search dialog (Cmd/Ctrl+K) for quick access to any game
 - **Admin panel** — Manual library scanning, IGDB metadata fetching, and per-game editing
@@ -98,7 +98,7 @@ Games are organized by platform in your library directories:
 
 - Folder names are parsed for title, year, and optional IGDB ID
 - Adding `igdb-NNNNN` to a folder name forces a specific IGDB match (e.g. `Celeste (2018) (igdb-26226)`)
-- Games can be loose files, or a single zip/tar/tar.gz archive
+- Games can be loose files, or a single zip/7z/tar/tar.gz archive
 - Background scanning runs every 2 minutes to pick up changes (configurable via `CLAUDIO_SCAN_INTERVAL`)
 
 ## Development

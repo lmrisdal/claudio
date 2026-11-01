@@ -9,6 +9,7 @@ using Claudio.Api.Enums;
 using Claudio.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SharpCompress.Archives.SevenZip;
 
 namespace Claudio.Api.Endpoints;
 
@@ -161,7 +162,7 @@ public static class GameEndpoints
         if (IsStandaloneArchive(game))
         {
             var ext = System.IO.Path.GetExtension(game.FolderPath).ToLowerInvariant();
-            var contentType = ext == ".zip" ? "application/zip" : ext == ".iso" ? "application/x-iso9660-image" : "application/x-tar";
+            var contentType = ext == ".iso" ? "application/x-iso9660-image" : ArchiveContentType(ext);
             var fileName = $"{game.Title}{ext}";
             return StreamPhysicalFile(
                 game.FolderPath,
@@ -174,8 +175,8 @@ public static class GameEndpoints
         if (singleArchive is not null)
         {
             var ext = System.IO.Path.GetExtension(singleArchive).ToLowerInvariant();
-            var contentType = ext == ".zip" ? "application/zip" : "application/x-tar";
-            var fileName = ext == ".zip" ? $"{game.Title}.zip" : $"{game.Title}.tar";
+            var contentType = ArchiveContentType(ext);
+            var fileName = ext is ".zip" or ".7z" ? $"{game.Title}{ext}" : $"{game.Title}.tar";
             return StreamPhysicalFile(
                 singleArchive,
                 contentType,
@@ -208,6 +209,13 @@ public static class GameEndpoints
 
         return StreamPhysicalFile(fullPath, "application/octet-stream");
     }
+
+    private static string ArchiveContentType(string extension) => extension switch
+    {
+        ".zip" => "application/zip",
+        ".7z" => "application/x-7z-compressed",
+        _ => "application/x-tar",
+    };
 
     private static List<DownloadFileManifestEntry>? BuildLooseFileManifest(Game game)
     {
@@ -259,16 +267,15 @@ public static class GameEndpoints
 
     internal static List<string> ListGameExecutables(Game game)
     {
-        if (IsStandaloneArchive(game))
-            return [];
-
         var exes = new List<string>();
         string[] extensions = [".exe", ".iso"];
 
-        var singleArchive = FindSingleArchive(game.FolderPath);
-        if (singleArchive is not null)
+        var archivePath = IsStandaloneArchive(game)
+            ? game.FolderPath
+            : FindSingleArchive(game.FolderPath);
+        if (archivePath is not null)
         {
-            foreach (var (name, _) in ReadArchiveEntries(singleArchive))
+            foreach (var (name, _) in ReadArchiveEntries(archivePath))
             {
                 if (extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
                     exes.Add(name);
@@ -304,7 +311,7 @@ public static class GameEndpoints
     internal static readonly HashSet<string> HiddenNames = new(StringComparer.OrdinalIgnoreCase)
         { "__MACOSX", ".DS_Store", "@eaDir", "#recycle", "Thumbs.db", ".claudio" };
 
-    private static readonly string[] ArchiveExtensions = [".zip", ".tar", ".tar.gz", ".tgz", ".iso"];
+    private static readonly string[] ArchiveExtensions = [".zip", ".7z", ".tar", ".tar.gz", ".tgz", ".iso"];
 
     private static readonly Dictionary<string, EmulationPlatformDefinition> EmulationPlatforms =
         new(StringComparer.OrdinalIgnoreCase)
@@ -784,7 +791,7 @@ public static class GameEndpoints
         return true;
     }
 
-    /// Enumerates all (path, size) entries inside a zip, tar, or tar.gz archive.
+    /// Enumerates all (path, size) entries inside a zip, 7z, tar, or tar.gz archive.
     internal static List<(string Name, long Size)> ReadArchiveEntries(string archivePath)
     {
         var entries = new List<(string, long)>();
@@ -800,6 +807,17 @@ public static class GameEndpoints
                     var name = entry.FullName.Replace('\\', '/');
                     if (!string.IsNullOrEmpty(name))
                         entries.Add((name, entry.Length));
+                }
+            }
+            else if (lower.EndsWith(".7z"))
+            {
+                using var archive = SevenZipArchive.Open(archivePath);
+                foreach (var entry in archive.Entries)
+                {
+                    var name = entry.Key?.Replace('\\', '/');
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    entries.Add(entry.IsDirectory ? (name.TrimEnd('/') + '/', 0) : (name, entry.Size));
                 }
             }
             else
@@ -877,6 +895,25 @@ public static class GameEndpoints
 
                 var buffer = new MemoryStream();
                 using var source = entry.Open();
+                source.CopyTo(buffer);
+                buffer.Position = 0;
+                return buffer;
+            }
+
+            if (lower.EndsWith(".7z"))
+            {
+                using var archive = SevenZipArchive.Open(archivePath);
+                var entry = archive.Entries.FirstOrDefault(entry =>
+                    !entry.IsDirectory &&
+                    string.Equals(
+                        entry.Key?.Replace('\\', '/'),
+                        relativePath,
+                        StringComparison.OrdinalIgnoreCase));
+                if (entry is null)
+                    return Stream.Null;
+
+                var buffer = new MemoryStream();
+                using var source = entry.OpenEntryStream();
                 source.CopyTo(buffer);
                 buffer.Position = 0;
                 return buffer;

@@ -18,6 +18,7 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Tomlyn" />
     <PackageReference Include="IGDB" />
+    <PackageReference Include="SharpCompress" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
   </ItemGroup>
 

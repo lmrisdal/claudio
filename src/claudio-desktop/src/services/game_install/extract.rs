@@ -28,6 +28,11 @@ where
     })?;
     let lower = source.to_string_lossy().to_lowercase();
 
+    if lower.ends_with(".7z") {
+        on_progress(None);
+        return extract_7z_blocking(source, destination, cancel_token).await;
+    }
+
     let mut command = if lower.ends_with(".zip") {
         #[cfg(target_os = "macos")]
         {
@@ -114,6 +119,8 @@ where
 
     if lower.ends_with(".zip") {
         extract_zip(source, destination, cancel_token, progress)
+    } else if lower.ends_with(".7z") {
+        extract_7z(source, destination, cancel_token, progress)
     } else if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
         extract_targz(source, destination, cancel_token, progress)
     } else if lower.ends_with(".tar") {

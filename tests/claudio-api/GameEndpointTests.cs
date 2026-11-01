@@ -212,6 +212,113 @@ public class GameEndpointTests : IAsyncDisposable
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    // --- 7z archives ---
+
+    private const string SevenZipFixtureBase64 = "N3q8ryccAARQnH/DpQAAAAAAAAAiAAAAAAAAAKzMYEIBABNoZWxsb01aLWdhbWVNWi1zZXR1cAAAAIEzB64Pz4CuDA/r6py/Nj3+cG8h8glczghOgiqan2/W4uIIwjB6BunJYMdywoHLFMAJFsUZKbQdKQAROCpxhOfxQl1SQWKndmqWLZOQFdn0dKjmqbPvu1nx8j8gmAolifguMb5gU4STpqAvyaAQOGBgTqQHgm7aWjGrjWX0N2tR6wr1u1CXKAAAAAAXBhgBCYCNAAcLAQABIwMBAQVdABAAAAyBCgoBPFio1QAA";
+
+    private string WriteSevenZipFixture(string relativePath)
+    {
+        var archivePath = Path.Combine(_gamesDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(archivePath)!);
+        File.WriteAllBytes(archivePath, Convert.FromBase64String(SevenZipFixtureBase64));
+        return archivePath;
+    }
+
+    private static async Task<List<string>> ReadBrowseNamesAsync(HttpResponseMessage response)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("insideArchive").GetBoolean().Should().BeTrue();
+        return body.GetProperty("entries").EnumerateArray()
+            .Select(entry => entry.GetProperty("name").GetString()!)
+            .ToList();
+    }
+
+    [Test]
+    public async Task BrowseGameFiles_SingleSevenZipInFolder_ListsArchiveContents()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "PT");
+        WriteSevenZipFixture(Path.Combine("pc", "PT", "PT (v1.0).7z"));
+        await SeedGameAsync("PT", "pc", "PT", gameDir);
+        var client = CreateClient();
+
+        var rootNames = await ReadBrowseNamesAsync(await client.GetAsync("/api/games/1/browse"));
+        var nestedNames = await ReadBrowseNamesAsync(await client.GetAsync("/api/games/1/browse?path=Game"));
+
+        rootNames.Should().Equal("Game");
+        nestedNames.Should().Equal("data", "game.exe", "setup.exe");
+    }
+
+    [Test]
+    public async Task GetExecutables_SingleSevenZipInFolder_ListsExecutablesInsideArchive()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "PT");
+        WriteSevenZipFixture(Path.Combine("pc", "PT", "PT.7z"));
+        await SeedGameAsync("PT", "pc", "PT", gameDir);
+        var client = CreateClient();
+
+        var executables = await client.GetFromJsonAsync<List<string>>("/api/games/1/executables");
+
+        executables.Should().Equal("Game/game.exe", "Game/setup.exe");
+    }
+
+    [Test]
+    public async Task GetExecutables_StandaloneSevenZip_ListsExecutablesInsideArchive()
+    {
+        var archivePath = WriteSevenZipFixture(Path.Combine("pc", "PT.7z"));
+        await SeedGameAsync("PT", "pc", "PT.7z", archivePath);
+        var client = CreateClient();
+
+        var executables = await client.GetFromJsonAsync<List<string>>("/api/games/1/executables");
+
+        executables.Should().Equal("Game/game.exe", "Game/setup.exe");
+    }
+
+    [Test]
+    public async Task InspectInstaller_ExecutableInsideSevenZip_ReturnsExeInspection()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "PT");
+        WriteSevenZipFixture(Path.Combine("pc", "PT", "PT.7z"));
+        await SeedGameAsync("PT", "pc", "PT", gameDir);
+        var client = CreateClient();
+
+        var response = await client.GetAsync("/api/games/1/installer-inspection?path=Game/setup.exe");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("installerType").GetString().Should().Be("exe");
+    }
+
+    [Test]
+    public async Task GetExecutables_CorruptSevenZip_ReturnsEmptyList()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Broken");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "broken.7z"), "not a 7z archive");
+        await SeedGameAsync("Broken", "pc", "Broken", gameDir);
+        var client = CreateClient();
+
+        var executables = await client.GetFromJsonAsync<List<string>>("/api/games/1/executables");
+
+        executables.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Download_SingleSevenZipInFolder_KeepsSevenZipFileNameAndContentType()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "PT");
+        WriteSevenZipFixture(Path.Combine("pc", "PT", "PT.7z"));
+        await SeedGameAsync("PT", "pc", "PT", gameDir);
+        var client = CreateClient();
+
+        var response = await client.GetAsync("/api/games/1/download");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/x-7z-compressed");
+        response.Content.Headers.ContentDisposition!.FileName!.Trim('"').Should().Be("PT.7z");
+        (await response.Content.ReadAsByteArrayAsync()).Should().Equal(Convert.FromBase64String(SevenZipFixtureBase64));
+    }
+
     // --- Emulation ---
 
     [Test]

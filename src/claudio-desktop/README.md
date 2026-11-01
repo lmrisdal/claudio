@@ -12,7 +12,7 @@ server.
 - `claudio://` URI scheme that forwards SPA requests to the configured
   server and injects user-defined custom headers.
 - Game install pipeline: streamed download with optional speed limiting,
-  `.zip` / `.tar.gz` extraction, native installer execution
+  `.zip` / `.7z` / `.tar.gz` extraction, native installer execution
   (`.exe` / `.msi`), progress events, cancellation, interactive-restart of
   silent installers.
 - Windows install integration: Start Menu / Desktop shortcuts and an Uninstall

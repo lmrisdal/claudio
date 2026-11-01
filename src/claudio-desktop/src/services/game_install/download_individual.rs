@@ -405,9 +405,7 @@ async fn stream_attempt(
     match writer_result {
         Ok(Ok(())) => Ok(()),
         Ok(Err(msg)) => Err(AttemptError::Retryable(format!("{rel_path}: {msg}"))),
-        Err(join) => Err(AttemptError::Fatal(format!(
-            "writer task panicked: {join}"
-        ))),
+        Err(join) => Err(AttemptError::Fatal(format!("writer task panicked: {join}"))),
     }
 }
 
@@ -442,8 +440,7 @@ async fn apply_throttle(
             break;
         }
         let elapsed = window.0.elapsed();
-        let expected =
-            std::time::Duration::from_secs_f64(window.1 as f64 / current_limit as f64);
+        let expected = std::time::Duration::from_secs_f64(window.1 as f64 / current_limit as f64);
         let delay = expected.checked_sub(elapsed);
         drop(window);
         let Some(delay) = delay else {

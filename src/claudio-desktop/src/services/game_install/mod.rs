@@ -28,6 +28,7 @@ mod api;
 mod download;
 mod download_individual;
 mod extract;
+mod extract_7z;
 mod file_ops;
 mod install;
 mod installer_cleanup;
@@ -64,6 +65,7 @@ use download::download_package_with;
 use download::{DownloadInfo, DownloadOptions, download_package};
 use download_individual::download_files_individually;
 use extract::{extract_archive_or_copy, extract_archive_subprocess, infer_filename};
+use extract_7z::{extract_7z, extract_7z_blocking};
 #[cfg(target_os = "windows")]
 use file_ops::apply_scene_overrides;
 #[cfg(any(test, feature = "integration-tests"))]
