@@ -15,6 +15,7 @@ import { useSettingsDialog } from "../../settings/hooks/use-settings-dialog";
 import { useNavigation } from "../hooks/use-navigation";
 import { useServerStatus } from "../hooks/use-server-status";
 import Logo from "./logo";
+import RefreshButton from "./refresh-button";
 import SearchDialog from "./search-dialog";
 import TasksPopover from "./tasks-popover";
 
@@ -147,6 +148,7 @@ export default function Header() {
               </span>
             )}
 
+            <RefreshButton />
             <button
               onClick={toggleSearch}
               className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition"

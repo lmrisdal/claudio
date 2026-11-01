@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useTheme } from "../../core/hooks/use-theme";
-import { desktopCheckServerConnection, getSettings, isDesktop } from "../hooks/use-desktop";
+import { getSettings, isDesktop } from "../hooks/use-desktop";
 import { HEADER_HEIGHT } from "./desktop-sidebar";
 import DesktopSetup from "../pages/desktop-setup";
 import { getConnectionErrorMessage } from "../utils/connection-check";
@@ -24,7 +24,7 @@ export function DesktopGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     getSettings()
-      .then(async (settings) => {
+      .then((settings) => {
         if (cancelled) return;
         if (settings.serverUrl) {
           localStorage.setItem("claudio_server_url", settings.serverUrl);
@@ -32,18 +32,7 @@ export function DesktopGate({ children }: { children: React.ReactNode }) {
             "claudio_custom_headers",
             JSON.stringify(settings.customHeaders ?? {}),
           );
-          const result = await desktopCheckServerConnection({
-            serverUrl: settings.serverUrl,
-            customHeaders: settings.customHeaders ?? {},
-            path: "/health",
-          });
-          if (cancelled) return;
-          if (result.ok) {
-            setState("ready");
-          } else {
-            setConnectionError(getConnectionErrorMessage(result.status));
-            setState("setup");
-          }
+          setState("ready");
         } else {
           setState("setup");
         }

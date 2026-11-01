@@ -6,7 +6,7 @@ type ListGameRow = Extract<LibraryRow, { kind: "list-game" }>;
 
 type LibraryListViewProps = {
   focusableElements: MutableRefObject<Map<string, HTMLElement>>;
-  onDownloadGame: (game: Game) => void;
+  onDownloadGame?: (game: Game) => void;
   onFocusItem: (key: string) => void;
   onGameActivate: (game: Game) => void;
   onGamePreviewStart: (game: Game) => void;
@@ -68,10 +68,10 @@ export default function LibraryListView({
           {row.game.genre ?? ""}
         </div>
         <div className="w-22.5 pr-3 text-right text-text-secondary font-mono text-xs hidden sm:block">
-          {formatSize(row.game.sizeBytes)}
+          {row.game.sizeBytes > 0 ? formatSize(row.game.sizeBytes) : ""}
         </div>
         <div className="w-10 pr-3 text-right">
-          {!row.game.isMissing && (
+          {onDownloadGame && !row.game.isMissing && (
             <button
               onClick={(event) => {
                 event.stopPropagation();

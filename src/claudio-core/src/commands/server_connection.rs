@@ -49,9 +49,17 @@ pub async fn desktop_check_server_connection(
     let response = request.send().await.map_err(|error| error.to_string())?;
 
     Ok(DesktopServerConnectionResult {
-        ok: response.status().is_success(),
+        ok: response.status().is_success() && !is_html_response(&response),
         status: Some(response.status().as_u16()),
     })
+}
+
+fn is_html_response(response: &reqwest::Response) -> bool {
+    response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.to_ascii_lowercase().contains("text/html"))
 }
 
 fn normalize_path(path: &str) -> Result<&str, String> {
@@ -146,6 +154,29 @@ mod tests {
                 .expect("connection check should succeed");
 
             assert!(result.ok);
+            assert_eq!(result.status, Some(200));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn desktop_check_server_connection_rejects_html_success_from_a_proxy() {
+        let server = TestServer::spawn(|_| TestResponse {
+            status: 200,
+            headers: vec![("content-type".to_string(), "text/html".to_string())],
+            body: b"<!DOCTYPE html><title>404: Not Found</title>".to_vec(),
+        });
+
+        with_test_data_dir_async(unique_test_dir("html-success"), || async {
+            let result = desktop_check_server_connection(
+                Some(server.url().to_string()),
+                Some(HashMap::new()),
+                None,
+            )
+            .await
+            .expect("connection check should complete");
+
+            assert!(!result.ok);
             assert_eq!(result.status, Some(200));
         })
         .await;

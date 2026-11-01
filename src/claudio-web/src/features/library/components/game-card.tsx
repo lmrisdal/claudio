@@ -1,5 +1,6 @@
 import type { FocusEventHandler, KeyboardEventHandler, MouseEventHandler, Ref } from "react";
 import { Link } from "react-router";
+import ServerImage from "../../core/components/server-image";
 import type { Game } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
 export default function GameCard({
@@ -45,7 +46,7 @@ export default function GameCard({
           </div>
         )}
         {game.coverUrl ? (
-          <img
+          <ServerImage
             src={game.coverUrl}
             alt={game.title}
             loading="lazy"

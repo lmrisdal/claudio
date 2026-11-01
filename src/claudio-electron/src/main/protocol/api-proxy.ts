@@ -129,6 +129,7 @@ export function createApiHandler(options: ApiProxyOptions) {
         headers: buildUpstreamHeaders(request.headers, settings.customHeaders),
         body: BODYLESS_METHODS.has(request.method) ? undefined : request.body,
         duplex: "half",
+        cache: "no-store",
         signal: controller.signal,
       });
       clearTimeout(timer);

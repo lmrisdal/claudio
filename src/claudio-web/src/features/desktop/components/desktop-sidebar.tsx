@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import ServerImage from "../../core/components/server-image";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import {
@@ -318,7 +319,11 @@ export default function DesktopSidebar({
                       }`}
                     >
                       {game.coverUrl ? (
-                        <img src={game.coverUrl} alt="" className="w-full h-full object-cover" />
+                        <ServerImage
+                          src={game.coverUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <div className="w-full h-full bg-surface-raised flex items-center justify-center">
                           <svg
@@ -379,7 +384,7 @@ export default function DesktopSidebar({
                       title={installed.title}
                     >
                       {cover ? (
-                        <img
+                        <ServerImage
                           src={cover}
                           alt=""
                           className={`rounded object-cover shrink-0 ${

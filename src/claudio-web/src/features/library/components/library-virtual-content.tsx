@@ -14,7 +14,7 @@ type LibraryVirtualContentProps = {
   containerWidth: number;
   isLoading: boolean;
   model: LibraryLayoutModel;
-  onDownloadGame: (game: Game) => void;
+  onDownloadGame?: (game: Game) => void;
   onFocusItem: (key: string) => void;
   onItemClick: (key: string) => void;
   onGameActivate: (game: Game) => void;

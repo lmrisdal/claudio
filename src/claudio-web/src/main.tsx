@@ -23,7 +23,11 @@ if (isDesktop) {
 
 const queryClient = new QueryClient({
   defaultOptions: {
+    mutations: {
+      networkMode: "always",
+    },
     queries: {
+      networkMode: "always",
       staleTime: 30_000,
       retry: 1,
       refetchOnReconnect: true,

@@ -61,35 +61,22 @@ describe("DesktopGate server recovery", () => {
     document.documentElement.classList.remove("dark", "light");
   });
 
-  it.each([
-    { ok: false, status: null },
-    { ok: false, status: 404 },
-  ])("returns to editable setup for a failed saved connection: %j", async (result) => {
-    desktopCheckServerConnection.mockResolvedValue(result);
-    await renderGate();
-    expect(view.container.querySelector<HTMLInputElement>("#server-url")?.value).toBe(
-      "https://wrong.example",
-    );
-    expect(view.container.querySelector('[role="alert"]')).not.toBeNull();
-    expect(view.container.textContent).not.toContain("Library");
-    expect(desktopCheckServerConnection).toHaveBeenCalledWith({
-      serverUrl: "https://wrong.example",
-      customHeaders: { "X-Access": "value" },
-      path: "/health",
-    });
-  });
-  it("recovers from a rejected connection check", async () => {
+  it("opens the app with a saved server without waiting for it to respond", async () => {
     desktopCheckServerConnection.mockRejectedValue("connection refused");
+    await renderGate();
+    expect(view.container.textContent).toBe("Library");
+    expect(view.container.querySelector("#server-url")).toBeNull();
+    expect(desktopCheckServerConnection).not.toHaveBeenCalled();
+    expect(localStorage.getItem("claudio_server_url")).toBe("https://wrong.example");
+  });
+  it("shows setup with an error when settings cannot be read", async () => {
+    getSettings.mockRejectedValueOnce("settings unavailable");
     await renderGate();
     expect(view.container.querySelector("#server-url")).not.toBeNull();
     expect(view.container.textContent).toContain("Could not connect");
   });
-  it("opens the app when the saved server responds successfully", async () => {
-    desktopCheckServerConnection.mockResolvedValue({ ok: true, status: 200 });
-    await renderGate();
-    expect(view.container.textContent).toBe("Library");
-  });
   it("keeps setup available after a failed save and allows retry", async () => {
+    getSettings.mockResolvedValueOnce({ serverUrl: null, customHeaders: {} });
     desktopCheckServerConnection.mockRejectedValue("connection refused");
     await renderGate();
     await saveSetup();
@@ -104,11 +91,20 @@ describe("DesktopGate server recovery", () => {
     expect(view.container.textContent).toBe("Library");
   });
   it("does not save a server returning an HTTP error", async () => {
+    getSettings.mockResolvedValueOnce({ serverUrl: null, customHeaders: {} });
     desktopCheckServerConnection.mockResolvedValue({ ok: false, status: 503 });
     await renderGate();
     await saveSetup();
     expect(updateSettings).not.toHaveBeenCalled();
     expect(view.container.textContent).toContain("Server responded with 503");
+  });
+  it("does not save a URL that answers with something other than Claudio", async () => {
+    getSettings.mockResolvedValueOnce({ serverUrl: null, customHeaders: {} });
+    desktopCheckServerConnection.mockResolvedValue({ ok: false, status: 200 });
+    await renderGate();
+    await saveSetup();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(view.container.textContent).toContain("doesn't look like a running Claudio server");
   });
   it("shows setup without checking when no URL is configured", async () => {
     getSettings.mockResolvedValue({ serverUrl: null, customHeaders: {} });

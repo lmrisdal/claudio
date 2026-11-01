@@ -139,6 +139,18 @@ describe("createApiHandler", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("bypasses the HTTP cache so a proxy error page cannot outlive an outage", async () => {
+    const fetchImpl = vi.fn(async () => new Response("[]"));
+    const { handler } = handlerFor("http://x", { fetchImpl });
+
+    await handler(apiRequest("/games"));
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://x/api/games",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
   it("returns 502 text/plain when no server is configured", async () => {
     const { handler } = handlerFor(null);
 

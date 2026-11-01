@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { Navigate, Route, createBrowserRouter, createRoutesFromElements } from "react-router";
 import AppShell from "./app";
+import RouteError from "./features/core/components/route-error";
 import DesktopLayout from "./features/desktop/components/desktop-layout";
 import { isDesktop } from "./features/desktop/hooks/use-desktop";
 import { loadGameDetailPage } from "./features/gamedetail/load-game-detail-page";
@@ -15,7 +16,7 @@ const DesktopSetup = lazy(() => import("./features/desktop/pages/desktop-setup")
 
 export const appRouter = createBrowserRouter(
   createRoutesFromElements(
-    <Route element={<AppShell />}>
+    <Route element={<AppShell />} errorElement={<RouteError />}>
       {isDesktop && (
         <Route
           path="/desktop-setup"
@@ -30,12 +31,14 @@ export const appRouter = createBrowserRouter(
         />
       )}
       <Route element={<DesktopLayout />}>
-        <Route index element={<Library />} />
-        <Route path="games/:id" element={<GameDetail />} />
-        <Route path="games/:id/edit" element={<GameEdit />} />
-        <Route path="games/:id/play" element={<GameEmulator />} />
-        {isDesktop && <Route path="downloads" element={<Downloads />} />}
-        <Route path="admin" element={<Admin />} />
+        <Route errorElement={<RouteError />}>
+          <Route index element={<Library />} />
+          <Route path="games/:id" element={<GameDetail />} />
+          <Route path="games/:id/edit" element={<GameEdit />} />
+          <Route path="games/:id/play" element={<GameEmulator />} />
+          {isDesktop && <Route path="downloads" element={<Downloads />} />}
+          <Route path="admin" element={<Admin />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>,

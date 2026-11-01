@@ -12,10 +12,12 @@ import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-sc
 import { useGamepadEvent, useShortcut } from "../../core/hooks/use-shortcut";
 import type { Game, TasksStatus } from "../../core/types/models";
 import { formatPlatform } from "../../core/utils/platforms";
+import { useAvailableGames } from "../../desktop/hooks/use-available-games";
 import { isDesktop } from "../../desktop/hooks/use-desktop";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
 import { loadGameDetailPage } from "../../gamedetail/load-game-detail-page";
 import { useAppPreferences } from "../../preferences/hooks/use-app-preferences";
+import LibraryOfflineState from "../components/library-offline-state";
 import LibraryVirtualContent from "../components/library-virtual-content";
 import {
   buildLibraryLayoutModel,
@@ -98,11 +100,7 @@ export default function Library() {
   });
   const hasActiveTasks = tasksData?.igdb.isRunning || tasksData?.steamGridDb.isRunning;
 
-  const { data: games = [], isLoading } = useQuery({
-    queryFn: () => api.get<Game[]>("/games"),
-    queryKey: ["games"],
-    refetchInterval: hasActiveTasks ? 5000 : false,
-  });
+  const { games, isLoading, isOffline } = useAvailableGames(hasActiveTasks ? 5000 : false);
 
   const { allPlatforms, filtered } = useMemo(() => {
     const platformSet = new Set<string>();
@@ -110,7 +108,7 @@ export default function Library() {
 
     for (const game of games) {
       platformSet.add(game.platform);
-      if (selectedPlatforms.size === 0 || selectedPlatforms.has(game.platform)) {
+      if (isOffline || selectedPlatforms.size === 0 || selectedPlatforms.has(game.platform)) {
         filteredGames.push(game);
       }
     }
@@ -119,7 +117,7 @@ export default function Library() {
       allPlatforms: [...platformSet].sort(),
       filtered: filteredGames,
     };
-  }, [games, selectedPlatforms]);
+  }, [games, isOffline, selectedPlatforms]);
 
   const platforms = useMemo(
     () => [
@@ -220,7 +218,13 @@ export default function Library() {
           case "ArrowDown":
           case "ArrowRight": {
             if (!model.firstFocusableKey) {
-              return false;
+              const action = contentReference.current?.querySelector<HTMLElement>("button");
+              if (!action) {
+                return false;
+              }
+
+              focusVisible(action);
+              return true;
             }
 
             queueFocus(model.firstFocusableKey);
@@ -582,6 +586,8 @@ export default function Library() {
     });
   }, []);
 
+  const showOfflineEmptyState = isOffline && !isLoading && games.length === 0;
+
   return (
     <main
       ref={setScrollElement}
@@ -592,7 +598,10 @@ export default function Library() {
         className="flex gap-3 mb-8 items-center"
         onKeyDown={handleToolbarKeyDown}
       >
-        <div className="relative min-w-40" ref={platformDropdownReference}>
+        <div
+          className={`relative min-w-40 ${isOffline ? "hidden" : ""}`}
+          ref={platformDropdownReference}
+        >
           <button
             onClick={() => setPlatformDropdownOpen((current) => !current)}
             className="w-full bg-surface border border-border rounded-lg px-4 py-1.5 text-sm text-left focus:outline-none focus:border-focus-ring focus:ring-1 focus:ring-focus-ring/30 transition flex items-center justify-between gap-2"
@@ -771,11 +780,17 @@ export default function Library() {
         </div>
       </div>
 
-      {!isLoading && (
+      {isOffline && !isLoading && games.length > 0 && <LibraryOfflineState hasGames />}
+
+      {!isLoading && !showOfflineEmptyState && (
         <p className="text-xs text-text-muted mb-4 font-mono">
           {filtered.length} {filtered.length === 1 ? "game" : "games"}
-          {selectedPlatforms.size === 1 && ` in ${formatPlatform([...selectedPlatforms][0])}`}
-          {selectedPlatforms.size > 1 && ` across ${selectedPlatforms.size} platforms`}
+          {!isOffline &&
+            selectedPlatforms.size === 1 &&
+            ` in ${formatPlatform([...selectedPlatforms][0])}`}
+          {!isOffline &&
+            selectedPlatforms.size > 1 &&
+            ` across ${selectedPlatforms.size} platforms`}
         </p>
       )}
 
@@ -787,38 +802,42 @@ export default function Library() {
       />
 
       <div ref={contentReference}>
-        <LibraryVirtualContent
-          collapsedGroups={collapsedGroups}
-          containerWidth={contentWidth}
-          isLoading={isLoading}
-          model={model}
-          onDownloadGame={handleDownloadGame}
-          onFocusItem={(key) => {
-            activeFocusKey.current = key;
-          }}
-          onItemClick={(key) => {
-            activeFocusKey.current = key;
-            if (key.startsWith("game:")) {
-              saveFocusedGameId(key.slice(5));
-            }
-          }}
-          onGameActivate={view === "list" ? handleGameActivate : handleGameCardActivate}
-          onGamePreviewStart={handleGamePreviewStart}
-          onKeyDown={handleFocusableKeyDown}
-          onPendingFocusHandled={(key) => {
-            if (pendingFocusKey === key) {
-              setPendingFocusKey(null);
-            }
-          }}
-          onToggleGroup={toggleGroup}
-          pendingFocusKey={pendingFocusKey}
-          scrollElement={scrollElement}
-          scrollMargin={scrollMargin}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          toggleSort={toggleSort}
-          totalGames={filtered.length}
-        />
+        {showOfflineEmptyState ? (
+          <LibraryOfflineState hasGames={false} />
+        ) : (
+          <LibraryVirtualContent
+            collapsedGroups={collapsedGroups}
+            containerWidth={contentWidth}
+            isLoading={isLoading}
+            model={model}
+            onDownloadGame={isOffline ? undefined : handleDownloadGame}
+            onFocusItem={(key) => {
+              activeFocusKey.current = key;
+            }}
+            onItemClick={(key) => {
+              activeFocusKey.current = key;
+              if (key.startsWith("game:")) {
+                saveFocusedGameId(key.slice(5));
+              }
+            }}
+            onGameActivate={view === "list" ? handleGameActivate : handleGameCardActivate}
+            onGamePreviewStart={handleGamePreviewStart}
+            onKeyDown={handleFocusableKeyDown}
+            onPendingFocusHandled={(key) => {
+              if (pendingFocusKey === key) {
+                setPendingFocusKey(null);
+              }
+            }}
+            onToggleGroup={toggleGroup}
+            pendingFocusKey={pendingFocusKey}
+            scrollElement={scrollElement}
+            scrollMargin={scrollMargin}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            toggleSort={toggleSort}
+            totalGames={filtered.length}
+          />
+        )}
       </div>
     </main>
   );

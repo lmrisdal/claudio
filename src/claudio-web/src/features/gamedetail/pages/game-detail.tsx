@@ -4,10 +4,13 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../../core/api/client";
 import { useArrowNav } from "../../core/hooks/use-arrow-nav";
 import { useInputScope, useInputScopeState } from "../../core/hooks/use-input-scope";
+import { SERVER_RETRY_INTERVAL_MS, useServerStatus } from "../../core/hooks/use-server-status";
 import { useShortcut } from "../../core/hooks/use-shortcut";
+import ServerImage from "../../core/components/server-image";
 import type { Game } from "../../core/types/models";
 import { useDesktop, type InstalledGame } from "../../desktop/hooks/use-desktop";
 import { useDesktopShellNavigation } from "../../desktop/hooks/use-desktop-shell-navigation";
+import { installedGameToGame } from "../../desktop/utils/installed-game";
 import BrowseFilesDialog from "../components/browse-files-dialog";
 import GameDetailActions from "../components/game-detail-actions";
 import GameDetailOverview from "../components/game-detail-overview";
@@ -18,6 +21,7 @@ export default function GameDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isDesktop, getInstalledGame: getDesktopInstalledGame } = useDesktop();
+  const { isConnected } = useServerStatus();
   const { focusSidebar } = useDesktopShellNavigation();
   const { isActionBlocked } = useInputScopeState();
   const mainReference = useRef<HTMLElement>(null);
@@ -55,7 +59,12 @@ export default function GameDetail() {
   const { data: game, isLoading } = useQuery({
     queryKey: ["game", id],
     queryFn: () => api.get<Game>(`/games/${id}`),
-    refetchInterval: (query) => (query.state.data?.isProcessing ? 3000 : false),
+    refetchInterval: (query) =>
+      query.state.status === "error"
+        ? SERVER_RETRY_INTERVAL_MS
+        : query.state.data?.isProcessing
+          ? 3000
+          : false,
     enabled: !!id,
     initialData: cachedGame,
     initialDataUpdatedAt: cachedGamesUpdatedAt,
@@ -89,6 +98,7 @@ export default function GameDetail() {
   });
 
   const displayGame = useMemo(() => mergeDisplayGame(game, installedGame), [game, installedGame]);
+  const reachableGame = isConnected ? game : undefined;
   const isDesktopPcGame = isDesktop && !!displayGame && isPcPlatform(displayGame.platform);
   const needsInstallerExe = game?.installType === "installer" && !game.installerExe;
   const needsGameExe = game?.installType === "portable" && !game.gameExe;
@@ -104,7 +114,7 @@ export default function GameDetail() {
     }
   }, [isLoading, game]);
 
-  if (isLoading) {
+  if ((isLoading && !installedGame) || (!displayGame && isInstalledGameLoading)) {
     return (
       <main className="max-w-5xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="flex flex-col md:flex-row gap-10 animate-pulse">
@@ -122,7 +132,11 @@ export default function GameDetail() {
   if (!displayGame) {
     return (
       <main className="max-w-5xl mx-auto px-6 py-24 text-center flex-1 w-full">
-        <p className="text-text-muted">Game not found</p>
+        <p className="text-text-muted">
+          {isConnected
+            ? "Game not found"
+            : "This game isn't installed and the server can't be reached"}
+        </p>
         <Link to="/" className="text-accent hover:underline text-sm mt-2 inline-block">
           Back to library
         </Link>
@@ -137,12 +151,12 @@ export default function GameDetail() {
           className="game-hero-backdrop pointer-events-none absolute inset-x-0 -top-14 h-72 overflow-hidden"
           aria-hidden="true"
         >
-          <img
+          <ServerImage
             src={displayGame.heroUrl}
             alt=""
             className="game-hero-backdrop-blur absolute inset-0 h-full w-full object-cover"
           />
-          <img
+          <ServerImage
             src={displayGame.heroUrl}
             alt=""
             className="game-hero-backdrop-image top-14 relative z-1 h-full w-full object-cover object-center"
@@ -199,7 +213,7 @@ export default function GameDetail() {
           <div className="w-72 shrink-0 mx-auto md:mx-0">
             <div className="aspect-2/3 bg-surface-raised rounded-xl overflow-hidden ring-1 ring-border">
               {displayGame.coverUrl ? (
-                <img
+                <ServerImage
                   src={displayGame.coverUrl}
                   alt={displayGame.title}
                   className="w-full h-full object-cover"
@@ -228,18 +242,18 @@ export default function GameDetail() {
           <div className="flex-1 min-w-0">
             <GameDetailOverview
               game={displayGame}
-              isAdmin={true}
-              onBrowseFiles={() => setBrowsePath("")}
+              isAdmin={!!reachableGame}
+              onBrowseFiles={reachableGame ? () => setBrowsePath("") : undefined}
             >
               <GameDetailActions
                 gameId={id ?? String(displayGame.id)}
-                game={game}
+                game={reachableGame}
                 displayGame={displayGame}
                 installedGame={installedGame}
                 isInstalledGameLoading={isInstalledGameLoading}
                 isDesktop={isDesktop}
                 isDesktopPcGame={isDesktopPcGame}
-                emulationSupported={!!emulation?.supported}
+                emulationSupported={isConnected && !!emulation?.supported}
                 installExeLabel={installExeLabel}
                 needsInstallerExe={needsInstallerExe}
                 needsGameExe={needsGameExe}
@@ -267,30 +281,7 @@ function mergeDisplayGame(game?: Game, installedGame?: InstalledGame | null) {
   }
 
   if (!game && installedGame) {
-    return {
-      id: installedGame.remoteGameId,
-      title: installedGame.title,
-      platform: installedGame.platform,
-      installType: installedGame.installType,
-      summary: installedGame.summary ?? undefined,
-      genre: installedGame.genre ?? undefined,
-      releaseYear: installedGame.releaseYear ?? undefined,
-      coverUrl: installedGame.coverUrl ?? undefined,
-      heroUrl: installedGame.heroUrl ?? undefined,
-      developer: installedGame.developer ?? undefined,
-      publisher: installedGame.publisher ?? undefined,
-      gameMode: installedGame.gameMode ?? undefined,
-      series: installedGame.series ?? undefined,
-      franchise: installedGame.franchise ?? undefined,
-      gameEngine: installedGame.gameEngine ?? undefined,
-      igdbId: installedGame.igdbId ?? undefined,
-      igdbSlug: installedGame.igdbSlug ?? undefined,
-      sizeBytes: 0,
-      folderName: "",
-      isArchive: false,
-      isMissing: false,
-      isProcessing: false,
-    } satisfies Game;
+    return installedGameToGame(installedGame);
   }
 
   if (!game || !installedGame) {

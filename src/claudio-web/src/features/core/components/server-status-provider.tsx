@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { desktopCheckServerConnection, isDesktop } from "../../desktop/hooks/use-desktop";
 import { ServerStatusContext } from "../hooks/use-server-status";
 
@@ -34,6 +34,19 @@ export default function ServerStatusProvider({ children }: { children: ReactNode
   const [isConnected, setIsConnected] = useState(true);
   const previousConnectedReference = useRef(true);
 
+  const checkServer = useCallback(async () => {
+    const controller = new AbortController();
+    const timeout = globalThis.setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
+    const nextConnected = await checkDesktopServerHealth(controller.signal);
+    globalThis.clearTimeout(timeout);
+
+    const reconnected = !previousConnectedReference.current && nextConnected;
+    previousConnectedReference.current = nextConnected;
+    setIsConnected(nextConnected);
+
+    return { nextConnected, reconnected };
+  }, []);
+
   useEffect(() => {
     if (!isDesktop) {
       setIsConnected(true);
@@ -48,22 +61,16 @@ export default function ServerStatusProvider({ children }: { children: ReactNode
         return;
       }
 
-      const controller = new AbortController();
-      const timeout = globalThis.setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
-      const nextConnected = await checkDesktopServerHealth(controller.signal);
-      globalThis.clearTimeout(timeout);
+      const { nextConnected, reconnected } = await checkServer();
 
       if (cancelled) {
         return;
       }
 
-      setIsConnected(nextConnected);
-
-      if (!previousConnectedReference.current && nextConnected) {
+      if (reconnected) {
         void queryClient.refetchQueries({ type: "active" });
       }
 
-      previousConnectedReference.current = nextConnected;
       timer = globalThis.setTimeout(
         pollServer,
         nextConnected ? CONNECTED_POLL_INTERVAL_MS : DISCONNECTED_POLL_INTERVAL_MS,
@@ -78,13 +85,22 @@ export default function ServerStatusProvider({ children }: { children: ReactNode
         globalThis.clearTimeout(timer);
       }
     };
-  }, [queryClient]);
+  }, [checkServer, queryClient]);
+
+  const refresh = useCallback(async () => {
+    if (isDesktop) {
+      await checkServer();
+    }
+
+    await queryClient.refetchQueries({ type: "active" });
+  }, [checkServer, queryClient]);
 
   const value = useMemo(
     () => ({
       isConnected,
+      refresh,
     }),
-    [isConnected],
+    [isConnected, refresh],
   );
 
   return <ServerStatusContext value={value}>{children}</ServerStatusContext>;

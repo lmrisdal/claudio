@@ -1,11 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { api } from "../api/client";
+import { useAvailableGames } from "../../desktop/hooks/use-available-games";
 import { useInputScope } from "../hooks/use-input-scope";
 import { GAMEPAD_NAV_DOWN_EVENT, GAMEPAD_NAV_UP_EVENT } from "../hooks/use-gamepad";
 import { useGamepadEvent, useKeydown } from "../hooks/use-shortcut";
-import type { Game } from "../types/models";
 import { formatPlatform } from "../utils/platforms";
 
 export default function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -22,10 +20,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
   const navigate = useNavigate();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const { data: games = [] } = useQuery({
-    queryKey: ["games"],
-    queryFn: () => api.get<Game[]>("/games"),
-  });
+  const { games } = useAvailableGames();
 
   const normalize = (s: string) =>
     s

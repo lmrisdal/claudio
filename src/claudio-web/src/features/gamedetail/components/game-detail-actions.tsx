@@ -677,9 +677,17 @@ export default function GameDetailActions({
                 </div>
               )}
             </div>
-          ) : null
-        ) : (
+          ) : (
+            <p role="status" className="text-sm text-text-muted">
+              Connect to the server to install this game.
+            </p>
+          )
+        ) : game ? (
           <DownloadButton gameId={displayGame.id} size={displayGame.sizeBytes} />
+        ) : (
+          <p role="status" className="text-sm text-text-muted">
+            Connect to the server to download this game.
+          </p>
         )}
       </div>
 

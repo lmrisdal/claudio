@@ -70,6 +70,10 @@ async function readSuccess<T>(response: Response): Promise<T> {
   }
 
   const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("text/html")) {
+    throw new Error("The server returned an unexpected response.");
+  }
+
   const body = await response.text();
 
   if (!body.trim()) {

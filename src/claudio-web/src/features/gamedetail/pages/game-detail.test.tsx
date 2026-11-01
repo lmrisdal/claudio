@@ -116,6 +116,36 @@ describe("GameDetail", () => {
     useShortcutMock.mockReset();
   });
 
+  it("renders an installed game while the server request is still failing", () => {
+    getQueryDataMock.mockReturnValue(null);
+    getQueryStateMock.mockReturnValue(null);
+    useQueryMock.mockImplementation((options: { queryKey: string[] }) =>
+      options.queryKey[0] === "game"
+        ? { data: undefined, isLoading: true }
+        : options.queryKey[0] === "installedGame"
+          ? {
+              data: {
+                remoteGameId: 1,
+                title: "Installed Alpha",
+                platform: "win",
+                installType: "portable",
+                installPath: "/games/alpha",
+                installedAt: "2026-01-01",
+              },
+              refetch: vi.fn(),
+              isFetching: false,
+            }
+          : { data: undefined, isLoading: false },
+    );
+
+    const view = renderInDom(<GameDetail />);
+
+    expect(view.container.textContent).toContain("actions");
+
+    view.unmount();
+    cleanupRenderedDom();
+  });
+
   it("renders the cached library cover immediately", () => {
     mockQueries();
 
