@@ -6,6 +6,7 @@ export interface ExitDeps {
 }
 
 export interface ExitController {
+  confirmExit: () => Promise<boolean>;
   requestExit: () => Promise<boolean>;
   allowQuitNow: () => boolean;
   isQuitting: () => boolean;
@@ -15,12 +16,17 @@ export function createExitController(deps: ExitDeps): ExitController {
   let quitting = false;
   const confirmsActiveInstalls = deps.platform === "win32";
 
-  async function requestExit(): Promise<boolean> {
+  async function confirmExit(): Promise<boolean> {
     if (confirmsActiveInstalls) {
       const active = await deps.hasActiveOperations().catch(() => false);
       if (active && !(await deps.confirmQuit())) return false;
     }
     quitting = true;
+    return true;
+  }
+
+  async function requestExit(): Promise<boolean> {
+    if (!(await confirmExit())) return false;
     deps.quit();
     return true;
   }
@@ -35,7 +41,7 @@ export function createExitController(deps: ExitDeps): ExitController {
     return false;
   }
 
-  return { requestExit, allowQuitNow, isQuitting: () => quitting };
+  return { confirmExit, requestExit, allowQuitNow, isQuitting: () => quitting };
 }
 
 export function shouldHideOnClose(settings: { closeToTray: boolean }): boolean {

@@ -1,6 +1,6 @@
 # Electron Migration Plan
 
-Status: implementation in progress on `feature/electron-migration` (2026-11-01). Phases 0–5 and 8 are implemented. Phase 6 (updates) is stubbed and Phase 7 (test matrix) is open.
+Status: implementation in progress on `feature/electron-migration` (2026-11-01). Phases 0–6 and 8 are implemented. Phase 6 still needs a real update test and a publicly reachable release feed. Phase 7 (test matrix) is open.
 
 ## Changes made during implementation
 
@@ -10,6 +10,7 @@ Status: implementation in progress on `feature/electron-migration` (2026-11-01).
 - Dev builds from `main` are uploaded as workflow artifacts instead of a rolling `dev` draft release.
 - `protocol.rs` had no tests, so nothing was ported before deleting it. Its behaviour is covered by `src/claudio-electron/tests/api-proxy.test.ts`.
 - electron-builder 26.18.0 uses the legacy AppImage runtime by default: it needs `libfuse2` (or `--appimage-extract-and-run`) and its generated desktop entry launches with `--no-sandbox`. The static runtime (`toolsets.appimage`) is still marked beta in 26.18.0, so it was not adopted.
+- Updates: `electron-updater` is wrapped by `src/main/updates/update-service.ts`. Unpackaged runs and the Windows portable build use the disabled service. Install asks the exit controller first, so the Windows active-install prompt still applies. `claudio-game-uninstaller.exe` is unrelated to app updates (it is the per-game uninstaller for portable games) and stays.
 - CI smoke test: `src/claudio-electron/scripts/smoke.mjs` launches the packaged AppImage under xvfb and checks for a window and a successful `ping`.
 
 ## Goal

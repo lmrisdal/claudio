@@ -9,7 +9,12 @@ import { createExitController, shouldHideOnClose } from "./lifecycle";
 import { createLogger } from "./logger";
 import { resolvePaths } from "./paths";
 import { restrictPermissions } from "./permissions";
-import { createDisabledUpdateService } from "./updates/update-service";
+import { autoUpdater } from "electron-updater";
+import {
+  createDisabledUpdateService,
+  createUpdateService,
+  updatesSupported,
+} from "./updates/update-service";
 import { createApiHandler, type ProxySettings } from "./protocol/api-proxy";
 import { createAppHandler } from "./protocol/app-protocol";
 import { createTray } from "./windows/tray";
@@ -160,7 +165,13 @@ async function start(): Promise<void> {
   registerIpc({
     core,
     logger,
-    updates: createDisabledUpdateService(),
+    updates: updatesSupported(process.env, app.isPackaged)
+      ? createUpdateService({
+          updater: autoUpdater,
+          confirmExit: exit.confirmExit,
+          log: (level, message) => logger.log(level, message, "updater"),
+        })
+      : createDisabledUpdateService(),
     send: (channel, payload) => windows.send(channel, payload),
     onSettingsUpdated: () => void refreshProxySettings(),
     shell: {

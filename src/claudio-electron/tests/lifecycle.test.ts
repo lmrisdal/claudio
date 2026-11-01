@@ -41,6 +41,15 @@ describe("createExitController", () => {
     expect(quit).toHaveBeenCalledOnce();
   });
 
+  it("confirms an exit without quitting itself, so the updater can quit", async () => {
+    const { controller, quit } = setup("win32", false, true);
+
+    expect(await controller.confirmExit()).toBe(true);
+
+    expect(quit).not.toHaveBeenCalled();
+    expect(controller.isQuitting()).toBe(true);
+  });
+
   it("never asks on Linux, matching the old behaviour", async () => {
     const { controller, quit, confirmQuit } = setup("linux", true, false);
 
