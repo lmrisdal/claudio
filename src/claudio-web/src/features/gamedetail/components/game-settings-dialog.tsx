@@ -1,6 +1,7 @@
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Switch } from "@headlessui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import StyledSelect from "../../core/components/styled-select";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isLinux, isWindows } from "../../core/utils/os";
 import { selectPath } from "../../desktop/hooks/desktop-dialog";
@@ -190,9 +191,8 @@ export default function GameSettingsDialog({
                       description="Choose an installed build or enter a path or codename. Leave empty for UMU-Latest."
                     >
                       <div className="space-y-2">
-                        <select
+                        <StyledSelect
                           aria-label="Installed Proton versions"
-                          className={inputClass}
                           value={
                             proton.data?.some((option) => option.value === protonPath)
                               ? protonPath
@@ -206,7 +206,7 @@ export default function GameSettingsDialog({
                               {option.label}
                             </option>
                           ))}
-                        </select>
+                        </StyledSelect>
                         <input
                           aria-label="Proton path or codename"
                           className={inputClass}

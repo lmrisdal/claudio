@@ -1,4 +1,5 @@
 import { useId } from "react";
+import StyledSelect from "../../core/components/styled-select";
 import type { ProtonVersionOption } from "../../desktop/hooks/use-desktop";
 
 interface InstallLinuxOptionsProps {
@@ -48,29 +49,18 @@ export default function InstallLinuxOptions({
           Runs Windows games on Linux.
         </p>
         <div className="relative mt-3">
-          <select
+          <StyledSelect
             id={`${id}-proton`}
             aria-describedby={`${id}-proton-hint`}
             value={protonPath}
             onChange={(event) => onProtonChange(event.target.value)}
-            className="w-full appearance-none truncate rounded-lg border border-border bg-surface px-3 py-2.5 pr-10 text-sm font-medium text-text-primary transition-colors hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
             {options.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-text-secondary"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.75}
-          >
-            <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          </StyledSelect>
         </div>
       </div>
       <fieldset className="min-w-0 border-t border-border p-4 pt-3">
