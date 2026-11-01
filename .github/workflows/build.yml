@@ -207,13 +207,46 @@ jobs:
 
           cargo_retry cargo test --workspace
 
-  desktop:
+  dev-release:
     needs: [detect-changes, desktop-tests]
     if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true'
+    runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+    outputs:
+      id: ${{ steps.release.outputs.id }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Ensure draft pre-release for the dev tag
+        id: release
+        run: |
+          body="Latest development build from ${GITHUB_REF_NAME}. Commit: ${GITHUB_SHA}"
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[] | select(.tag_name=="dev") | .id' | head -n1)"
+          if [ -z "$id" ]; then
+            id="$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name=dev \
+              -f name="Claudio Dev Build" \
+              -f body="$body" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -F draft=true \
+              -F prerelease=true \
+              --jq .id)"
+          else
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${id}" -f body="$body" --silent
+          fi
+          echo "id=${id}" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    needs: [detect-changes, desktop-tests, dev-release]
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true'
+    permissions:
+      contents: write
     env:
       CLAUDIO_COMMIT_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_ID: ${{ needs.dev-release.outputs.id }}
       CARGO_HTTP_MULTIPLEXING: "false"
       CARGO_NET_RETRY: "10"
       CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
@@ -283,12 +316,17 @@ jobs:
           sudo apt-get install -y xvfb
           xvfb-run -a node scripts/smoke.mjs release/*.AppImage --appimage-extract-and-run --no-sandbox
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: claudio-${{ matrix.platform }}
-          path: |
-            src/claudio-electron/release/*.AppImage
-            src/claudio-electron/release/*.exe
-            src/claudio-electron/release/latest*.yml
-          if-no-files-found: error
-          retention-days: 14
+      - name: Upload to dev release
+        shell: bash
+        working-directory: src/claudio-electron
+        run: |
+          for file in release/*.AppImage release/*.exe release/latest*.yml; do
+            [ -f "$file" ] || continue
+            name="$(basename "$file")"
+            for asset in $(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets" --paginate --jq ".[] | select(.name==\"${name}\") | .id"); do
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset}"
+            done
+            gh api -X POST -H "Content-Type: application/octet-stream" \
+              "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=${name}" \
+              --input "$file" > /dev/null
+          done
