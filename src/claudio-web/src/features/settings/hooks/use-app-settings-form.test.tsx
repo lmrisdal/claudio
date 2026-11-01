@@ -10,14 +10,11 @@ const resolveDefaultDownloadRootMock = vi.fn();
 const updateSettingsMock = vi.fn();
 const desktopCheckServerConnectionMock = vi.fn();
 const listProtonVersionsMock = vi.fn();
-const listLinuxRuntimeBackendsMock = vi.fn();
 
 vi.mock("../../desktop/hooks/use-desktop", () => ({
   desktopCheckServerConnection: (...arguments_: unknown[]) =>
     desktopCheckServerConnectionMock(...arguments_),
   getSettings: (...arguments_: unknown[]) => getSettingsMock(...arguments_),
-  listLinuxRuntimeBackends: (...arguments_: unknown[]) =>
-    listLinuxRuntimeBackendsMock(...arguments_),
   listProtonVersions: (...arguments_: unknown[]) => listProtonVersionsMock(...arguments_),
   resolveDefaultDownloadRoot: (...arguments_: unknown[]) =>
     resolveDefaultDownloadRootMock(...arguments_),
@@ -34,17 +31,6 @@ function TestHarness() {
         value={form.downloadPath}
         onChange={(event) => form.setDownloadPath(event.target.value)}
       />
-      <select
-        data-testid="linux-runtime"
-        value={form.linuxRuntimeBackend}
-        onChange={(event) => form.setLinuxRuntimeBackend(event.target.value as "umu" | "bottles")}
-      >
-        {form.linuxRuntimeOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
       <button
         type="button"
         data-testid="test"
@@ -81,12 +67,6 @@ function setInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function setSelectValue(select: HTMLSelectElement, value: string) {
-  const descriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
-  descriptor?.set?.call(select, value);
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
 function createDeferredPromise<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   const promise = new Promise<T>((resolvePromise) => {
@@ -106,7 +86,6 @@ const baseSettings = {
   defaultInstallPath: "C:/Games",
   defaultDownloadPath: "C:/Games/downloads",
   defaultProtonPath: "UMU-Latest",
-  defaultLinuxRuntimeBackend: "umu" as const,
   closeToTray: false,
   hideDockIcon: false,
   customHeaders: {},
@@ -122,14 +101,9 @@ describe("useAppSettingsForm", () => {
     updateSettingsMock.mockReset();
     desktopCheckServerConnectionMock.mockReset();
     listProtonVersionsMock.mockReset();
-    listLinuxRuntimeBackendsMock.mockReset();
     getSettingsMock.mockResolvedValue(baseSettings);
     resolveDefaultDownloadRootMock.mockResolvedValue(appDefaultDownloads);
     listProtonVersionsMock.mockResolvedValue([{ label: "UMU Latest", value: "UMU-Latest" }]);
-    listLinuxRuntimeBackendsMock.mockResolvedValue([
-      { label: "Bottles", value: "bottles", available: true, detail: null },
-      { label: "Proton", value: "umu", available: true, detail: null },
-    ]);
     desktopCheckServerConnectionMock.mockResolvedValue({ ok: true, status: 200 });
   });
 
@@ -202,32 +176,6 @@ describe("useAppSettingsForm", () => {
     expect(updateSettingsMock).toHaveBeenCalledTimes(1);
     const saved = updateSettingsMock.mock.calls[0]?.[0];
     expect(saved.defaultDownloadPath).toBe("D:/Custom/Downloads");
-  });
-
-  it("persists the selected Linux runtime backend when saving settings", async () => {
-    const view = renderInDom(<TestHarness />);
-
-    await flushFormLoad();
-
-    const select = view.container.querySelector<HTMLSelectElement>('[data-testid="linux-runtime"]');
-    expect(select).not.toBeNull();
-
-    await act(async () => {
-      if (select) {
-        setSelectValue(select, "bottles");
-      }
-    });
-
-    const saveButton = view.container.querySelector<HTMLButtonElement>('[data-testid="save"]');
-
-    await act(async () => {
-      saveButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(updateSettingsMock).toHaveBeenCalledTimes(1);
-    const saved = updateSettingsMock.mock.calls[0]?.[0];
-    expect(saved.defaultLinuxRuntimeBackend).toBe("bottles");
   });
 
   it("does not overwrite a typed download path when async initialization finishes later", async () => {

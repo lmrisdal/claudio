@@ -1,7 +1,6 @@
 pub mod game_install;
 pub mod game_runtime;
 #[cfg(any(target_os = "linux", test))]
-pub mod linux_bottles;
 #[cfg(any(target_os = "linux", test))]
 pub(crate) mod linux_host_paths;
 #[cfg(any(target_os = "linux", test))]

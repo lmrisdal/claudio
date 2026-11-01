@@ -13,11 +13,6 @@ use std::time::Duration;
 const MANAGED_UMU_VERSION: &str = "1.4.0";
 const MANAGED_UMU_ARCHIVE_MEMBER: &str = "umu/umu-run";
 
-pub fn default_prefix_path(game_id: i32, title: &str) -> PathBuf {
-    let settings = settings::load();
-    settings::default_install_root(&settings).join(format!("{game_id}-{}", sanitize_segment(title)))
-}
-
 pub fn run_prefix_command(
     prefix: &Path,
     proton_path: &str,
@@ -522,22 +517,6 @@ mod tests {
                 .expect("version marker should be written");
 
             assert_eq!(cached_managed_umu_run(), Some(umu_run));
-        });
-    }
-
-    #[test]
-    fn default_prefix_path_uses_install_root_without_prefixes_folder() {
-        let temp_dir = unique_temp_dir("default-prefix");
-
-        crate::settings::with_test_data_dir(temp_dir, || {
-            let prefix = default_prefix_path(12, "Halo: Reach");
-
-            assert!(
-                !prefix
-                    .components()
-                    .any(|part| part.as_os_str() == ".prefixes")
-            );
-            assert!(prefix.ends_with("12-Halo_ Reach"));
         });
     }
 }

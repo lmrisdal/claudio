@@ -369,117 +369,19 @@ pub fn uninstall_game(remote_game_id: i32, delete_files: bool) -> Result<(), Str
     Ok(())
 }
 
-fn delete_install_artifacts(installed: &InstalledGame) -> Result<(), String> {
-    #[cfg(target_os = "linux")]
-    {
-        delete_install_artifacts_with(installed, |bottle_name| {
-            crate::services::linux_bottles::bottle_root_candidates(bottle_name)
-        })
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        remove_install_paths(&[PathBuf::from(&installed.install_path)])
-    }
-}
-
-#[cfg(any(target_os = "linux", test))]
-pub(super) fn delete_install_artifacts_with(
-    installed: &InstalledGame,
-    resolve_bottle_paths: impl Fn(&str) -> Vec<PathBuf>,
-) -> Result<(), String> {
+pub(super) fn delete_install_artifacts(installed: &InstalledGame) -> Result<(), String> {
     let install_path = PathBuf::from(&installed.install_path);
-    let is_bottles_install =
-        installed.linux_runtime_backend == Some(crate::models::LinuxRuntimeBackend::Bottles);
-    let mut paths = if is_bottles_install && looks_like_bottle_root(&install_path) {
-        Vec::new()
-    } else {
-        vec![install_path.clone()]
-    };
+    let mut paths = Vec::new();
 
-    if let Some(prefix) = installed.wine_prefix.as_deref() {
-        push_unique_path(&mut paths, PathBuf::from(prefix));
+    if installed.wine_prefix.is_some() || !is_wine_prefix_root(&install_path) {
+        paths.push(install_path);
     }
-
-    if !is_bottles_install
-        && let Some(bottle_root) = infer_bottle_root(Path::new(&installed.install_path))
-    {
-        push_unique_path(&mut paths, bottle_root);
-    }
-
-    if let Some(exe) = installed.game_exe.as_deref()
-        && !is_bottles_install
-        && let Some(bottle_root) = infer_bottle_root(Path::new(exe))
-    {
-        push_unique_path(&mut paths, bottle_root);
-    }
-
-    if !is_bottles_install || installed.bottle_name.is_none() {
-        for bottle_name in bottle_name_candidates(installed) {
-            for bottle_root in resolve_bottle_paths(&bottle_name) {
-                push_unique_path(&mut paths, bottle_root);
-            }
-        }
-    }
+    paths.extend(installed.wine_prefix.as_deref().map(PathBuf::from));
 
     remove_install_paths(&paths)
 }
 
-#[cfg(any(target_os = "linux", test))]
-fn push_unique_path(paths: &mut Vec<PathBuf>, candidate: PathBuf) {
-    if !paths.iter().any(|path| path == &candidate) {
-        paths.push(candidate);
-    }
-}
-
-#[cfg(any(target_os = "linux", test))]
-fn bottle_name_candidates(installed: &InstalledGame) -> Vec<String> {
-    let mut names = Vec::new();
-
-    if let Some(bottle_name) = installed.bottle_name.as_deref() {
-        names.push(bottle_name.to_string());
-    }
-
-    let derived = crate::services::linux_bottles::default_bottle_name(
-        installed.remote_game_id,
-        &installed.title,
-    );
-    if !names.iter().any(|name| name == &derived) {
-        names.push(derived);
-    }
-
-    let legacy = crate::services::linux_bottles::legacy_bottle_name(
-        installed.remote_game_id,
-        &installed.title,
-    );
-    if !names.iter().any(|name| name == &legacy) {
-        names.push(legacy);
-    }
-
-    names
-}
-
-#[cfg(any(target_os = "linux", test))]
-fn infer_bottle_root(path: &Path) -> Option<PathBuf> {
-    let mut current = if path.is_dir() {
-        Some(path)
-    } else {
-        path.parent()
-    };
-
-    while let Some(candidate) = current {
-        if looks_like_bottle_root(candidate) {
-            return Some(candidate.to_path_buf());
-        }
-
-        current = candidate.parent();
-    }
-
-    None
-}
-
-#[cfg(any(target_os = "linux", test))]
-fn looks_like_bottle_root(path: &Path) -> bool {
+fn is_wine_prefix_root(path: &Path) -> bool {
     path.join("drive_c").is_dir() && path.join("dosdevices").exists()
 }
 
@@ -542,12 +444,7 @@ pub fn add_steam_shortcut(remote_game_id: i32) -> Result<(), String> {
     let installed =
         registry::get(remote_game_id)?.ok_or_else(|| "Game is not installed.".to_string())?;
 
-    match installed.linux_runtime_backend {
-        Some(crate::models::LinuxRuntimeBackend::Bottles) => {
-            crate::services::linux_bottles::add_steam_shortcut(&installed)
-        }
-        _ => crate::services::linux_umu::add_steam_shortcut(&installed),
-    }
+    crate::services::linux_umu::add_steam_shortcut(&installed)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -624,14 +521,6 @@ fn executable_search_roots(game: &InstalledGame) -> Vec<PathBuf> {
         {
             roots.push(drive_c);
         }
-    }
-    #[cfg(target_os = "linux")]
-    if let Some(bottle_name) = game.bottle_name.as_deref()
-        && let Ok(drive_c) = crate::services::linux_bottles::bottle_drive_c_path(bottle_name)
-        && !drive_c.starts_with(&install_path)
-        && !roots.iter().any(|root| root == &drive_c)
-    {
-        roots.push(drive_c);
     }
 
     roots

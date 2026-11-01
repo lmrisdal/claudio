@@ -21,12 +21,6 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 vi.mock("../../desktop/hooks/use-desktop", () => ({
-  listLinuxBottles: () => Promise.resolve([{ label: "Gaming", value: "Gaming" }]),
-  listLinuxRuntimeBackends: () =>
-    Promise.resolve([
-      { label: "Bottles", value: "bottles", available: true, detail: null },
-      { label: "Proton", value: "umu", available: true, detail: null },
-    ]),
   listProtonVersions: () => Promise.resolve([{ label: "UMU Latest", value: "UMU-Latest" }]),
   resolveInstallBrowseRoot: (targetPath: string) =>
     Promise.resolve(targetPath.replace(/[\\/][^\\/]+$/, "")),
@@ -110,7 +104,7 @@ describe("InstallDialog download mode", () => {
     const call = onConfirm.mock.calls[0]!;
     expect(call[0]).toContain("Games");
     expect(call[0]).toContain("Test");
-    expect(call[10]).toBe(false);
+    expect(call[8]).toBe(false);
   });
 
   it("shows extract option when manifest files is null (archive download)", async () => {

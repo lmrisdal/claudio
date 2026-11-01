@@ -214,8 +214,6 @@ pub fn run() {
             commands::games::launch_game,
             commands::games::list_game_executables,
             commands::games::list_installed_games,
-            commands::games::list_linux_bottles,
-            commands::games::list_linux_runtime_backends,
             commands::games::list_proton_versions,
             commands::games::list_running_games,
             commands::games::restart_install_interactive,

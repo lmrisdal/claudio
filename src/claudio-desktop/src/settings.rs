@@ -1,4 +1,3 @@
-use crate::models::LinuxRuntimeBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -42,8 +41,6 @@ pub struct DesktopSettings {
     pub default_download_path: Option<String>,
     pub default_proton_path: Option<String>,
     #[serde(default)]
-    pub default_linux_runtime_backend: Option<LinuxRuntimeBackend>,
-    #[serde(default)]
     pub close_to_tray: bool,
     #[serde(default)]
     pub hide_dock_icon: bool,
@@ -65,7 +62,6 @@ impl Default for DesktopSettings {
             default_install_path: None,
             default_download_path: None,
             default_proton_path: Some(default_proton_path()),
-            default_linux_runtime_backend: None,
             close_to_tray: false,
             hide_dock_icon: false,
             custom_headers: HashMap::new(),

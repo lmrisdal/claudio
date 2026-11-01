@@ -7,13 +7,6 @@ pub enum InstallType {
     Installer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum LinuxRuntimeBackend {
-    Umu,
-    Bottles,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteGame {
@@ -27,8 +20,6 @@ pub struct RemoteGame {
     pub desktop_shortcut: Option<bool>,
     pub app_menu_shortcut: Option<bool>,
     pub steam_shortcut: Option<bool>,
-    pub linux_runtime_backend: Option<LinuxRuntimeBackend>,
-    pub bottle_name: Option<String>,
     pub proton_path: Option<String>,
     pub run_as_administrator: Option<bool>,
     pub force_interactive: Option<bool>,
@@ -55,8 +46,6 @@ pub struct InstalledGame {
     pub install_path: String,
     pub game_exe: Option<String>,
     pub wine_prefix: Option<String>,
-    pub linux_runtime_backend: Option<LinuxRuntimeBackend>,
-    pub bottle_name: Option<String>,
     pub proton_path: Option<String>,
     pub installed_at: String,
     pub summary: Option<String>,

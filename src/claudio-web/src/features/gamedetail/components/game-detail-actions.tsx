@@ -16,7 +16,6 @@ import {
   uninstallGame,
   validateInstallTarget,
   type InstalledGame,
-  type LinuxRuntimeBackend,
   type RunningGame,
 } from "../../desktop/hooks/use-desktop";
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
@@ -84,8 +83,6 @@ export default function GameDetailActions({
   const [showInstallConfirm, setShowInstallConfirm] = useState(false);
   const [defaultInstallPath, setDefaultInstallPath] = useState("");
   const [defaultProtonPath, setDefaultProtonPath] = useState("UMU-Latest");
-  const [defaultLinuxRuntimeBackend, setDefaultLinuxRuntimeBackend] =
-    useState<LinuxRuntimeBackend | null>(null);
   const [installerDownloadOverride, setInstallerDownloadOverride] = useState(false);
   const [installButtonMenu, setInstallButtonMenu] = useState<{ x: number; y: number } | null>(null);
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false);
@@ -119,8 +116,6 @@ export default function GameDetailActions({
         desktopShortcut?: boolean;
         appMenuShortcut?: boolean;
         steamShortcut?: boolean;
-        linuxRuntimeBackend?: "umu" | "bottles" | null;
-        bottleName?: string | null;
         protonPath?: string | null;
         runAsAdministrator?: boolean;
         forceInteractive?: boolean;
@@ -137,8 +132,6 @@ export default function GameDetailActions({
         desktopShortcut: input.desktopShortcut,
         appMenuShortcut: input.appMenuShortcut,
         steamShortcut: input.steamShortcut,
-        linuxRuntimeBackend: input.linuxRuntimeBackend ?? null,
-        bottleName: input.bottleName ?? null,
         protonPath: input.protonPath ?? null,
         runAsAdministrator: input.runAsAdministrator,
         forceInteractive: input.forceInteractive,
@@ -276,7 +269,6 @@ export default function GameDetailActions({
       ]);
       setDefaultInstallPath(fullPath);
       setDefaultProtonPath(settings.defaultProtonPath ?? "UMU-Latest");
-      setDefaultLinuxRuntimeBackend(settings.defaultLinuxRuntimeBackend ?? null);
       setShowInstallConfirm(true);
     } catch (error) {
       setInstallError(
@@ -390,9 +382,7 @@ export default function GameDetailActions({
       if (top + menuRect.height > window.innerHeight - margin) {
         const above = buttonRect.top - margin - menuRect.height;
         top =
-          above >= margin
-            ? above
-            : Math.max(margin, window.innerHeight - menuRect.height - margin);
+          above >= margin ? above : Math.max(margin, window.innerHeight - menuRect.height - margin);
       }
 
       setOptionsMenuPosition({ left, top });
@@ -418,9 +408,7 @@ export default function GameDetailActions({
       setInstallError(null);
       await addSteamShortcut(displayGame.id);
     } catch (error) {
-      setInstallError(
-        error instanceof Error ? error.message : "Could not add a Steam shortcut.",
-      );
+      setInstallError(error instanceof Error ? error.message : "Could not add a Steam shortcut.");
     }
   }
 
@@ -780,7 +768,6 @@ export default function GameDetailActions({
         title={displayGame.title}
         defaultPath={defaultInstallPath}
         defaultProtonPath={defaultProtonPath}
-        defaultLinuxRuntimeBackend={defaultLinuxRuntimeBackend}
         isPortable={displayGame.installType === "portable"}
         exeLabel={installExeLabel}
         exeOptions={exeList ?? []}
@@ -797,8 +784,6 @@ export default function GameDetailActions({
         onConfirm={async (
           path,
           exe,
-          linuxRuntimeBackend,
-          bottleName,
           protonPath,
           desktopShortcut,
           appMenuShortcut,
@@ -826,29 +811,22 @@ export default function GameDetailActions({
             return;
           }
 
-          const usesBottlesRuntime = linuxRuntimeBackend === "bottles";
-          if (!usesBottlesRuntime) {
-            const installTarget = path ?? defaultInstallPath;
-            try {
-              await validateInstallTarget(installTarget);
-            } catch (error) {
-              setInstallError(
-                installErrorMessage(error, "Could not validate the install location."),
-              );
-              return;
-            }
+          const installTarget = path ?? defaultInstallPath;
+          try {
+            await validateInstallTarget(installTarget);
+          } catch (error) {
+            setInstallError(installErrorMessage(error, "Could not validate the install location."));
+            return;
           }
 
           setShowInstallConfirm(false);
           setInstallerDownloadOverride(false);
           installMutation.mutate({
             ...game,
-            installPath: usesBottlesRuntime ? undefined : path,
+            installPath: path,
             desktopShortcut,
             appMenuShortcut,
             steamShortcut,
-            linuxRuntimeBackend: linuxRuntimeBackend ?? null,
-            bottleName: bottleName ?? null,
             protonPath: protonPath ?? null,
             runAsAdministrator,
             forceInteractive,

@@ -161,8 +161,6 @@ where
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
         wine_prefix: None,
-        linux_runtime_backend: None,
-        bottle_name: None,
         proton_path: None,
         installed_at: current_timestamp(),
         summary: game.summary.clone(),

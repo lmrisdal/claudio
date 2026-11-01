@@ -45,7 +45,6 @@ fn save_and_load_use_overridden_data_dir() {
             server_url: Some("https://example.com".to_string()),
             default_install_path: Some("/tmp/games".to_string()),
             default_download_path: Some("/tmp/downloads".to_string()),
-            default_linux_runtime_backend: Some(LinuxRuntimeBackend::Bottles),
             custom_headers: HashMap::from([
                 ("X-Test".to_string(), "ok".to_string()),
                 ("Authorization".to_string(), "allowed".to_string()),
@@ -62,10 +61,6 @@ fn save_and_load_use_overridden_data_dir() {
         assert_eq!(
             loaded.default_download_path.as_deref(),
             Some("/tmp/downloads")
-        );
-        assert_eq!(
-            loaded.default_linux_runtime_backend,
-            Some(LinuxRuntimeBackend::Bottles)
         );
         assert_eq!(
             loaded.custom_headers.get("X-Test").map(String::as_str),
@@ -154,4 +149,21 @@ fn sanitize_custom_headers_removes_forbidden_entries() {
     assert_eq!(sanitized.get("Cookie").map(String::as_str), Some("allowed"));
     assert!(!sanitized.contains_key("Host"));
     assert!(!sanitized.contains_key("Content-Length"));
+}
+
+#[test]
+fn load_keeps_settings_saved_with_removed_linux_runtime_backend() {
+    with_test_data_dir(unique_test_dir("legacy-runtime-backend"), || {
+        let settings = DesktopSettings {
+            server_url: Some("https://example.com".to_string()),
+            ..DesktopSettings::default()
+        };
+        let mut saved = serde_json::to_value(&settings).expect("settings should serialize");
+        saved["defaultLinuxRuntimeBackend"] = serde_json::json!("bottles");
+        fs::write(settings_path(), saved.to_string()).expect("legacy settings should be written");
+
+        let loaded = load();
+
+        assert_eq!(loaded.server_url.as_deref(), Some("https://example.com"));
+    });
 }

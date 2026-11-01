@@ -2,21 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   desktopCheckServerConnection,
   getSettings,
-  listLinuxRuntimeBackends,
   listProtonVersions,
   resolveDefaultDownloadRoot,
   updateSettings,
   type DesktopSettings,
-  type LinuxRuntimeBackend,
-  type LinuxRuntimeBackendOption,
   type ProtonVersionOption,
 } from "../../desktop/hooks/use-desktop";
 import { getConnectionErrorMessage } from "../../desktop/utils/connection-check";
 import { buildDesktopCustomHeaders } from "../../desktop/utils/custom-headers";
 
 type HeaderField = { name: string; value: string };
-
-const DEFAULT_LINUX_RUNTIME_BACKEND: LinuxRuntimeBackend = "umu";
 
 function deriveDownloadPathFromInstallPath(installPath: string): string {
   const trimmed = installPath.trim();
@@ -25,18 +20,6 @@ function deriveDownloadPathFromInstallPath(installPath: string): string {
   const normalized = trimmed.replace(/[\\/]+$/, "");
   const separator = normalized.includes("\\") && !normalized.includes("/") ? "\\" : "/";
   return `${normalized}${separator}downloads`;
-}
-
-function resolveRuntimeBackend(
-  saved: LinuxRuntimeBackend | null | undefined,
-  options: LinuxRuntimeBackendOption[],
-): LinuxRuntimeBackend {
-  const available = options.filter((option) => option.available);
-  if (saved && available.some((option) => option.value === saved)) {
-    return saved;
-  }
-
-  return available[0]?.value ?? saved ?? DEFAULT_LINUX_RUNTIME_BACKEND;
 }
 
 export interface AppSettingsFormState {
@@ -55,9 +38,6 @@ export interface AppSettingsFormState {
   protonPath: string;
   setProtonPath: (value: string) => void;
   protonOptions: ProtonVersionOption[];
-  linuxRuntimeBackend: LinuxRuntimeBackend;
-  setLinuxRuntimeBackend: (value: LinuxRuntimeBackend) => void;
-  linuxRuntimeOptions: LinuxRuntimeBackendOption[];
   headers: HeaderField[];
   setHeaders: (value: HeaderField[]) => void;
   showHeaders: boolean;
@@ -67,7 +47,7 @@ export interface AppSettingsFormState {
   connectionMessage: string;
   saveMessage: string;
   handleTest: () => Promise<void>;
-  handleSave: (overrideBackend?: LinuxRuntimeBackend) => Promise<void>;
+  handleSave: () => Promise<void>;
 }
 
 export function useAppSettingsForm(active: boolean): AppSettingsFormState {
@@ -81,10 +61,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
   const [speedLimit, setSpeedLimit] = useState("");
   const [protonPath, setProtonPath] = useState("UMU-Latest");
   const [protonOptions, setProtonOptions] = useState<ProtonVersionOption[]>([]);
-  const [linuxRuntimeBackend, setLinuxRuntimeBackend] = useState<LinuxRuntimeBackend>(
-    DEFAULT_LINUX_RUNTIME_BACKEND,
-  );
-  const [linuxRuntimeOptions, setLinuxRuntimeOptions] = useState<LinuxRuntimeBackendOption[]>([]);
   const [headers, setHeaders] = useState<HeaderField[]>([]);
   const [showHeaders, setShowHeaders] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,12 +81,10 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       if (cancelled) return;
 
       const loadedInstallPath = loadedSettings.defaultInstallPath ?? "";
-      const [effectiveDefaultDownloadRoot, loadedProtonOptions, loadedRuntimeOptions] =
-        await Promise.all([
-          resolveDefaultDownloadRoot().catch(() => ""),
-          listProtonVersions().catch(() => []),
-          listLinuxRuntimeBackends().catch(() => []),
-        ]);
+      const [effectiveDefaultDownloadRoot, loadedProtonOptions] = await Promise.all([
+        resolveDefaultDownloadRoot().catch(() => ""),
+        listProtonVersions().catch(() => []),
+      ]);
       const fallbackDownloadPath =
         effectiveDefaultDownloadRoot || deriveDownloadPathFromInstallPath(loadedInstallPath);
       if (cancelled) return;
@@ -131,10 +105,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       );
       setProtonPath(loadedSettings.defaultProtonPath ?? "UMU-Latest");
       setProtonOptions(loadedProtonOptions);
-      setLinuxRuntimeOptions(loadedRuntimeOptions);
-      setLinuxRuntimeBackend(
-        resolveRuntimeBackend(loadedSettings.defaultLinuxRuntimeBackend, loadedRuntimeOptions),
-      );
 
       const customHeaders = loadedSettings.customHeaders ?? {};
       const entries = Object.entries(customHeaders).map(([name, value]) => ({
@@ -204,11 +174,9 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     }
   }
 
-  async function handleSave(overrideBackend?: LinuxRuntimeBackend) {
+  async function handleSave() {
     try {
       if (!settings) return;
-
-      const effectiveBackend = overrideBackend ?? linuxRuntimeBackend;
 
       const trimmedUrl = serverUrl.trim().replace(/\/+$/, "");
       if (!trimmedUrl) {
@@ -219,13 +187,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
       const { customHeaders, forbiddenHeaders } = buildCustomHeaders();
       if (forbiddenHeaders.length > 0) {
         setSaveMessage(`These headers cannot be set manually: ${forbiddenHeaders.join(", ")}.`);
-        return;
-      }
-      const selectedRuntimeOption = linuxRuntimeOptions.find(
-        (option) => option.value === effectiveBackend,
-      );
-      if (selectedRuntimeOption && !selectedRuntimeOption.available) {
-        setSaveMessage(`${selectedRuntimeOption.label} is not installed.`);
         return;
       }
 
@@ -248,7 +209,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
         defaultInstallPath: normalizedInstallPath || null,
         defaultDownloadPath: normalizedDownloadPath || null,
         defaultProtonPath: protonPath.trim() || null,
-        defaultLinuxRuntimeBackend: effectiveBackend,
         closeToTray,
         hideDockIcon,
         customHeaders,
@@ -326,9 +286,6 @@ export function useAppSettingsForm(active: boolean): AppSettingsFormState {
     protonPath,
     setProtonPath,
     protonOptions,
-    linuxRuntimeBackend,
-    setLinuxRuntimeBackend,
-    linuxRuntimeOptions,
     headers,
     setHeaders,
     showHeaders,

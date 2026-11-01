@@ -3,8 +3,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export const isDesktop = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis;
 
-type LinuxRuntimeBackend = "umu" | "bottles";
-
 interface DesktopSettings {
   serverUrl: string | null;
   logLevel: "error" | "warn" | "info" | "debug" | "trace";
@@ -15,7 +13,6 @@ interface DesktopSettings {
   defaultInstallPath: string | null;
   defaultDownloadPath: string | null;
   defaultProtonPath: string | null;
-  defaultLinuxRuntimeBackend: LinuxRuntimeBackend | null;
   closeToTray: boolean;
   hideDockIcon: boolean;
   customHeaders: Record<string, string>;
@@ -50,8 +47,6 @@ interface DesktopInstallGameInput {
   desktopShortcut?: boolean;
   appMenuShortcut?: boolean;
   steamShortcut?: boolean;
-  linuxRuntimeBackend?: "umu" | "bottles" | null;
-  bottleName?: string | null;
   protonPath?: string | null;
   runAsAdministrator?: boolean;
   forceInteractive?: boolean;
@@ -78,8 +73,6 @@ interface InstalledGame {
   installPath: string;
   gameExe?: string | null;
   winePrefix?: string | null;
-  linuxRuntimeBackend?: "umu" | "bottles" | null;
-  bottleName?: string | null;
   protonPath?: string | null;
   installedAt: string;
   summary?: string | null;
@@ -119,18 +112,6 @@ interface ProtonVersionOption {
   value: string;
 }
 
-interface LinuxRuntimeBackendOption {
-  label: string;
-  value: LinuxRuntimeBackend;
-  available: boolean;
-  detail?: string | null;
-}
-
-interface LinuxBottleOption {
-  label: string;
-  value: string;
-}
-
 export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
 }
@@ -165,14 +146,6 @@ export async function retryCachedInstall(game: DesktopInstallGameInput): Promise
 
 export async function listProtonVersions(): Promise<ProtonVersionOption[]> {
   return invoke<ProtonVersionOption[]>("list_proton_versions");
-}
-
-export async function listLinuxRuntimeBackends(): Promise<LinuxRuntimeBackendOption[]> {
-  return invoke<LinuxRuntimeBackendOption[]>("list_linux_runtime_backends");
-}
-
-export async function listLinuxBottles(): Promise<LinuxBottleOption[]> {
-  return invoke<LinuxBottleOption[]>("list_linux_bottles");
 }
 
 export async function downloadGamePackage(input: DownloadPackageInput): Promise<string> {
@@ -268,8 +241,6 @@ export function useDesktop() {
     updateSettings,
     openSettingsWindow,
     installGame,
-    listLinuxBottles,
-    listLinuxRuntimeBackends,
     listProtonVersions,
     validateInstallTarget,
     getInstalledGame,
@@ -283,9 +254,6 @@ export type {
   DesktopInstallGameInput,
   DownloadPackageInput,
   DesktopSettings,
-  LinuxRuntimeBackend,
-  LinuxRuntimeBackendOption,
-  LinuxBottleOption,
   ProtonVersionOption,
   InstalledGame,
   InstallProgress,

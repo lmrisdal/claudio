@@ -197,93 +197,55 @@ fn uninstall_game_can_preserve_or_delete_install_files() {
 }
 
 #[test]
-fn delete_install_artifacts_with_preserves_selected_bottles_for_portable_installs() {
-    let root = unique_test_dir("uninstall-linux-runtime");
-    let bottle_install_dir = root.join("bottle-game");
-    let bottle_dir = root.join("bottle-prefix");
-    let umu_install_dir = root.join("umu-game");
-    let umu_prefix_dir = root.join("umu-prefix");
-    fs::create_dir_all(&bottle_install_dir).expect("bottle install dir should exist");
-    fs::create_dir_all(&bottle_dir).expect("bottle dir should exist");
-    fs::create_dir_all(&umu_install_dir).expect("umu install dir should exist");
-    fs::create_dir_all(&umu_prefix_dir).expect("umu prefix dir should exist");
+fn delete_install_artifacts_removes_install_dir_and_umu_prefix() {
+    let root = unique_test_dir("uninstall-umu");
+    let install_dir = root.join("umu-game");
+    let prefix_dir = root.join("umu-prefix");
+    fs::create_dir_all(&install_dir).expect("umu install dir should exist");
+    fs::create_dir_all(&prefix_dir).expect("umu prefix dir should exist");
 
-    let mut bottles_game = installed_game(3, "Bottle Game", &bottle_install_dir);
-    bottles_game.linux_runtime_backend = Some(crate::models::LinuxRuntimeBackend::Bottles);
-    bottles_game.bottle_name = Some("claudio-3-Bottle Game".to_string());
+    let mut game = installed_game(4, "UMU Game", &install_dir);
+    game.wine_prefix = Some(prefix_dir.to_string_lossy().into_owned());
 
-    super::super::api::delete_install_artifacts_with(&bottles_game, |bottle_name| {
-        if bottle_name == "claudio-3-Bottle Game" {
-            vec![bottle_dir.clone()]
-        } else {
-            Vec::new()
-        }
-    })
-    .expect("bottles uninstall cleanup should succeed");
-
-    let mut umu_game = installed_game(4, "UMU Game", &umu_install_dir);
-    umu_game.linux_runtime_backend = Some(crate::models::LinuxRuntimeBackend::Umu);
-    umu_game.wine_prefix = Some(umu_prefix_dir.to_string_lossy().into_owned());
-
-    super::super::api::delete_install_artifacts_with(&umu_game, |_| Vec::new())
+    super::super::api::delete_install_artifacts(&game)
         .expect("umu uninstall cleanup should succeed");
 
-    assert!(!bottle_install_dir.exists());
-    assert!(bottle_dir.exists());
-    assert!(!umu_install_dir.exists());
-    assert!(!umu_prefix_dir.exists());
+    assert!(!install_dir.exists());
+    assert!(!prefix_dir.exists());
     let _ = fs::remove_dir_all(&root);
 }
 
 #[test]
-fn delete_install_artifacts_with_removes_derived_bottle_dir_when_metadata_is_missing() {
-    let root = unique_test_dir("uninstall-derived-bottle");
-    let install_dir = root.join("install");
-    let bottle_dir = root.join("Legacy Game");
-    fs::create_dir_all(&install_dir).expect("install dir should exist");
-    fs::create_dir_all(&bottle_dir).expect("bottle dir should exist");
+fn delete_install_artifacts_removes_prefix_used_as_install_path() {
+    let root = unique_test_dir("uninstall-umu-shared-path");
+    let prefix_dir = root.join("umu-game");
+    fs::create_dir_all(prefix_dir.join("pfx").join("drive_c"))
+        .expect("umu prefix should be created");
 
-    let mut legacy_game = installed_game(7, "Legacy Game", &install_dir);
-    legacy_game.linux_runtime_backend = Some(crate::models::LinuxRuntimeBackend::Bottles);
-    legacy_game.bottle_name = None;
+    let mut game = installed_game(5, "UMU Game", &prefix_dir);
+    game.wine_prefix = Some(prefix_dir.to_string_lossy().into_owned());
 
-    super::super::api::delete_install_artifacts_with(&legacy_game, |bottle_name| {
-        if bottle_name == "Legacy Game" {
-            vec![bottle_dir.clone()]
-        } else {
-            Vec::new()
-        }
-    })
-    .expect("derived bottle cleanup should succeed");
+    super::super::api::delete_install_artifacts(&game)
+        .expect("umu uninstall cleanup should succeed");
 
-    assert!(!install_dir.exists());
-    assert!(!bottle_dir.exists());
+    assert!(!prefix_dir.exists());
     let _ = fs::remove_dir_all(&root);
 }
 
 #[test]
-fn delete_install_artifacts_with_removes_legacy_bottle_dir_when_only_old_name_exists() {
-    let root = unique_test_dir("uninstall-legacy-bottle-name");
-    let install_dir = root.join("install");
-    let bottle_dir = root.join("claudio-8-Legacy Game");
-    fs::create_dir_all(&install_dir).expect("install dir should exist");
-    fs::create_dir_all(&bottle_dir).expect("bottle dir should exist");
+fn delete_install_artifacts_keeps_wine_prefix_it_does_not_manage() {
+    let root = unique_test_dir("uninstall-unmanaged-prefix");
+    let prefix_dir = root.join("Gaming");
+    let other_game_dir = prefix_dir.join("drive_c").join("Other Game");
+    fs::create_dir_all(&other_game_dir).expect("prefix contents should be created");
+    fs::create_dir_all(prefix_dir.join("dosdevices")).expect("dosdevices should be created");
 
-    let mut legacy_game = installed_game(8, "Legacy Game", &install_dir);
-    legacy_game.linux_runtime_backend = Some(crate::models::LinuxRuntimeBackend::Bottles);
-    legacy_game.bottle_name = None;
+    let game = installed_game(3, "Legacy Game", &prefix_dir);
 
-    super::super::api::delete_install_artifacts_with(&legacy_game, |bottle_name| {
-        if bottle_name == "claudio-8-Legacy Game" {
-            vec![bottle_dir.clone()]
-        } else {
-            Vec::new()
-        }
-    })
-    .expect("legacy bottle cleanup should succeed");
+    super::super::api::delete_install_artifacts(&game)
+        .expect("unmanaged prefix cleanup should succeed");
 
-    assert!(!install_dir.exists());
-    assert!(!bottle_dir.exists());
+    assert!(other_game_dir.exists());
     let _ = fs::remove_dir_all(&root);
 }
 

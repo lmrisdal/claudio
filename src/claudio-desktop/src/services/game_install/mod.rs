@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use crate::models::LinuxRuntimeBackend;
 use crate::models::{
     DownloadPackageInput, InstallProgress, InstallType, InstalledGame, RemoteGame,
 };

@@ -48,59 +48,22 @@ async fn install_game_inner_with_options(
     };
     log::info!("Install target: {}", target_dir.display());
 
-    #[cfg(target_os = "linux")]
-    let linux_runtime_backend = selected_linux_runtime_backend(&game)?;
-    #[cfg(target_os = "linux")]
-    let bottles_portable_target = if linux_runtime_backend == LinuxRuntimeBackend::Bottles
-        && matches!(game.install_type, InstallType::Portable)
-    {
-        Some(resolve_bottles_portable_target(&game)?)
-    } else {
-        None
-    };
-    #[cfg(target_os = "linux")]
-    let effective_target_dir = bottles_portable_target.as_deref().unwrap_or(&target_dir);
-    #[cfg(not(target_os = "linux"))]
-    let effective_target_dir = target_dir.as_path();
-    #[cfg(target_os = "linux")]
-    let is_bottles_installer = linux_runtime_backend == LinuxRuntimeBackend::Bottles
-        && matches!(game.install_type, InstallType::Installer);
-
-    if effective_target_dir.exists() {
+    if target_dir.exists() {
         if reuse_cached_package && matches!(game.install_type, InstallType::Portable) {
-            fs::remove_dir_all(effective_target_dir).map_err(|err| {
-                log_io_failure(
-                    "remove failed portable install target",
-                    effective_target_dir,
-                    &err,
-                );
-                format_install_io_error(
-                    "clean the failed install target",
-                    effective_target_dir,
-                    &err,
-                )
+            fs::remove_dir_all(&target_dir).map_err(|err| {
+                log_io_failure("remove failed portable install target", &target_dir, &err);
+                format_install_io_error("clean the failed install target", &target_dir, &err)
             })?;
         } else if !reuse_cached_package {
-            #[cfg(target_os = "linux")]
-            if is_bottles_installer {
-                // Bottles owns the actual prefix for installer installs; the selected
-                // Claudio target is kept only as the user's intent from the install dialog.
-            } else {
-                return Err(format!(
-                    "Install target already exists: {}",
-                    effective_target_dir.display()
-                ));
-            }
-            #[cfg(not(target_os = "linux"))]
             return Err(format!(
                 "Install target already exists: {}",
-                effective_target_dir.display()
+                target_dir.display()
             ));
         }
     }
 
-    if !effective_target_dir.exists() {
-        validate_install_target_path(effective_target_dir)?;
+    if !target_dir.exists() {
+        validate_install_target_path(&target_dir)?;
     }
 
     let downloads_root = settings::resolve_download_root(&settings)?;
@@ -151,26 +114,10 @@ async fn install_game_inner_with_options(
 
     let install_result = match game.install_type {
         InstallType::Portable => {
-            install_portable(
-                app,
-                &game,
-                effective_target_dir,
-                &download_info.file_path,
-                control,
-                reuse_cached_package,
-            )
-            .await
+            install_portable(app, &game, &target_dir, &download_info.file_path, control).await
         }
         InstallType::Installer => {
-            install_installer(
-                app,
-                &game,
-                &target_dir,
-                &download_info.file_path,
-                control,
-                reuse_cached_package,
-            )
-            .await
+            install_installer(app, &game, &target_dir, &download_info.file_path, control).await
         }
     };
 
@@ -184,7 +131,7 @@ async fn install_game_inner_with_options(
     #[cfg(target_os = "windows")]
     crate::windows_integration::register(app, &installed, game.desktop_shortcut.unwrap_or(false));
     #[cfg(target_os = "linux")]
-    sync_linux_shortcuts(
+    crate::services::linux_umu::sync_shortcuts(
         &installed,
         game.desktop_shortcut.unwrap_or(false),
         game.app_menu_shortcut.unwrap_or(false),
@@ -205,36 +152,6 @@ async fn install_game_inner_with_options(
         Some("Install complete"),
     );
     Ok(installed)
-}
-
-#[cfg(target_os = "linux")]
-fn resolve_bottles_portable_target(game: &RemoteGame) -> Result<PathBuf, String> {
-    let bottle_name = selected_bottle_name(game)?;
-    let drive_c = crate::services::linux_bottles::bottle_drive_c_path(bottle_name)?;
-    Ok(drive_c.join(sanitize_segment(&game.title)))
-}
-
-#[cfg(target_os = "linux")]
-fn sync_linux_shortcuts(
-    installed: &InstalledGame,
-    desktop_shortcut: bool,
-    app_menu_shortcut: bool,
-    steam_shortcut: bool,
-) {
-    match installed.linux_runtime_backend {
-        Some(LinuxRuntimeBackend::Bottles) => crate::services::linux_bottles::sync_shortcuts(
-            installed,
-            desktop_shortcut,
-            app_menu_shortcut,
-            steam_shortcut,
-        ),
-        _ => crate::services::linux_umu::sync_shortcuts(
-            installed,
-            desktop_shortcut,
-            app_menu_shortcut,
-            steam_shortcut,
-        ),
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -326,7 +243,6 @@ pub(super) async fn install_portable(
     target_dir: &Path,
     package_path: &Path,
     control: &InstallControl,
-    _allow_existing_runtime: bool,
 ) -> Result<InstalledGame, String> {
     emit_progress(
         app,
@@ -337,12 +253,9 @@ pub(super) async fn install_portable(
     );
 
     #[cfg(target_os = "linux")]
-    let prepared_umu_runtime = prepare_portable_umu_runtime(app, game, target_dir, control).await?;
+    let umu_runtime = prepare_portable_umu_runtime(app, game, target_dir, control).await?;
     #[cfg(target_os = "linux")]
-    let payload_dir = prepared_umu_runtime
-        .as_ref()
-        .map(|runtime| runtime.payload_dir.clone())
-        .unwrap_or_else(|| target_dir.to_path_buf());
+    let payload_dir = umu_runtime.payload_dir;
     #[cfg(not(target_os = "linux"))]
     let payload_dir = target_dir.to_path_buf();
 
@@ -421,20 +334,10 @@ pub(super) async fn install_portable(
     .map_err(|err| format!("Extract task failed: {err}"))??;
 
     #[cfg(target_os = "linux")]
-    let (wine_prefix, linux_runtime_backend, bottle_name, proton_path) =
-        if let Some(runtime) = prepared_umu_runtime {
-            (
-                Some(runtime.wine_prefix),
-                Some(LinuxRuntimeBackend::Umu),
-                None,
-                Some(runtime.proton_path),
-            )
-        } else {
-            prepare_linux_runtime(app, game, control, _allow_existing_runtime).await?
-        };
+    let (wine_prefix, proton_path) = (Some(umu_runtime.wine_prefix), Some(umu_runtime.proton_path));
 
     #[cfg(not(target_os = "linux"))]
-    let (wine_prefix, linux_runtime_backend, bottle_name, proton_path) = (None, None, None, None);
+    let (wine_prefix, proton_path) = (None, None);
 
     Ok(InstalledGame {
         remote_game_id: game.id,
@@ -444,8 +347,6 @@ pub(super) async fn install_portable(
         install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
         wine_prefix,
-        linux_runtime_backend,
-        bottle_name,
         proton_path,
         installed_at: current_timestamp(),
         summary: game.summary.clone(),
@@ -475,11 +376,7 @@ async fn prepare_portable_umu_runtime(
     game: &RemoteGame,
     target_dir: &Path,
     control: &InstallControl,
-) -> Result<Option<PreparedUmuPortableRuntime>, String> {
-    if selected_linux_runtime_backend(game)? != LinuxRuntimeBackend::Umu {
-        return Ok(None);
-    }
-
+) -> Result<PreparedUmuPortableRuntime, String> {
     let prefix = target_dir.to_path_buf();
     let proton_path =
         crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
@@ -508,105 +405,11 @@ async fn prepare_portable_umu_runtime(
         format_install_io_error("create the UMU drive_c folder", &payload_dir, &err)
     })?;
 
-    Ok(Some(PreparedUmuPortableRuntime {
+    Ok(PreparedUmuPortableRuntime {
         payload_dir,
         wine_prefix: prefix.to_string_lossy().into_owned(),
         proton_path,
-    }))
-}
-
-#[cfg(target_os = "linux")]
-async fn prepare_linux_runtime(
-    app: &AppHandle,
-    game: &RemoteGame,
-    control: &InstallControl,
-    allow_existing_runtime: bool,
-) -> Result<
-    (
-        Option<String>,
-        Option<LinuxRuntimeBackend>,
-        Option<String>,
-        Option<String>,
-    ),
-    String,
-> {
-    match selected_linux_runtime_backend(game)? {
-        LinuxRuntimeBackend::Umu => {
-            let prefix = crate::services::linux_umu::default_prefix_path(game.id, &game.title);
-            let proton_path =
-                crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
-            let control = control.clone();
-            let prefix_for_task = prefix.clone();
-            let proton_for_task = proton_path.clone();
-            emit_progress_indeterminate(
-                app,
-                game.id,
-                "preparing-prefix",
-                Some(97.0),
-                Some("Preparing Proton prefix..."),
-                true,
-            );
-            tokio::task::spawn_blocking(move || {
-                crate::services::linux_umu::prepare_prefix(
-                    &prefix_for_task,
-                    &proton_for_task,
-                    || control.is_cancelled(),
-                )
-            })
-            .await
-            .map_err(|err| format!("Prefix setup task failed: {err}"))??;
-            Ok((
-                Some(prefix.to_string_lossy().into_owned()),
-                Some(LinuxRuntimeBackend::Umu),
-                None,
-                Some(proton_path),
-            ))
-        }
-        LinuxRuntimeBackend::Bottles => {
-            let bottle_name = selected_bottle_name(game)?.to_string();
-            let control = control.clone();
-            let bottle_for_task = bottle_name.clone();
-            emit_progress_indeterminate(
-                app,
-                game.id,
-                "preparing-prefix",
-                Some(97.0),
-                Some("Preparing Bottles bottle..."),
-                true,
-            );
-            tokio::task::spawn_blocking(move || {
-                let _ = allow_existing_runtime;
-                if control.is_cancelled() {
-                    return Err("Install cancelled.".to_string());
-                }
-                crate::services::linux_bottles::existing_bottle_path(&bottle_for_task)
-            })
-            .await
-            .map_err(|err| format!("Bottles setup task failed: {err}"))??;
-            Ok((
-                None,
-                Some(LinuxRuntimeBackend::Bottles),
-                Some(bottle_name),
-                None,
-            ))
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn selected_linux_runtime_backend(game: &RemoteGame) -> Result<LinuxRuntimeBackend, String> {
-    game.linux_runtime_backend
-        .clone()
-        .ok_or_else(|| "Choose either Bottles or Proton as the Linux runtime backend.".to_string())
-}
-
-#[cfg(target_os = "linux")]
-fn selected_bottle_name(game: &RemoteGame) -> Result<&str, String> {
-    game.bottle_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .ok_or_else(|| "Choose an existing Bottles bottle for this install.".to_string())
+    })
 }
 
 #[cfg(test)]

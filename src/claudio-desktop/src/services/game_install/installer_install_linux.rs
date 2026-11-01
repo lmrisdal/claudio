@@ -7,7 +7,6 @@ pub(super) async fn install_installer_linux(
     target_dir: &Path,
     package_path: &Path,
     control: &InstallControl,
-    allow_existing_runtime: bool,
 ) -> Result<InstalledGame, String> {
     emit_progress(
         app,
@@ -27,146 +26,88 @@ pub(super) async fn install_installer_linux(
     let package_path_owned = package_path.to_path_buf();
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
-    let runtime_backend = game.linux_runtime_backend.clone().ok_or_else(|| {
-        "Choose either Bottles or Proton as the Linux runtime backend.".to_string()
-    })?;
     let prefix = target_dir.to_path_buf();
-    let bottle_name = if runtime_backend == LinuxRuntimeBackend::Bottles {
-        game.bottle_name
-            .as_deref()
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .ok_or_else(|| "Choose an existing Bottles bottle for this install.".to_string())?
-            .to_string()
-    } else {
-        String::new()
-    };
-    let proton_path = (runtime_backend == LinuxRuntimeBackend::Umu)
-        .then(|| crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref()));
+    let proton_path =
+        crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
     let control_for_task = control.clone();
     let proton_for_task = proton_path.clone();
-    let bottle_for_task = bottle_name.clone();
-    let runtime_for_task = runtime_backend.clone();
 
-    let install_output =
-        tokio::task::spawn_blocking(move || -> Result<(Option<String>, String), String> {
-            let mut progress_cb = |p: f64| {
-                emit_progress(
-                    &app_handle,
-                    gid,
-                    "extracting",
-                    Some(60.0 + (p * 25.0)),
-                    Some("Extracting installer..."),
-                );
-            };
-
-            if staging_dir.exists()
-                && let Err(error) = cleanup_directory(&staging_dir, "installer staging directory")
-            {
-                log::warn!(
-                    "[installer {gid}] failed to clean stale staging directory {}: {}",
-                    staging_dir.display(),
-                    error
-                );
-            }
-            fs::create_dir_all(&staging_dir).map_err(|err| {
-                log_io_failure("create installer staging directory", &staging_dir, &err);
-                format_install_io_error("create the installer staging folder", &staging_dir, &err)
-            })?;
-
-            extract_archive_or_copy(
-                &package_path_owned,
-                &staging_dir,
-                &control_for_task.cancel_token,
-                &mut progress_cb,
-            )?;
-
-            let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
-            emit_progress_indeterminate(
+    let game_exe = tokio::task::spawn_blocking(move || -> Result<Option<String>, String> {
+        let mut progress_cb = |p: f64| {
+            emit_progress(
                 &app_handle,
                 gid,
-                "installing-interactive",
-                Some(88.0),
-                Some(match runtime_for_task {
-                    LinuxRuntimeBackend::Umu => "Running installer through Proton...",
-                    LinuxRuntimeBackend::Bottles => "Running installer through Bottles...",
-                }),
-                true,
+                "extracting",
+                Some(60.0 + (p * 25.0)),
+                Some("Extracting installer..."),
             );
+        };
 
-            let search_root = match runtime_for_task {
-                LinuxRuntimeBackend::Umu => {
-                    let proton = proton_for_task
-                        .as_deref()
-                        .ok_or_else(|| "No Proton version was selected.".to_string())?;
-                    crate::services::linux_umu::run_prefix_command_wait(
-                        &prefix,
-                        proton,
-                        &installer,
-                        &[],
-                        || control_for_task.is_cancelled(),
-                    )?;
-                    prefix.join("pfx").join("drive_c")
-                }
-                LinuxRuntimeBackend::Bottles => {
-                    let _ = allow_existing_runtime;
-                    let bottle_path =
-                        crate::services::linux_bottles::existing_bottle_path(&bottle_for_task)?;
-                    crate::services::linux_bottles::run_bottle_command_wait(
-                        &bottle_for_task,
-                        &installer,
-                        &[],
-                        || control_for_task.is_cancelled(),
-                    )?;
-                    bottle_path.join("drive_c")
-                }
-            };
+        if staging_dir.exists()
+            && let Err(error) = cleanup_directory(&staging_dir, "installer staging directory")
+        {
+            log::warn!(
+                "[installer {gid}] failed to clean stale staging directory {}: {}",
+                staging_dir.display(),
+                error
+            );
+        }
+        fs::create_dir_all(&staging_dir).map_err(|err| {
+            log_io_failure("create installer staging directory", &staging_dir, &err);
+            format_install_io_error("create the installer staging folder", &staging_dir, &err)
+        })?;
 
-            let _ = cleanup_directory(&staging_dir, "installer staging directory");
-            // Setup-based installers scatter the real game executable across the
-            // prefix in ways we can't reliably guess. Only honor an explicit hint;
-            // otherwise leave it unset so the user picks the executable the first
-            // time they click Play.
-            let exe = game_exe_hint
-                .as_ref()
-                .map(|entry| search_root.join(entry))
-                .filter(|path| path.exists())
-                .map(|path| path.to_string_lossy().into_owned());
+        extract_archive_or_copy(
+            &package_path_owned,
+            &staging_dir,
+            &control_for_task.cancel_token,
+            &mut progress_cb,
+        )?;
 
-            let install_path = match runtime_for_task {
-                LinuxRuntimeBackend::Umu => prefix.to_string_lossy().into_owned(),
-                LinuxRuntimeBackend::Bottles => search_root
-                    .parent()
-                    .unwrap_or(&search_root)
-                    .to_string_lossy()
-                    .into_owned(),
-            };
-            Ok((exe, install_path))
-        })
-        .await
-        .map_err(|err| format!("Linux installer task failed: {err}"))??;
+        let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+        emit_progress_indeterminate(
+            &app_handle,
+            gid,
+            "installing-interactive",
+            Some(88.0),
+            Some("Running installer through Proton..."),
+            true,
+        );
 
-    let (game_exe, install_path) = install_output;
-    let (wine_prefix, stored_bottle_name, stored_proton_path) = match runtime_backend {
-        LinuxRuntimeBackend::Umu => (
-            Some(target_dir.to_string_lossy().into_owned()),
-            None,
-            proton_path,
-        ),
-        LinuxRuntimeBackend::Bottles => (None, Some(bottle_name), None),
-    };
+        crate::services::linux_umu::run_prefix_command_wait(
+            &prefix,
+            &proton_for_task,
+            &installer,
+            &[],
+            || control_for_task.is_cancelled(),
+        )?;
+        let search_root = prefix.join("pfx").join("drive_c");
+
+        let _ = cleanup_directory(&staging_dir, "installer staging directory");
+        // Setup-based installers scatter the real game executable across the
+        // prefix in ways we can't reliably guess. Only honor an explicit hint;
+        // otherwise leave it unset so the user picks the executable the first
+        // time they click Play.
+        let exe = game_exe_hint
+            .as_ref()
+            .map(|entry| search_root.join(entry))
+            .filter(|path| path.exists())
+            .map(|path| path.to_string_lossy().into_owned());
+
+        Ok(exe)
+    })
+    .await
+    .map_err(|err| format!("Linux installer task failed: {err}"))??;
 
     Ok(InstalledGame {
         remote_game_id: game.id,
         title: game.title.clone(),
         platform: game.platform.clone(),
         install_type: game.install_type.clone(),
-        install_path,
+        install_path: target_dir.to_string_lossy().into_owned(),
         game_exe,
-        wine_prefix,
-        linux_runtime_backend: Some(runtime_backend),
-        bottle_name: stored_bottle_name,
-        proton_path: stored_proton_path,
+        wine_prefix: Some(target_dir.to_string_lossy().into_owned()),
+        proton_path: Some(proton_path),
         installed_at: current_timestamp(),
         summary: game.summary.clone(),
         genre: game.genre.clone(),

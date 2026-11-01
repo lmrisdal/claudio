@@ -81,8 +81,6 @@ mod tests {
             install_path: install_path.to_string_lossy().into_owned(),
             game_exe: None,
             wine_prefix: None,
-            linux_runtime_backend: None,
-            bottle_name: None,
             proton_path: None,
             installed_at: "1".to_string(),
             summary: None,
@@ -137,5 +135,32 @@ mod tests {
             assert!(persisted.contains("Keep"));
             assert!(!persisted.contains("Missing"));
         });
+    }
+
+    #[test]
+    fn get_loads_entries_saved_with_removed_bottles_fields() {
+        let root = unique_test_dir("legacy-bottles-entry");
+        let install_dir = root.join("game");
+        fs::create_dir_all(&install_dir).expect("install dir should be created");
+
+        settings::with_test_data_dir(root.join("data"), || {
+            let mut entry = serde_json::to_value(installed_game(9, "Legacy Game", &install_dir))
+                .expect("entry should serialize");
+            entry["linuxRuntimeBackend"] = serde_json::json!("bottles");
+            entry["bottleName"] = serde_json::json!("Gaming");
+            fs::write(
+                settings::registry_path(),
+                serde_json::json!([entry]).to_string(),
+            )
+            .expect("legacy registry should be written");
+
+            let game = get(9)
+                .expect("legacy registry should load")
+                .expect("legacy entry should be present");
+
+            assert_eq!(game.title, "Legacy Game");
+        });
+
+        let _ = fs::remove_dir_all(&root);
     }
 }
