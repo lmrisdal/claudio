@@ -4,16 +4,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const tauriConfPath = path.join(root, "src/claudio-desktop/tauri.conf.json");
+const electronPackageJsonPath = path.join(root, "src/claudio-electron/package.json");
 const cargoTomlPath = path.join(root, "src/claudio-desktop/Cargo.toml");
 const frontendPackageJsonPath = path.join(root, "src/claudio-web/package.json");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
-function updateTauriConfig(version) {
-  const config = JSON.parse(fs.readFileSync(tauriConfPath, "utf8"));
-  const previous = String(config.version ?? "");
-  config.version = version;
-  fs.writeFileSync(tauriConfPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+function updateElectronPackageJson(version) {
+  const packageJson = JSON.parse(fs.readFileSync(electronPackageJsonPath, "utf8"));
+  const previous = String(packageJson.version ?? "");
+  packageJson.version = version;
+  fs.writeFileSync(electronPackageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
   return previous;
 }
 
@@ -66,7 +66,7 @@ function updateFrontendPackageJson(version) {
 function main() {
   const version = process.argv[2]?.trim();
   if (!version) {
-    console.error("Usage: node scripts/bump_desktop_version.cjs <version>");
+    console.error("Usage: node scripts/bump_version.cjs <version>");
     process.exit(1);
   }
 
@@ -75,12 +75,12 @@ function main() {
     process.exit(1);
   }
 
-  const oldTauri = updateTauriConfig(version);
+  const oldElectron = updateElectronPackageJson(version);
   const oldCargo = updateCargoToml(version);
   const oldFrontend = updateFrontendPackageJson(version);
 
   console.log(`Updated desktop version to ${version}`);
-  console.log(`- tauri.conf.json: ${oldTauri} -> ${version}`);
+  console.log(`- src/claudio-electron/package.json: ${oldElectron} -> ${version}`);
   console.log(`- Cargo.toml: ${oldCargo} -> ${version}`);
   console.log(`- src/claudio-web/package.json: ${oldFrontend} -> ${version}`);
 }

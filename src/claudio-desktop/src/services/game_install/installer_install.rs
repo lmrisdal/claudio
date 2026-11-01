@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) async fn install_installer(
-    app: &AppHandle,
+    app: &Host,
     game: &RemoteGame,
     target_dir: &Path,
     package_path: &Path,
@@ -212,6 +212,7 @@ pub(super) async fn install_installer(
     .map_err(|err| format!("Install task failed: {err}"))??;
 
         Ok(InstalledGame {
+            launch_options: Default::default(),
             remote_game_id: game.id,
             title: game.title.clone(),
             platform: game.platform.clone(),

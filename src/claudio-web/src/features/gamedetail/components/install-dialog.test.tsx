@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { cleanupRenderedDom, renderInDom } from "../../../test-utils/render";
 import { api } from "../../core/api/client";
 import { InputScopeProvider } from "../../core/hooks/use-input-scope";
+import { selectPath } from "../../desktop/hooks/desktop-dialog";
 import InstallDialog, { INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD } from "./install-dialog";
 
 vi.mock("../../core/api/client", () => ({
@@ -16,8 +16,8 @@ vi.mock("../../core/api/client", () => ({
   },
 }));
 
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  open: vi.fn(),
+vi.mock("../../desktop/hooks/desktop-dialog", () => ({
+  selectPath: vi.fn(),
 }));
 
 vi.mock("../../desktop/hooks/use-desktop", () => ({
@@ -27,24 +27,32 @@ vi.mock("../../desktop/hooks/use-desktop", () => ({
 }));
 
 const apiGet = vi.mocked(api.get);
-const openDialogMock = vi.mocked(openDialog);
+const openDialogMock = vi.mocked(selectPath);
 
 function renderWithQuery(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return renderInDom(
+  renderInDom(
     <QueryClientProvider client={queryClient}>
       <InputScopeProvider>{ui}</InputScopeProvider>
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
-async function flushQueries() {
+async function flushQueryNotifications() {
   await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve));
   });
+}
+
+async function settleQueries(queryClient: QueryClient) {
+  await vi.waitFor(async () => {
+    await flushQueryNotifications();
+    expect(queryClient.isFetching()).toBe(0);
+  });
+  await flushQueryNotifications();
 }
 
 function dialogSurface(): HTMLElement {
@@ -75,7 +83,7 @@ describe("InstallDialog download mode", () => {
     });
 
     const onConfirm = vi.fn();
-    renderWithQuery(
+    const queryClient = renderWithQuery(
       <InstallDialog
         open
         gameId={1}
@@ -87,7 +95,7 @@ describe("InstallDialog download mode", () => {
       />,
     );
 
-    await flushQueries();
+    await settleQueries(queryClient);
 
     expect(dialogSurface().textContent).not.toContain("Extract downloaded archive");
 
@@ -115,7 +123,7 @@ describe("InstallDialog download mode", () => {
       return Promise.reject(new Error(`unexpected: ${path}`));
     });
 
-    renderWithQuery(
+    const queryClient = renderWithQuery(
       <InstallDialog
         open
         gameId={1}
@@ -127,7 +135,7 @@ describe("InstallDialog download mode", () => {
       />,
     );
 
-    await flushQueries();
+    await settleQueries(queryClient);
 
     expect(dialogSurface().textContent).toContain("Extract downloaded archive");
   });
@@ -144,7 +152,7 @@ describe("InstallDialog download mode", () => {
       return Promise.reject(new Error(`unexpected: ${path}`));
     });
 
-    renderWithQuery(
+    const queryClient = renderWithQuery(
       <InstallDialog
         open
         gameId={1}
@@ -156,7 +164,7 @@ describe("InstallDialog download mode", () => {
       />,
     );
 
-    await flushQueries();
+    await settleQueries(queryClient);
 
     expect(dialogSurface().textContent).toContain("Extract downloaded archive");
   });

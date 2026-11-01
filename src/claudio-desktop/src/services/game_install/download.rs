@@ -13,7 +13,7 @@ pub(super) struct DownloadOptions<'a> {
 }
 
 pub(super) async fn download_package(
-    app: &AppHandle,
+    app: &Host,
     opts: &DownloadOptions<'_>,
     game_id: i32,
     game_title: &str,
@@ -27,7 +27,7 @@ pub(super) async fn download_package(
         temp_root,
         control,
         |progress| {
-            let _ = app.emit("install-progress", progress);
+            app.emit("install-progress", progress);
         },
         || Ok(()),
     )

@@ -1,7 +1,7 @@
+use crate::host::Host;
 use crate::models::{InstallType, InstalledGame};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Media::Audio::{
     IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2, IMMDeviceEnumerator,
@@ -64,7 +64,7 @@ pub fn allow_system_sleep() -> Result<(), String> {
     allow_system_sleep_inner()
 }
 
-pub fn register(app: &AppHandle, game: &InstalledGame, desktop_shortcut: bool) {
+pub fn register(app: &Host, game: &InstalledGame, desktop_shortcut: bool) {
     register_inner(app, game, desktop_shortcut);
 }
 

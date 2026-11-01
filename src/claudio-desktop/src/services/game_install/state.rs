@@ -2,14 +2,12 @@ use super::*;
 
 pub struct InstallState {
     installs: Mutex<HashMap<i32, InstallControl>>,
-    exit_approved: AtomicBool,
 }
 
 impl Default for InstallState {
     fn default() -> Self {
         Self {
             installs: Mutex::new(HashMap::new()),
-            exit_approved: AtomicBool::new(false),
         }
     }
 }
@@ -154,15 +152,7 @@ impl InstallState {
             .unwrap_or(false)
     }
 
-    pub fn approve_exit(&self) {
-        self.exit_approved.store(true, Ordering::Relaxed);
-    }
-
-    pub fn take_exit_approval(&self) -> bool {
-        self.exit_approved.swap(false, Ordering::Relaxed)
-    }
-
-    pub(super) fn cancel(&self, app: &AppHandle, game_id: i32) -> Result<(), String> {
+    pub(super) fn cancel(&self, app: &Host, game_id: i32) -> Result<(), String> {
         let installs = self
             .installs
             .lock()
@@ -185,7 +175,7 @@ impl InstallState {
         }
     }
 
-    pub(super) fn restart_interactive(&self, app: &AppHandle, game_id: i32) -> Result<(), String> {
+    pub(super) fn restart_interactive(&self, app: &Host, game_id: i32) -> Result<(), String> {
         let installs = self
             .installs
             .lock()

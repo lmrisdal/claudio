@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::future::Future;
 #[cfg(target_os = "windows")]
 use std::path::Path;
@@ -9,7 +8,6 @@ pub use crate::models::{
 };
 pub use crate::settings::DesktopSettings;
 pub use crate::test_support::{TestRequest, TestResponse, TestServer};
-pub use tauri::http;
 
 #[derive(Clone)]
 pub struct InstallController(
@@ -207,16 +205,6 @@ pub fn record_running_game_for_test(
     game: RunningGameInfo,
 ) -> Result<(), String> {
     crate::services::game_runtime::record_running_game_for_tests(state, game)
-}
-
-pub async fn forward_protocol_request<F>(
-    request: http::Request<Vec<u8>>,
-    on_logged_out: F,
-) -> Result<http::Response<Cow<'static, [u8]>>, String>
-where
-    F: FnMut() -> Result<(), String>,
-{
-    crate::protocol::forward_request_for_tests(request, on_logged_out).await
 }
 
 #[cfg(target_os = "windows")]

@@ -1,10 +1,10 @@
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import UninstallDialog from "../../core/components/uninstall-dialog";
 import type { Game } from "../../core/types/models";
 import { isLinux } from "../../core/utils/os";
+import { selectPath } from "../../desktop/hooks/desktop-dialog";
 import {
   addSteamShortcut,
   launchGame,
@@ -21,6 +21,7 @@ import {
 import { useDownloadManager } from "../../downloads/hooks/use-download-manager-hook";
 import CompressionProgress from "./compression-progress";
 import DownloadButton from "./download-button";
+import GameSettingsButton from "./game-settings-button";
 import InstallDialog from "./install-dialog";
 import PickExeDialog from "./pick-exe-dialog";
 import PlayContextMenu from "./play-context-menu";
@@ -45,7 +46,6 @@ interface GameDetailActionsProperties {
   isInstalledGameLoading: boolean;
   isDesktop: boolean;
   isDesktopPcGame: boolean;
-  isDesktopPcDownload: boolean;
   emulationSupported: boolean;
   installExeLabel?: string;
   needsInstallerExe: boolean;
@@ -61,7 +61,6 @@ export default function GameDetailActions({
   isInstalledGameLoading,
   isDesktop,
   isDesktopPcGame,
-  isDesktopPcDownload,
   emulationSupported,
   installExeLabel,
   needsInstallerExe,
@@ -294,23 +293,17 @@ export default function GameDetailActions({
 
   async function promptLinuxExecutableSelection(gameToUpdate: InstalledGame) {
     try {
-      const selected = await openDialog({
+      const selected = await selectPath({
         directory: false,
-        multiple: false,
         title: "Select Game Executable",
         defaultPath: linuxExecutableBrowseRoot(gameToUpdate),
       });
 
-      if (selected === null) {
+      if (!selected) {
         return;
       }
 
-      const executable = Array.isArray(selected) ? selected[0] : selected;
-      if (!executable) {
-        return;
-      }
-
-      await setAndLaunchExecutable(executable);
+      await setAndLaunchExecutable(selected);
     } catch (error) {
       setLaunchingGameId(null);
       setInstallError(error instanceof Error ? error.message : "Could not launch game.");
@@ -499,6 +492,7 @@ export default function GameDetailActions({
                       : "Play"}
               </button>
 
+              <GameSettingsButton game={installedGame} />
               <div>
                 <button
                   ref={optionsButtonRef}
@@ -684,72 +678,6 @@ export default function GameDetailActions({
               )}
             </div>
           ) : null
-        ) : isDesktopPcDownload ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-nav
-              disabled={packageDownloadMutation.isPending || hasActiveInstallProgress}
-              onClick={() => void handleInstallClick()}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition enabled:hover:bg-accent-hover disabled:bg-text-muted/20 disabled:text-text-muted disabled:cursor-not-allowed! outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-            >
-              <svg
-                className={`h-4 w-4 ${packageDownloadMutation.isPending || hasActiveInstallProgress ? "animate-spin" : ""}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.25}
-              >
-                {packageDownloadMutation.isPending || hasActiveInstallProgress ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364 6.364-2.121-2.121M8.757 8.757 6.636 6.636m10.728 0-2.121 2.121M8.757 15.243l-2.121 2.121"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                )}
-              </svg>
-              {hasActiveInstallProgress
-                ? installProgress?.status === "stopping"
-                  ? (installProgress.detail ?? "Stopping download...")
-                  : installProgress?.status === "extracting"
-                    ? typeof installProgress?.percent === "number"
-                      ? `Extracting ${Math.round(installProgress.percent)}%`
-                      : "Extracting..."
-                    : typeof installProgress?.percent === "number"
-                      ? `Downloading ${Math.round(installProgress.percent)}%`
-                      : "Downloading..."
-                : packageDownloadMutation.isPending
-                  ? "Starting download..."
-                  : "Download"}
-            </button>
-
-            {(packageDownloadMutation.isPending || hasActiveInstallProgress) && (
-              <button
-                type="button"
-                data-nav
-                onClick={() => void cancelDownload(displayGame.id)}
-                aria-label="Cancel download"
-                disabled={installProgress?.status === "stopping"}
-                className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-3 text-sm text-text-secondary transition hover:border-red-400 hover:text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.25}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
         ) : (
           <DownloadButton gameId={displayGame.id} size={displayGame.sizeBytes} />
         )}
@@ -774,7 +702,7 @@ export default function GameDetailActions({
         installerPath={
           displayGame.installType === "installer" ? displayGame.installerExe : undefined
         }
-        downloadMode={isDesktopPcDownload || installerDownloadOverride}
+        downloadMode={installerDownloadOverride}
         errorMessage={installError}
         onPathChange={() => setInstallError(null)}
         onClose={() => {
@@ -792,7 +720,7 @@ export default function GameDetailActions({
           forceInteractive,
           extract,
         ) => {
-          const isDownloadFlow = isDesktopPcDownload || installerDownloadOverride;
+          const isDownloadFlow = installerDownloadOverride;
 
           if (isDownloadFlow) {
             if (!path) {

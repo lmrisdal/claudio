@@ -1,0 +1,50 @@
+appId: com.claudio.desktop
+productName: Claudio
+artifactName: Claudio-${version}-${os}-${arch}.${ext}
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: ../claudio-web/dist
+    to: web
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/tray-icon-white.png
+    to: tray-icon-white.png
+  - from: resources/tray-icon-black.png
+    to: tray-icon-black.png
+linux:
+  target:
+    - AppImage
+  icon: resources/icon.png
+  category: Game
+  executableName: claudio
+  extraResources:
+    - from: ../../target/release/claudio-core
+      to: claudio-core
+win:
+  target:
+    - target: nsis
+      arch: x64
+    - target: portable
+      arch: x64
+  icon: resources/icon.ico
+  extraResources:
+    - from: ../../target/release/claudio-core.exe
+      to: claudio-core.exe
+    - from: ../../target/release/claudio-game-uninstaller.exe
+      to: claudio-game-uninstaller.exe
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: ${productName}-Setup-${version}.${ext}
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+publish:
+  provider: github
+  owner: lmrisdal
+  repo: claudio
+  releaseType: release

@@ -170,9 +170,20 @@ fn format_install_io_error_pair_maps_access_denied_to_friendly_message() {
 fn sanitize_segment_replaces_invalid_path_characters() {
     assert_eq!(
         sanitize_segment(" Halo: Reach / GOTY?* "),
-        "Halo_ Reach _ GOTY__"
+        "Halo Reach _ GOTY__"
     );
     assert_eq!(sanitize_segment("   "), "game");
+}
+
+#[test]
+fn sanitize_segment_replaces_colons_with_single_spaces() {
+    for title in [
+        "Call of Juarez: Gunslinger",
+        "Call of Juarez:Gunslinger",
+        "Call of Juarez : Gunslinger",
+    ] {
+        assert_eq!(sanitize_segment(title), "Call of Juarez Gunslinger");
+    }
 }
 
 #[test]
@@ -243,7 +254,7 @@ fn build_install_dir_uses_sanitized_title() {
 
     let path = build_install_dir(Path::new("/games"), &game);
 
-    assert_eq!(path, PathBuf::from("/games/Max Payne_ GOTY"));
+    assert_eq!(path, PathBuf::from("/games/Max Payne GOTY"));
 }
 
 #[test]
@@ -364,5 +375,5 @@ fn install_download_root_uses_configured_download_root_and_sanitized_title() {
     };
     let path = install_download_root(Path::new("/games/downloads"), &game);
 
-    assert_eq!(path, PathBuf::from("/games/downloads/Max Payne_ GOTY-9"));
+    assert_eq!(path, PathBuf::from("/games/downloads/Max Payne GOTY-9"));
 }

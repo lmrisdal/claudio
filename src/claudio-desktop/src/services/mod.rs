@@ -11,3 +11,9 @@ pub(crate) mod linux_steam_shortcuts;
 pub mod linux_umu;
 #[cfg(any(target_os = "linux", test))]
 pub(crate) mod process_log;
+
+#[cfg(any(not(target_os = "windows"), test))]
+pub(crate) mod launch_arguments;
+
+#[cfg(target_os = "windows")]
+mod game_elevation;

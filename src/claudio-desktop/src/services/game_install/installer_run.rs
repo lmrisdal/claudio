@@ -1,10 +1,14 @@
 #[cfg(target_os = "windows")]
+use super::installer_arguments::{installer_arguments, windows_argument_line};
+#[cfg(target_os = "windows")]
 use super::installer_detect::{InstallerType, detect_installer_type};
 #[cfg(target_os = "windows")]
 use super::installer_elevated::spawn_mute_wait;
 #[cfg(target_os = "windows")]
 use super::installer_innoextract::run_innoextract;
 use super::*;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 pub(super) fn run_installer_with_retries<F, G, H>(
     mut attempt: InstallerAttemptConfig,
@@ -50,16 +54,13 @@ where
 }
 
 #[cfg(target_os = "windows")]
-pub(super) fn confirm_installer_elevation(app: &AppHandle) -> bool {
-    app.dialog()
-        .message("This installer requires administrator privileges. Continue?")
-        .title("Administrator Privileges Required")
-        .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            "Continue".to_string(),
-            "Cancel".to_string(),
-        ))
-        .blocking_show()
+pub(super) fn confirm_installer_elevation(app: &Host) -> bool {
+    app.confirm(
+        "Administrator Privileges Required",
+        "This installer requires administrator privileges. Continue?",
+        "Continue",
+        "Cancel",
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -91,139 +92,46 @@ pub(super) fn run_installer(
         path.display()
     );
 
-    if force_interactive {
-        if matches!(installer_type, InstallerType::Msi) {
-            let msi_args = format!("/i \"{}\"", path.to_string_lossy());
-            let mut cmd = std::process::Command::new("msiexec");
-            cmd.arg("/i").arg(path).stdin(Stdio::null());
-            return spawn_mute_wait(
-                cmd,
-                Path::new("msiexec"),
-                &msi_args,
-                run_as_administrator,
-                false,
-                control,
-            );
+    if !force_interactive && installer_type == InstallerType::GogInnoSetup {
+        match run_innoextract(path, target_dir) {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                log::warn!(
+                    "innoextract failed ({error}), falling back to silent InnoSetup install"
+                );
+                let _ = fs::remove_dir_all(target_dir);
+            }
         }
+    }
 
-        let mut cmd = std::process::Command::new(path);
-        if force_run_as_invoker {
-            apply_run_as_invoker_env(&mut cmd);
-        }
-        cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
-            .stdin(Stdio::null());
-        return spawn_mute_wait(
-            cmd,
-            path,
-            "",
-            run_as_administrator,
-            force_run_as_invoker,
-            control,
+    let mut args = installer_arguments(installer_type, &target, force_interactive);
+    let program = if installer_type == InstallerType::Msi {
+        args.splice(
+            0..0,
+            ["/i".to_string(), path.to_string_lossy().into_owned()],
         );
-    }
-
-    match installer_type {
-        InstallerType::GogInnoSetup => run_innoextract(path, target_dir).or_else(|err| {
-            log::warn!("innoextract failed ({err}), falling back to silent InnoSetup install");
-            let _ = fs::remove_dir_all(target_dir);
-            run_innosetup_silent(
-                path,
-                &target,
-                run_as_administrator,
-                force_run_as_invoker,
-                control,
-            )
-        }),
-        InstallerType::Msi => {
-            let msi_args = format!(
-                "/i \"{}\" /qn TARGETDIR=\"{}\"",
-                path.to_string_lossy(),
-                target
-            );
-            let mut cmd = std::process::Command::new("msiexec");
-            cmd.arg("/i")
-                .arg(path)
-                .arg("/qn")
-                .arg(format!("TARGETDIR={target}"))
-                .stdin(Stdio::null());
-            spawn_mute_wait(
-                cmd,
-                Path::new("msiexec"),
-                &msi_args,
-                run_as_administrator,
-                false,
-                control,
-            )
-        }
-        InstallerType::InnoSetup => run_innosetup_silent(
-            path,
-            &target,
-            run_as_administrator,
-            force_run_as_invoker,
-            control,
-        ),
-        InstallerType::Nsis => {
-            let nsis_args = format!("/S /D={target}");
-            let mut cmd = std::process::Command::new(path);
-            if force_run_as_invoker {
-                apply_run_as_invoker_env(&mut cmd);
-            }
-            cmd.arg("/S")
-                .arg(format!("/D={target}"))
-                .stdin(Stdio::null());
-            spawn_mute_wait(
-                cmd,
-                path,
-                &nsis_args,
-                run_as_administrator,
-                force_run_as_invoker,
-                control,
-            )
-        }
-        InstallerType::Unknown => {
-            let mut cmd = std::process::Command::new(path);
-            if force_run_as_invoker {
-                apply_run_as_invoker_env(&mut cmd);
-            }
-            cmd.current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
-                .stdin(Stdio::null());
-            spawn_mute_wait(
-                cmd,
-                path,
-                "",
-                run_as_administrator,
-                force_run_as_invoker,
-                control,
-            )
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn run_innosetup_silent(
-    path: &Path,
-    target: &str,
-    run_as_administrator: bool,
-    force_run_as_invoker: bool,
-    control: &InstallControl,
-) -> Result<(), RunInstallerError> {
-    let args = format!("/VERYSILENT /SUPPRESSMSGBOXES /NOSOUND \"/DIR={target}\"");
-    let mut cmd = std::process::Command::new(path);
-    if force_run_as_invoker {
+        Path::new("msiexec")
+    } else {
+        path
+    };
+    let argument_line = windows_argument_line(installer_type, &args);
+    let mut cmd = std::process::Command::new(program);
+    if installer_type != InstallerType::Msi && force_run_as_invoker {
         apply_run_as_invoker_env(&mut cmd);
     }
-    cmd.arg("/VERYSILENT")
-        .arg("/SUPPRESSMSGBOXES")
-        .arg("/NOSOUND")
-        .arg(format!("/DIR={target}"))
+    cmd.raw_arg(&argument_line)
+        .current_dir(path.parent().unwrap_or_else(|| Path::new(".")))
         .stdin(Stdio::null());
-
+    log::info!(
+        "[installer] launching {} {argument_line}",
+        program.display()
+    );
     spawn_mute_wait(
         cmd,
-        path,
-        &args,
+        program,
+        &argument_line,
         run_as_administrator,
-        force_run_as_invoker,
+        installer_type != InstallerType::Msi && force_run_as_invoker,
         control,
     )
 }

@@ -8,7 +8,6 @@ pub struct PingResponse {
     pub platform: String,
 }
 
-#[tauri::command]
 pub fn ping() -> PingResponse {
     PingResponse {
         version: version::display_version(),

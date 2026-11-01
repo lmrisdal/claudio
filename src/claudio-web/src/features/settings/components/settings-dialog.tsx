@@ -32,15 +32,13 @@ export default function SettingsDialog({
   open,
   initialTab,
   onClose,
-  embedded = false,
 }: {
   open: boolean;
   initialTab: SettingsTab;
   onClose: () => void;
-  embedded?: boolean;
 }) {
   useInputScope({
-    id: embedded ? "settings-window" : "settings-dialog",
+    id: "settings-dialog",
     kind: "dialog",
     blocks: ["page-nav", "search"],
     enabled: open,
@@ -430,25 +428,19 @@ export default function SettingsDialog({
     </svg>
   );
 
-  const containerClassName = embedded
-    ? "h-full w-full"
-    : "fixed inset-0 z-[100] flex items-end justify-center sm:items-center";
-  const panelClassName = embedded
-    ? "relative flex h-full w-full flex-col overflow-hidden border border-border bg-surface sm:flex-row"
-    : "relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl";
-  const sidebarClassName = embedded
-    ? "flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r"
-    : "flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r";
-  const sidebarActiveClassName = embedded
-    ? "bg-(--settings-sidebar-active-bg) text-text-primary font-medium"
-    : "bg-(--settings-sidebar-active-bg) text-text-primary font-medium";
-  const sidebarHoverClassName = embedded
-    ? "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary"
-    : "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary";
+  const containerClassName =
+    "desktop-no-drag fixed inset-0 z-[100] flex items-end justify-center sm:items-center";
+  const panelClassName =
+    "relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:mx-4 sm:h-[min(620px,86vh)] sm:max-w-4xl sm:flex-row sm:rounded-2xl";
+  const sidebarClassName =
+    "flex flex-col border-border bg-(--settings-sidebar-bg) sm:w-56 sm:shrink-0 sm:border-r";
+  const sidebarActiveClassName = "bg-(--settings-sidebar-active-bg) text-text-primary font-medium";
+  const sidebarHoverClassName =
+    "text-text-secondary hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary";
 
   return (
-    <div className={containerClassName} onClick={embedded ? undefined : onClose}>
-      {!embedded && <div className="app-modal-backdrop app-modal-backdrop-blur fixed inset-0" />}
+    <div className={containerClassName} onClick={onClose}>
+      <div className="app-modal-backdrop app-modal-backdrop-blur fixed inset-0" />
       <div
         ref={panelReference}
         className={panelClassName}
@@ -464,7 +456,7 @@ export default function SettingsDialog({
             </div>
             <button
               onClick={onClose}
-              className={`rounded-lg p-1.5 text-text-muted transition ${embedded ? "hover:bg-(--settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden`}
+              className={`rounded-lg p-1.5 text-text-muted transition hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring sm:hidden`}
               aria-label="Close"
             >
               {closeIcon}
@@ -518,7 +510,7 @@ export default function SettingsDialog({
 
                   checkForUpdates();
                 }}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors ${embedded ? "hover:bg-(--desktop-settings-sidebar-hover-bg)" : "hover:bg-(--settings-sidebar-hover-bg)"} hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted outline-none transition-colors hover:bg-(--settings-sidebar-hover-bg) hover:text-text-primary ${showSidebarFocusRing ? "focus-visible:ring-2 focus-visible:ring-focus-ring" : "focus-visible:ring-0"}`}
               >
                 <span className={isCheckingForUpdates ? "checking-wave-text" : undefined}>
                   {checkForUpdatesLabel}

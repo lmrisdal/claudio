@@ -2,7 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
-const isTauri = !!globalThis.process?.env?.TAURI_ENV_PLATFORM;
+const isDesktopBuild = globalThis.process?.env?.CLAUDIO_DESKTOP_BUILD === "1";
 
 export default defineConfig({
   fmt: {},
@@ -264,9 +264,9 @@ export default defineConfig({
     },
   },
   plugins: [react(), tailwindcss()],
-  clearScreen: !isTauri,
+  clearScreen: !isDesktopBuild,
   build: {
-    outDir: isTauri ? "dist" : "../claudio-api/wwwroot",
+    outDir: isDesktopBuild ? "dist" : "../claudio-api/wwwroot",
     emptyOutDir: true,
     rollupOptions: {
       output: {
@@ -289,13 +289,16 @@ export default defineConfig({
     },
   },
   server: {
-    strictPort: isTauri,
-    proxy: isTauri
+    strictPort: isDesktopBuild,
+    proxy: isDesktopBuild
       ? undefined
       : {
           "/api": "http://localhost:8080",
           "/connect": "http://localhost:8080",
           "/images": "http://localhost:8080",
         },
+  },
+  test: {
+    execArgv: ["--no-experimental-webstorage"],
   },
 });

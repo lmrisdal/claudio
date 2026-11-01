@@ -154,6 +154,7 @@ where
     }
 
     let installed = registry::upsert(InstalledGame {
+        launch_options: Default::default(),
         remote_game_id: game.id,
         title: game.title.clone(),
         platform: game.platform.clone(),

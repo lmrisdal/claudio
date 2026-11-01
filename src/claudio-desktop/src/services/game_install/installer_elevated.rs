@@ -69,6 +69,9 @@ pub(super) fn spawn_mute_wait(
         return wait_for_elevated_installer(elevated, path, exe_name, control);
     }
 
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(err) if err.raw_os_error() == Some(740) => {

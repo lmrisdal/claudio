@@ -1,7 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke, listen, type UnlistenFn } from "./desktop-bridge";
 
-export const isDesktop = globalThis.window !== undefined && "__TAURI_INTERNALS__" in globalThis;
+export const isDesktop = globalThis.window !== undefined && "claudioDesktop" in globalThis;
 
 interface DesktopSettings {
   serverUrl: string | null;
@@ -14,7 +13,6 @@ interface DesktopSettings {
   defaultDownloadPath: string | null;
   defaultProtonPath: string | null;
   closeToTray: boolean;
-  hideDockIcon: boolean;
   customHeaders: Record<string, string>;
   downloadSpeedLimitKbs: number | null;
 }
@@ -65,7 +63,14 @@ interface DesktopInstallGameInput {
   igdbSlug?: string | null;
 }
 
+interface GameLaunchOptions {
+  parameters: string;
+  runAsAdministrator: boolean;
+  umuGameId: string | null;
+}
+
 interface InstalledGame {
+  launchOptions?: GameLaunchOptions;
   remoteGameId: number;
   title: string;
   platform: string;
@@ -130,10 +135,6 @@ export async function getSettings(): Promise<DesktopSettings> {
 
 export async function updateSettings(settings: DesktopSettings): Promise<void> {
   return invoke<void>("update_settings", { settings });
-}
-
-export async function openSettingsWindow(): Promise<void> {
-  return invoke<void>("open_settings_window");
 }
 
 export async function installGame(game: DesktopInstallGameInput): Promise<InstalledGame> {
@@ -220,6 +221,20 @@ export async function setGameExe(remoteGameId: number, gameExe: string): Promise
   return invoke<InstalledGame>("set_game_exe", { remoteGameId, gameExe });
 }
 
+export async function updateGameLaunchSettings(
+  remoteGameId: number,
+  gameExe: string | null,
+  protonPath: string | null,
+  options: GameLaunchOptions,
+): Promise<InstalledGame> {
+  return invoke<InstalledGame>("update_game_launch_settings", {
+    remoteGameId,
+    gameExe,
+    protonPath,
+    options,
+  });
+}
+
 export async function listGameExecutables(remoteGameId: number): Promise<string[]> {
   return invoke<string[]>("list_game_executables", { remoteGameId });
 }
@@ -227,9 +242,7 @@ export async function listGameExecutables(remoteGameId: number): Promise<string[
 export async function listenToInstallProgress(
   handler: (progress: InstallProgress) => void,
 ): Promise<UnlistenFn> {
-  return listen<InstallProgress>("install-progress", (event) => {
-    handler(event.payload);
-  });
+  return listen<InstallProgress>("install-progress", handler);
 }
 
 export function useDesktop() {
@@ -239,7 +252,6 @@ export function useDesktop() {
     ping,
     getSettings,
     updateSettings,
-    openSettingsWindow,
     installGame,
     listProtonVersions,
     validateInstallTarget,
@@ -251,6 +263,7 @@ export function useDesktop() {
 }
 
 export type {
+  GameLaunchOptions,
   DesktopInstallGameInput,
   DownloadPackageInput,
   DesktopSettings,

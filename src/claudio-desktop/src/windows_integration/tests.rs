@@ -14,6 +14,7 @@ fn unique_test_dir(name: &str) -> PathBuf {
 
 fn installed_game(remote_game_id: i32, install_path: &Path, exe_path: &Path) -> InstalledGame {
     InstalledGame {
+        launch_options: Default::default(),
         remote_game_id,
         title: format!("Test Game {remote_game_id}"),
         platform: "windows".to_string(),

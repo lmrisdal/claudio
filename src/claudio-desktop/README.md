@@ -1,72 +1,81 @@
 # claudio-desktop
 
-Tauri 2 desktop client for Claudio. Wraps the `claudio-web` SPA in a native
-window and adds the local capabilities the browser can't: installing games to
-disk, launching them, and proxying API traffic to the user's configured Claudio
-server.
+Headless Rust sidecar (`claudio-core`) for the Claudio desktop app. The Electron
+shell in `../claudio-electron` owns the windows, tray and API proxy; this crate
+does the local work the browser can't: installing games to disk, launching them
+and tracking running processes.
 
 ## Features
 
-- Native shell around `../claudio-web/dist` (single `main` window + on-demand
-  `settings` window).
-- `claudio://` URI scheme that forwards SPA requests to the configured
-  server and injects user-defined custom headers.
 - Game install pipeline: streamed download with optional speed limiting,
   `.zip` / `.7z` / `.tar.gz` extraction, native installer execution
   (`.exe` / `.msi`), progress events, cancellation, interactive-restart of
   silent installers.
+- Linux: Proton/umu prefixes, Steam shortcuts, host path mapping.
 - Windows install integration: Start Menu / Desktop shortcuts and an Uninstall
   registry entry pointing at the bundled `claudio-game-uninstaller.exe`.
 - Installed-games registry persisted as JSON, self-pruning when install paths
   disappear.
 - Game runtime: launch as child process, track PID, detect exit, list/stop
-  running games.
-- Tray icon + native macOS app menu, close-to-tray and hide-dock-icon toggles.
-- Auto-updates via `tauri-plugin-updater` against the GitHub releases
-  `latest.json`, signed with an embedded minisign key.
-- Windows release builds compile and bundle the `../claudio-uninstaller` crate
-  via `build.rs` + `tauri.windows.conf.json`.
+  running games. Games keep running when the core exits.
+
+## Protocol
+
+`claudio-core` reads one JSON object per line on stdin and writes one per line
+on stdout. Nothing else may write to stdout, so every spawned subprocess sets
+its stdio explicitly.
+
+```
+→ {"id":1,"method":"install_game","params":{"game":{...}}}
+← {"id":1,"result":{...}}          or {"id":1,"error":"message"}
+← {"event":"install-progress","payload":{...}}
+← {"id":"c1","request":"confirm","params":{...}}     the core asks the shell
+→ {"id":"c1","result":true}
+```
+
+Params use the camelCase names the web app sends. The core exits when stdin
+closes. Pass `--resource-dir <path>` so Windows registration can find
+`claudio-game-uninstaller.exe`.
 
 ## Layout
 
 ```
 src/
-  main.rs                    entry → claudio_desktop::run()
-  lib.rs                     Tauri builder, tray, menus, plugins, handlers
-  protocol.rs                claudio:// → server request forwarding
+  main.rs                    claudio-core entry: logging, runtime, rpc::serve
+  lib.rs                     module wiring
+  rpc/                       stdio protocol, dispatcher, confirm round trip
+  host.rs                    Host abstraction (emit, confirm, resource_dir)
+  logging.rs                 claudio.log with 10 MB rotation, mirrored to stderr
   settings.rs                DesktopSettings (JSON on disk)
   registry.rs                installed-games JSON registry
   models.rs                  RemoteGame / InstalledGame / progress DTOs
   version.rs                 display version (commit SHA or Cargo version)
   windows_integration.rs     Windows-only shortcuts / uninstall / process bits
-  commands/                  #[tauri::command] handlers
+  commands/                  command implementations called by the dispatcher
   services/                  game_install + game_runtime
   integration_test_api.rs    gated behind `integration-tests`
   test_support.rs            gated behind `test` / `integration-tests`
-capabilities/default.json    Tauri v2 permission manifest
-tauri.conf.json              main Tauri config
-tauri.windows.conf.json      Windows-only overrides
-build.rs                     builds claudio-uninstaller on Windows release
+tests/core_process.rs        runs the real binary over piped stdio
 ```
 
 ## Building
 
 ```bash
-# cross-build from macOS/Linux to Windows
+cargo build --release -p claudio-desktop --bin claudio-core
+cargo test --workspace
+
+# cross-check or cross-build for Windows from Linux
 ./scripts/check-windows-xwin.sh
 ./scripts/build-windows-xwin.sh
-
-# or directly
-cargo tauri dev
-cargo tauri build
 ```
 
-Cargo features: `devtools`, `integration-tests`.
+Cargo features: `integration-tests`.
 
 ## Runtime data
 
 - **Settings** — JSON in the platform app-data dir (`serverUrl`, `logLevel`,
-  window geometry, `defaultInstallPath`, `closeToTray`, `hideDockIcon`,
-  `customHeaders`, `downloadSpeedLimitKbs`).
+  `defaultInstallPath`, `closeToTray`, `customHeaders`,
+  `downloadSpeedLimitKbs`).
 - **Installed games** — JSON registry alongside settings.
-- **Logs** — `tauri-plugin-log`, 10 MB rotation, one file kept.
+- **Logs** — `claudio.log` next to the settings, 10 MB rotation, one old file
+  kept. The Electron shell and renderer log through the core's `log` method.

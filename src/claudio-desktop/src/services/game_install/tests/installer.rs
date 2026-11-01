@@ -1,3 +1,4 @@
+use super::super::installer_detect::{InstallerType, detect_installer_type};
 use super::*;
 use crate::services::game_install::installer_run::RunInstallerError;
 
@@ -17,7 +18,6 @@ fn detect_installer_and_windows_executable_find_sorted_matches() {
     let _ = fs::remove_dir_all(root);
 }
 
-#[cfg(target_os = "windows")]
 fn write_installer_fixture(name: &str, contents: &[u8]) -> PathBuf {
     let root = unique_test_dir(name);
     fs::create_dir_all(&root).expect("root should be created");
@@ -70,7 +70,6 @@ fn installer_launch_kind_detects_common_extensions() {
     }
 }
 
-#[cfg(target_os = "windows")]
 #[test]
 fn detect_installer_type_identifies_gog_inno_setup_from_ascii_marker() {
     let installer = write_installer_fixture(
@@ -86,7 +85,6 @@ fn detect_installer_type_identifies_gog_inno_setup_from_ascii_marker() {
     let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
 }
 
-#[cfg(target_os = "windows")]
 #[test]
 fn detect_installer_type_identifies_gog_inno_setup_from_utf16_marker() {
     let installer = write_installer_fixture(
@@ -102,7 +100,6 @@ fn detect_installer_type_identifies_gog_inno_setup_from_utf16_marker() {
     let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
 }
 
-#[cfg(target_os = "windows")]
 #[test]
 fn detect_installer_type_falls_back_to_plain_inno_without_gog_marker() {
     let installer =
@@ -113,7 +110,6 @@ fn detect_installer_type_falls_back_to_plain_inno_without_gog_marker() {
     let _ = fs::remove_dir_all(installer.parent().expect("fixture dir should exist"));
 }
 
-#[cfg(target_os = "windows")]
 #[test]
 fn detect_installer_type_requires_inno_marker_for_gog_classification() {
     let installer = write_installer_fixture(
@@ -193,4 +189,45 @@ fn stream_requests_elevation_detects_ascii_and_utf16_markers() {
 
     assert!(stream_requests_elevation(&mut ascii).expect("ascii marker should be read"));
     assert!(stream_requests_elevation(&mut utf16).expect("utf16 marker should be read"));
+}
+
+#[test]
+fn detect_installer_prefers_top_level_setup_over_nested_dependencies()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = unique_test_dir("installer-depth");
+    fs::create_dir_all(root.join("dependencies"))?;
+    fs::write(root.join("setup.exe"), b"setup")?;
+    fs::write(root.join("dependencies/setup.exe"), b"dependency")?;
+    assert_eq!(detect_installer(&root), Some(root.join("setup.exe")));
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn detect_installer_finds_named_setups_without_selecting_uninstallers()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = unique_test_dir("installer-names");
+    fs::create_dir_all(&root)?;
+    fs::write(root.join("a-uninstall.exe"), b"uninstaller")?;
+    fs::write(root.join("game.exe"), b"game")?;
+    fs::write(root.join("Game_Setup_64.EXE"), b"installer")?;
+    assert_eq!(
+        detect_installer(&root),
+        Some(root.join("Game_Setup_64.EXE"))
+    );
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn resolve_installer_path_ignores_directory_hint() -> Result<(), Box<dyn std::error::Error>> {
+    let root = unique_test_dir("installer-directory-hint");
+    fs::create_dir_all(root.join("folder.exe"))?;
+    fs::write(root.join("setup.msi"), b"installer")?;
+    assert_eq!(
+        resolve_installer_path(&root, Some("folder.exe")),
+        Ok(root.join("setup.msi"))
+    );
+    fs::remove_dir_all(root)?;
+    Ok(())
 }

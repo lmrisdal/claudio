@@ -1,14 +1,15 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { useQuery } from "@tanstack/react-query";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../core/api/client";
 import { useInputScope } from "../../core/hooks/use-input-scope";
 import { isLinux, isWindows } from "../../core/utils/os";
+import { selectPath } from "../../desktop/hooks/desktop-dialog";
 import { listProtonVersions, resolveInstallBrowseRoot } from "../../desktop/hooks/use-desktop";
 import ExeListbox from "./exe-listbox";
+import InstallLinuxOptions from "./install-linux-options";
+import InstallWindowsOptions from "./install-windows-options";
 
-/** Must match `INDIVIDUAL_FILE_THRESHOLD` in `game_install/download.rs`. */
 export const INDIVIDUAL_FILE_DOWNLOAD_THRESHOLD = 100;
 
 interface InstallerInspection {
@@ -198,19 +199,17 @@ export default function InstallDialog({
       const browseRoot = currentPath
         ? ((await resolveInstallBrowseRoot(currentPath).catch(() => null)) ?? fallbackBrowseRoot)
         : undefined;
-      const selected = await openDialog({
+      const selected = await selectPath({
         directory: true,
-        multiple: false,
         title: "Select Install Location",
         defaultPath: browseRoot,
       });
 
       if (selected !== null) {
-        const selectedPath = Array.isArray(selected) ? selected[0] : selected;
         setInstallPath(
           currentPath && !downloadMode
-            ? resolveBrowsedInstallTarget(selectedPath, currentPath)
-            : selectedPath,
+            ? resolveBrowsedInstallTarget(selected, currentPath)
+            : selected,
         );
         onPathChange?.();
       }
@@ -315,52 +314,15 @@ export default function InstallDialog({
               )}
 
               {!downloadMode && isLinux && (
-                <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-raised/45 p-3">
-                  <div>
-                    <label
-                      htmlFor="install-proton-version"
-                      className="mb-1.5 block text-sm font-medium text-text-primary"
-                    >
-                      Proton version
-                    </label>
-                    <select
-                      id="install-proton-version"
-                      value={protonPath}
-                      onChange={(event) => setProtonPath(event.target.value)}
-                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-focus-ring"
-                    >
-                      {(protonOptions.length > 0
-                        ? protonOptions
-                        : [{ label: "UMU Latest", value: "UMU-Latest" }]
-                      ).map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
-                      <input
-                        type="checkbox"
-                        checked={desktopShortcut}
-                        onChange={(event) => setDesktopShortcut(event.target.checked)}
-                        className="h-4 w-4 rounded accent-accent"
-                      />
-                      Desktop
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-primary">
-                      <input
-                        type="checkbox"
-                        checked={appMenuShortcut}
-                        onChange={(event) => setAppMenuShortcut(event.target.checked)}
-                        className="h-4 w-4 rounded accent-accent"
-                      />
-                      App menu
-                    </label>
-                  </div>
-                </div>
+                <InstallLinuxOptions
+                  protonPath={protonPath}
+                  protonOptions={protonOptions}
+                  onProtonChange={setProtonPath}
+                  desktopShortcut={desktopShortcut}
+                  appMenuShortcut={appMenuShortcut}
+                  onDesktopShortcutChange={setDesktopShortcut}
+                  onAppMenuShortcutChange={setAppMenuShortcut}
+                />
               )}
 
               {!downloadMode && isPortable && isWindows && (
@@ -376,73 +338,15 @@ export default function InstallDialog({
               )}
 
               {downloadMode || isPortable || !isWindows ? null : (
-                <>
-                  <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
-                    <input
-                      type="checkbox"
-                      checked={runAsAdministrator}
-                      disabled={!canToggleRunAsAdministrator}
-                      onChange={(e) => handleRunAsAdministratorChange(e.target.checked)}
-                      className="sr-only"
-                    />
-                    <span
-                      aria-hidden="true"
-                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
-                        runAsAdministrator
-                          ? canToggleRunAsAdministrator
-                            ? "border-accent bg-accent text-accent-foreground"
-                            : "border-accent/80 bg-accent/80 text-accent-foreground opacity-85"
-                          : canToggleRunAsAdministrator
-                            ? "border-border bg-surface-raised text-transparent"
-                            : "border-border/70 bg-surface-raised/80 text-transparent opacity-70"
-                      }`}
-                    >
-                      <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
-                        <path
-                          d="M3.5 8.5 6.5 11.5 12.5 4.5"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
-                    <div>
-                      <span className="text-sm text-text-primary">
-                        Run installer as administrator
-                      </span>
-                      {requiresAdministrator && (
-                        <span className="ml-2 inline-flex rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-accent">
-                          Required
-                        </span>
-                      )}
-                      <p className="text-xs text-text-muted mt-0.5">
-                        {canToggleRunAsAdministrator
-                          ? installerInspection?.installerType === "msi"
-                            ? "MSI installers default to standard privileges unless you enable elevation."
-                            : "Request administrator privileges before starting the installer."
-                          : requiresAdministrator
-                            ? "This installer requires administrator privileges."
-                            : "Select a setup executable to inspect its administrator requirements."}
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none w-fit">
-                    <input
-                      type="checkbox"
-                      checked={forceInteractive}
-                      onChange={(e) => setForceInteractive(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded accent-accent cursor-pointer shrink-0"
-                    />
-                    <div>
-                      <span className="text-sm text-text-primary">Run installer interactively</span>
-                      <p className="text-xs text-text-muted mt-0.5">
-                        Show the installer&apos;s setup wizard instead of installing silently.
-                      </p>
-                    </div>
-                  </label>
-                </>
+                <InstallWindowsOptions
+                  runAsAdministrator={runAsAdministrator}
+                  canToggleRunAsAdministrator={canToggleRunAsAdministrator}
+                  requiresAdministrator={requiresAdministrator}
+                  isMsi={installerInspection?.installerType === "msi"}
+                  forceInteractive={forceInteractive}
+                  onRunAsAdministratorChange={handleRunAsAdministratorChange}
+                  onForceInteractiveChange={setForceInteractive}
+                />
               )}
             </div>
           </div>

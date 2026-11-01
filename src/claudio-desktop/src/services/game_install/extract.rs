@@ -33,20 +33,11 @@ where
         return extract_7z_blocking(source, destination, cancel_token).await;
     }
 
-    let mut command = if lower.ends_with(".zip") {
-        #[cfg(target_os = "macos")]
-        {
-            let mut c = tokio::process::Command::new("ditto");
-            c.arg("-x").arg("-k").arg(source).arg(destination);
-            c
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let mut c = tokio::process::Command::new("tar");
-            c.arg("-xf").arg(source).arg("-C").arg(destination);
-            c
-        }
-    } else if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") || lower.ends_with(".tar") {
+    let mut command = if lower.ends_with(".zip")
+        || lower.ends_with(".tar.gz")
+        || lower.ends_with(".tgz")
+        || lower.ends_with(".tar")
+    {
         let mut c = tokio::process::Command::new("tar");
         c.arg("-xf").arg(source).arg("-C").arg(destination);
         c
@@ -76,7 +67,10 @@ where
         return Ok(());
     };
 
-    command.stdout(Stdio::null()).stderr(Stdio::piped());
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
     let mut child = command
         .spawn()
         .map_err(|err| format!("Failed to start extractor: {err}"))?;

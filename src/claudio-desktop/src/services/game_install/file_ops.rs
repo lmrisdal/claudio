@@ -244,15 +244,16 @@ pub(crate) fn sanitize_segment(value: &str) -> String {
     let sanitized: String = value
         .chars()
         .map(|ch| match ch {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            ':' => ' ',
+            '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
             _ => ch,
         })
         .collect();
 
-    let trimmed = sanitized.trim();
+    let trimmed = sanitized.split_whitespace().collect::<Vec<_>>().join(" ");
     if trimmed.is_empty() {
         "game".to_string()
     } else {
-        trimmed.to_string()
+        trimmed
     }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShortcut } from "../../core/hooks/use-shortcut";
-import { isDesktop, openSettingsWindow } from "../../desktop/hooks/use-desktop";
+import { isDesktop } from "../../desktop/hooks/use-desktop";
 import { SettingsDialogContext, type SettingsTab } from "../hooks/use-settings-dialog";
 import SettingsDialog from "./settings-dialog";
 
@@ -17,19 +17,16 @@ export default function SettingsDialogProvider({ children }: { children: ReactNo
 
   useEffect(() => {
     const openSettings = () => openTab("interface");
-    const openDesktop = () => {
-      void openSettingsWindow();
-    };
 
     globalThis.addEventListener("claudio:open-account", openSettings);
     if (isDesktop) {
-      globalThis.addEventListener("claudio:open-desktop-settings", openDesktop);
+      globalThis.addEventListener("claudio:open-desktop-settings", openSettings);
     }
 
     return () => {
       globalThis.removeEventListener("claudio:open-account", openSettings);
       if (isDesktop) {
-        globalThis.removeEventListener("claudio:open-desktop-settings", openDesktop);
+        globalThis.removeEventListener("claudio:open-desktop-settings", openSettings);
       }
     };
   }, [openTab]);
@@ -38,7 +35,7 @@ export default function SettingsDialogProvider({ children }: { children: ReactNo
     "mod+,",
     (event) => {
       event.preventDefault();
-      void openSettingsWindow();
+      open();
     },
     { enabled: isDesktop },
   );

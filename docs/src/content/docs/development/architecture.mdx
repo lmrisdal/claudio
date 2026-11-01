@@ -13,7 +13,11 @@ ASP.NET minimal API. Serves the SPA as static files and provides REST endpoints.
 
 ### `src/claudio-desktop`
 
-Tauri desktop client.
+Headless Rust sidecar (`claudio-core`) for the desktop app. It owns downloads, extraction, installers, the installed-games registry, game launching and Proton/umu. It speaks one JSON object per line over stdin/stdout and has no UI dependencies.
+
+### `src/claudio-electron`
+
+Electron shell for the desktop app. It serves the SPA from `claudio-app://`, proxies API traffic from `claudio://api` to the configured server, manages windows, the tray and the quit/close behaviour, and talks to `claudio-core`. The renderer is sandboxed and only sees the `window.claudioDesktop` bridge exposed by the preload script.
 
 ### `src/claudio-web/`
 

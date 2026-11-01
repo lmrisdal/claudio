@@ -16,7 +16,7 @@
     {
       "label": "build web",
       "type": "process",
-      "command": "vp",
+      "command": "${workspaceFolder}/src/claudio-web/node_modules/.bin/vp",
       "args": [
         "build"
       ],
@@ -58,10 +58,53 @@
       "problemMatcher": "$msCompile"
     },
     {
-      "label": "tauri dev",
-      "type": "npm",
-      "script": "tauri:dev",
-      "path": "src/claudio-web/",
+      "label": "build core",
+      "type": "process",
+      "command": "cargo",
+      "args": ["build", "-p", "claudio-desktop", "--bin", "claudio-core"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$rustc"
+    },
+    {
+      "label": "build desktop web",
+      "type": "process",
+      "command": "${workspaceFolder}/src/claudio-web/node_modules/.bin/vp",
+      "args": ["build"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/claudio-web",
+        "env": {
+          "CLAUDIO_DESKTOP_BUILD": "1"
+        }
+      }
+    },
+    {
+      "label": "build electron",
+      "type": "process",
+      "command": "${workspaceFolder}/src/claudio-electron/node_modules/.bin/vp",
+      "args": ["pack"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/claudio-electron"
+      }
+    },
+    {
+      "label": "build desktop",
+      "dependsOn": [
+        "build core",
+        "build desktop web",
+        "build electron"
+      ],
+      "dependsOrder": "parallel"
+    },
+    {
+      "label": "electron dev",
+      "type": "shell",
+      "command": "./node_modules/.bin/electron .",
+      "dependsOn": ["build desktop"],
+      "options": {
+        "cwd": "${workspaceFolder}/src/claudio-electron"
+      },
       "isBackground": true,
       "problemMatcher": [],
       "presentation": {
@@ -71,10 +114,10 @@
       }
     },
     {
-      "label": "API + Tauri",
+      "label": "API + Electron",
       "dependsOn": [
         "watch",
-        "tauri dev"
+        "electron dev"
       ],
       "dependsOrder": "parallel"
     }

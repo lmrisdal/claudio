@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) fn emit_progress(
-    app: &AppHandle,
+    app: &Host,
     game_id: i32,
     status: &str,
     percent: Option<f64>,
@@ -22,7 +22,7 @@ pub(super) fn emit_progress(
 }
 
 pub(super) fn emit_progress_indeterminate(
-    app: &AppHandle,
+    app: &Host,
     game_id: i32,
     status: &str,
     percent: Option<f64>,
@@ -43,10 +43,10 @@ pub(super) fn emit_progress_indeterminate(
     );
 }
 
-pub(super) fn emit_progress_with_bytes(app: &AppHandle, progress: InstallProgress) {
+pub(super) fn emit_progress_with_bytes(app: &Host, progress: InstallProgress) {
     emit_progress_with_bytes_to(
         &mut |progress| {
-            let _ = app.emit("install-progress", progress);
+            app.emit("install-progress", progress);
         },
         progress,
     );

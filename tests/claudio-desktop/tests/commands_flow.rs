@@ -64,7 +64,7 @@ async fn command_registry_flow_lists_gets_updates_uninstalls_and_resolves_instal
         let resolved = command_resolve_install_path(" Halo: Reach / GOTY?* ");
         assert_eq!(
             resolved,
-            install_root.join("Halo_ Reach _ GOTY__").to_string_lossy()
+            install_root.join("Halo Reach _ GOTY__").to_string_lossy()
         );
 
         let resolved_download = command_resolve_download_path(" Halo: Reach / GOTY?* ");
@@ -73,7 +73,7 @@ async fn command_registry_flow_lists_gets_updates_uninstalls_and_resolves_instal
             workspace
                 .data_dir
                 .join("downloads")
-                .join("Halo_ Reach _ GOTY__")
+                .join("Halo Reach _ GOTY__")
                 .to_string_lossy()
         );
 

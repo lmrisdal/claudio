@@ -11,9 +11,12 @@ const DEFAULT_PREFERENCES: AppPreferences = {
 };
 
 function normalizePreferences(preferences?: AppPreferences | null): AppPreferences {
+  const platformOrder = preferences?.library?.platformOrder;
   return {
     library: {
-      platformOrder: preferences?.library.platformOrder ?? [],
+      platformOrder: Array.isArray(platformOrder)
+        ? platformOrder.filter((platform): platform is string => typeof platform === "string")
+        : [],
     },
   };
 }
