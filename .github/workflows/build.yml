@@ -2,6 +2,19 @@ name: Build Artifacts
 
 on:
   workflow_dispatch:
+    inputs:
+      skip-tests:
+        description: Skip the API and desktop test jobs
+        type: boolean
+        default: false
+      skip-web-image:
+        description: Skip building and pushing the web Docker image
+        type: boolean
+        default: false
+      skip-desktop:
+        description: Skip building the desktop app and updating the dev release
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -57,8 +70,13 @@ jobs:
               - "Cargo.lock"
 
   web-image:
-    needs: web-tests
-    if: needs.web-tests.result == 'success'
+    needs: [detect-changes, web-tests]
+    if: >-
+      ${{ always() && !cancelled()
+      && needs.detect-changes.result == 'success'
+      && needs.web-tests.result != 'failure'
+      && inputs.skip-web-image != true
+      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -133,7 +151,9 @@ jobs:
 
   web-tests:
     needs: detect-changes
-    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true'
+    if: >-
+      ${{ inputs.skip-tests != true
+      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -154,7 +174,9 @@ jobs:
 
   desktop-tests:
     needs: detect-changes
-    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-tests == 'true'
+    if: >-
+      ${{ inputs.skip-tests != true
+      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-tests == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -209,7 +231,12 @@ jobs:
 
   dev-release:
     needs: [detect-changes, desktop-tests]
-    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true'
+    if: >-
+      ${{ always() && !cancelled()
+      && needs.detect-changes.result == 'success'
+      && needs.desktop-tests.result != 'failure'
+      && inputs.skip-desktop != true
+      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -240,7 +267,13 @@ jobs:
 
   desktop:
     needs: [detect-changes, desktop-tests, dev-release]
-    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true'
+    if: >-
+      ${{ always() && !cancelled()
+      && needs.detect-changes.result == 'success'
+      && needs.desktop-tests.result != 'failure'
+      && needs.dev-release.result == 'success'
+      && inputs.skip-desktop != true
+      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
     permissions:
       contents: write
     env:
