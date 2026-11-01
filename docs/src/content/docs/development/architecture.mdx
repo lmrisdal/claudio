@@ -11,9 +11,9 @@ Claudio is a monorepo with two .NET projects and a React frontend.
 
 ASP.NET minimal API. Serves the SPA as static files and provides REST endpoints. Uses minimal APIs with route groups (no controllers).
 
-### `src/claudio-desktop`
+### `src/claudio-core`
 
-Headless Rust sidecar (`claudio-core`) for the desktop app. It owns downloads, extraction, installers, the installed-games registry, game launching and Proton/umu. It speaks one JSON object per line over stdin/stdout and has no UI dependencies.
+Headless Rust sidecar for the desktop app. It owns downloads, extraction, installers, the installed-games registry, game launching and Proton/umu. It speaks one JSON object per line over stdin/stdout and has no UI dependencies.
 
 ### `src/claudio-electron`
 

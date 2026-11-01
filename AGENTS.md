@@ -24,7 +24,7 @@ vp lint .                                 # ESLint
 ### Desktop (Electron + Rust sidecar)
 
 ```bash
-cargo build -p claudio-desktop --bin claudio-core   # headless sidecar used by the shell
+cargo build -p claudio-core --bin claudio-core   # headless sidecar used by the shell
 cd src/claudio-electron
 vp install
 vp run dev                                         # bundles the shell and starts Electron
@@ -46,11 +46,11 @@ docker compose -f docker/docker-compose.yml up --build
 Monorepo with a Rust API, an Electron desktop client backed by a Rust sidecar, and a React frontend:
 
 - **`src/claudio-api`** — Axum-based Rust API. Serves the SPA as static files and provides REST endpoints.
-- **`src/claudio-desktop`** — Headless Rust sidecar (`claudio-core`) for the desktop app: installs, game launching, Proton/umu. JSON lines over stdio, no UI dependencies.
+- **`src/claudio-core`** — Headless Rust sidecar for the desktop app: installs, game launching, Proton/umu. JSON lines over stdio, no UI dependencies.
 - **`src/claudio-electron`** — Electron shell: windows, tray, `claudio-app://` and `claudio://api` protocols, auto-updates, packaging with electron-builder.
 - **`src/claudio-web/`** — React 19 SPA built with Vite. Output goes to `src/claudio-api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
 - **`tests/claudio-api-rs/`** — Rust integration test crate for API behavior.
-- **`tests/claudio-desktop/`** — Rust integration tests for the sidecar.
+- **`tests/claudio-core/`** — Rust integration tests for the sidecar.
 
 ### Backend structure
 

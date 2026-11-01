@@ -148,7 +148,7 @@ for (const [name, files, expected] of [
   ['API source', ['src/claudio-api/Program.cs'], { web: true, desktop: false }],
   ['web source', ['src/claudio-web/src/App.tsx'], { web: true, desktop: true }],
   ['Electron source', ['src/claudio-electron/src/main.ts'], { web: false, desktop: true }],
-  ['sidecar source', ['src/claudio-desktop/src/main.rs'], { web: false, desktop: true }],
+  ['sidecar source', ['src/claudio-core/src/main.rs'], { web: false, desktop: true }],
   ['uninstaller source', ['src/claudio-uninstaller/src/main.rs'], { web: false, desktop: true }],
   ['Docker config', ['docker/Dockerfile'], { web: true, desktop: false }],
   ['Rust dependencies', ['Cargo.lock'], { web: false, desktop: true }],

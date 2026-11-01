@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "src/claudio-api/**"
-      - "src/claudio-desktop/**"
+      - "src/claudio-core/**"
       - "src/claudio-electron/**"
       - "src/claudio-uninstaller/**"
       - "src/claudio-web/**"

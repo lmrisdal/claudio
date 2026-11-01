@@ -61,7 +61,7 @@
       "label": "build core",
       "type": "process",
       "command": "cargo",
-      "args": ["build", "-p", "claudio-desktop", "--bin", "claudio-core"],
+      "args": ["build", "-p", "claudio-core", "--bin", "claudio-core"],
       "options": {
         "cwd": "${workspaceFolder}"
       },

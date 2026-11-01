@@ -126,7 +126,7 @@ The Vite dev server runs on port 5173 and proxies API requests to the backend on
 
 ### Desktop app
 
-The desktop app is an Electron shell (`src/claudio-electron`) around the `claudio-web` SPA, plus a headless Rust sidecar (`src/claudio-desktop`, binary `claudio-core`) that handles installs, game launching and Proton/umu.
+The desktop app is an Electron shell (`src/claudio-electron`) around the `claudio-web` SPA, plus a headless Rust sidecar (`src/claudio-core`) that handles installs, game launching and Proton/umu.
 
 ```bash
 cd src/claudio-electron
@@ -134,7 +134,7 @@ vp install
 vp run package        # builds the AppImage (Linux) or installer (Windows) into release/
 ```
 
-Build `claudio-core` (`cargo build --release -p claudio-desktop --bin claudio-core`) and the SPA (`CLAUDIO_DESKTOP_BUILD=1 vp build` in `src/claudio-web`) first, because the package bundles both. To run without packaging, use `vp run dev` from `src/claudio-electron`; it picks up `target/debug/claudio-core` and `src/claudio-web/dist`.
+Build `claudio-core` (`cargo build --release -p claudio-core --bin claudio-core`) and the SPA (`CLAUDIO_DESKTOP_BUILD=1 vp build` in `src/claudio-web`) first, because the package bundles both. To run without packaging, use `vp run dev` from `src/claudio-electron`; it picks up `target/debug/claudio-core` and `src/claudio-web/dist`.
 
 AppImage notes (electron-builder 26): the legacy AppImage runtime needs `libfuse2`, or run it with `--appimage-extract-and-run`. The generated launcher adds `--no-sandbox` for desktop-entry launches, which keeps the app working on Ubuntu 24.04 where AppArmor restricts unprivileged user namespaces.
 
@@ -163,7 +163,7 @@ Use a single Makefile helper to bump desktop version, commit, and tag in one ste
 make bump 0.1.1
 ```
 
-This updates `src/claudio-electron/package.json`, `src/claudio-desktop/Cargo.toml`, and `src/claudio-web/package.json` to the same version before committing and tagging.
+This updates `src/claudio-electron/package.json`, `src/claudio-core/Cargo.toml`, and `src/claudio-web/package.json` to the same version before committing and tagging.
 
 ## Tech Stack
 

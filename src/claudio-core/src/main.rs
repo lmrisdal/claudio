@@ -1,6 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
-use claudio_desktop::{logging, rpc, settings};
+use claudio_core::{logging, rpc, settings};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::io::BufReader;

@@ -1,13 +1,13 @@
-use claudio_desktop::integration_test_api::{
+use claudio_core::integration_test_api::{
     DesktopSettings, RunningGameInfo, command_get_installed_game, command_launch_game,
     command_list_game_executables, command_list_installed_games, command_list_running_games,
     command_resolve_download_path, command_resolve_install_path, command_set_game_exe,
     command_stop_game, command_uninstall_game, new_running_games_state,
     record_running_game_for_test, save_settings, upsert_installed_game, with_test_data_dir_async,
 };
-use claudio_desktop_tests::support::fixtures::installed_game;
-use claudio_desktop_tests::support::fs::TestWorkspace;
-use claudio_desktop_tests::support::process::spawn_long_running_process;
+use claudio_core_tests::support::fixtures::installed_game;
+use claudio_core_tests::support::fs::TestWorkspace;
+use claudio_core_tests::support::process::spawn_long_running_process;
 use serial_test::serial;
 use std::fs;
 use std::thread;

@@ -108,7 +108,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "claudio-desktop"
+name = "claudio-core"
 version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
@@ -130,11 +130,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "claudio-desktop-tests"
+name = "claudio-core-tests"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "claudio-desktop",
+ "claudio-core",
  "flate2",
  "serde_json",
  "serial_test",

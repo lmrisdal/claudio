@@ -1,4 +1,4 @@
-use claudio_desktop::integration_test_api::{
+use claudio_core::integration_test_api::{
     DesktopSettings, DownloadPackageInput, InstallType, InstalledGame, RemoteGame,
 };
 

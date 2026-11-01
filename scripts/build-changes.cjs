@@ -5,7 +5,7 @@ const webPaths = [
   'src/claudio-api/', 'src/claudio-web/', 'tests/', 'docker/',
 ];
 const desktopPaths = [
-  'src/claudio-desktop/', 'src/claudio-electron/', 'src/claudio-uninstaller/', 'src/claudio-web/',
+  'src/claudio-core/', 'src/claudio-electron/', 'src/claudio-uninstaller/', 'src/claudio-web/',
 ];
 const webFiles = new Set(['Directory.Build.props', 'Directory.Packages.props', 'Claudio.slnx']);
 const desktopFiles = new Set(['Cargo.toml', 'Cargo.lock']);

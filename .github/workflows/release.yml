@@ -246,7 +246,7 @@ jobs:
 
       - name: Build claudio-core
         shell: bash
-        run: cargo build --release -p claudio-desktop --bin claudio-core
+        run: cargo build --release -p claudio-core --bin claudio-core
 
       - name: Build web app for desktop
         working-directory: src/claudio-web

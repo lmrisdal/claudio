@@ -44,5 +44,5 @@ fi
 rustup run "$TOOLCHAIN" cargo xwin build --release --target "$TARGET" --manifest-path "$UNINSTALLER_DIR/Cargo.toml"
 mkdir -p "$UNINSTALLER_BUNDLE_DIR"
 cp "$UNINSTALLER_TARGET_DIR/claudio-game-uninstaller.exe" "$UNINSTALLER_BUNDLE_DIR/claudio-game-uninstaller.exe"
-rustup run "$TOOLCHAIN" cargo xwin build --release --target "$TARGET" --manifest-path "$ROOT_DIR/src/claudio-desktop/Cargo.toml" --bin claudio-core
+rustup run "$TOOLCHAIN" cargo xwin build --release --target "$TARGET" --manifest-path "$ROOT_DIR/src/claudio-core/Cargo.toml" --bin claudio-core
 cp "$ROOT_DIR/target/$TARGET/release/claudio-core.exe" "$UNINSTALLER_BUNDLE_DIR/claudio-core.exe"

@@ -5,7 +5,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const electronPackageJsonPath = path.join(root, "src/claudio-electron/package.json");
-const cargoTomlPath = path.join(root, "src/claudio-desktop/Cargo.toml");
+const cargoTomlPath = path.join(root, "src/claudio-core/Cargo.toml");
 const frontendPackageJsonPath = path.join(root, "src/claudio-web/package.json");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 

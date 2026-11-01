@@ -1,12 +1,12 @@
 #![cfg(target_os = "windows")]
 
-use claudio_desktop::integration_test_api::{
+use claudio_core::integration_test_api::{
     deregister_windows_game, register_windows_game_from_resource_dir,
     windows_desktop_shortcut_path, windows_registry_key_name, windows_start_menu_shortcut_path,
     windows_uninstall_root, with_test_windows_shell_dirs,
 };
-use claudio_desktop_tests::support::fixtures::installed_game;
-use claudio_desktop_tests::support::fs::TestWorkspace;
+use claudio_core_tests::support::fixtures::installed_game;
+use claudio_core_tests::support::fs::TestWorkspace;
 use serde_json::Value;
 use serial_test::serial;
 use std::fs;

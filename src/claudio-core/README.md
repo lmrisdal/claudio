@@ -1,6 +1,6 @@
-# claudio-desktop
+# claudio-core
 
-Headless Rust sidecar (`claudio-core`) for the Claudio desktop app. The Electron
+Headless Rust sidecar for the Claudio desktop app. The Electron
 shell in `../claudio-electron` owns the windows, tray and API proxy; this crate
 does the local work the browser can't: installing games to disk, launching them
 and tracking running processes.
@@ -61,7 +61,7 @@ tests/core_process.rs        runs the real binary over piped stdio
 ## Building
 
 ```bash
-cargo build --release -p claudio-desktop --bin claudio-core
+cargo build --release -p claudio-core --bin claudio-core
 cargo test --workspace
 
 # cross-check or cross-build for Windows from Linux

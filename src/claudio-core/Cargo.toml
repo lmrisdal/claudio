@@ -1,5 +1,5 @@
 [package]
-name = "claudio-desktop"
+name = "claudio-core"
 version = "0.2.0"
 edition = "2024"
 
@@ -8,7 +8,7 @@ name = "claudio-core"
 path = "src/main.rs"
 
 [lib]
-name = "claudio_desktop"
+name = "claudio_core"
 path = "src/lib.rs"
 
 [features]

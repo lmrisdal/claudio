@@ -1,13 +1,13 @@
 #![cfg(target_os = "windows")]
 
-use claudio_desktop::integration_test_api::{
+use claudio_core::integration_test_api::{
     TestInstallerLaunchKind, TestInstallerOutcome, cleanup_failed_installer_state,
     run_windows_innoextract_with_binary, simulate_windows_installer_session,
     terminate_windows_tracked_processes,
 };
-use claudio_desktop_tests::support::fs::TestWorkspace;
-use claudio_desktop_tests::support::process::spawn_long_running_process;
-use claudio_desktop_tests::support::windows::{
+use claudio_core_tests::support::fs::TestWorkspace;
+use claudio_core_tests::support::process::spawn_long_running_process;
+use claudio_core_tests::support::windows::{
     write_fake_exe_installer_fixture, write_fake_gog_inno_installer_fixture,
     write_fake_innoextract_script, write_fake_msi_installer_fixture,
 };
