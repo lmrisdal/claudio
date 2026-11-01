@@ -8,7 +8,10 @@ use zip::write::SimpleFileOptions;
 mod core;
 mod extract;
 mod installer;
+mod installer_arguments;
 mod launch_settings;
+#[cfg(target_os = "linux")]
+mod portable;
 
 fn unique_test_dir(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!(

@@ -1,3 +1,6 @@
+use super::installer_arguments::installer_arguments;
+use super::installer_detect::detect_installer_type;
+use super::prefix_paths::prefix_install_directory;
 use super::*;
 
 #[cfg(target_os = "linux")]
@@ -27,6 +30,7 @@ pub(super) async fn install_installer_linux(
     let installer_exe_hint = game.installer_exe.clone();
     let game_exe_hint = game.game_exe.clone();
     let prefix = target_dir.to_path_buf();
+    let install_directory = prefix_install_directory(&game.title);
     let proton_path =
         crate::services::linux_proton::selected_proton_path(game.proton_path.as_deref());
     let control_for_task = control.clone();
@@ -74,25 +78,22 @@ pub(super) async fn install_installer_linux(
             true,
         );
 
+        let args = installer_arguments(detect_installer_type(&installer), &install_directory, true);
+        log::info!(
+            "[installer {gid}] running {} with arguments {args:?}",
+            installer.display()
+        );
         crate::services::linux_umu::run_prefix_command_wait(
             &prefix,
             &proton_for_task,
             &installer,
-            &[],
+            &args,
             || control_for_task.is_cancelled(),
         )?;
         let search_root = prefix.join("pfx").join("drive_c");
 
         let _ = cleanup_directory(&staging_dir, "installer staging directory");
-        // Setup-based installers scatter the real game executable across the
-        // prefix in ways we can't reliably guess. Only honor an explicit hint;
-        // otherwise leave it unset so the user picks the executable the first
-        // time they click Play.
-        let exe = game_exe_hint
-            .as_ref()
-            .map(|entry| search_root.join(entry))
-            .filter(|path| path.exists())
-            .map(|path| path.to_string_lossy().into_owned());
+        let exe = resolve_game_exe_hint(&search_root, &install_directory, game_exe_hint.as_deref());
 
         Ok(exe)
     })
@@ -122,4 +123,17 @@ pub(super) async fn install_installer_linux(
         franchise: game.franchise.clone(),
         game_engine: game.game_engine.clone(),
     })
+}
+
+pub(super) fn resolve_game_exe_hint(
+    drive_c: &Path,
+    install_directory: &str,
+    hint: Option<&str>,
+) -> Option<String> {
+    let hint = hint?.replace('\\', "/");
+    let destination = install_directory.strip_prefix(r"C:\")?.replace('\\', "/");
+    [drive_c.join(&hint), drive_c.join(destination).join(&hint)]
+        .into_iter()
+        .find(|path| path.is_file())
+        .map(|path| path.to_string_lossy().into_owned())
 }

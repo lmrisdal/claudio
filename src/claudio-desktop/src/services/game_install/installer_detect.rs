@@ -6,7 +6,7 @@ pub(super) fn resolve_installer_path(
 ) -> Result<PathBuf, String> {
     if let Some(hint) = installer_hint {
         let hinted = root.join(hint);
-        if hinted.exists() {
+        if hinted.is_file() {
             return Ok(hinted);
         }
     }
@@ -26,15 +26,39 @@ pub(super) fn detect_installer(root: &Path) -> Option<PathBuf> {
             return false;
         }
 
-        let stem = path
-            .file_stem()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default();
-        stem.eq_ignore_ascii_case("setup") || stem.eq_ignore_ascii_case("install")
+        installer_name_rank(path).is_some()
     });
 
-    candidates.sort();
+    candidates.sort_by_key(|path| {
+        (
+            installer_name_rank(path),
+            path.strip_prefix(root).unwrap_or(path).components().count(),
+            path.to_string_lossy().to_ascii_lowercase(),
+            path.clone(),
+        )
+    });
     candidates.into_iter().next()
+}
+
+fn installer_name_rank(path: &Path) -> Option<u8> {
+    let stem = path.file_stem()?.to_str()?.to_ascii_lowercase();
+    if [
+        "setup",
+        "install",
+        "installer",
+        "setup64",
+        "install64",
+        "setup32",
+        "install32",
+    ]
+    .contains(&stem.as_str())
+    {
+        Some(0)
+    } else if !stem.contains("uninstall") && (stem.contains("setup") || stem.contains("install")) {
+        Some(1)
+    } else {
+        None
+    }
 }
 
 pub(super) fn detect_windows_executable(root: &Path) -> Option<PathBuf> {
@@ -50,7 +74,6 @@ pub(super) fn detect_windows_executable(root: &Path) -> Option<PathBuf> {
     candidates.into_iter().next()
 }
 
-#[cfg(target_os = "windows")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum InstallerType {
     Msi,
@@ -78,7 +101,6 @@ pub(super) struct InstallerAttemptConfig {
     pub(super) force_run_as_invoker: bool,
 }
 
-#[cfg(target_os = "windows")]
 pub(super) fn detect_installer_type(path: &Path) -> InstallerType {
     let ext = path
         .extension()
@@ -110,7 +132,6 @@ pub(super) fn detect_installer_type(path: &Path) -> InstallerType {
     InstallerType::Unknown
 }
 
-#[cfg(target_os = "windows")]
 fn contains_any_pattern(haystack: &[u8], patterns: &[&[u8]]) -> bool {
     patterns.iter().any(|pattern| {
         haystack

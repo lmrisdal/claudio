@@ -27,6 +27,7 @@ mod extract;
 mod extract_7z;
 mod file_ops;
 mod install;
+mod installer_arguments;
 mod installer_cleanup;
 mod installer_detect;
 #[cfg(target_os = "windows")]
@@ -42,6 +43,9 @@ mod installer_run;
 pub(crate) mod integration_testing;
 mod launch_settings;
 mod paths;
+mod portable_install;
+#[cfg(target_os = "linux")]
+mod prefix_paths;
 mod progress;
 mod request_headers;
 mod state;
@@ -80,10 +84,10 @@ use installer_cleanup::cleanup_failed_installer_state;
 use installer_cleanup::cleanup_partial_install_dir;
 #[cfg(test)]
 use installer_detect::detect_installer;
+#[cfg(all(test, target_os = "windows"))]
+use installer_detect::stream_requests_elevation;
 #[cfg(any(target_os = "windows", test, feature = "integration-tests"))]
 use installer_detect::{InstallerAttemptConfig, InstallerLaunchKind, installer_launch_kind};
-#[cfg(all(test, target_os = "windows"))]
-use installer_detect::{InstallerType, detect_installer_type, stream_requests_elevation};
 use installer_detect::{detect_windows_executable, resolve_installer_path};
 #[cfg(any(target_os = "windows", feature = "integration-tests"))]
 use installer_detect::{file_requests_elevation, installer_attempt_config};
@@ -101,6 +105,7 @@ use paths::{
     format_install_io_error_pair, install_download_root, installer_staging_dir, log_io_failure,
     log_io_failure_pair, resolve_install_browse_root_path, validate_install_target_path,
 };
+use portable_install::install_portable;
 use progress::{
     current_timestamp, emit_progress, emit_progress_indeterminate, emit_progress_with_bytes_to,
 };
