@@ -3,10 +3,6 @@ name: Build Artifacts
 on:
   workflow_dispatch:
     inputs:
-      run-tests:
-        description: Run tests
-        type: boolean
-        default: true
       build-web-image:
         description: Build and push docker image
         type: boolean
@@ -15,68 +11,58 @@ on:
         description: Build desktop app
         type: boolean
         default: true
-  push:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
     branches: [main]
-    paths:
-      - "src/claudio-api/**"
-      - "src/claudio-desktop/**"
-      - "src/claudio-electron/**"
-      - "src/claudio-uninstaller/**"
-      - "tests/**"
-      - "src/claudio-web/**"
-      - "docker/**"
-      - "Directory.Build.props"
-      - "Directory.Packages.props"
-      - "Cargo.toml"
-      - "Cargo.lock"
 
 jobs:
-  detect-changes:
+  verify-tests:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+      && !startsWith(github.event.workflow_run.head_commit.message, 'chore(release): bump version to ')
+      && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event)) }}
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     outputs:
-      web: ${{ steps.filter.outputs.web }}
-      desktop-tests: ${{ steps.filter.outputs.desktop-tests }}
-      desktop-build: ${{ steps.filter.outputs.desktop-build }}
+      sha: ${{ steps.verify.outputs.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Require successful CI for the build commit
+        id: verify
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
-
-      - uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          filters: |
-            web:
-              - "src/claudio-api/**"
-              - "tests/**"
-              - "src/claudio-web/**"
-              - "docker/**"
-              - "Directory.Build.props"
-              - "Directory.Packages.props"
-              - "Claudio.slnx"
-            desktop-tests:
-              - "src/claudio-desktop/**"
-              - "src/claudio-uninstaller/**"
-              - "tests/claudio-desktop/**"
-              - "src/claudio-web/**"
-              - "Cargo.toml"
-              - "Cargo.lock"
-            desktop-build:
-              - "src/claudio-desktop/**"
-              - "src/claudio-electron/**"
-              - "src/claudio-uninstaller/**"
-              - "src/claudio-web/**"
-              - "Cargo.toml"
-              - "Cargo.lock"
+          script: |
+            const sha = context.payload.workflow_run?.head_sha ?? context.sha;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              ...context.repo,
+              workflow_id: 'test.yml',
+              head_sha: sha,
+              per_page: 100,
+            });
+            const run = runs.find(run =>
+              run.head_sha === sha &&
+              run.head_repository?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              ['push', 'workflow_dispatch'].includes(run.event) &&
+              run.status === 'completed' &&
+              run.conclusion === 'success'
+            );
+            if (!run) {
+              core.setFailed(
+                `Build blocked: Tests has not passed for commit ${sha}. ` +
+                'Wait for CI or manually run test.yml on this exact commit, then rerun this build.'
+              );
+              return;
+            }
+            core.setOutput('sha', sha);
+            core.info(`Verified successful CI: ${run.html_url}`);
 
   web-image:
-    needs: [detect-changes, web-tests]
-    if: >-
-      ${{ always() && !cancelled()
-      && needs.detect-changes.result == 'success'
-      && needs.web-tests.result != 'failure'
-      && (github.event_name != 'workflow_dispatch' || inputs.build-web-image)
-      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
+    needs: verify-tests
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build-web-image }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -87,6 +73,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify-tests.outputs.sha }}
 
       - uses: docker/setup-qemu-action@v3
 
@@ -139,6 +127,8 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=dev
+          labels: |
+            org.opencontainers.image.revision=${{ needs.verify-tests.outputs.sha }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -149,94 +139,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  web-tests:
-    needs: detect-changes
-    if: >-
-      ${{ (github.event_name != 'workflow_dispatch' || inputs.run-tests)
-      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.web == 'true') }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - run: dotnet restore tests/claudio-api/Claudio.Api.Tests.csproj
-
-      - run: dotnet build tests/claudio-api/Claudio.Api.Tests.csproj --no-restore
-
-      - name: Run tests
-        run: dotnet run --project tests/claudio-api --no-build
-
-  desktop-tests:
-    needs: detect-changes
-    if: >-
-      ${{ (github.event_name != 'workflow_dispatch' || inputs.run-tests)
-      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-tests == 'true') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [ubuntu-24.04, windows-latest]
-    runs-on: ${{ matrix.platform }}
-    env:
-      CARGO_HTTP_MULTIPLEXING: "false"
-      CARGO_NET_RETRY: "10"
-      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: . -> target
-
-      - name: Build uninstaller (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          cargo_retry() {
-            for attempt in 1 2 3; do
-              "$@" && return 0
-              status=$?
-              echo "Cargo command failed with exit code $status (attempt $attempt/3)"
-              sleep $((attempt * 10))
-            done
-            return "$status"
-          }
-
-          cargo_retry cargo build --release -p claudio-uninstaller --target x86_64-pc-windows-msvc
-          mkdir -p target/release
-          cp target/x86_64-pc-windows-msvc/release/claudio-game-uninstaller.exe target/release/claudio-game-uninstaller.exe
-
-      - name: Run desktop Rust tests
-        shell: bash
-        run: |
-          cargo_retry() {
-            for attempt in 1 2 3; do
-              "$@" && return 0
-              status=$?
-              echo "Cargo command failed with exit code $status (attempt $attempt/3)"
-              sleep $((attempt * 10))
-            done
-            return "$status"
-          }
-
-          cargo_retry cargo test --workspace
-
   dev-release:
-    needs: [detect-changes, desktop-tests]
-    if: >-
-      ${{ always() && !cancelled()
-      && needs.detect-changes.result == 'success'
-      && needs.desktop-tests.result != 'failure'
-      && (github.event_name != 'workflow_dispatch' || inputs.build-desktop)
-      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
+    needs: verify-tests
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build-desktop }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -244,19 +149,20 @@ jobs:
       id: ${{ steps.release.outputs.id }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BUILD_SHA: ${{ needs.verify-tests.outputs.sha }}
 
     steps:
       - name: Ensure draft pre-release for the dev tag
         id: release
         run: |
-          body="Latest development build from ${GITHUB_REF_NAME}. Commit: ${GITHUB_SHA}"
+          body="Latest development build from ${GITHUB_REF_NAME}. Commit: ${BUILD_SHA}"
           id="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[] | select(.tag_name=="dev") | .id' | head -n1)"
           if [ -z "$id" ]; then
             id="$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name=dev \
               -f name="Claudio Dev Build" \
               -f body="$body" \
-              -f target_commitish="${GITHUB_SHA}" \
+              -f target_commitish="${BUILD_SHA}" \
               -F draft=true \
               -F prerelease=true \
               --jq .id)"
@@ -266,18 +172,12 @@ jobs:
           echo "id=${id}" >> "$GITHUB_OUTPUT"
 
   desktop:
-    needs: [detect-changes, desktop-tests, dev-release]
-    if: >-
-      ${{ always() && !cancelled()
-      && needs.detect-changes.result == 'success'
-      && needs.desktop-tests.result != 'failure'
-      && needs.dev-release.result == 'success'
-      && (github.event_name != 'workflow_dispatch' || inputs.build-desktop)
-      && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.desktop-build == 'true') }}
+    needs: [verify-tests, dev-release]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build-desktop }}
     permissions:
       contents: write
     env:
-      CLAUDIO_COMMIT_SHA: ${{ github.sha }}
+      CLAUDIO_COMMIT_SHA: ${{ needs.verify-tests.outputs.sha }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_ID: ${{ needs.dev-release.outputs.id }}
       CARGO_HTTP_MULTIPLEXING: "false"
@@ -297,6 +197,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verify-tests.outputs.sha }}
 
       - uses: voidzero-dev/setup-vp@v1
         with:
