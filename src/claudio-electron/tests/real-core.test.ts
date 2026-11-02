@@ -1,21 +1,11 @@
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import { CoreProcess } from "../src/main/core/core-process";
+import { coreAvailable, coreBinary as binary } from "./support/core-harness";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const binary = path.resolve(
-  here,
-  "..",
-  "..",
-  "..",
-  "target",
-  "debug",
-  process.platform === "win32" ? "claudio-core.exe" : "claudio-core",
-);
-
-describe.skipIf(!existsSync(binary))("against the real claudio-core binary", () => {
+describe.skipIf(!coreAvailable)("against the real claudio-core binary", () => {
   it("answers ping and reports domain errors as strings", async () => {
     const core = new CoreProcess({
       command: binary,

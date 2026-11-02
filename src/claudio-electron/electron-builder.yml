@@ -23,8 +23,8 @@ linux:
   category: Game
   executableName: claudio
   extraResources:
-    - from: ../../target/release/claudio-core
-      to: claudio-core
+    - from: sidecar
+      to: .
 win:
   target:
     - target: nsis
@@ -33,10 +33,8 @@ win:
       arch: x64
   icon: resources/icon.ico
   extraResources:
-    - from: ../../target/release/claudio-core.exe
-      to: claudio-core.exe
-    - from: ../../target/release/claudio-game-uninstaller.exe
-      to: claudio-game-uninstaller.exe
+    - from: sidecar
+      to: .
 nsis:
   oneClick: true
   perMachine: false

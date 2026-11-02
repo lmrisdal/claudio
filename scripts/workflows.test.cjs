@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const { readVersions, validateVersion } = require('./release-version.cjs');
 
-const versions = version => ({ electron: version, web: version, core: version });
+const versions = version => ({ electron: version, web: version, core: version, csharp: version });
 
 for (const version of ['0.3.0', '1.0.0-beta.1', '2.0.0-rc.0']) {
   test(`validates version and prerelease status: ${version}`, () => {
@@ -20,7 +20,7 @@ test('manual builds validate application versions without requiring a tag', () =
   assert.deepEqual(validateVersion(versions('0.3.0')), { version: '0.3.0', prerelease: false });
 });
 
-for (const component of ['web', 'core']) {
+for (const component of ['web', 'core', 'csharp']) {
   test(`rejects a mismatched ${component} version`, () => {
     assert.throws(() => validateVersion({ ...versions('0.3.0'), [component]: '0.2.0' }), /does not match/);
   });
@@ -41,12 +41,13 @@ for (const version of ['01.2.3', '1.2', '1.2.3-', '1.2.3-01', '1.2.3-beta.01', '
 test('reads the package version rather than a Cargo dependency version', () => {
   const root = mkdtempSync(join(tmpdir(), 'claudio-version-'));
   try {
-    for (const name of ['claudio-electron', 'claudio-web', 'claudio-core']) {
+    for (const name of ['claudio-electron', 'claudio-web', 'claudio-core', 'claudio-core-cs']) {
       mkdirSync(join(root, 'src', name), { recursive: true });
     }
     for (const name of ['claudio-electron', 'claudio-web']) {
       writeFileSync(join(root, 'src', name, 'package.json'), JSON.stringify({ version: '0.3.0' }));
     }
+    writeFileSync(join(root, 'src/claudio-core-cs/Claudio.Core.csproj'), '<Project><PropertyGroup><Version>0.3.0</Version></PropertyGroup></Project>');
     const cargo = join(root, 'src/claudio-core/Cargo.toml');
     writeFileSync(cargo, '[package]\nname = "claudio-core"\nversion = "0.3.0"\n\n[dependencies.example]\nversion = "9.0.0"\n');
     assert.deepEqual(readVersions(root), versions('0.3.0'));

@@ -6,6 +6,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const electronPackageJsonPath = path.join(root, "src/claudio-electron/package.json");
 const cargoTomlPath = path.join(root, "src/claudio-core/Cargo.toml");
+const csprojPath = path.join(root, "src/claudio-core-cs/Claudio.Core.csproj");
 const frontendPackageJsonPath = path.join(root, "src/claudio-web/package.json");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -55,6 +56,17 @@ function updateCargoToml(version) {
   return previous;
 }
 
+function updateCsproj(version) {
+  const contents = fs.readFileSync(csprojPath, "utf8");
+  const pattern = /<Version>([^<]+)<\/Version>/;
+  const match = contents.match(pattern);
+  if (!match) {
+    throw new Error("Could not find <Version> in Claudio.Core.csproj");
+  }
+  fs.writeFileSync(csprojPath, contents.replace(pattern, `<Version>${version}</Version>`), "utf8");
+  return match[1];
+}
+
 function updateFrontendPackageJson(version) {
   const packageJson = JSON.parse(fs.readFileSync(frontendPackageJsonPath, "utf8"));
   const previous = String(packageJson.version ?? "");
@@ -77,11 +89,13 @@ function main() {
 
   const oldElectron = updateElectronPackageJson(version);
   const oldCargo = updateCargoToml(version);
+  const oldCsproj = updateCsproj(version);
   const oldFrontend = updateFrontendPackageJson(version);
 
   console.log(`Updated desktop version to ${version}`);
   console.log(`- src/claudio-electron/package.json: ${oldElectron} -> ${version}`);
   console.log(`- Cargo.toml: ${oldCargo} -> ${version}`);
+  console.log(`- Claudio.Core.csproj: ${oldCsproj} -> ${version}`);
   console.log(`- src/claudio-web/package.json: ${oldFrontend} -> ${version}`);
 }
 

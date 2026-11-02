@@ -1,0 +1,16 @@
+{
+  "serverUrl": "http://ü.example",
+  "logLevel": "debug",
+  "windowWidth": 1.0,
+  "windowHeight": 2.0,
+  "windowX": 3.0,
+  "windowY": null,
+  "defaultInstallPath": null,
+  "defaultDownloadPath": null,
+  "defaultProtonPath": null,
+  "closeToTray": false,
+  "customHeaders": {
+    "X-A": "b"
+  },
+  "downloadSpeedLimitKbs": 512.5
+}

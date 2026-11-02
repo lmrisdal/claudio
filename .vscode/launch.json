@@ -59,6 +59,21 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
+      "name": "Electron Dev (C# core)",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "build desktop (C# core)",
+      "cwd": "${workspaceFolder}/src/claudio-electron",
+      "runtimeExecutable": "${workspaceFolder}/src/claudio-electron/node_modules/.bin/electron",
+      "runtimeArgs": ["."],
+      "env": {
+        "CLAUDIO_CORE_PATH": "${workspaceFolder}/artifacts/claudio-core-cs/debug/claudio-core"
+      },
+      "noDebug": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
       "name": "Electron Main (Debug)",
       "type": "node",
       "request": "launch",
@@ -75,6 +90,10 @@
     {
       "name": "API + Electron",
       "configurations": ["Claudio API (No Debug)", "Electron Dev"]
+    },
+    {
+      "name": "API + Electron (C# core)",
+      "configurations": ["Claudio API (No Debug)", "Electron Dev (C# core)"]
     }
   ]
 }

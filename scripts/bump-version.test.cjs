@@ -19,15 +19,16 @@ function fixture(t, { broken = false } = {}) {
     return result.stdout.trim();
   };
   const git = (...args) => success('git', args);
-  for (const directory of ['scripts', 'src/claudio-core/src', 'src/claudio-web', 'src/claudio-electron']) {
+  for (const directory of ['scripts', 'src/claudio-core/src', 'src/claudio-core-cs', 'src/claudio-web', 'src/claudio-electron']) {
     mkdirSync(join(cwd, directory), { recursive: true });
   }
   copyFileSync(join(__dirname, '../Makefile'), join(cwd, 'Makefile'));
   copyFileSync(join(__dirname, 'bump_version.cjs'), join(cwd, 'scripts/bump_version.cjs'));
-  writeFileSync(join(cwd, '.gitignore'), '/target/\n');
+  writeFileSync(join(cwd, '.gitignore'), '/target/\nartifacts/\nbin/\nobj/\n');
   writeFileSync(join(cwd, 'Cargo.toml'), '[workspace]\nmembers = ["src/claudio-core"]\nresolver = "3"\n');
   writeFileSync(join(cwd, 'src/claudio-core/Cargo.toml'), '[package]\nname = "claudio-core"\nversion = "0.2.1"\nedition = "2024"\n');
   writeFileSync(join(cwd, 'src/claudio-core/src/lib.rs'), broken ? 'invalid rust' : '');
+  writeFileSync(join(cwd, 'src/claudio-core-cs/Claudio.Core.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><Version>0.2.1</Version></PropertyGroup></Project>');
   for (const name of ['claudio-web', 'claudio-electron']) {
     writeFileSync(join(cwd, 'src', name, 'package.json'), JSON.stringify({ version: '0.2.1' }));
   }
@@ -48,6 +49,8 @@ test('make bump commits the refreshed lockfile and tags the release commit', t =
   success('make', ['bump', '0.2.2'], { input: 'n\n' });
   const lock = git('show', 'HEAD:Cargo.lock');
   assert.match(lock, /name = "claudio-core"\nversion = "0\.2\.2"/);
+  assert.match(readFileSync(join(cwd, 'src/claudio-core-cs/Claudio.Core.csproj'), 'utf8'), /<Version>0\.2\.2<\/Version>/);
+  assert.match(git('show', 'HEAD:src/claudio-core-cs/Claudio.Core.csproj'), /<Version>0\.2\.2<\/Version>/);
   assert.equal(git('status', '--porcelain'), '');
   assert.equal(git('rev-parse', 'v0.2.2^{commit}'), git('rev-parse', 'HEAD'));
   assert.equal(git('cat-file', '-t', 'v0.2.2'), 'tag');

@@ -2,7 +2,37 @@
 
 Build a C# version of the Rust desktop sidecar (`claudio-core`) and the Windows game uninstaller (`claudio-uninstaller`) on .NET 10, compiled with Native AOT. It lives next to the Rust code, so the two can be compared directly. **No Rust is deleted until the project owner has compared them and decided, in phase 8.** Electron, the SPA and the JSON-lines protocol stay as they are.
 
-**Status:** not started. Written 2026-11-01 against `main` at `35dd878`.
+**Status:** implemented side by side with Rust on `feature/csharp` (2026-11-02). Rust is untouched and still the default. Linux is verified end to end. Windows code compiles but has never run on Windows, and phase 0 Windows items, the phase 5 exit tests, the phase 6 real-game checks and the phase 8 beta and decision are open. See 'Implementation status' below.
+
+## Implementation status (2026-11-02)
+
+**Built and verified on Linux**
+
+- `src/claudio-core-cs`: all 29 protocol methods, Native AOT 8.2 MB. The shell contract suite (103 tests: contract, process, golden files, downloads with a fake HTTP server, portable and installer installs through a fake `umu-run`, executables, Steam VDF) passes against Rust, the C# JIT build and the C# Native AOT build. `scripts/compare-sidecars.mjs` reports 0 differences on 31 requests plus the data files.
+- `src/claudio-uninstaller-cs`: ported, 3.1 MB Native AOT on Linux, phase 1 and phase 2 smoke-tested by hand against a fixture.
+- `tests/claudio-core-cs`: 130 unit tests. Rust has 151 test attributes, of which about 20 are process or integration tests that the shell contract suite covers instead, and the Windows-only tests (`windows_integration/tests.rs`, `windows_*_flow.rs`) have not been ported.
+- Phase 7 tooling: `fetch-7zip.mjs`, `stage-sidecar.mjs` (a Rust stage contains exactly the files it did before, tested), `electron-builder.yml` reading from `sidecar/`, version bump and release checks for both projects, CI steps and the `sidecar` release input, `THIRD-PARTY-NOTICES.md`, VS Code task.
+
+**Written but never run on Windows**
+
+CsWin32 layer (`Windows/`): `CreateProcessW` with NUL handles, `ShellExecuteExW` elevation, process tracking, `SetThreadExecutionState` on a dedicated thread, `.lnk` creation, registry registration and deregistration, the uninstaller, innoextract, the installer retry flow and scene overrides. It compiles for `win-x64` as a JIT build. Native AOT for Windows needs the CI Windows runner. The Windows contract flows (`windows_installer_flow.rs`, `windows_registration_flow.rs`) have not been ported to tests.
+
+Two things in the Windows code that differ from Rust and need checking on Windows: the sidecar marks its own stdio handles non-inheritable at startup so launched children cannot keep the protocol pipe open (Rust does not), and `CLAUDIO_START_MENU_DIR` and `CLAUDIO_DESKTOP_DIR` are test overrides for the shortcut folders.
+
+**Linux checks run on 2026-11-02**
+
+- Packaged AppImage with the C# sidecar (`electron-builder --linux AppImage`): the sidecar, `7-zip/7zzs` (executable bit kept) and `THIRD-PARTY-NOTICES.md` are inside. `7zzs` extracts an archive when run from the mounted AppImage, the packaged core answers `ping`, and `scripts/smoke.mjs` passes against the AppImage.
+- OpenSSL hidden with `bwrap` (libssl.so.3 and libcrypto.so.3 replaced by `/dev/null`): Rust keeps working because it bundles its TLS. The C# core aborted the whole process with "No usable version of libssl was found". Fixed with a guard (`Install/Tls.cs`) that returns an error string for HTTPS URLs when no libssl can be loaded and keeps plain HTTP working. `core-openssl.test.ts` covers both. Static linking, tried in an Ubuntu 24.04 podman container (`dotnet-sdk-10.0`, `clang`, `zlib1g-dev`, `libssl-dev`, `cmake`, `make`): `-p:StaticOpenSslLinking=true` produces a 13.3 MB binary with no libssl or libcrypto dependency. With OpenSSL hidden it still fetched `https://github.com`, and the full shell suite passes against it. CI and release now publish the Linux sidecar that way (the guard compiles out via `STATIC_OPENSSL`); cost is +5 MB and OpenSSL fixes then arrive with Claudio releases, not the distro. It fails to link on this Arch host, which has no `libssl.a`.
+- Private CA behaviour: not tested, not needed by the project owner.
+
+**Not done**
+
+- Phase 0: items 1, 2 (Windows half), 3 (missing OpenSSL), 4, 5 (SteamOS, AppImage), 8, 9, 10, 11.
+- Phase 5 exit: real Inno Setup, NSIS, MSI and GOG installs with UAC.
+- Phase 6 exit: a real game through Proton.
+- Phase 8: beta through the auto-updater, the section 9 checklist, and the owner's decision. Nothing is deleted.
+- The LGPL text itself is linked from `THIRD-PARTY-NOTICES.md`, not bundled.
+- Audio muting is deliberately not ported.
 
 ## 1. Decisions
 
@@ -42,6 +72,19 @@ Results from throwaway tests. The Windows test code is on branch `feature/window
 - Password-protected archives with 7-Zip (they must fail, not hang).
 - Registry access under Native AOT.
 - Real game archives and installers.
+
+**Phase 0 results, Linux (2026-11-02, Arch host, system `7z` 26.05, .NET SDK 10.0.302):**
+
+| Item | Result |
+| --- | --- |
+| 2. `WinExe` + Native AOT on Linux | Publishes and runs (6.0 MB with `HttpClient`). JSON-line style stdin/stdout loop works. Windows half still open. |
+| 3. HTTPS under Native AOT | `https://github.com` returned 200 on a host with OpenSSL 3. Missing-OpenSSL hosts (SteamOS, minimal distros) and `StaticOpenSslLinking` still open. |
+| 5. `7zzs` 26.05 on Linux (Arch) | SHA-256 matches the plan. Statically linked. LZMA2, LZMA, PPMd, BCJ, BZip2, Deflate and Copy extract byte-identical. Corruption exits 2. Password-protected archives (with and without header encryption) exit 255 with stdin closed. Open: BCJ2, SteamOS, and running from a mounted AppImage. |
+| 6. Password-protected 7z, stdin closed | Exit 255 ("Break signaled"), no hang. |
+| 7. Traversal and symlinks | `../evil.txt` stored in an archive extracted inside the destination only. A stored absolute symlink was rewritten to a path inside the destination. Nothing written outside. |
+| Truncated 7z (half the file) | Exit 2, "Unexpected end of archive". |
+
+Still open: items 1, 4, 5 (SteamOS and AppImage only), 8, 9, 10, 11, and the Windows half of 2. The spike lives only in the scratchpad and is not committed.
 
 **Open question:** reading the test shortcuts through `WScript.Shell` returned an empty target and working directory, even though they launched correctly from the right folder. The cause is unknown. Phase 0 resolves it.
 
@@ -143,6 +186,46 @@ Write the safety net while Rust is still the only implementation.
 5. Add a fake HTTP server for download flows: 200, 206, 404 fallback, 429, 5xx, a dropped connection, and a mid-download cancel.
 
 **Exit:** the suite passes against the current Rust binary on both platforms in CI.
+
+### Phase 1 progress (2026-11-02, Linux, against `target/debug/claudio-core`)
+
+Done, all in `src/claudio-electron/tests/`:
+
+- `support/core-harness.ts`: spawns any sidecar named by `CLAUDIO_CORE_PATH` (default `target/debug`), with its own data directory.
+- `real-core.test.ts` now honours `CLAUDIO_CORE_PATH`.
+- `core-processes.test.ts`: three of the four Linux process tests (stdout purity, exit on stdin close with games alive, no shell expansion of saved arguments). The fourth, "no `Stdio::inherit`", scans Rust source and has no black-box form, so it stays in Rust. Windows variants are not written.
+- `core-contract.test.ts`: 37 cases for framing, ping/log, settings, installed games, missing-game errors, install control, paths, proton and server connection.
+- `core-golden.test.ts` with `fixtures/golden/settings.json`. Note Rust writes floats as `1.0` and pretty-prints with 2 spaces; C# must match byte-for-byte or the golden test needs relaxing.
+
+Not done: contract cases for the 11 methods that need a server or a real install (`install_game`, `retry_cached_install`, `download_game_package`, `update_game_launch_settings`, `launch_game` success on Windows, and so on), golden files for `installed-games.json`, the download marker, `uninstall-config.json` and `shortcuts.vdf`, the fake HTTP server, and Windows CI runs.
+
+### Phase 3 progress (2026-11-02)
+
+`src/claudio-core-cs/Claudio.Core.csproj` builds with warnings as errors, `dotnet format` is clean, and the Native AOT publish is 7.0 MB. Build output goes to `artifacts/claudio-core-cs/<debug|release>/`.
+
+Ported: entry and `--resource-dir` parsing, the protocol loop (single writer channel, concurrent requests, 500 ms shutdown grace, `confirm` with `c1`, `c2` ids), the dispatcher and param parsing, `ping`, `log`, settings (including byte-identical `settings.json`, with `1.0` floats), the installed games registry (atomic save with flush), file logging with rotation, `desktop_check_server_connection`, install path resolution and validation, `cleanup_failed_install`, `uninstall_game` (without Windows deregistration), `cancel_install`, `restart_install_interactive` and `has_active_operations` (no installs yet).
+
+Results against the Rust contract suite: JIT and Native AOT builds both pass all 43 tests, including the golden `settings.json` and the 3 Linux process tests.
+
+Also ported on Linux: `launch_game` (via `/bin/sh -c 'exec ...' </dev/null >/dev/null 2>&1`, same PID, exact launch argument parser), `stop_game` and `list_running_games`. Windows launch (CsWin32 `CreateProcessW`) and Proton launches (`winePrefix`) return a not-implemented error.
+
+Stubs, not yet ported: `open_install_folder`, `list_game_executables`, `add_steam_shortcut`, `set_game_exe`, `update_game_launch_settings`, `install_game`, `retry_cached_install`, `download_game_package`, and the Proton directory scan (only the two fixed entries). The Rust unit tests have not been ported yet.
+
+### Phase 4 progress (2026-11-02, Linux)
+
+Ported: package download (manifest, ticket fallback, 404 retry via ticket, `Content-Disposition` filename, 4 MiB writer behind a 32-chunk queue, speed limit re-read every second, cancel), individual-file download (2 concurrent, 5 attempts with `500ms * 2^(n-1)` backoff capped at 10 s, `Range` resume, 200-instead-of-206 rewrite, 429/5xx retry, 404 fatal), extraction (ZIP with per-entry CRC check and `enclosed_name` rules, tar and tar.gz through `System.Formats.Tar` with a progress and cancel stream, tar.gz drained to the end so a bad trailer fails, 7z through the bundled `7-zip/7zzs` or `7za.exe` with `-bsp1` progress, copy for non-archives), `FileOps` helpers and `download_game_package` including cancel cleanup. Own CRC-32 table instead of `System.IO.Hashing`, to avoid a new package until it is needed.
+
+`core-downloads.test.ts` (23 cases, fake HTTP server in `tests/support/fake-server.ts`) passes against Rust, C# JIT and C# Native AOT, except that the ZIP cases are skipped for Rust: it extracts ZIP through `tar -xf`, which is the broken path described in section 6. Total C# result: 66 of 66 contract tests on JIT and on Native AOT (publish is 7.2 MB), Rust 148 of 148.
+
+Not yet done: `install_game` and `retry_cached_install` (portable and installer flows, cached download marker, `.lnk`/registry/shortcut registration), which on Linux need the umu prefix work from phase 6; throttle-specific tests; real-game-size timing against Rust.
+
+### Phase 6 start: portable installs on Linux (2026-11-02)
+
+Ported ahead of schedule so `install_game` can be tested: `install_game` and `retry_cached_install` for portable games (cached download marker, progress ranges 60 / 60-95 / 96 / 100, registry upsert, cleanup), the Proton prefix runtime (`UmuCommand.PreparePrefix`, `RunWait`, `SpawnPrefixCommand`, managed umu 1.4.0 download and cache, binary search dirs, `LoggedChild` with a 40-line tail), Proton discovery and selection, `.desktop` desktop and app-menu shortcuts, and `launch_game` for Proton prefixes.
+
+`core-install.test.ts` (10 cases) runs against a fake `umu-run` seeded into the data directory's `tools/umu-launcher/1.4.0/`. It pins the registry field order, the marker shape, the progress events, the retry flow, the shortcut contents and the umu environment. It passes against Rust, C# JIT and C# Native AOT, with identical behaviour. Total: 76 of 76 on both C# builds, Rust 181 of 181.
+
+Still open on Linux: Windows-installer-on-Proton installs (`installer_install_linux`), Steam `shortcuts.vdf`, `add_steam_shortcut`, `list_game_executables`, `set_game_exe`, `update_game_launch_settings`, `open_install_folder`. All of Windows (phase 5) is open.
 
 ### Phase 2: set up the side-by-side comparison
 

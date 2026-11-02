@@ -35,6 +35,18 @@ vp check && vp test                                # lint, type-check and unit t
 ./scripts/build-windows-xwin.sh           # cross-build Windows claudio-core + uninstaller via cargo-xwin
 ```
 
+### C# sidecar (side by side with Rust, see CSHARP_MIGRATION_PLAN.md)
+
+```bash
+dotnet build src/claudio-core-cs                          # JIT build → artifacts/claudio-core-cs/debug/
+dotnet test --project tests/claudio-core-cs               # unit tests
+dotnet publish src/claudio-core-cs -c Release -r linux-x64 -o artifacts/claudio-core-cs/publish   # Native AOT
+node scripts/fetch-7zip.mjs linux artifacts/7-zip         # pinned, hash-verified 7-Zip
+node scripts/stage-sidecar.mjs <rust|csharp>              # copy the chosen sidecar for electron-builder
+node scripts/compare-sidecars.mjs                         # run both sidecars and print differences
+CLAUDIO_CORE_PATH=$PWD/artifacts/claudio-core-cs/debug/claudio-core vp test   # shell contract suite against C#
+```
+
 ### Docker
 
 ```bash

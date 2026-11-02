@@ -68,6 +68,31 @@
       "problemMatcher": "$rustc"
     },
     {
+      "label": "build core (C#)",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/claudio-core-cs/Claudio.Core.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "fetch 7-zip",
+      "type": "shell",
+      "command": "test -x artifacts/7-zip/7zzs || node scripts/fetch-7zip.mjs linux artifacts/7-zip",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "build core (C#) with 7-zip",
+      "dependsOn": ["fetch 7-zip", "build core (C#)"],
+      "dependsOrder": "sequence"
+    },
+    {
       "label": "build desktop web",
       "type": "process",
       "command": "${workspaceFolder}/src/claudio-web/node_modules/.bin/vp",
@@ -92,6 +117,15 @@
       "label": "build desktop",
       "dependsOn": [
         "build core",
+        "build desktop web",
+        "build electron"
+      ],
+      "dependsOrder": "parallel"
+    },
+    {
+      "label": "build desktop (C# core)",
+      "dependsOn": [
+        "build core (C#) with 7-zip",
         "build desktop web",
         "build electron"
       ],
