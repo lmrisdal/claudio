@@ -69,7 +69,20 @@ function serveZip(): void {
   writeFileSync(path.join(source, "Game", "game.exe"), "exe");
   writeFileSync(path.join(source, "Game", "readme.txt"), "hello");
   const archive = path.join(work, "pack.zip");
-  execFileSync("tar", ["-a", "-cf", archive, "-C", source, "Game"]);
+  const sevenZip = process.env.CLAUDIO_TEST_7Z;
+  if (sevenZip) {
+    execFileSync(sevenZip, ["a", "-tzip", archive, "Game"], { cwd: source, stdio: "ignore" });
+  } else {
+    execFileSync(
+      "powershell",
+      [
+        "-NoProfile",
+        "-Command",
+        `Compress-Archive -Path '${path.join(source, "Game")}' -DestinationPath '${archive}'`,
+      ],
+      { stdio: "ignore" },
+    );
+  }
   const body = readFileSync(archive);
   server.on("GET", `/api/games/${GAME_ID}/download-files-manifest`, (_req, res) => {
     res.statusCode = 404;
