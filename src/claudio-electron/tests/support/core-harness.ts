@@ -59,6 +59,7 @@ export class CoreHarness {
           ...process.env,
           XDG_DATA_HOME: this.dataHome,
           LOCALAPPDATA: this.dataHome,
+          ...(process.platform === "win32" ? { CLAUDIO_DATA_DIR: this.dataDir } : {}),
           ...extraEnv,
         },
         stdio: ["pipe", "pipe", "pipe"],

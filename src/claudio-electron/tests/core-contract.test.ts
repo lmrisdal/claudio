@@ -235,9 +235,23 @@ describe.skipIf(!contractAvailable)("claudio-core protocol contract", () => {
   });
 
   describe("missing games", () => {
+    it("add_steam_shortcut is only supported on Linux", async () => {
+      if (process.platform === "linux") {
+        return;
+      }
+      start();
+
+      await expect(core.call("add_steam_shortcut", { remoteGameId: 99 })).rejects.toThrow(
+        "Steam shortcuts are only supported on Linux.",
+      );
+    });
+
     it.each(["launch_game", "list_game_executables", "open_install_folder", "add_steam_shortcut"])(
       "%s reports a game that is not installed",
       async (method) => {
+        if (method === "add_steam_shortcut" && process.platform !== "linux") {
+          return;
+        }
         start();
 
         await expect(core.call(method, { remoteGameId: 99 })).rejects.toThrow(
