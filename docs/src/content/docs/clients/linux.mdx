@@ -1,0 +1,83 @@
+---
+title: Installing on Linux
+description: Install the Claudio desktop app on Linux.
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+The Claudio desktop app lets you install and launch the games on your server directly from your Linux machine. Windows games are run through [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) and Proton, so no manual Wine setup is needed.
+
+## Requirements
+
+- A 64-bit Linux distribution
+- `libfuse2` for running AppImages (or use `--appimage-extract-and-run`, see below)
+- A running Claudio server that you can reach from your machine
+- Free disk space for downloads and installed games
+
+## Installation
+
+Claudio is distributed as an AppImage. Download `Claudio-<version>-linux-x86_64.AppImage` from the [GitHub releases page](https://github.com/lmrisdal/claudio/releases/latest).
+
+<Steps>
+
+1. Make it executable:
+
+   ```bash
+   chmod +x Claudio-*.AppImage
+   ```
+
+2. Run it:
+
+   ```bash
+   ./Claudio-*.AppImage
+   ```
+
+</Steps>
+
+<Aside type="tip" title="AppImage won't start?">
+  The AppImage runtime needs FUSE 2. On Ubuntu 22.04 and newer, install `libfuse2` (`libfuse2t64` on 24.04). Alternatively, run it without FUSE:
+
+```bash
+./Claudio-*.AppImage --appimage-extract-and-run
+```
+
+</Aside>
+
+## First start
+
+<Steps>
+
+1. Enter the address of your server, for example `https://claudio.example.com`, and continue.
+
+   If your server sits behind a proxy that needs extra request headers, add them under **Custom headers**.
+
+2. Open **Settings → Downloads** and choose where games should be downloaded and installed. You can leave both empty to use the defaults.
+
+3. Open a game in your library and press **Install**.
+
+</Steps>
+
+## Running Windows games
+
+Windows games run through umu-launcher, which Claudio downloads and manages for you. Each game gets its own Wine prefix.
+
+- **Proton version** — choose an installed build, or leave it on `UMU-Latest`. You can set a default under **Settings → Downloads** and override it per game in the game settings. Builds in Steam's `compatibilitytools.d` and umu's compatibility tools folders are detected automatically.
+- **Game ID** — the umu database ID used to apply game-specific fixes. Leave empty for `umu-default`.
+- **Launch parameters** — optional arguments passed to the game executable.
+
+### Shortcuts
+
+When installing a game you can create launchers for it:
+
+- **Desktop** — a shortcut on your desktop
+- **App menu** — an entry in your application launcher
+- **Steam** — a non-Steam game shortcut, handy for Big Picture and Steam Deck
+
+## Updating
+
+The app checks for updates in the background and shows a notice when a new version is ready. You can also replace the AppImage with a newer one from the releases page.
+
+## Next steps
+
+- [Web UI vs Desktop App](/claudio/clients/web-ui/) — what each client can do
+- [Library Structure](/claudio/getting-started/library-structure/) — how to organize games on the server

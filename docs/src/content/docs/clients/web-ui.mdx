@@ -1,0 +1,42 @@
+---
+title: Web UI vs Desktop App
+description: What you can do in the browser compared to the desktop app.
+---
+
+The web UI is the Claudio interface served by your server, and the desktop app is the same interface with a local companion that can install and launch games. A browser can't touch your file system or start programs, so everything that happens on your machine needs the desktop app.
+
+| Capability                                            | Desktop app         | Web UI                     |
+| ----------------------------------------------------- | ------------------- | -------------------------- |
+| Browse library, search, game details                  | ✅                  | ✅                         |
+| IGDB and SteamGridDB metadata and covers              | ✅                  | ✅                         |
+| Browse files inside game folders and archives         | ✅                  | ✅                         |
+| Admin panel (scans, metadata, game editing)           | ✅                  | ✅                         |
+| Play in the browser with the built-in emulator        | ✅                  | ✅                         |
+| Light and dark theme, keyboard and gamepad navigation | ✅                  | ✅                         |
+| Download games                                        | ✅ download manager | ✅ direct browser download |
+| Download speed limit                                  | ✅                  | ❌                         |
+| Choose install and download folders                   | ✅                  | ❌                         |
+| Install games automatically                           | ✅                  | ❌                         |
+| Launch games                                          | ✅                  | ❌                         |
+| Pick executable, launch parameters, run as admin      | ✅                  | ❌                         |
+| Run Windows games on Linux (Proton/umu)               | ✅                  | ❌                         |
+| Desktop, app menu and Steam shortcuts (Linux)         | ✅                  | ❌                         |
+| Custom request headers for the server                 | ✅                  | n/a                        |
+| Close to tray                                         | ✅                  | n/a                        |
+| Updates                                               | ✅ automatic        | ⚠️ updates with the server |
+| Platforms                                             | Windows and Linux   | Any modern browser         |
+
+The web UI is a good fit for browsing from another device, managing the library as an admin, or grabbing a download. Use the desktop app when you want to install games and play them.
+
+## Opening the web UI
+
+Open your server's address in a browser, for example `http://localhost:8080` or `https://claudio.example.com`. There is nothing to enable, the server always serves it. See [Installation](/claudio/getting-started/installation/) to set up a server.
+
+## Updating the web UI
+
+The web UI is part of the server, so it is updated whenever you update the server container image.
+
+## Next steps
+
+- [Installing on Windows](/claudio/clients/windows/)
+- [Installing on Linux](/claudio/clients/linux/)
