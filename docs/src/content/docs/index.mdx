@@ -33,8 +33,8 @@ import { Card, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
     Browse game folder contents in the browser — including inside zip and tar archives. Download
     games with resume support.
   </Card>
-  <Card title="Flexible Authentication" icon="setting">
-    Local accounts, GitHub, Google, any OpenID Connect provider, or reverse-proxy SSO. Your choice.
+  <Card title="Admin Panel" icon="setting">
+    Trigger scans, fetch IGDB metadata, and edit individual games from the admin panel.
   </Card>
 </CardGrid>
 
@@ -55,7 +55,7 @@ import { Card, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
 
 2. **Open the UI**
 
-   Navigate to `http://localhost:8080` and register your first user — they automatically become admin.
+   Navigate to `http://localhost:8080`.
 
 3. **Organize your games**
 
@@ -63,7 +63,7 @@ import { Card, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
 
    ```
    /games/
-     pc/
+     win/
        Hades II (2025)/
        Celeste (2018)/
      switch/
@@ -88,15 +88,5 @@ import { Card, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
     title="Configuration"
     href="/claudio/configuration/environment-variables/"
     description="All environment variables and config file options."
-  />
-  <LinkCard
-    title="Authentication"
-    href="/claudio/authentication/overview/"
-    description="Local accounts, OAuth, OIDC, and proxy auth."
-  />
-  <LinkCard
-    title="Development"
-    href="/claudio/development/setup/"
-    description="Set up a local dev environment and learn the architecture."
   />
 </CardGrid>

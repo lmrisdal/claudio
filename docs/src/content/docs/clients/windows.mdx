@@ -1,0 +1,65 @@
+---
+title: Installing on Windows
+description: Install the Claudio desktop app on Windows.
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+The Claudio desktop app lets you install and launch the games on your server directly from your PC. Windows builds are available as an installer and as a portable executable.
+
+## Requirements
+
+- Windows 10 or 11 (64-bit)
+- A running Claudio server that you can reach from your PC
+- Free disk space for downloads and installed games
+
+## Installation
+
+Download the latest release from the [GitHub releases page](https://github.com/lmrisdal/claudio/releases/latest). Pick one of:
+
+| File                             | Description                                                                |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `Claudio-Setup-<version>.exe`    | Installer. Installs per user, so no administrator rights are required.     |
+| `Claudio-<version>-portable.exe` | Portable build. Run it from anywhere, nothing is installed on your system. |
+
+<Steps>
+
+1. Run the downloaded file.
+
+2. If Windows SmartScreen blocks it, choose **More info** and then **Run anyway**. The builds are not code-signed yet.
+
+3. Start **Claudio** from the Start menu (or launch the portable executable).
+
+</Steps>
+
+## First start
+
+<Steps>
+
+1. Enter the address of your server, for example `https://claudio.example.com`, and continue.
+
+   If your server sits behind a proxy that needs extra request headers, add them under **Custom headers**.
+
+2. Open **Settings → Downloads** and choose where games should be downloaded and installed. You can leave both empty to use the defaults.
+
+3. Open a game in your library and press **Install**.
+
+</Steps>
+
+## Installing games
+
+Claudio detects whether a game is an installer or a portable game.
+
+- **Portable games** are downloaded, extracted, and ready to play.
+- **Installers** are run for you. Options in the install dialog let you run the installer as administrator or interactively, in case it needs your input.
+
+Once installed, press **Play**. In the game settings you can pick which executable to launch, add launch parameters, and run the game as administrator.
+
+## Updating
+
+The app checks for updates in the background and shows a notice when a new version is ready. You can also download the newest installer from the releases page and run it over the existing install.
+
+## Next steps
+
+- [Web UI vs Desktop App](/claudio/clients/web-ui/) — what each client can do
+- [Library Structure](/claudio/getting-started/library-structure/) — how to organize games on the server

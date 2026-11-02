@@ -17,14 +17,14 @@
   --sl-color-bg-inline-code: #1a1a24;
 
   --sl-color-text: #e5e5e5;
-  --sl-color-text-accent: #00d9b8;
+  --sl-color-text-accent: #f3998a;
   --sl-color-text-invert: #0a0a0f;
 
-  --sl-color-accent-low: rgba(0, 217, 184, 0.15);
-  --sl-color-accent: #00d9b8;
-  --sl-color-accent-high: #b3f5ea;
+  --sl-color-accent-low: rgba(243, 153, 138, 0.15);
+  --sl-color-accent: #f3998a;
+  --sl-color-accent-high: #f6eeda;
 
-  --sl-color-bg-accent: #00d9b8;
+  --sl-color-bg-accent: #f3998a;
 
   --sl-color-gray-1: #e5e5e5;
   --sl-color-gray-2: #a0a0b0;
@@ -50,14 +50,14 @@
   --sl-color-bg-inline-code: #f0f0f3;
 
   --sl-color-text: #1a1a2e;
-  --sl-color-text-accent: #009e87;
+  --sl-color-text-accent: #b8412f;
   --sl-color-text-invert: #f8f8fa;
 
-  --sl-color-accent-low: rgba(0, 158, 135, 0.1);
-  --sl-color-accent: #009e87;
-  --sl-color-accent-high: #006b5c;
+  --sl-color-accent-low: rgba(207, 90, 72, 0.12);
+  --sl-color-accent: #cf5a48;
+  --sl-color-accent-high: #8f2f22;
 
-  --sl-color-bg-accent: #009e87;
+  --sl-color-bg-accent: #cf5a48;
 
   --sl-color-gray-1: #1a1a2e;
   --sl-color-gray-2: #555566;
@@ -129,34 +129,56 @@ mobile-starlight-toc summary {
 }
 
 /* Steps counter circles are fine rounded-full, but the sidebar items need a bump */
-nav.sidebar-content a {
+.sidebar-content a {
   border-radius: 0.375rem;
 }
 
 /* Sidebar current page — use subtle highlight instead of solid accent bg */
-nav.sidebar-content [aria-current="page"],
-nav.sidebar-content [aria-current="page"]:hover,
-nav.sidebar-content [aria-current="page"]:focus {
+.sidebar-content [aria-current="page"],
+.sidebar-content [aria-current="page"]:hover,
+.sidebar-content [aria-current="page"]:focus {
   color: var(--sl-color-text-accent) !important;
   background-color: var(--sl-color-accent-low) !important;
 }
 
 /* Hero section tweaks */
-.hero .action.primary {
-  background-color: #00d9b8 !important;
-  border-color: #00d9b8 !important;
-  color: #0a0a0f !important;
+.hero .sl-link-button.primary {
+  background-color: #f3998a !important;
+  border-color: #f3998a !important;
+  color: #1c1c28 !important;
 }
-.hero .action.primary:hover {
-  background-color: #00c4a6 !important;
-  border-color: #00c4a6 !important;
+.hero .sl-link-button.primary:hover {
+  background-color: #f7ada0 !important;
+  border-color: #f7ada0 !important;
 }
-:root[data-theme="light"] .hero .action.primary {
-  background-color: #009e87 !important;
-  border-color: #009e87 !important;
-  color: #f8f8fa !important;
+:root[data-theme="light"] .hero .sl-link-button.primary {
+  background-color: #cf5a48 !important;
+  border-color: #cf5a48 !important;
+  color: #fff !important;
 }
-:root[data-theme="light"] .hero .action.primary:hover {
-  background-color: #008a76 !important;
-  border-color: #008a76 !important;
+:root[data-theme="light"] .hero .sl-link-button.primary:hover {
+  background-color: #b8412f !important;
+  border-color: #b8412f !important;
+}
+
+/* Icon next to the hero title */
+.hero h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+}
+.hero h1::before {
+  content: "";
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  background: url("./assets/icon.svg") center / contain no-repeat;
+}
+
+/* Keep the header icons neutral like search and theme select */
+.social-icons a {
+  color: var(--sl-color-gray-2);
+}
+.social-icons a:hover {
+  color: var(--sl-color-white);
 }
