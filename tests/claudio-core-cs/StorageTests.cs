@@ -249,7 +249,9 @@ public class LoggingTests
         Log.Warn("t", "a warning");
         Log.Info("t", "an info");
 
-        var text = File.ReadAllText(Path.Combine(data.DataDir, "claudio.log"));
+        using var stream = new FileStream(Path.Combine(data.DataDir, "claudio.log"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        var text = reader.ReadToEnd();
         text.Should().Contain("[ERROR][t] an error").And.Contain("[WARN][t] a warning").And.NotContain("an info");
         await Task.CompletedTask;
     }
