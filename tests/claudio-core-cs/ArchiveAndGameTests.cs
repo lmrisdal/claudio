@@ -289,6 +289,11 @@ public class GameCommandTests
     [Test]
     public async Task ListGameExecutablesIncludesWinePrefixDriveC()
     {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
         using var data = new TestDataDir();
         var install = data.Child("install");
         var prefix = data.Child("prefix");
@@ -306,6 +311,11 @@ public class GameCommandTests
     [Test]
     public async Task ListGameExecutablesUsesDriveCWhenInstallPathIsWinePrefix()
     {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
         using var data = new TestDataDir();
         var prefix = data.Child("prefix");
         Directory.CreateDirectory(Path.Combine(prefix, "pfx", "drive_c"));
@@ -341,6 +351,11 @@ public class GameCommandTests
     [Test]
     public async Task LinuxExecutableHintResolvesInsidePrefilledDestination()
     {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
         using var data = new TestDataDir();
         var driveC = data.Child("drive_c");
         var destination = Path.Combine(driveC, "Games", "Game");
@@ -356,7 +371,7 @@ public class GameCommandTests
     public async Task LinuxDestinationStaysInsideThePrefixCDrive()
     {
         PayloadOps.PrefixInstallDirectory("My: Game.").Should().Be(@"C:\Games\My Game");
-        PayloadOps.PrefixPayloadDirectory("/p", "My: Game").Should().Be(Path.Combine("/p", "pfx", "drive_c", "Games", "My Game"));
+        PayloadOps.PrefixPayloadDirectory("p", "My: Game").Should().Be(Path.Combine("p", "pfx", "drive_c", "Games", "My Game"));
         await Task.CompletedTask;
     }
 

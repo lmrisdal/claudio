@@ -3,10 +3,12 @@ using Claudio.Core.Logging;
 
 namespace Claudio.Core.Linux;
 
-internal sealed class LoggedChild(Process process, LogTail tail)
+internal sealed class LoggedChild(Process process, LogTail tail, Task[] pumps)
 {
     public Process Process { get; } = process;
     public LogTail Tail { get; } = tail;
+
+    public void DrainOutput() => Task.WaitAll(pumps, TimeSpan.FromSeconds(2));
 }
 
 internal sealed class LogTail
@@ -50,14 +52,17 @@ internal static class ProcessLog
         var process = Process.Start(info) ?? throw new System.ComponentModel.Win32Exception("process did not start");
         process.StandardInput.Close();
         var tail = new LogTail();
-        Pump(process.StandardOutput, "stdout", processName, tail);
-        Pump(process.StandardError, "stderr", processName, tail);
-        return new LoggedChild(process, tail);
+        var pumps = new[]
+        {
+            Pump(process.StandardOutput, "stdout", processName, tail),
+            Pump(process.StandardError, "stderr", processName, tail),
+        };
+        return new LoggedChild(process, tail, pumps);
     }
 
-    private static void Pump(StreamReader reader, string label, string processName, LogTail tail)
+    private static Task Pump(StreamReader reader, string label, string processName, LogTail tail)
     {
-        _ = Task.Factory.StartNew(
+        return Task.Factory.StartNew(
             () =>
             {
                 try

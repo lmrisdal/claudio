@@ -46,9 +46,11 @@ internal static class SettingsStore
         return dir;
     }
 
+    internal static string? DataDirOverride { get; set; }
+
     public static string DataDir()
     {
-        var dir = DefaultDataDir();
+        var dir = DataDirOverride ?? DefaultDataDir();
         Directory.CreateDirectory(dir);
         return dir;
     }
@@ -59,6 +61,12 @@ internal static class SettingsStore
 
     private static string DefaultDataDir()
     {
+        var explicitDir = Environment.GetEnvironmentVariable("CLAUDIO_DATA_DIR");
+        if (!string.IsNullOrEmpty(explicitDir) && Path.IsPathRooted(explicitDir))
+        {
+            return explicitDir;
+        }
+
         if (OperatingSystem.IsWindows())
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Claudio");

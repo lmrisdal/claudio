@@ -118,6 +118,7 @@ internal static class UmuCommand
         }
 
         child.Process.WaitForExit();
+        child.DrainOutput();
         if (child.Process.ExitCode != 0)
         {
             throw new CommandException(

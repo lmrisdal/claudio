@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { CoreHarness, coreAvailable } from "./support/core-harness";
+import { CoreHarness, contractAvailable } from "./support/core-harness";
 
 const golden = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "golden");
 let core: CoreHarness;
 
 afterEach(() => core?.dispose());
 
-describe.skipIf(!coreAvailable)("claudio-core data files", () => {
+describe.skipIf(!contractAvailable)("claudio-core data files", () => {
   it("writes settings.json exactly as the golden file", async () => {
     core = new CoreHarness();
 

@@ -9,6 +9,7 @@ internal sealed class TestDataDir : IDisposable
         Root = Path.Combine(Path.GetTempPath(), $"claudio-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Root);
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", Root);
+        SettingsStore.DataDirOverride = DataDir;
     }
 
     public string Root { get; }
@@ -25,6 +26,8 @@ internal sealed class TestDataDir : IDisposable
     public void Dispose()
     {
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", previous);
+        SettingsStore.DataDirOverride = null;
+        Claudio.Core.Logging.Log.Shutdown();
         try
         {
             Directory.Delete(Root, recursive: true);

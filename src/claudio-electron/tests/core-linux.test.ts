@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { CoreHarness, coreAvailable } from "./support/core-harness";
+import { CoreHarness, contractAvailable } from "./support/core-harness";
 import { FakeServer } from "./support/fake-server";
 
 const golden = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "golden");
@@ -83,7 +83,7 @@ function registerGame(id: number, extra: Record<string, unknown> = {}): string {
   return exe;
 }
 
-describe.skipIf(!coreAvailable || process.platform !== "linux")("claudio-core linux", () => {
+describe.skipIf(!contractAvailable || process.platform !== "linux")("claudio-core linux", () => {
   describe("executables and launch settings", () => {
     it("lists executables relative to drive_c in sorted order", async () => {
       startCore("exit 0");

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { CoreHarness, coreAvailable } from "./support/core-harness";
+import { CoreHarness, contractAvailable } from "./support/core-harness";
 
 const platform = process.platform === "win32" ? "windows" : process.platform;
 let core: CoreHarness;
@@ -11,7 +11,7 @@ function start(): CoreHarness {
 
 afterEach(() => core?.dispose());
 
-describe.skipIf(!coreAvailable)("claudio-core protocol contract", () => {
+describe.skipIf(!contractAvailable)("claudio-core protocol contract", () => {
   describe("framing", () => {
     it("echoes numeric and string ids unchanged", async () => {
       start();

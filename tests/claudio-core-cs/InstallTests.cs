@@ -122,14 +122,14 @@ public class FileOpsTests
     [Test]
     public async Task BuildInstallDirUsesSanitizedTitle()
     {
-        Path.Combine("/games", FileOps.SanitizeSegment("A: B")).Should().Be("/games/A B");
+        Path.Combine("games", FileOps.SanitizeSegment("A: B")).Should().Be(Path.Combine("games", "A B"));
         await Task.CompletedTask;
     }
 
     [Test]
     public async Task InstallDownloadRootUsesConfiguredDownloadRootAndSanitizedTitle()
     {
-        InstallPaths.DownloadWorkspaceRoot("/downloads", 7, "A/B").Should().Be("/downloads/A_B-7");
+        InstallPaths.DownloadWorkspaceRoot("downloads", 7, "A/B").Should().Be(Path.Combine("downloads", "A_B-7"));
         await Task.CompletedTask;
     }
 
@@ -288,8 +288,8 @@ public class InstallerDetectTests
     {
         using var data = new TestDataDir();
         var root = data.Child("root");
-        Touch(root, "b/game.exe");
-        var first = Touch(root, "a/game.exe");
+        Touch(root, Path.Combine("b", "game.exe"));
+        var first = Touch(root, Path.Combine("a", "game.exe"));
 
         PayloadOps.DetectWindowsExecutable(root).Should().Be(first);
         await Task.CompletedTask;

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { CoreHarness, coreAvailable, coreKind } from "./support/core-harness";
+import { CoreHarness, contractAvailable, coreKind } from "./support/core-harness";
 import { FakeServer } from "./support/fake-server";
 
 const libssl = [
@@ -31,7 +31,7 @@ afterEach(async () => {
   await server?.close();
 });
 
-describe.skipIf(!coreAvailable || coreKind !== "csharp" || !canHideOpenSsl())(
+describe.skipIf(!contractAvailable || coreKind !== "csharp" || !canHideOpenSsl())(
   "claudio-core without OpenSSL",
   () => {
     function start(): void {

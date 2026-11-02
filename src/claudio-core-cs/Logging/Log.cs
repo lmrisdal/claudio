@@ -38,6 +38,15 @@ internal static class Log
         }
     }
 
+    public static void Shutdown()
+    {
+        lock (Gate)
+        {
+            file?.Dispose();
+            file = null;
+        }
+    }
+
     public static LogLevel ParseLevel(string value) =>
         value switch
         {

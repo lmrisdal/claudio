@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { CoreHarness, coreAvailable } from "./support/core-harness";
+import { CoreHarness, contractAvailable } from "./support/core-harness";
 import { FakeServer } from "./support/fake-server";
 
 let core: CoreHarness;
@@ -91,7 +91,7 @@ function game(id: number, extra: Record<string, unknown> = {}): Record<string, u
 
 const payload = (): string => path.join(target, "pfx", "drive_c", "Games", "Test Game");
 
-describe.skipIf(!coreAvailable || process.platform !== "linux")(
+describe.skipIf(!contractAvailable || process.platform !== "linux")(
   "claudio-core portable installs",
   () => {
     it("installs into a Proton prefix and registers the game", async () => {

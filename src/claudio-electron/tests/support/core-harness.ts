@@ -14,9 +14,14 @@ export const coreBinary = process.env.CLAUDIO_CORE_PATH
   : path.join(repoRoot, "target", "debug", executable);
 
 export const coreAvailable = existsSync(coreBinary);
+// Rust resolves the Windows data folder through the shell API and has no override, so contract
+// suites that need an isolated data directory only run against the C# core there.
 export const coreKind: "rust" | "csharp" = coreBinary.includes("claudio-core-cs")
   ? "csharp"
   : "rust";
+
+export const contractAvailable =
+  coreAvailable && (process.platform !== "win32" || coreKind === "csharp");
 
 export interface Response {
   id?: unknown;
