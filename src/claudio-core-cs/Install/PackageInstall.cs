@@ -5,27 +5,27 @@ namespace Claudio.Core.Install;
 
 internal static class PackageInstall
 {
-    public static async Task<string> DownloadAsync(RpcHost host, InstallState state, DownloadPackageInput input)
+    public static Task<string> DownloadAsync(RpcHost host, InstallState state, DownloadPackageInput input)
     {
-        var control = state.Start(input.Id);
-        var targetDir = input.TargetDir;
-        var targetExisted = Directory.Exists(targetDir);
-        string? result = null;
-        CommandException? failure = null;
-        try
-        {
-            result = await DownloadInnerAsync(host, input, control);
-        }
-        catch (CommandException error)
-        {
-            failure = error;
-            if (!control.IsCancelled)
+        var targetExisted = Directory.Exists(input.TargetDir);
+        return TrackedOperation.RunAsync(
+            state,
+            input.Id,
+            "Download cancelled.",
+            control => DownloadInnerAsync(host, input, control),
+            message => Progress.Emit(host, input.Id, "failed", null, $"Download failed for {input.Title}: {message}"),
+            control =>
             {
-                Progress.Emit(host, input.Id, "failed", null, $"Download failed for {input.Title}: {error.Message}");
-            }
-        }
+                CleanWorkspace(input);
+                if (control.IsCancelled && !targetExisted)
+                {
+                    TryRemoveEmptyDirectory(input.TargetDir);
+                }
+            });
+    }
 
-        state.Finish(input.Id);
+    private static void CleanWorkspace(DownloadPackageInput input)
+    {
         try
         {
             var downloadRoot = SettingsStore.ResolveDownloadRoot(SettingsStore.Load());
@@ -35,18 +35,6 @@ internal static class PackageInstall
         {
             Log.Warn("claudio_core", $"Could not clean the download workspace: {error.Message}");
         }
-
-        if (control.IsCancelled)
-        {
-            if (!targetExisted)
-            {
-                TryRemoveEmptyDirectory(targetDir);
-            }
-
-            throw new CommandException("Download cancelled.");
-        }
-
-        return failure is null ? result! : throw failure;
     }
 
     private static void TryRemoveEmptyDirectory(string path)

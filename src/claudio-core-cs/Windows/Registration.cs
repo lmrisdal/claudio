@@ -52,7 +52,7 @@ internal static class Registration
         {
             action();
         }
-        catch (Exception error) when (error is CommandException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        catch (Exception error)
         {
             Log.Warn("claudio_core", $"{prefix} {error.Message}");
         }

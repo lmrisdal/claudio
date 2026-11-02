@@ -610,3 +610,86 @@ public class InstallerRetryTests
         await Task.CompletedTask;
     }
 }
+
+public class TrackedOperationTests
+{
+    [Test]
+    public async Task AnUnexpectedExceptionStillReleasesTheInstallAndReportsFailure()
+    {
+        var state = new InstallState();
+        string? reported = null;
+
+        var run = () => TrackedOperation.RunAsync<int>(
+            state,
+            5,
+            "Install cancelled.",
+            _ => throw new InvalidOperationException("boom"),
+            message => reported = message);
+
+        await run.Should().ThrowAsync<CommandException>().WithMessage("boom");
+        state.HasActiveOperations.Should().BeFalse();
+        reported.Should().Be("boom");
+    }
+
+    [Test]
+    public async Task ACancelledOperationReportsCancellationInsteadOfFailure()
+    {
+        var state = new InstallState();
+        var failures = 0;
+
+        var run = () => TrackedOperation.RunAsync<int>(
+            state,
+            6,
+            "Download cancelled.",
+            control =>
+            {
+                control.SetCancelled(true);
+                throw new CommandException("Install cancelled.");
+            },
+            _ => failures++);
+
+        await run.Should().ThrowAsync<CommandException>().WithMessage("Download cancelled.");
+        failures.Should().Be(0);
+        state.HasActiveOperations.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task ASuccessfulOperationReturnsItsResultAndReleasesTheInstall()
+    {
+        var state = new InstallState();
+
+        var result = await TrackedOperation.RunAsync(state, 7, "x", _ => Task.FromResult(42), _ => { });
+
+        result.Should().Be(42);
+        state.HasActiveOperations.Should().BeFalse();
+    }
+}
+
+public class SerializationCoverageTests
+{
+    [Test]
+    public async Task EveryTypeWrittenToDiskHasSourceGeneratedMetadata()
+    {
+        var json = Claudio.Core.Json.CoreJsonContext.SerializePretty(DesktopSettings.CreateDefault());
+        json.Should().Contain("windowWidth");
+        Claudio.Core.Json.CoreJsonContext.SerializePretty(new List<InstalledGame>()).Should().Be("[]");
+        Claudio.Core.Json.CoreJsonContext.SerializePretty(new CachedDownloadInfo { FilePath = "p" }).Should().Contain("isIndividual");
+        await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task UninstallConfigIsWrittenWithAlphabeticalCamelCaseKeys()
+    {
+        var json = Claudio.Core.Json.CoreJsonContext.SerializePretty(new UninstallConfig
+        {
+            DesktopShortcutPath = "d",
+            GameTitle = "t",
+            InstallPath = "i",
+            RegistryKeyName = "Claudio-1",
+            ShortcutPath = "s",
+        });
+
+        json.Should().Be("{\n  \"desktopShortcutPath\": \"d\",\n  \"gameTitle\": \"t\",\n  \"installPath\": \"i\",\n  \"registryKeyName\": \"Claudio-1\",\n  \"shortcutPath\": \"s\"\n}");
+        await Task.CompletedTask;
+    }
+}

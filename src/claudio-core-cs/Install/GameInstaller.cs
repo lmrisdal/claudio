@@ -16,37 +16,18 @@ internal static class GameInstaller
     public static Task<InstalledGame> RetryCachedAsync(RpcHost host, InstallState state, RemoteGame game) =>
         RunAsync(host, state, game, reuseCachedPackage: true, failurePrefix: "Retry failed for");
 
-    private static async Task<InstalledGame> RunAsync(
+    private static Task<InstalledGame> RunAsync(
         RpcHost host,
         InstallState state,
         RemoteGame game,
         bool reuseCachedPackage,
-        string failurePrefix)
-    {
-        var control = state.Start(game.Id);
-        InstalledGame? installed = null;
-        CommandException? failure = null;
-        try
-        {
-            installed = await InnerAsync(host, game, control, reuseCachedPackage);
-        }
-        catch (CommandException error)
-        {
-            failure = error;
-            if (!control.IsCancelled)
-            {
-                Progress.Emit(host, game.Id, "failed", null, $"{failurePrefix} {game.Title}: {error.Message}");
-            }
-        }
-
-        state.Finish(game.Id);
-        if (control.IsCancelled)
-        {
-            throw new CommandException("Install cancelled.");
-        }
-
-        return failure is null ? installed! : throw failure;
-    }
+        string failurePrefix) =>
+        TrackedOperation.RunAsync(
+            state,
+            game.Id,
+            "Install cancelled.",
+            control => InnerAsync(host, game, control, reuseCachedPackage),
+            message => Progress.Emit(host, game.Id, "failed", null, $"{failurePrefix} {game.Title}: {message}"));
 
     private static async Task<InstalledGame> InnerAsync(RpcHost host, RemoteGame game, InstallControl control, bool reuseCachedPackage)
     {

@@ -16,6 +16,7 @@ namespace Claudio.Core.Json;
 [JsonSerializable(typeof(RemoteGame))]
 [JsonSerializable(typeof(PingResponse))]
 [JsonSerializable(typeof(CachedDownloadInfo))]
+[JsonSerializable(typeof(Windows.UninstallConfig))]
 [JsonSerializable(typeof(InstallProgress))]
 [JsonSerializable(typeof(DownloadPackageInput))]
 [JsonSerializable(typeof(Rpc.DownloadArgs))]
