@@ -39,11 +39,11 @@ afterEach(async () => {
 
 function startCore(umuScript: string): void {
   core = new CoreHarness({ HOME: home });
-  const toolsDir = path.join(core.dataDir, "tools", "umu-launcher", "1.4.0");
+  const toolsDir = path.join(core.dataDir, "tools", "umu-launcher", "1.4.4");
   mkdirSync(toolsDir, { recursive: true });
   writeFileSync(path.join(toolsDir, "umu-run"), `#!/bin/sh\n${umuScript}\n`);
   chmodSync(path.join(toolsDir, "umu-run"), 0o755);
-  writeFileSync(path.join(toolsDir, "VERSION"), "1.4.0\n");
+  writeFileSync(path.join(toolsDir, "VERSION"), "1.4.4\n");
   core.writeData(
     "settings.json",
     JSON.stringify({

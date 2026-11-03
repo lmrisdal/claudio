@@ -36,7 +36,6 @@ fn spawn_prefix_command(
         .env("PROTONPATH", proton_path)
         .env("GAMEID", game_id.unwrap_or("umu-default"))
         .env("STORE", store.unwrap_or("none"))
-        .env("UMU_LOG", "debug")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -115,7 +114,6 @@ pub fn prepare_prefix(
         .env("PROTONPATH", proton_path)
         .env("GAMEID", "umu-default")
         .env("STORE", "none")
-        .env("UMU_LOG", "debug")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

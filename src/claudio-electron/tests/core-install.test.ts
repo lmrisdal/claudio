@@ -34,7 +34,7 @@ afterEach(async () => {
 
 function startCore(): void {
   core = new CoreHarness();
-  const toolsDir = path.join(core.dataDir, "tools", "umu-launcher", "1.4.0");
+  const toolsDir = path.join(core.dataDir, "tools", "umu-launcher", "1.4.4");
   mkdirSync(toolsDir, { recursive: true });
   const log = path.join(work, "umu.log");
   writeFileSync(
@@ -42,7 +42,7 @@ function startCore(): void {
     `#!/bin/sh\nmkdir -p "$WINEPREFIX"\n{ echo "args:$*"; echo "WINEPREFIX=$WINEPREFIX"; echo "PROTONPATH=$PROTONPATH"; echo "GAMEID=$GAMEID"; } >> "${log}"\n`,
   );
   chmodSync(path.join(toolsDir, "umu-run"), 0o755);
-  writeFileSync(path.join(toolsDir, "VERSION"), "1.4.0\n");
+  writeFileSync(path.join(toolsDir, "VERSION"), "1.4.4\n");
   core.writeData(
     "settings.json",
     JSON.stringify({

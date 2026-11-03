@@ -71,13 +71,13 @@ internal static class ProcessLog
                     while ((line = reader.ReadLine()) is not null)
                     {
                         tail.Push(label, line);
-                        if (label == "stderr")
+                        if (label == "stderr" && StderrIsProblem(line))
                         {
                             Log.Warn("claudio_core", $"[{processName} stderr] {line}");
                         }
                         else
                         {
-                            Log.Info("claudio_core", $"[{processName} stdout] {line}");
+                            Log.Info("claudio_core", $"[{processName} {label}] {line}");
                         }
                     }
                 }
@@ -89,5 +89,13 @@ internal static class ProcessLog
             CancellationToken.None,
             TaskCreationOptions.LongRunning,
             TaskScheduler.Default);
+    }
+
+    // Tools such as umu write their routine INFO output to stderr, so only lines that
+    // look like problems are worth a warning.
+    private static bool StderrIsProblem(string line)
+    {
+        return line.Contains("WARN") || line.Contains("ERROR") || line.Contains("Error")
+            || line.Contains("Traceback") || line.Contains("mismatch");
     }
 }

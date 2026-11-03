@@ -13,7 +13,9 @@ Build a C# version of the Rust desktop sidecar (`claudio-core`) and the Windows 
 - `tests/claudio-core-cs`: 130 unit tests. Rust has 151 test attributes, of which about 20 are process or integration tests that the shell contract suite covers instead, and the Windows-only tests (`windows_integration/tests.rs`, `windows_*_flow.rs`) have not been ported.
 - Phase 7 tooling: `fetch-7zip.mjs`, `stage-sidecar.mjs` (a Rust stage contains exactly the files it did before, tested), `electron-builder.yml` reading from `sidecar/`, version bump and release checks for both projects, CI steps and the `sidecar` release input, `THIRD-PARTY-NOTICES.md`, VS Code task.
 
-**Written but never run on Windows**
+**Checked by hand on Windows (project owner, 2026-11-02):** a portable `.7z` install, the uninstall dialog and file removal, the Start Menu shortcut, and the Apps & features entry all work after the AOT JSON fix. CI on `windows-2025` runs the unit tests, the Native AOT publish and the contract suite (the Windows-only integration tests are in `core-windows.test.ts`).
+
+**Still never run on Windows**
 
 CsWin32 layer (`Windows/`): `CreateProcessW` with NUL handles, `ShellExecuteExW` elevation, process tracking, `SetThreadExecutionState` on a dedicated thread, `.lnk` creation, registry registration and deregistration, the uninstaller, innoextract, the installer retry flow and scene overrides. It compiles for `win-x64` as a JIT build. Native AOT for Windows needs the CI Windows runner. The Windows contract flows (`windows_installer_flow.rs`, `windows_registration_flow.rs`) have not been ported to tests.
 
@@ -514,7 +516,7 @@ Rust paths are relative to `src/claudio-core/src`. Literal strings, including al
 | `installer_innoextract.rs` | `Install/InnoExtract.cs` | Downloads the latest release at runtime. Flatten `app/`, remove `tmp/`. |
 | `windows_integration/*` | `Windows/ProcessTracking.cs`, `Windows/SleepPrevention.cs`, `Windows/Registration.cs`, `Windows/ShellLink.cs`, `Windows/ShellDirectories.cs` | `.lnk` target and working directory, as `mslnk` set them. |
 | `services/game_runtime.rs`, `launch_arguments.rs` | `Runtime/GameRuntime.cs`, `Runtime/LaunchArguments.cs` | Windows passes parameters raw, Linux parses them. |
-| `linux_umu.rs`, `linux_umu_command.rs`, `linux_proton.rs`, `linux_host_paths.rs`, `process_log.rs` | `Linux/Umu.cs`, `Linux/UmuCommand.cs`, `Linux/Proton.cs`, `Linux/HostPaths.cs`, `Linux/ProcessLog.cs` | umu pinned at 1.4.0. Read its zipapp tar with `System.Formats.Tar`. |
+| `linux_umu.rs`, `linux_umu_command.rs`, `linux_proton.rs`, `linux_host_paths.rs`, `process_log.rs` | `Linux/Umu.cs`, `Linux/UmuCommand.cs`, `Linux/Proton.cs`, `Linux/HostPaths.cs`, `Linux/ProcessLog.cs` | umu pinned at 1.4.4. Read its zipapp tar with `System.Formats.Tar`. |
 | `linux_steam_shortcuts.rs` | `Linux/SteamShortcuts.cs` | Lossy UTF-8 on read, backup to `.vdf.claudio.bak`, atomic replace. |
 | `src/claudio-uninstaller/src/main.rs` | `src/claudio-uninstaller/Program.cs` | Same two phases and `--do-delete` arguments. `MessageBoxW` through CsWin32, flags `0x124`, `0x10`, `0x40`. |
 

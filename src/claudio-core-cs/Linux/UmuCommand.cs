@@ -55,7 +55,6 @@ internal static class UmuCommand
         info.Environment["PROTONPATH"] = protonPath;
         info.Environment["GAMEID"] = gameId;
         info.Environment["STORE"] = store;
-        info.Environment["UMU_LOG"] = "debug";
     }
 
     public static void PreparePrefix(string prefix, string protonPath, Func<bool> cancelled)

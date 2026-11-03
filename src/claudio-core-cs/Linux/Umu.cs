@@ -6,7 +6,7 @@ namespace Claudio.Core.Linux;
 [System.Runtime.Versioning.SupportedOSPlatform("linux")]
 internal static class Umu
 {
-    public const string ManagedVersion = "1.4.0";
+    public const string ManagedVersion = "1.4.4";
     private const string ArchiveMember = "umu/umu-run";
 
     public static string ManagedDir() => Path.Combine(SettingsStore.ToolsDir(), "umu-launcher", ManagedVersion);

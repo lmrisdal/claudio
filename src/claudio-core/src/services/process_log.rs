@@ -60,7 +60,10 @@ fn spawn_log_reader(
                 Ok(line) => {
                     push_log_tail(&log_tail, label, &line);
                     match label {
-                        "stderr" => log::warn!("[{process_name} stderr] {line}"),
+                        "stderr" if stderr_is_problem(&line) => {
+                            log::warn!("[{process_name} stderr] {line}")
+                        }
+                        "stderr" => log::info!("[{process_name} stderr] {line}"),
                         _ => log::info!("[{process_name} stdout] {line}"),
                     }
                 }
@@ -73,6 +76,14 @@ fn spawn_log_reader(
     });
 }
 
+// Tools such as umu write their routine INFO output to stderr, so only lines that
+// look like problems are worth a warning.
+fn stderr_is_problem(line: &str) -> bool {
+    ["WARN", "ERROR", "Error", "Traceback", "mismatch"]
+        .iter()
+        .any(|marker| line.contains(marker))
+}
+
 fn push_log_tail(log_tail: &LogTail, label: &str, line: &str) {
     let Ok(mut tail) = log_tail.lock() else {
         return;
@@ -81,4 +92,24 @@ fn push_log_tail(log_tail: &LogTail, label: &str, line: &str) {
         tail.pop_front();
     }
     tail.push_back(format!("{label}: {line}"));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stderr_is_problem;
+
+    #[test]
+    fn routine_info_lines_are_not_problems() {
+        assert!(!stderr_is_problem("INFO: Updating steamrt4 to latest..."));
+        assert!(!stderr_is_problem("ProtonFixes[1] INFO: All checks successful"));
+        assert!(!stderr_is_problem(""));
+    }
+
+    #[test]
+    fn warnings_and_errors_are_problems() {
+        assert!(stderr_is_problem("ERROR: Digest mismatched: foo.tar.xz"));
+        assert!(stderr_is_problem("ProtonFixes[1] WARN: Game title not found in CSV"));
+        assert!(stderr_is_problem("Proton: Error: unable to use parent for game drive"));
+        assert!(stderr_is_problem("Traceback (most recent call last):"));
+    }
 }
