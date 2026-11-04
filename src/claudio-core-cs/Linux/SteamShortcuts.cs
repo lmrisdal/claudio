@@ -15,7 +15,7 @@ internal static class SteamShortcuts
 
     public static void WriteCommand(InstalledGame installed, string exeCommand, string launchOptions)
     {
-        var shortcutPath = ShortcutsPath()
+        var shortcutPath = SteamUsers.ShortcutsPath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             ?? throw new CommandException("No Steam userdata folder was found for shortcut creation.");
         var exe = installed.GameExe ?? installed.InstallPath;
         var startDir = Path.GetDirectoryName(exe) is { Length: > 0 } parent ? parent : ".";
@@ -54,35 +54,6 @@ internal static class SteamShortcuts
     private static void SetString(VdfObject target, string key, string value) => target.Items[key] = new VdfString(value);
 
     private static void SetInt(VdfObject target, string key, int value) => target.Items[key] = new VdfInt32(BinaryVdf.Int32, value);
-
-    private static string? ShortcutsPath()
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        foreach (var steamRoot in new[]
-        {
-            Path.Combine(home, ".steam", "steam"),
-            Path.Combine(home, ".var", "app", "com.valvesoftware.Steam", ".steam", "steam"),
-        })
-        {
-            var userdata = Path.Combine(steamRoot, "userdata");
-            if (!Directory.Exists(userdata))
-            {
-                continue;
-            }
-
-            var ids = Directory.EnumerateDirectories(userdata)
-                .Select(Path.GetFileName)
-                .Where(name => !string.IsNullOrEmpty(name) && name.All(char.IsAsciiDigit))
-                .Order(StringComparer.Ordinal)
-                .ToList();
-            if (ids.Count > 0)
-            {
-                return Path.Combine(userdata, ids[0]!, "config", "shortcuts.vdf");
-            }
-        }
-
-        return null;
-    }
 
     private static VdfObject Load(string path)
     {

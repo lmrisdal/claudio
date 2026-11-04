@@ -3,7 +3,7 @@
 use crate::models::InstalledGame;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const BIN_NONE: u8 = 0x00;
 const BIN_STRING: u8 = 0x01;
@@ -52,7 +52,8 @@ pub(crate) fn write_steam_shortcut_command(
     exe_command: String,
     launch_options: String,
 ) -> Result<(), String> {
-    let shortcut_path = steam_shortcuts_path()
+    let shortcut_path = dirs::home_dir()
+        .and_then(|home| crate::services::linux_steam_users::steam_shortcuts_path(&home))
         .ok_or_else(|| "No Steam userdata folder was found for shortcut creation.".to_string())?;
     let exe = installed
         .game_exe
@@ -115,37 +116,6 @@ fn insert_i32(object: &mut BinaryVdfObject, key: &str, value: i32) {
             value,
         },
     );
-}
-
-fn steam_shortcuts_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    [
-        home.join(".steam").join("steam"),
-        home.join(".var")
-            .join("app")
-            .join("com.valvesoftware.Steam")
-            .join(".steam")
-            .join("steam"),
-    ]
-    .into_iter()
-    .filter_map(|steam_root| {
-        let userdata = steam_root.join("userdata");
-        let mut ids = fs::read_dir(&userdata)
-            .ok()?
-            .flatten()
-            .filter_map(|entry| {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                (entry.path().is_dir() && name.chars().all(|ch| ch.is_ascii_digit()))
-                    .then(|| name.into_owned())
-            })
-            .collect::<Vec<_>>();
-        ids.sort();
-        ids.into_iter()
-            .next()
-            .map(|id| userdata.join(id).join("config").join("shortcuts.vdf"))
-    })
-    .next()
 }
 
 fn load_shortcuts(path: &Path) -> Result<BinaryVdfObject, String> {

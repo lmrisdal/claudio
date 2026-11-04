@@ -211,6 +211,28 @@ describe.skipIf(!contractAvailable || process.platform !== "linux")("claudio-cor
       expect(existsSync(`${steamConfig()}.claudio.bak`)).toBe(true);
     });
 
+    it("writes to the logged-in Steam account, not userdata/0", async () => {
+      startCore("exit 0");
+      registerGame(10);
+      const steamRoot = path.join(home, ".steam", "steam");
+      for (const account of ["0", "49630926"]) {
+        mkdirSync(path.join(steamRoot, "userdata", account), { recursive: true });
+      }
+      mkdirSync(path.join(steamRoot, "config"), { recursive: true });
+      writeFileSync(
+        path.join(steamRoot, "config", "loginusers.vdf"),
+        '"users"\n{\n\t"76561198009896654"\n\t{\n\t\t"AccountName"\t\t"player"\n\t\t"timestamp"\t\t"200"\n\t}\n}\n',
+      );
+
+      await core.call("add_steam_shortcut", { remoteGameId: 10 });
+
+      const account = path.join(steamRoot, "userdata", "49630926", "config", "shortcuts.vdf");
+      expect(readFileSync(account).includes(Buffer.from("Test Game"))).toBe(true);
+      expect(existsSync(path.join(steamRoot, "userdata", "0", "config", "shortcuts.vdf"))).toBe(
+        false,
+      );
+    });
+
     it("leaves an unreadable shortcuts file unchanged", async () => {
       startCore("exit 0");
       registerGame(8);
