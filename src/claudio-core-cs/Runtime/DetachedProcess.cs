@@ -4,7 +4,7 @@ namespace Claudio.Core.Runtime;
 
 internal static class DetachedProcess
 {
-    private const string ShellScript = "exec \"$0\" \"$@\" </dev/null >/dev/null 2>&1";
+    internal const string ShellScript = "exec \"$0\" \"$@\" </dev/null >/dev/null 2>&1";
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows6.1")]
     public static int StartWindows(string exe, string rawParameters, string workingDirectory, bool elevated)

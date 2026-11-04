@@ -183,10 +183,17 @@ internal static class PackageInstall
         FileOps.ClearExistingPath(destination);
         try
         {
-            File.Move(downloadInfo.FilePath, destination);
+            FileOps.MoveEntry(downloadInfo.FilePath, destination);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
+            if (Directory.Exists(downloadInfo.FilePath))
+            {
+                Directory.CreateDirectory(destination);
+                FileOps.CopyDirContents(downloadInfo.FilePath, destination);
+                return destination;
+            }
+
             try
             {
                 File.Copy(downloadInfo.FilePath, destination, overwrite: true);

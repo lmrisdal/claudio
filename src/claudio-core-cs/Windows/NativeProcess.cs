@@ -15,6 +15,7 @@ internal sealed class NativeProcess : IDisposable
 {
     private const int ElevationRequiredError = 740;
     private const uint StillActive = 259;
+    private const nuint HandleListAttribute = 0x20002;
     private static unsafe HANDLE InvalidHandle => new((void*)-1);
 
     private HANDLE handle;
@@ -62,6 +63,28 @@ internal sealed class NativeProcess : IDisposable
 
     public static bool IsStillActive(uint exitCode) => exitCode == StillActive;
 
+    public static bool IsPidRunning(uint pid)
+    {
+        var process = PInvoke.OpenProcess(PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (process.IsNull)
+        {
+            return false;
+        }
+
+        try
+        {
+            unsafe
+            {
+                uint code;
+                return PInvoke.GetExitCodeProcess(process, &code) && code == StillActive;
+            }
+        }
+        finally
+        {
+            PInvoke.CloseHandle(process);
+        }
+    }
+
     public static void DisableStandardHandleInheritance()
     {
         foreach (var id in new[] { STD_HANDLE.STD_INPUT_HANDLE, STD_HANDLE.STD_OUTPUT_HANDLE, STD_HANDLE.STD_ERROR_HANDLE })
@@ -86,40 +109,72 @@ internal sealed class NativeProcess : IDisposable
         var nul = OpenNul();
         try
         {
-            var startup = new STARTUPINFOW
+            var startup = new STARTUPINFOEXW
             {
-                cb = (uint)Marshal.SizeOf<STARTUPINFOW>(),
-                dwFlags = STARTUPINFOW_FLAGS.STARTF_USESTDHANDLES,
-                hStdInput = nul,
-                hStdOutput = nul,
-                hStdError = nul,
+                StartupInfo = new STARTUPINFOW
+                {
+                    cb = (uint)Marshal.SizeOf<STARTUPINFOEXW>(),
+                    dwFlags = STARTUPINFOW_FLAGS.STARTF_USESTDHANDLES,
+                    hStdInput = nul,
+                    hStdOutput = nul,
+                    hStdError = nul,
+                },
             };
-            var flags = PROCESS_CREATION_FLAGS.CREATE_UNICODE_ENVIRONMENT;
+            var flags = PROCESS_CREATION_FLAGS.CREATE_UNICODE_ENVIRONMENT | PROCESS_CREATION_FLAGS.EXTENDED_STARTUPINFO_PRESENT;
             PROCESS_INFORMATION info;
             bool created;
+            var createError = 0;
             unsafe
             {
+                nuint size = 0;
+                PInvoke.InitializeProcThreadAttributeList(default, 1, 0, &size);
+                var attributeBuffer = new byte[(int)size];
+                fixed (byte* attributePointer = attributeBuffer)
                 fixed (char* commandLinePointer = buffer)
                 fixed (char* directoryPointer = workingDirectory)
                 fixed (char* environmentPointer = environment)
                 {
-                    created = PInvoke.CreateProcess(
-                        default,
-                        commandLinePointer,
-                        null,
-                        null,
-                        true,
-                        flags,
-                        environment is null ? null : environmentPointer,
-                        directoryPointer,
-                        &startup,
-                        &info);
+                    var attributes = new LPPROC_THREAD_ATTRIBUTE_LIST(attributePointer);
+                    if (!PInvoke.InitializeProcThreadAttributeList(attributes, 1, 0, &size))
+                    {
+                        throw new CommandException(new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+                    }
+
+                    try
+                    {
+                        // Only NUL may be inherited. Without this list the child also inherits any pipe
+                        // that a concurrent Process.Start (7-Zip, innoextract) has open, and that
+                        // process's output then never reaches EOF while the game runs.
+                        var inherited = nul;
+                        if (!PInvoke.UpdateProcThreadAttribute(attributes, 0, HandleListAttribute, &inherited, (nuint)sizeof(HANDLE), null, null))
+                        {
+                            throw new CommandException(new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+                        }
+
+                        startup.lpAttributeList = attributes;
+                        created = PInvoke.CreateProcess(
+                            default,
+                            commandLinePointer,
+                            null,
+                            null,
+                            true,
+                            flags,
+                            environment is null ? null : environmentPointer,
+                            directoryPointer,
+                            (STARTUPINFOW*)&startup,
+                            &info);
+                        createError = created ? 0 : Marshal.GetLastWin32Error();
+                    }
+                    finally
+                    {
+                        PInvoke.DeleteProcThreadAttributeList(attributes);
+                    }
                 }
             }
 
             if (!created)
             {
-                var error = Marshal.GetLastWin32Error();
+                var error = createError;
                 if (error == ElevationRequiredError)
                 {
                     throw new RequiresAdministratorException();

@@ -24,3 +24,7 @@ PROCESS_ACCESS_RIGHTS
 HANDLE_FLAGS
 WAIT_EVENT
 SHELLEXECUTEINFOW
+InitializeProcThreadAttributeList
+UpdateProcThreadAttribute
+DeleteProcThreadAttributeList
+STARTUPINFOEXW

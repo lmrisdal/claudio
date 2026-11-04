@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Formats.Tar;
 using System.IO.Compression;
 
 namespace Claudio.Core.Install;
@@ -21,11 +20,11 @@ internal static class Extract
         }
         else if (lower.EndsWith(".tar.gz", StringComparison.Ordinal) || lower.EndsWith(".tgz", StringComparison.Ordinal))
         {
-            Tar(source, destination, control, progress, gzip: true);
+            TarExtract.Run(source, destination, control, progress, gzip: true);
         }
         else if (lower.EndsWith(".tar", StringComparison.Ordinal))
         {
-            Tar(source, destination, control, progress, gzip: false);
+            TarExtract.Run(source, destination, control, progress, gzip: false);
         }
         else
         {
@@ -237,47 +236,5 @@ internal static class Extract
         }
 
         return parts.Count == 0 ? null : string.Join(Path.DirectorySeparatorChar, parts);
-    }
-
-    private static void Tar(string source, string destination, InstallControl control, Action<double> progress, bool gzip)
-    {
-        var label = gzip ? "tar.gz" : "tar";
-        CreateDirectory(destination, $"create {label} extraction destination", $"create the {label} extraction destination");
-        FileStream file;
-        try
-        {
-            file = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            FileOps.LogIoFailure($"open {label} archive", source, error);
-            throw new CommandException(FileOps.FormatInstallIoError($"open the {label} archive", source, error));
-        }
-
-        try
-        {
-            using var counted = new ProgressStream(file, control, progress);
-            if (gzip)
-            {
-                using var decoder = new GZipStream(counted, CompressionMode.Decompress);
-                TarFile.ExtractToDirectory(decoder, destination, overwriteFiles: true);
-                decoder.CopyTo(Stream.Null);
-            }
-            else
-            {
-                TarFile.ExtractToDirectory(counted, destination, overwriteFiles: true);
-            }
-        }
-        catch (Exception error) when (error is OperationCanceledException || control.IsCancelled)
-        {
-            throw new CommandException(CancelledMessage);
-        }
-        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException)
-        {
-            Logging.Log.Error("claudio_core", $"[installer] unpack {label} archive failed for {source} into {destination}: {error.Message}");
-            throw new CommandException(FileOps.FormatInstallIoErrorPair($"unpack the {label} archive", source, destination, error));
-        }
-
-        progress(1.0);
     }
 }

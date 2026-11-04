@@ -86,6 +86,18 @@ internal static class Umu
             throw new CommandException($"Failed to download UMU Launcher: {error.Message}");
         }
 
+        try
+        {
+            return ExtractManagedRun(bytes, target);
+        }
+        catch (Exception error) when (error is InvalidDataException or EndOfStreamException or FormatException)
+        {
+            throw new CommandException($"Failed to read UMU Launcher archive: {error.Message}");
+        }
+    }
+
+    private static string ExtractManagedRun(byte[] bytes, string target)
+    {
         using var reader = new TarReader(new MemoryStream(bytes));
         while (reader.GetNextEntry() is { } entry)
         {
@@ -175,7 +187,7 @@ internal static class Umu
             {
                 SteamShortcuts.Write(installed, ResolveRun());
             }
-            catch (CommandException error)
+            catch (Exception error) when (IsShortcutFailure(error))
             {
                 Log.Warn("claudio_core", $"[linux shortcut] failed to write Steam shortcut: {error.Message}");
             }
@@ -193,11 +205,14 @@ internal static class Umu
         {
             WriteDesktopShortcut(installed, directory);
         }
-        catch (CommandException error)
+        catch (Exception error) when (IsShortcutFailure(error))
         {
             Log.Warn("claudio_core", $"[linux shortcut] failed to write {label} shortcut: {error.Message}");
         }
     }
+
+    private static bool IsShortcutFailure(Exception error) =>
+        error is CommandException or IOException or UnauthorizedAccessException;
 
     private static string DesktopDir()
     {

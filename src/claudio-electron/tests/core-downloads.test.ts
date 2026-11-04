@@ -368,6 +368,22 @@ describe.skipIf(!contractAvailable || !canBuildArchives || !sevenZip)(
         expect(readFileSync(path.join(target, "big.bin")).equals(full)).toBe(true);
       });
 
+      it("saves the downloaded folder when extract is off", async () => {
+        manifestServer(25);
+        server.on("GET", "/api/games/25/download-files", (req, res) => {
+          const requested = new URL(req.url ?? "", "http://x").searchParams.get("path");
+          res.end(requested === "Game/game.exe" ? "exe" : "12345");
+        });
+        startCore();
+
+        const saved = await download(25, false);
+
+        expect(readFileSync(path.join(String(saved), "Game", "game.exe"), "utf8")).toBe("exe");
+        expect(readFileSync(path.join(String(saved), "Game", "data", "a b.bin"), "utf8")).toBe(
+          "12345",
+        );
+      });
+
       it("fails immediately on a 404 with the file path", async () => {
         manifestServer(24);
         server.on("GET", "/api/games/24/download-files", (_req, res) => {

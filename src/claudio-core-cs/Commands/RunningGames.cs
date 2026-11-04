@@ -199,14 +199,6 @@ internal sealed class RunningGames
             }
         }
 
-        try
-        {
-            using var process = Process.GetProcessById((int)pid);
-            return !process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
+        return OperatingSystem.IsWindowsVersionAtLeast(6, 1) && Windows.NativeProcess.IsPidRunning(pid);
     }
 }

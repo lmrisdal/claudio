@@ -159,7 +159,7 @@ internal static class FileOps
         }
     }
 
-    private static void MoveEntry(string entry, string target)
+    public static void MoveEntry(string entry, string target)
     {
         if (Directory.Exists(entry))
         {
