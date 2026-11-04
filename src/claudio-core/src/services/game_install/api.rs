@@ -5,7 +5,8 @@ pub async fn install_game(
     state: &InstallState,
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
-    let control = state.start(game.id)?;
+    let active = state.start(game.id)?;
+    let control = active.control.clone();
     let game_id = game.id;
     let game_title = game.title.clone();
     let result = install_game_inner(&app, game, &control).await;
@@ -20,7 +21,7 @@ pub async fn install_game(
             Some(&format!("Install failed for {game_title}: {error}")),
         );
     }
-    state.finish(game_id);
+    drop(active);
     if control.is_cancelled() {
         return Err("Install cancelled.".to_string());
     }
@@ -32,7 +33,8 @@ pub async fn retry_cached_install(
     state: &InstallState,
     game: RemoteGame,
 ) -> Result<InstalledGame, String> {
-    let control = state.start(game.id)?;
+    let active = state.start(game.id)?;
+    let control = active.control.clone();
     let game_id = game.id;
     let game_title = game.title.clone();
     let result = install_game_from_cached_package_inner(&app, game, &control).await;
@@ -47,7 +49,7 @@ pub async fn retry_cached_install(
             Some(&format!("Retry failed for {game_title}: {error}")),
         );
     }
-    state.finish(game_id);
+    drop(active);
     if control.is_cancelled() {
         return Err("Install cancelled.".to_string());
     }
@@ -59,7 +61,8 @@ pub async fn download_game_package(
     state: &InstallState,
     input: DownloadPackageInput,
 ) -> Result<String, String> {
-    let control = state.start(input.id)?;
+    let active = state.start(input.id)?;
+    let control = active.control.clone();
     let game_id = input.id;
     let game_title = input.title.clone();
     let target_dir = PathBuf::from(&input.target_dir);
@@ -76,7 +79,7 @@ pub async fn download_game_package(
             Some(&format!("Download failed for {game_title}: {error}")),
         );
     }
-    state.finish(game_id);
+    drop(active);
     if let Ok(download_root) = settings::resolve_download_root(&settings::load()) {
         let workspace = download_workspace_root(&download_root, input.id, &input.title);
         let _ = fs::remove_dir_all(workspace);

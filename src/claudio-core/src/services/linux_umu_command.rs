@@ -36,7 +36,6 @@ fn spawn_prefix_command(
         .env("PROTONPATH", proton_path)
         .env("GAMEID", game_id.unwrap_or("umu-default"))
         .env("STORE", store.unwrap_or("none"))
-        .env("UMU_LOG", "debug")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -89,7 +88,7 @@ pub fn run_prefix_command_wait(
                 return Err(format!(
                     "UMU exited with status {status} while running {}.\n{}",
                     exe.display(),
-                    crate::services::process_log::format_log_tail("UMU", &process.log_tail)
+                    process.failure_output("UMU")
                 ));
             }
             Ok(None) => thread::sleep(Duration::from_millis(250)),
@@ -115,7 +114,6 @@ pub fn prepare_prefix(
         .env("PROTONPATH", proton_path)
         .env("GAMEID", "umu-default")
         .env("STORE", "none")
-        .env("UMU_LOG", "debug")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -145,7 +143,7 @@ pub fn prepare_prefix(
                 return Err(format!(
                     "UMU exited with status {status} while preparing prefix {}.\n{}",
                     runtime_prefix.display(),
-                    crate::services::process_log::format_log_tail("UMU", &process.log_tail)
+                    process.failure_output("UMU")
                 ));
             }
             Ok(None) => thread::sleep(Duration::from_millis(250)),

@@ -7,7 +7,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-const MANAGED_UMU_VERSION: &str = "1.4.0";
+const MANAGED_UMU_VERSION: &str = "1.4.4";
 const MANAGED_UMU_ARCHIVE_MEMBER: &str = "umu/umu-run";
 
 #[path = "linux_umu_command.rs"]

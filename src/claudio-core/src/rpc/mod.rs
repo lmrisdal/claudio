@@ -7,8 +7,11 @@ use crate::host::Host;
 use crate::services::game_install::InstallState;
 use crate::services::game_runtime::RunningGamesState;
 use backend::RpcBackend;
+use futures_util::FutureExt;
 use message::{Incoming, error_line, parse_line, result_line};
 use serde_json::Value;
+use std::any::Any;
+use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
@@ -85,15 +88,32 @@ fn spawn_request(
     output: UnboundedSender<String>,
 ) {
     tokio::spawn(async move {
-        let line = match dispatch::dispatch(&ctx, &method, params).await {
-            Ok(result) => result_line(&id, &result),
-            Err(message) => {
+        // Without this a panicking command never answers and the shell waits on it forever.
+        let dispatched = AssertUnwindSafe(dispatch::dispatch(&ctx, &method, params))
+            .catch_unwind()
+            .await;
+        let line = match dispatched {
+            Ok(Ok(result)) => result_line(&id, &result),
+            Ok(Err(message)) => {
                 log::debug!("command {method} failed: {message}");
                 error_line(&id, &message)
+            }
+            Err(panic) => {
+                let message = panic_message(panic.as_ref());
+                log::error!("command {method} panicked: {message}");
+                error_line(&id, &format!("Unexpected failure in {method}: {message}"))
             }
         };
         let _ = output.send(line);
     });
+}
+
+fn panic_message(panic: &(dyn Any + Send)) -> String {
+    panic
+        .downcast_ref::<&str>()
+        .map(|message| (*message).to_string())
+        .or_else(|| panic.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "unknown panic".to_string())
 }
 
 #[cfg(test)]

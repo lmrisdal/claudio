@@ -25,6 +25,20 @@ impl Drop for ActiveInstallGuard<'_> {
     }
 }
 
+// Releasing on drop keeps the game from staying marked as installing (quit warning,
+// Windows sleep prevention) when the install future panics instead of returning.
+pub(super) struct ActiveInstall<'a> {
+    state: &'a InstallState,
+    game_id: i32,
+    pub(super) control: InstallControl,
+}
+
+impl Drop for ActiveInstall<'_> {
+    fn drop(&mut self) {
+        self.state.finish(self.game_id);
+    }
+}
+
 #[derive(Clone)]
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub(super) struct InstallControl {
@@ -110,7 +124,7 @@ impl InstallControl {
 }
 
 impl InstallState {
-    pub(super) fn start(&self, game_id: i32) -> Result<InstallControl, String> {
+    pub(super) fn start(&self, game_id: i32) -> Result<ActiveInstall<'_>, String> {
         let mut installs = self
             .installs
             .lock()
@@ -130,10 +144,14 @@ impl InstallState {
         let control = InstallControl::new();
         installs.insert(game_id, control.clone());
         guard.should_release = false;
-        Ok(control)
+        Ok(ActiveInstall {
+            state: self,
+            game_id,
+            control,
+        })
     }
 
-    pub(super) fn finish(&self, game_id: i32) {
+    fn finish(&self, game_id: i32) {
         if let Ok(mut installs) = self.installs.lock() {
             let removed = installs.remove(&game_id).is_some();
             let should_release = removed && installs.is_empty();
@@ -227,3 +245,32 @@ pub(super) fn terminate_external_installer(control: &InstallControl) {
 
 #[cfg(not(target_os = "windows"))]
 pub(super) fn terminate_external_installer(_control: &InstallControl) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    #[test]
+    fn panicking_install_releases_the_game() {
+        let state = InstallState::default();
+        let outcome = catch_unwind(AssertUnwindSafe(|| {
+            let _active = state.start(7).expect("first start should succeed");
+            panic!("install blew up");
+        }));
+
+        assert!(outcome.is_err());
+        assert!(!state.has_active_operations());
+        assert!(state.start(7).is_ok());
+    }
+
+    #[test]
+    fn second_start_for_same_game_is_rejected_until_released() {
+        let state = InstallState::default();
+        let active = state.start(3).expect("first start should succeed");
+        assert!(state.start(3).is_err());
+
+        drop(active);
+        assert!(state.start(3).is_ok());
+    }
+}
