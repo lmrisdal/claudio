@@ -15,17 +15,15 @@ const shouldRenderSearch =
 	<div class="title-wrapper sl-flex">
 		<SiteTitle />
 	</div>
-	<div class="sl-hidden md:sl-flex print:hidden right-group">
+	<div class="sl-flex print:hidden right-group">
 		{shouldRenderSearch && <Search />}
-		<div class="sl-flex social-icons">
+		<div class="sl-hidden md:sl-flex social-icons">
 			<SocialIcons />
 		</div>
-		<ThemeSelect />
-		<LanguageSelect />
-	</div>
-	{/* Mobile: search still visible */}
-	<div class="md:sl-hidden print:hidden mobile-search">
-		{shouldRenderSearch && <Search />}
+		<div class="sl-hidden md:sl-flex">
+			<ThemeSelect />
+			<LanguageSelect />
+		</div>
 	</div>
 </div>
 
