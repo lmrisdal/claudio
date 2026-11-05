@@ -3,8 +3,14 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - docs/**
+      - .github/workflows/docs.yml
   push:
     branches: [main]
+    paths-ignore:
+      - docs/**
+      - .github/workflows/docs.yml
   workflow_dispatch:
   workflow_call:
 
@@ -73,16 +79,16 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: '22'
-          working-directory: src/claudio-electron
+          working-directory: src/claudio-desktop/app
           cache: true
           run-install: |
             args: ['--frozen-lockfile']
       - run: vp check
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
       - run: vp test
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
       - run: vp pack
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
       - name: Test release helpers
         if: runner.os == 'Linux'
         run: node --test scripts/*.test.cjs

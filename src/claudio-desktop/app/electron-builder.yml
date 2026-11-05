@@ -8,7 +8,7 @@ files:
   - dist/**/*
   - package.json
 extraResources:
-  - from: ../claudio-web/dist
+  - from: ../../claudio-web/dist
     to: web
   - from: resources/icon.png
     to: icon.png
@@ -23,7 +23,7 @@ linux:
   category: Game
   executableName: claudio
   extraResources:
-    - from: ../../target/release/claudio-core
+    - from: ../../../target/release/claudio-core
       to: claudio-core
 win:
   target:
@@ -33,9 +33,9 @@ win:
       arch: x64
   icon: resources/icon.ico
   extraResources:
-    - from: ../../target/release/claudio-core.exe
+    - from: ../../../target/release/claudio-core.exe
       to: claudio-core.exe
-    - from: ../../target/release/claudio-game-uninstaller.exe
+    - from: ../../../target/release/claudio-game-uninstaller.exe
       to: claudio-game-uninstaller.exe
 nsis:
   oneClick: true

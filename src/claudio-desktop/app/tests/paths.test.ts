@@ -10,7 +10,7 @@ describe.each(["linux", "win32"] as const)("resolvePaths (%s)", (platform) => {
   const base = {
     isPackaged: false,
     resourcesPath,
-    appPath: path.join(repoRoot, "src", "claudio-electron"),
+    appPath: path.join(repoRoot, "src", "claudio-desktop", "app"),
     env: {},
     platform,
   };

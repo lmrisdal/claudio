@@ -19,16 +19,16 @@ function fixture(t, { broken = false } = {}) {
     return result.stdout.trim();
   };
   const git = (...args) => success('git', args);
-  for (const directory of ['scripts', 'src/claudio-core/src', 'src/claudio-web', 'src/claudio-electron']) {
+  for (const directory of ['scripts', 'src/claudio-desktop/core/src', 'src/claudio-web', 'src/claudio-desktop/app']) {
     mkdirSync(join(cwd, directory), { recursive: true });
   }
   copyFileSync(join(__dirname, '../Makefile'), join(cwd, 'Makefile'));
   copyFileSync(join(__dirname, 'bump_version.cjs'), join(cwd, 'scripts/bump_version.cjs'));
   writeFileSync(join(cwd, '.gitignore'), '/target/\n');
-  writeFileSync(join(cwd, 'Cargo.toml'), '[workspace]\nmembers = ["src/claudio-core"]\nresolver = "3"\n');
-  writeFileSync(join(cwd, 'src/claudio-core/Cargo.toml'), '[package]\nname = "claudio-core"\nversion = "0.2.1"\nedition = "2024"\n');
-  writeFileSync(join(cwd, 'src/claudio-core/src/lib.rs'), broken ? 'invalid rust' : '');
-  for (const name of ['claudio-web', 'claudio-electron']) {
+  writeFileSync(join(cwd, 'Cargo.toml'), '[workspace]\nmembers = ["src/claudio-desktop/core"]\nresolver = "3"\n');
+  writeFileSync(join(cwd, 'src/claudio-desktop/core/Cargo.toml'), '[package]\nname = "claudio-core"\nversion = "0.2.1"\nedition = "2024"\n');
+  writeFileSync(join(cwd, 'src/claudio-desktop/core/src/lib.rs'), broken ? 'invalid rust' : '');
+  for (const name of ['claudio-web', 'claudio-desktop/app']) {
     writeFileSync(join(cwd, 'src', name, 'package.json'), JSON.stringify({ version: '0.2.1' }));
   }
   success('cargo', ['generate-lockfile', '--offline']);
@@ -51,7 +51,7 @@ test('make bump commits the refreshed lockfile and tags the release commit', t =
   assert.equal(git('status', '--porcelain'), '');
   assert.equal(git('rev-parse', 'v0.2.2^{commit}'), git('rev-parse', 'HEAD'));
   assert.equal(git('cat-file', '-t', 'v0.2.2'), 'tag');
-  for (const name of ['claudio-web', 'claudio-electron']) {
+  for (const name of ['claudio-web', 'claudio-desktop/app']) {
     assert.equal(JSON.parse(readFileSync(join(cwd, 'src', name, 'package.json'), 'utf8')).version, '0.2.2');
   }
   success('cargo', ['check', '--workspace', '--locked', '--offline']);

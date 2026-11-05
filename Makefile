@@ -10,7 +10,7 @@ bump:
 	fi; \
 	node scripts/bump_version.cjs "$$version"; \
 	cargo check --workspace; \
-	git add src/claudio-electron/package.json src/claudio-core/Cargo.toml src/claudio-web/package.json Cargo.lock; \
+	git add src/claudio-desktop/app/package.json src/claudio-desktop/core/Cargo.toml src/claudio-web/package.json Cargo.lock; \
 	git commit -m "chore(release): bump version to $$version"; \
 	git tag -a "v$$version" -m "Claudio $$version"; \
 	case "$$push_flag" in \

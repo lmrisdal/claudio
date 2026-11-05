@@ -41,13 +41,13 @@ for (const version of ['01.2.3', '1.2', '1.2.3-', '1.2.3-01', '1.2.3-beta.01', '
 test('reads the package version rather than a Cargo dependency version', () => {
   const root = mkdtempSync(join(tmpdir(), 'claudio-version-'));
   try {
-    for (const name of ['claudio-electron', 'claudio-web', 'claudio-core']) {
+    for (const name of ['claudio-desktop/app', 'claudio-web', 'claudio-desktop/core']) {
       mkdirSync(join(root, 'src', name), { recursive: true });
     }
-    for (const name of ['claudio-electron', 'claudio-web']) {
+    for (const name of ['claudio-desktop/app', 'claudio-web']) {
       writeFileSync(join(root, 'src', name, 'package.json'), JSON.stringify({ version: '0.3.0' }));
     }
-    const cargo = join(root, 'src/claudio-core/Cargo.toml');
+    const cargo = join(root, 'src/claudio-desktop/core/Cargo.toml');
     writeFileSync(cargo, '[package]\nname = "claudio-core"\nversion = "0.3.0"\n\n[dependencies.example]\nversion = "9.0.0"\n');
     assert.deepEqual(readVersions(root), versions('0.3.0'));
     writeFileSync(cargo, '[package]\nname = "claudio-core"\n\n[dependencies.example]\nversion = "9.0.0"\n');

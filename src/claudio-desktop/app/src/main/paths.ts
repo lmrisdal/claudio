@@ -20,7 +20,7 @@ export interface AppPaths {
 export function resolvePaths(inputs: PathInputs): AppPaths {
   const { isPackaged, resourcesPath, appPath, env, platform } = inputs;
   const executable = platform === "win32" ? "claudio-core.exe" : "claudio-core";
-  const repoRoot = path.resolve(appPath, "..", "..");
+  const repoRoot = path.resolve(appPath, "..", "..", "..");
   const profile = env.CLAUDIO_CORE_PROFILE === "release" ? "release" : "debug";
 
   const coreBinary =

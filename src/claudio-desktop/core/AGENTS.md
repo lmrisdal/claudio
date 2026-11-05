@@ -1,6 +1,6 @@
 # Desktop Agent Rules
 
-These rules apply when working in `src/claudio-core`.
+These rules apply when working in `src/claudio-desktop/core`.
 
 - Preserve detailed path-aware error logging for install, extraction, staging, and cleanup failures. If code returns a user-friendly I/O error, make sure `claudio.log` still records the exact failing operation and paths.
 - Do not revert `cargo fmt` output just to keep a diff smaller. If `cargo fmt` reformats touched desktop files, keep those formatting changes.

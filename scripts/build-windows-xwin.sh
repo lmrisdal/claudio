@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-x86_64-pc-windows-msvc}"
 RUSTUP_HOME_DIR="${RUSTUP_HOME:-$(rustup show home)}"
 TOOLCHAIN="${RUSTUP_TOOLCHAIN:-$(rustup show active-toolchain | awk '{print $1}')}"
-UNINSTALLER_DIR="$ROOT_DIR/src/claudio-uninstaller"
+UNINSTALLER_DIR="$ROOT_DIR/src/claudio-desktop/uninstaller"
 UNINSTALLER_TARGET_DIR="$ROOT_DIR/target/$TARGET/release"
 UNINSTALLER_BUNDLE_DIR="$ROOT_DIR/target/release"
 
@@ -44,5 +44,5 @@ fi
 rustup run "$TOOLCHAIN" cargo xwin build --release --target "$TARGET" --manifest-path "$UNINSTALLER_DIR/Cargo.toml"
 mkdir -p "$UNINSTALLER_BUNDLE_DIR"
 cp "$UNINSTALLER_TARGET_DIR/claudio-game-uninstaller.exe" "$UNINSTALLER_BUNDLE_DIR/claudio-game-uninstaller.exe"
-rustup run "$TOOLCHAIN" cargo xwin build --release --target "$TARGET" --manifest-path "$ROOT_DIR/src/claudio-core/Cargo.toml" --bin claudio-core
+rustup run "$TOOLCHAIN" cargo xwin build --release --target "$TARGET" --manifest-path "$ROOT_DIR/src/claudio-desktop/core/Cargo.toml" --bin claudio-core
 cp "$ROOT_DIR/target/$TARGET/release/claudio-core.exe" "$UNINSTALLER_BUNDLE_DIR/claudio-core.exe"

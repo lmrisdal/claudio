@@ -18,10 +18,10 @@ function validateVersion(versions, tag) {
 
 function readVersions(root) {
   const packageVersion = directory => JSON.parse(readFileSync(join(root, 'src', directory, 'package.json'), 'utf8')).version;
-  const cargo = readFileSync(join(root, 'src/claudio-core/Cargo.toml'), 'utf8');
+  const cargo = readFileSync(join(root, 'src/claudio-desktop/core/Cargo.toml'), 'utf8');
   const section = cargo.split(/^\[package\]\s*$/m)[1]?.split(/^\[/m)[0];
   const core = section?.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-  return { electron: packageVersion('claudio-electron'), web: packageVersion('claudio-web'), core };
+  return { electron: packageVersion('claudio-desktop/app'), web: packageVersion('claudio-web'), core };
 }
 
 if (require.main === module) {

@@ -1,7 +1,7 @@
 # claudio-core
 
 Headless Rust sidecar for the Claudio desktop app. The Electron
-shell in `../claudio-electron` owns the windows, tray and API proxy; this crate
+shell in `../claudio-desktop/app` owns the windows, tray and API proxy; this crate
 does the local work the browser can't: installing games to disk, launching them
 and tracking running processes.
 

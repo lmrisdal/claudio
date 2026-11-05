@@ -77,17 +77,17 @@ jobs:
           CLAUDIO_DESKTOP_BUILD: '1'
         run: vp run build
       - name: Install shell dependencies
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: vp install --frozen-lockfile
       - name: Bundle shell
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: vp pack
       - name: Package
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: vp exec electron-builder ${{ matrix.args }} --publish never
       - name: Smoke-test AppImage
         if: runner.os == 'Linux'
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y xvfb
@@ -95,7 +95,7 @@ jobs:
           xvfb-run -a node scripts/smoke.mjs release/*.AppImage --appimage-extract-and-run --no-sandbox
       - name: Smoke-test packaged Windows app
         if: runner.os == 'Windows'
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: node scripts/smoke.mjs release/win-unpacked/Claudio.exe
       - uses: actions/upload-artifact@v4
         with:
@@ -104,11 +104,11 @@ jobs:
           compression-level: 0
           retention-days: 14
           path: |
-            src/claudio-electron/release/*.AppImage
-            src/claudio-electron/release/*.exe
-            src/claudio-electron/release/*.blockmap
-            src/claudio-electron/release/*.yml
-            !src/claudio-electron/release/builder-*.yml
+            src/claudio-desktop/app/release/*.AppImage
+            src/claudio-desktop/app/release/*.exe
+            src/claudio-desktop/app/release/*.blockmap
+            src/claudio-desktop/app/release/*.yml
+            !src/claudio-desktop/app/release/builder-*.yml
 
   container:
     name: Package container (${{ matrix.arch }})

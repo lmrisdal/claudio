@@ -1,6 +1,6 @@
 # Electron Shell Agent Rules
 
-These rules apply when working in `src/claudio-electron`.
+These rules apply when working in `src/claudio-desktop/app`.
 
 - Renderer security is not negotiable: `sandbox` and `contextIsolation` on, `nodeIntegration` off, no remote content with a preload. The renderer only gets what `src/preload/index.ts` exposes as `window.claudioDesktop`.
 - Every IPC handler checks the sender with `isTrustedFrame` (top frame served from `claudio-app://app/`). Renderer-callable commands go through the allowlists in `src/shared/channels.ts` (`CORE_METHODS`, `SHELL_METHODS`). `log` and `has_active_operations` stay core-internal.

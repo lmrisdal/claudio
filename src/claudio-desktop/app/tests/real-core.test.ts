@@ -10,6 +10,7 @@ const binary = path.resolve(
   "..",
   "..",
   "..",
+  "..",
   "target",
   "debug",
   process.platform === "win32" ? "claudio-core.exe" : "claudio-core",
