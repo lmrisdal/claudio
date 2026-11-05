@@ -2,6 +2,7 @@
   "name": "claudio-electron",
   "version": "0.2.2",
   "private": true,
+  "license": "AGPL-3.0-only",
   "description": "Claudio desktop client",
   "author": "Claudio",
   "type": "module",
