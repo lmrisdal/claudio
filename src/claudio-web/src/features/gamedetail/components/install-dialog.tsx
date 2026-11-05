@@ -7,6 +7,7 @@ import { isLinux, isWindows } from "../../core/utils/os";
 import { selectPath } from "../../desktop/hooks/desktop-dialog";
 import { listProtonVersions, resolveInstallBrowseRoot } from "../../desktop/hooks/use-desktop";
 import ExeListbox from "./exe-listbox";
+import InstallSpaceInfo from "./install-space-info";
 import InstallLinuxOptions from "./install-linux-options";
 import InstallWindowsOptions from "./install-windows-options";
 
@@ -55,6 +56,7 @@ interface InstallDialogProperties {
   defaultPath: string;
   defaultProtonPath?: string;
   isPortable?: boolean;
+  requiredBytes?: number;
   exeLabel?: string;
   exeOptions?: string[];
   installerPath?: string;
@@ -82,6 +84,7 @@ export default function InstallDialog({
   defaultPath,
   defaultProtonPath = "UMU-Latest",
   isPortable = false,
+  requiredBytes = 0,
   exeLabel,
   exeOptions = [],
   installerPath,
@@ -283,6 +286,7 @@ export default function InstallDialog({
                     Browse…
                   </button>
                 </div>
+                <InstallSpaceInfo path={installPath} requiredBytes={requiredBytes} enabled={open} />
                 {errorMessage && (
                   <p className="mt-2 text-sm text-red-400" role="alert">
                     {errorMessage}

@@ -54,7 +54,7 @@ mod tests;
 
 pub use api::{
     add_steam_shortcut, cancel_install, cleanup_failed_install, download_game_package,
-    get_installed_game, install_game, list_game_executables, list_installed_games,
+    get_disk_space, get_installed_game, install_game, list_game_executables, list_installed_games,
     open_install_folder, resolve_default_download_root_path, resolve_download_path,
     resolve_install_browse_root, resolve_install_path, restart_install_interactive,
     retry_cached_install, set_game_exe, uninstall_game, validate_install_target,

@@ -109,6 +109,20 @@ fn validate_install_target_path_allows_writable_parent() {
 }
 
 #[test]
+fn get_disk_space_measures_nearest_existing_parent() {
+    let root = unique_test_dir("disk-space");
+    fs::create_dir_all(&root).expect("root directory should be created");
+
+    let space = get_disk_space(&root.join("missing").join("deeper").to_string_lossy())
+        .expect("disk space should be reported");
+    assert!(space.free_bytes > 0);
+    assert!(space.total_bytes >= space.free_bytes);
+    assert!(get_disk_space("   ").is_none());
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn resolve_install_browse_root_path_uses_nearest_readable_parent() {
     let root = unique_test_dir("browse-root");
     let target = root.join("Claudio").join("Game");

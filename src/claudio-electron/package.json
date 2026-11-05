@@ -3,6 +3,7 @@
   "version": "0.2.2",
   "private": true,
   "description": "Claudio desktop client",
+  "license": "AGPL-3.0-only",
   "author": "Claudio",
   "type": "module",
   "main": "dist/main/index.cjs",

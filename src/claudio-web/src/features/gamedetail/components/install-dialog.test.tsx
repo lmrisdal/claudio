@@ -21,6 +21,8 @@ vi.mock("../../desktop/hooks/desktop-dialog", () => ({
 }));
 
 vi.mock("../../desktop/hooks/use-desktop", () => ({
+  isDesktop: true,
+  getDiskSpace: () => Promise.resolve({ freeBytes: 50 * 1024 ** 3, totalBytes: 200 * 1024 ** 3 }),
   listProtonVersions: () => Promise.resolve([{ label: "UMU Latest", value: "UMU-Latest" }]),
   resolveInstallBrowseRoot: (targetPath: string) =>
     Promise.resolve(targetPath.replace(/[\\/][^\\/]+$/, "")),
@@ -113,6 +115,31 @@ describe("InstallDialog download mode", () => {
     expect(call[0]).toContain("Games");
     expect(call[0]).toContain("Test");
     expect(call[8]).toBe(false);
+  });
+
+  it("shows required and free space for the install location", async () => {
+    apiGet.mockResolvedValue({ files: null });
+
+    const queryClient = renderWithQuery(
+      <InstallDialog
+        open
+        gameId={1}
+        title="Test Game"
+        defaultPath="/games/Test"
+        requiredBytes={2 * 1024 ** 3}
+        onClose={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+
+    await settleQueries(queryClient);
+
+    const text = dialogSurface().textContent;
+    expect(text).toContain("2.00 GB needed");
+    expect(text).toContain("50.00 GB free of 200.00 GB");
+    const bar = dialogSurface().querySelector('[role="progressbar"]');
+    expect(bar?.getAttribute("aria-valuenow")).toBe("150");
+    expect(bar?.getAttribute("aria-valuemax")).toBe("200");
   });
 
   it("shows extract option when manifest files is null (archive download)", async () => {

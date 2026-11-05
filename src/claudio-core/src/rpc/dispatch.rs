@@ -68,6 +68,10 @@ pub(super) async fn dispatch(ctx: &Context, method: &str, params: Value) -> Resu
             let args: TargetPathArgs = parse(method, params)?;
             to_value(blocking(move || games::resolve_install_browse_root(args.target_path)).await?)
         }
+        "get_disk_space" => {
+            let args: TargetPathArgs = parse(method, params)?;
+            to_value(blocking(move || games::get_disk_space(args.target_path)).await?)
+        }
         "resolve_default_download_root" => {
             to_value(blocking(games::resolve_default_download_root).await?)
         }

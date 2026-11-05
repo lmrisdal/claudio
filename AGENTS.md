@@ -35,6 +35,31 @@ vp check && vp test                                # lint, type-check and unit t
 ./scripts/build-windows-xwin.sh           # cross-build Windows claudio-core + uninstaller via cargo-xwin
 ```
 
+### Windows test VM (Windows behaviour from a Linux host)
+
+`cargo-xwin` (`scripts/check-windows-xwin.sh`) only type-checks and cross-builds. To actually run Windows-only code (`claudio-core` Windows services, installers, the uninstaller), use `scripts/windows-vm.sh`: a Windows 11 VM ([dockur/windows](https://github.com/dockur/windows) under rootless podman with KVM).
+
+```bash
+scripts/windows-vm.sh status                  # container state and whether SSH answers; run this first
+scripts/windows-vm.sh up                      # start it (it is stopped when not in use)
+scripts/windows-vm.sh wait                    # block until SSH answers after a start
+scripts/windows-vm.sh push                    # copy the working tree to C:\claudio (push --clean wipes it first)
+scripts/windows-vm.sh run 'cargo test -p claudio-core-tests'
+scripts/windows-vm.sh run 'cargo build -p claudio-core --bin claudio-core'
+scripts/windows-vm.sh desktop 'target\debug\claudio-core.exe < request.jsonl'
+scripts/windows-vm.sh snapshot clean          # save the disk (stops the VM); restore clean rolls back
+scripts/windows-vm.sh down
+```
+
+- **`run` is not a normal user.** It is PowerShell over SSH as an administrator with a full token and no desktop, so UAC never prompts and error 740 never happens. Use it for builds and unit tests only.
+- **`desktop` is a normal user.** It runs a `cmd` command line in the signed-in desktop session with the UAC-filtered token, the way Claudio runs for real users. Use it for installers, elevation, game launch, shortcuts and the uninstaller.
+- **UAC prompts and dialogs** appear on the VM screen. Open `http://127.0.0.1:8006/vnc.html?autoconnect=true&resize=scale` in the built-in browser to see them and click through. A `desktop` command that triggers a prompt blocks until it is answered, so run it in the background. Ask the user before approving a prompt that would change something outside the VM test data.
+- **Quoting:** `desktop` commands pass through bash, PowerShell and `cmd`. For anything with quotes, copy a `.ps1` or `.cmd` into the VM (`push`, or `scp` with the VM key) and run that file.
+- **Reset between installer tests:** `restore clean`, then `up` and `wait`. Snapshots are reflink copies on btrfs, so they are instant.
+- **Files:** `pull <remote> <local>` copies a file out. The host folder `~/.local/share/claudio-winvm/shared` is `Z:` in Windows.
+- **State** (disk, snapshots, SSH key, generated password) lives in `~/.local/share/claudio-winvm`, outside the repo. All ports listen on 127.0.0.1 only.
+- **First-time setup:** `up`, `wait` (Windows installs itself, 20-40 minutes), `provision` (MSVC build tools, Rust, Node.js, Vite+, and UAC switched back on, since the dockur install turns it off), then `snapshot clean`. Warn the user on first-time setup that the process will take a long time.
+
 ### Docker
 
 ```bash

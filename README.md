@@ -203,3 +203,7 @@ GitHub release stays in draft until the container images have been published.
 - **Backend:** C#, .NET 10, EF Core, SQLite/PostgreSQL
 - **Frontend:** React 19, Vite, TanStack Query, Tailwind CSS v4, Headless UI
 - **Metadata:** IGDB API via Twitch OAuth
+
+## License
+
+Claudio is licensed under the [GNU Affero General Public License v3.0](LICENSE). Bundled and downloaded third-party components keep their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

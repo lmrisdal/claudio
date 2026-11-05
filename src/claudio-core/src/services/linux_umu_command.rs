@@ -108,7 +108,7 @@ pub fn prepare_prefix(
     let runtime_prefix = crate::services::linux_host_paths::nested_runtime_path(prefix);
     let mut command = Command::new(umu_run);
     command
-        .arg("")
+        .arg("createprefix")
         .current_dir(prefix)
         .env("WINEPREFIX", &runtime_prefix)
         .env("PROTONPATH", proton_path)
@@ -138,7 +138,7 @@ pub fn prepare_prefix(
         }
 
         match process.child.try_wait() {
-            Ok(Some(status)) if status.success() => return Ok(()),
+            Ok(Some(status)) if status.success() || prefix_is_initialised(prefix) => return Ok(()),
             Ok(Some(status)) => {
                 return Err(format!(
                     "UMU exited with status {status} while preparing prefix {}.\n{}",
@@ -151,9 +151,28 @@ pub fn prepare_prefix(
         }
     }
 }
+// Proton exits 1 after creating the prefix because there is no executable to run, so judge
+// success by the prefix itself.
+fn prefix_is_initialised(prefix: &Path) -> bool {
+    prefix.join("pfx").join("system.reg").is_file() || prefix.join("system.reg").is_file()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prefix_is_initialised_when_system_registry_exists() {
+        let root = std::env::temp_dir().join(format!("claudio-prefix-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("pfx")).unwrap();
+        assert!(!prefix_is_initialised(&root));
+
+        fs::write(root.join("pfx").join("system.reg"), b"").unwrap();
+        assert!(prefix_is_initialised(&root));
+
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn msi_uses_msiexec_and_preserves_spaced_paths() {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::models::DiskSpace;
 
 pub async fn install_game(
     app: Host,
@@ -553,4 +554,18 @@ fn open_path_command(path: &Path) -> std::process::Command {
     command.arg(path);
 
     command
+}
+
+pub fn get_disk_space(target_path: &str) -> Option<DiskSpace> {
+    let trimmed = target_path.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // The target usually doesn't exist yet, so measure the nearest existing ancestor.
+    let existing = Path::new(trimmed).ancestors().find(|path| path.is_dir())?;
+    Some(DiskSpace {
+        free_bytes: fs4::available_space(existing).ok()?,
+        total_bytes: fs4::total_space(existing).ok()?,
+    })
 }

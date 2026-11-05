@@ -45,6 +45,7 @@ export const CORE_METHODS = [
   "validate_install_target",
   "resolve_install_path",
   "resolve_install_browse_root",
+  "get_disk_space",
   "resolve_default_download_root",
   "resolve_download_path",
   "open_install_folder",

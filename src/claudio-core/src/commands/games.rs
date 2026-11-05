@@ -77,6 +77,10 @@ pub(crate) fn resolve_install_browse_root_command(target_path: String) -> Option
     game_install::resolve_install_browse_root(&target_path)
 }
 
+pub(crate) fn get_disk_space_command(target_path: String) -> Option<crate::models::DiskSpace> {
+    game_install::get_disk_space(&target_path)
+}
+
 pub(crate) fn resolve_default_download_root_command() -> String {
     game_install::resolve_default_download_root_path()
 }
@@ -189,6 +193,10 @@ pub fn validate_install_target(target_path: String) -> Result<(), String> {
 
 pub fn resolve_install_browse_root(target_path: String) -> Option<String> {
     resolve_install_browse_root_command(target_path)
+}
+
+pub fn get_disk_space(target_path: String) -> Option<crate::models::DiskSpace> {
+    get_disk_space_command(target_path)
 }
 
 pub fn resolve_default_download_root() -> String {
