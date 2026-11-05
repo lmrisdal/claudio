@@ -9,26 +9,16 @@ const load = name => import(join(__dirname, name));
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'claudio-stage-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const dirs = { rustDir: join(root, 'rust'), csharpDir: join(root, 'cs'), uninstallerDir: join(root, 'un'), sevenZipDir: join(root, '7z'), output: join(root, 'out') };
-  for (const dir of [dirs.rustDir, dirs.csharpDir, dirs.uninstallerDir, join(dirs.sevenZipDir)]) mkdirSync(dir, { recursive: true });
+  const dirs = { csharpDir: join(root, 'cs'), uninstallerDir: join(root, 'un'), sevenZipDir: join(root, '7z'), output: join(root, 'out') };
+  for (const dir of [dirs.csharpDir, dirs.uninstallerDir, join(dirs.sevenZipDir)]) mkdirSync(dir, { recursive: true });
   writeFileSync(join(dirs.sevenZipDir, '7z2605-src.tar.xz'), 'source');
   for (const [dir, names] of [
-    [dirs.rustDir, ['claudio-core', 'claudio-core.exe', 'claudio-game-uninstaller.exe', 'claudio-core.d', 'claudio-core.pdb']],
     [dirs.csharpDir, ['claudio-core', 'claudio-core.exe', 'claudio-core.dbg', 'claudio-core.pdb']],
     [dirs.uninstallerDir, ['claudio-game-uninstaller.exe', 'claudio-game-uninstaller.pdb']],
     [dirs.sevenZipDir, ['7zzs', '7za.exe', 'License.txt']],
   ]) for (const name of names) writeFileSync(join(dir, name), name);
   return dirs;
 }
-
-test('a rust package stages exactly the files it shipped before', async t => {
-  const { stage } = await load('stage-sidecar.mjs');
-  const dirs = fixture(t);
-  assert.deepEqual(stage('rust', 'linux', dirs), ['claudio-core']);
-  assert.deepEqual(readdirSync(dirs.output).sort(), ['claudio-core']);
-  assert.deepEqual(stage('rust', 'win32', dirs), ['claudio-core.exe', 'claudio-game-uninstaller.exe']);
-  assert.deepEqual(readdirSync(dirs.output).sort(), ['claudio-core.exe', 'claudio-game-uninstaller.exe']);
-});
 
 test('a csharp package adds 7-Zip and notices and leaves debug symbols out', async t => {
   const { stage } = await load('stage-sidecar.mjs');
@@ -43,8 +33,8 @@ test('a csharp package adds 7-Zip and notices and leaves debug symbols out', asy
 test('staging fails with a clear message when the sidecar was not built', async t => {
   const { stage } = await load('stage-sidecar.mjs');
   const dirs = fixture(t);
-  rmSync(join(dirs.rustDir, 'claudio-core'));
-  assert.throws(() => stage('rust', 'linux', dirs), /Build the rust sidecar first/);
+  rmSync(join(dirs.csharpDir, 'claudio-core'));
+  assert.throws(() => stage('csharp', 'linux', dirs), /Build the csharp sidecar first/);
   assert.throws(() => stage('go', 'linux', dirs), /Unknown sidecar/);
 });
 

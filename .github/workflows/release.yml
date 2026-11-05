@@ -4,12 +4,6 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      sidecar:
-        description: Desktop sidecar to package (tag pushes always package rust)
-        type: choice
-        options: [rust, csharp]
-        default: rust
 
 permissions:
   contents: read
@@ -61,35 +55,22 @@ jobs:
     env:
       CLAUDIO_COMMIT_SHA: ${{ github.sha }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      SIDECAR: ${{ github.event_name == 'workflow_dispatch' && inputs.sidecar || 'rust' }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        if: env.SIDECAR == 'rust'
-      - uses: Swatinem/rust-cache@v2
-        if: env.SIDECAR == 'rust'
-      - name: Build sidecar
-        if: env.SIDECAR == 'rust'
-        run: cargo build --release --locked -p claudio-core --bin claudio-core
-      - name: Build Windows uninstaller
-        if: env.SIDECAR == 'rust' && runner.os == 'Windows'
-        run: cargo build --release --locked -p claudio-uninstaller
       - uses: actions/setup-dotnet@v5
-        if: env.SIDECAR == 'csharp'
         with:
           dotnet-version: 10.0.x
       - name: Install Native AOT prerequisites
-        if: env.SIDECAR == 'csharp' && runner.os == 'Linux'
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y clang zlib1g-dev libssl-dev cmake make
       - name: Build C# sidecar (Native AOT)
-        if: env.SIDECAR == 'csharp'
         run: |
           rid=linux-x64
           extra=-p:StaticOpenSslLinking=true
           if [ "$RUNNER_OS" = Windows ]; then rid=win-x64; extra=; fi
-          dotnet publish src/claudio-core-cs -c Release -r "$rid" $extra -o artifacts/claudio-core-cs/publish
+          dotnet publish src/claudio-core -c Release -r "$rid" $extra -o artifacts/claudio-core/publish
           if [ "$RUNNER_OS" = Windows ]; then
-            dotnet publish src/claudio-uninstaller-cs -c Release -r "$rid" -o artifacts/claudio-uninstaller-cs/publish
+            dotnet publish src/claudio-uninstaller -c Release -r "$rid" -o artifacts/claudio-uninstaller/publish
           fi
       - uses: voidzero-dev/setup-vp@v1
         with:
@@ -104,13 +85,12 @@ jobs:
           CLAUDIO_DESKTOP_BUILD: '1'
         run: vp run build
       - name: Fetch 7-Zip
-        if: env.SIDECAR == 'csharp'
         run: |
           source_flag=
           if [ "$RUNNER_OS" = Linux ]; then source_flag=--with-source; fi
           node scripts/fetch-7zip.mjs "$(node -p process.platform)" artifacts/7-zip $source_flag
       - name: Stage sidecar
-        run: node scripts/stage-sidecar.mjs "$SIDECAR"
+        run: node scripts/stage-sidecar.mjs csharp
       - name: Install shell dependencies
         working-directory: src/claudio-electron
         run: vp install --frozen-lockfile

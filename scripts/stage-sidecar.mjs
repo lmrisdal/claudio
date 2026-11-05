@@ -8,18 +8,9 @@ export const stageDirectory = path.join(root, "src", "claudio-electron", "sideca
 
 export function plan(kind, platform, options = {}) {
   const exe = platform === "win32" ? ".exe" : "";
-  const releaseDir = options.rustDir ?? path.join(root, "target", "release");
-  const publishDir = options.csharpDir ?? path.join(root, "artifacts", "claudio-core-cs", "publish");
-  const uninstallerDir = options.uninstallerDir ?? path.join(root, "artifacts", "claudio-uninstaller-cs", "publish");
+  const publishDir = options.csharpDir ?? path.join(root, "artifacts", "claudio-core", "publish");
+  const uninstallerDir = options.uninstallerDir ?? path.join(root, "artifacts", "claudio-uninstaller", "publish");
   const sevenZipDir = options.sevenZipDir ?? path.join(root, "artifacts", "7-zip");
-
-  if (kind === "rust") {
-    const files = [{ from: path.join(releaseDir, `claudio-core${exe}`), to: `claudio-core${exe}`, executable: true }];
-    if (platform === "win32") {
-      files.push({ from: path.join(releaseDir, "claudio-game-uninstaller.exe"), to: "claudio-game-uninstaller.exe" });
-    }
-    return { files, directories: [] };
-  }
 
   if (kind === "csharp") {
     const files = [
@@ -32,7 +23,7 @@ export function plan(kind, platform, options = {}) {
     return { files, directories: [{ from: sevenZipDir, to: "7-zip" }] };
   }
 
-  throw new Error(`Unknown sidecar '${kind}'. Use rust or csharp.`);
+  throw new Error(`Unknown sidecar '${kind}'. Use csharp.`);
 }
 
 export function stage(kind, platform = process.platform, options = {}) {
@@ -64,8 +55,8 @@ export function stage(kind, platform = process.platform, options = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
-    const staged = stage(process.argv[2] ?? "rust");
-    console.log(`Staged ${process.argv[2] ?? "rust"} sidecar: ${staged.join(", ")}`);
+    const staged = stage(process.argv[2] ?? "csharp");
+    console.log(`Staged ${process.argv[2] ?? "csharp"} sidecar: ${staged.join(", ")}`);
   } catch (error) {
     console.error(error.message);
     process.exit(1);

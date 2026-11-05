@@ -5,8 +5,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const electronPackageJsonPath = path.join(root, "src/claudio-electron/package.json");
-const cargoTomlPath = path.join(root, "src/claudio-core/Cargo.toml");
-const csprojPath = path.join(root, "src/claudio-core-cs/Claudio.Core.csproj");
+const csprojPath = path.join(root, "src/claudio-core/Claudio.Core.csproj");
 const frontendPackageJsonPath = path.join(root, "src/claudio-web/package.json");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -15,44 +14,6 @@ function updateElectronPackageJson(version) {
   const previous = String(packageJson.version ?? "");
   packageJson.version = version;
   fs.writeFileSync(electronPackageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
-  return previous;
-}
-
-function updateCargoToml(version) {
-  const lines = fs.readFileSync(cargoTomlPath, "utf8").split(/\r?\n/);
-  let inPackageSection = false;
-  let replaced = false;
-  let previous = "";
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-      inPackageSection = trimmed === "[package]";
-      continue;
-    }
-
-    if (!inPackageSection) {
-      continue;
-    }
-
-    const match = line.match(/^\s*version\s*=\s*"([^"]+)"\s*$/);
-    if (!match) {
-      continue;
-    }
-
-    previous = match[1];
-    lines[index] = `version = "${version}"`;
-    replaced = true;
-    break;
-  }
-
-  if (!replaced) {
-    throw new Error("Could not find [package] version in Cargo.toml");
-  }
-
-  fs.writeFileSync(cargoTomlPath, `${lines.join("\n")}\n`, "utf8");
   return previous;
 }
 
@@ -88,13 +49,11 @@ function main() {
   }
 
   const oldElectron = updateElectronPackageJson(version);
-  const oldCargo = updateCargoToml(version);
   const oldCsproj = updateCsproj(version);
   const oldFrontend = updateFrontendPackageJson(version);
 
   console.log(`Updated desktop version to ${version}`);
   console.log(`- src/claudio-electron/package.json: ${oldElectron} -> ${version}`);
-  console.log(`- Cargo.toml: ${oldCargo} -> ${version}`);
   console.log(`- Claudio.Core.csproj: ${oldCsproj} -> ${version}`);
   console.log(`- src/claudio-web/package.json: ${oldFrontend} -> ${version}`);
 }

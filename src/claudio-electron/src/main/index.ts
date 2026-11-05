@@ -46,7 +46,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-// Keeps Chromium's profile out of the folder the Rust core uses for its data.
+// Keeps Chromium's profile out of the folder the core uses for its data.
 const shellDataDir = path.join(app.getPath("appData"), "claudio-shell");
 mkdirSync(shellDataDir, { recursive: true });
 app.setPath("userData", shellDataDir);

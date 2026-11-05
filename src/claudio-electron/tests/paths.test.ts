@@ -15,11 +15,13 @@ describe.each(["linux", "win32"] as const)("resolvePaths (%s)", (platform) => {
     platform,
   };
 
-  it("finds the cargo build and web dist relative to the repo in development", () => {
+  it("finds the dotnet build and web dist relative to the repo in development", () => {
     const paths = resolvePaths(base);
 
-    expect(paths.coreBinary).toBe(path.join(repoRoot, "target", "debug", executable));
-    expect(paths.resourceDir).toBe(path.join(repoRoot, "target", "debug"));
+    expect(paths.coreBinary).toBe(
+      path.join(repoRoot, "artifacts", "claudio-core", "debug", executable),
+    );
+    expect(paths.resourceDir).toBe(path.join(repoRoot, "artifacts", "claudio-core", "debug"));
     expect(paths.webRoot).toBe(path.join(repoRoot, "src", "claudio-web", "dist"));
     expect(paths.preload).toBe(path.join(base.appPath, "dist", "preload", "index.cjs"));
     expect(paths.trayIcons).toEqual({
@@ -34,7 +36,9 @@ describe.each(["linux", "win32"] as const)("resolvePaths (%s)", (platform) => {
       env: { CLAUDIO_CORE_PROFILE: "release" },
     });
 
-    expect(paths.coreBinary).toBe(path.join(repoRoot, "target", "release", executable));
+    expect(paths.coreBinary).toBe(
+      path.join(repoRoot, "artifacts", "claudio-core", "release", executable),
+    );
   });
 
   it("reads everything from the resources directory when packaged", () => {

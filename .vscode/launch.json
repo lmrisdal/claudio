@@ -67,7 +67,7 @@
       "runtimeExecutable": "${workspaceFolder}/src/claudio-electron/node_modules/.bin/electron",
       "runtimeArgs": ["."],
       "env": {
-        "CLAUDIO_CORE_PATH": "${workspaceFolder}/artifacts/claudio-core-cs/debug/claudio-core"
+        "CLAUDIO_CORE_PATH": "${workspaceFolder}/artifacts/claudio-core/debug/claudio-core"
       },
       "noDebug": true,
       "console": "integratedTerminal",

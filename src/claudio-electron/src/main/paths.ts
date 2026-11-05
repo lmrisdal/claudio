@@ -27,7 +27,7 @@ export function resolvePaths(inputs: PathInputs): AppPaths {
     env.CLAUDIO_CORE_PATH ??
     (isPackaged
       ? path.join(resourcesPath, executable)
-      : path.join(repoRoot, "target", profile, executable));
+      : path.join(repoRoot, "artifacts", "claudio-core", profile, executable));
   const resourceDir =
     env.CLAUDIO_RESOURCE_DIR ?? (isPackaged ? resourcesPath : path.dirname(coreBinary));
   const webRoot =

@@ -105,7 +105,7 @@ Games are organized by platform in your library directories:
 
 ### Prerequisites
 
-- [Rust toolchain](https://www.rust-lang.org/tools/install)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 24+](https://nodejs.org/)
 
 ### Backend
@@ -126,7 +126,7 @@ The Vite dev server runs on port 5173 and proxies API requests to the backend on
 
 ### Desktop app
 
-The desktop app is an Electron shell (`src/claudio-electron`) around the `claudio-web` SPA, plus a headless Rust sidecar (`src/claudio-core`) that handles installs, game launching and Proton/umu.
+The desktop app is an Electron shell (`src/claudio-electron`) around the `claudio-web` SPA, plus a headless C# sidecar (`src/claudio-core`) that handles installs, game launching and Proton/umu.
 
 ```bash
 cd src/claudio-electron
@@ -134,26 +134,9 @@ vp install
 vp run package        # builds the AppImage (Linux) or installer (Windows) into release/
 ```
 
-Build `claudio-core` (`cargo build --release -p claudio-core --bin claudio-core`) and the SPA (`CLAUDIO_DESKTOP_BUILD=1 vp build` in `src/claudio-web`) first, because the package bundles both. To run without packaging, use `vp run dev` from `src/claudio-electron`; it picks up `target/debug/claudio-core` and `src/claudio-web/dist`.
+Build `claudio-core` (`dotnet build src/claudio-core`) and the SPA (`CLAUDIO_DESKTOP_BUILD=1 vp build` in `src/claudio-web`) first, because the package bundles both. To run without packaging, use `vp run dev` from `src/claudio-electron`; it picks up `artifacts/claudio-core/debug/claudio-core` and `src/claudio-web/dist`.
 
 AppImage notes (electron-builder 26): the legacy AppImage runtime needs `libfuse2`, or run it with `--appimage-extract-and-run`. The generated launcher adds `--no-sandbox` for desktop-entry launches, which keeps the app working on Ubuntu 24.04 where AppArmor restricts unprivileged user namespaces.
-
-### Desktop Windows Cross-Check From Linux
-
-For faster local Windows-target validation without changing the release target, install `cargo-xwin` once:
-
-```bash
-cargo install cargo-xwin
-```
-
-Then run either of these from the repo root:
-
-```bash
-./scripts/check-windows-xwin.sh
-./scripts/build-windows-xwin.sh
-```
-
-These scripts cross-check or cross-build `claudio-core` and the bundled uninstaller for `x86_64-pc-windows-msvc`. They do not replace the real Windows packaging/release flow, which still runs on Windows for the NSIS installer.
 
 ### CI and releases
 
@@ -175,13 +158,12 @@ To publish a release from the current branch:
 make bump 0.2.2
 ```
 
-This updates the three application versions, runs `cargo check --workspace` to
-refresh `Cargo.lock`, commits all four version files, and creates the annotated
+This updates the three application versions, builds the sidecar, commits the version files, and creates the annotated
 `v0.2.2` tag. It asks before pushing the commit and that tag. To push without the
 prompt, use `make bump 0.2.2 push=true`. If validation fails, it stops before
 committing or tagging.
 
-The tag must match the Electron, frontend, and Rust sidecar versions. Stable
+The tag must match the Electron, frontend, and C# sidecar versions. Stable
 releases publish a GitHub release and GHCR images tagged `0.2.2` and `latest`.
 Prerelease versions such as `0.3.0-beta.1` publish a GitHub prerelease and container
 images tagged `0.3.0-beta.1` and `dev`, leaving `latest` unchanged. Build metadata (`+...`) is not supported

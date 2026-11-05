@@ -73,7 +73,7 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/src/claudio-core-cs/Claudio.Core.csproj",
+        "${workspaceFolder}/src/claudio-core/Claudio.Core.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],

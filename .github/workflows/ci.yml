@@ -61,15 +61,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets --locked
-      - run: cargo test --workspace --locked
-      - name: Build sidecar for shell integration tests
-        run: cargo build --locked -p claudio-core --bin claudio-core
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
@@ -79,20 +70,20 @@ jobs:
       - name: Check C# formatting
         shell: bash
         run: |
-          dotnet format src/claudio-core-cs/Claudio.Core.csproj --verify-no-changes
-          dotnet format src/claudio-uninstaller-cs/Claudio.Uninstaller.csproj --verify-no-changes
-          dotnet format tests/claudio-core-cs/Claudio.Core.Tests.csproj --verify-no-changes
+          dotnet format src/claudio-core/Claudio.Core.csproj --verify-no-changes
+          dotnet format src/claudio-uninstaller/Claudio.Uninstaller.csproj --verify-no-changes
+          dotnet format tests/claudio-core/Claudio.Core.Tests.csproj --verify-no-changes
       - name: Test C# sidecar
-        run: dotnet test --project tests/claudio-core-cs
+        run: dotnet test --project tests/claudio-core
       - name: Publish C# sidecar (Native AOT)
         shell: bash
         run: |
           rid=linux-x64
           extra=-p:StaticOpenSslLinking=true
           if [ "$RUNNER_OS" = Windows ]; then rid=win-x64; extra=; fi
-          dotnet publish src/claudio-core-cs -c Release -r "$rid" $extra -o artifacts/claudio-core-cs/publish
+          dotnet publish src/claudio-core -c Release -r "$rid" $extra -o artifacts/claudio-core/publish
           if [ "$RUNNER_OS" = Windows ]; then
-            dotnet publish src/claudio-uninstaller-cs -c Release -r "$rid" -o artifacts/claudio-uninstaller-cs/publish
+            dotnet publish src/claudio-uninstaller -c Release -r "$rid" -o artifacts/claudio-uninstaller/publish
           fi
       - uses: voidzero-dev/setup-vp@v1
         with:
@@ -112,13 +103,10 @@ jobs:
         shell: bash
         working-directory: src/claudio-electron
         env:
-          CLAUDIO_CORE_PATH: ${{ github.workspace }}/artifacts/claudio-core-cs/publish/claudio-core${{ runner.os == 'Windows' && '.exe' || '' }}
+          CLAUDIO_CORE_PATH: ${{ github.workspace }}/artifacts/claudio-core/publish/claudio-core${{ runner.os == 'Windows' && '.exe' || '' }}
           CLAUDIO_STATIC_OPENSSL: ${{ runner.os == 'Linux' && '1' || '' }}
           CLAUDIO_TEST_7Z: ${{ github.workspace }}/artifacts/7-zip/${{ runner.os == 'Windows' && '7za.exe' || '7zzs' }}
         run: vp test tests/core-*.test.ts tests/real-core.test.ts
-      - name: Compare the Rust and C# sidecars
-        if: runner.os == 'Linux'
-        run: node scripts/compare-sidecars.mjs target/debug/claudio-core artifacts/claudio-core-cs/publish/claudio-core
       - run: vp pack
         working-directory: src/claudio-electron
       - name: Test release helpers

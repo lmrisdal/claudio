@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)../../artifacts/claudio-core-tests/bin/</BaseOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Claudio.Core.Commands" />
+    <Using Include="Claudio.Core.Install" />
+    <Using Include="Claudio.Core.Runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="AwesomeAssertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\claudio-core\Claudio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

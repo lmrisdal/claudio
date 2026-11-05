@@ -7,7 +7,7 @@ These rules apply when working in `src/claudio-electron`.
 - Rejections reach the SPA as plain strings. `game-detail-actions.tsx` and `use-download-manager.tsx` check `typeof error === "string"`, so keep the `{ ok, value } | { ok: false, error }` wrapping in main and the plain-string rejection in the preload.
 - `claudio-core` owns stdout for its protocol. Never add a code path that lets a child process inherit it. The shell spawns the core with piped stdio, `windowsHide: true` and a scrubbed environment (`buildCoreEnv`).
 - The custom schemes are registered in `src/main/index.ts` before `ready`. `claudio-app` serves the SPA with an `index.html` fallback for extension-less routes and must keep Range support for the emulator. `claudio` is the API proxy and must stay streaming.
-- Keep data folders apart: Chromium's profile lives in `<appData>/claudio-shell`, the Rust core keeps its data in `dirs::data_local_dir()/claudio`. On Windows never install the app into the core's data directory.
+- Keep data folders apart: Chromium's profile lives in `<appData>/claudio-shell`, the core keeps its data in the local app data folder under `claudio`. On Windows never install the app into the core's data directory.
 - The SPA is Linux and Windows only. Do not add macOS code paths.
 - Keep pure logic out of files that import `electron` so it can be unit-tested in Node (see `navigation-policy.ts`, `invoke-handler.ts`, `lifecycle.ts`).
 - Frameless window: the drag region is the `.desktop-drag` CSS class. Chromium drag regions swallow pointer events, so every interactive element inside one needs `.desktop-no-drag`.

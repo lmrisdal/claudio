@@ -500,7 +500,4 @@ docs/.astro/
 .claude/
 
 # Rust
-/target/
-src/claudio-core/target/
-src/claudio-uninstaller/target/
 src/claudio-electron/sidecar/

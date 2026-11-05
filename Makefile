@@ -9,9 +9,8 @@ bump:
 		exit 1; \
 	fi; \
 	node scripts/bump_version.cjs "$$version"; \
-	cargo check --workspace; \
-	dotnet build src/claudio-core-cs; \
-	git add src/claudio-electron/package.json src/claudio-core/Cargo.toml src/claudio-core-cs/Claudio.Core.csproj src/claudio-web/package.json Cargo.lock; \
+	dotnet build src/claudio-core; \
+	git add src/claudio-electron/package.json src/claudio-core/Claudio.Core.csproj src/claudio-web/package.json; \
 	git commit -m "chore(release): bump version to $$version"; \
 	git tag -a "v$$version" -m "Claudio $$version"; \
 	case "$$push_flag" in \

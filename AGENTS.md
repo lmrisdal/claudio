@@ -21,30 +21,20 @@ npx tsc --noEmit                          # type-check without emitting
 vp lint .                                 # ESLint
 ```
 
-### Desktop (Electron + Rust sidecar)
+### Desktop (Electron + C# sidecar)
 
 ```bash
-cargo build -p claudio-core --bin claudio-core   # headless sidecar used by the shell
+dotnet build src/claudio-core                      # JIT build → artifacts/claudio-core/debug/
+dotnet test --project tests/claudio-core           # unit tests
+dotnet publish src/claudio-core -c Release -r linux-x64 -o artifacts/claudio-core/publish   # Native AOT
+node scripts/fetch-7zip.mjs linux artifacts/7-zip  # pinned, hash-verified 7-Zip
+node scripts/stage-sidecar.mjs                     # copy the sidecar for electron-builder
 cd src/claudio-electron
 vp install
 vp run dev                                         # bundles the shell and starts Electron
 vp run package                                     # AppImage / NSIS installer into release/
 vp check && vp test                                # lint, type-check and unit tests
-
-./scripts/check-windows-xwin.sh           # cross-check Windows claudio-core + uninstaller via cargo-xwin
-./scripts/build-windows-xwin.sh           # cross-build Windows claudio-core + uninstaller via cargo-xwin
-```
-
-### C# sidecar (side by side with Rust, see CSHARP_MIGRATION_PLAN.md)
-
-```bash
-dotnet build src/claudio-core-cs                          # JIT build → artifacts/claudio-core-cs/debug/
-dotnet test --project tests/claudio-core-cs               # unit tests
-dotnet publish src/claudio-core-cs -c Release -r linux-x64 -o artifacts/claudio-core-cs/publish   # Native AOT
-node scripts/fetch-7zip.mjs linux artifacts/7-zip         # pinned, hash-verified 7-Zip
-node scripts/stage-sidecar.mjs <rust|csharp>              # copy the chosen sidecar for electron-builder
-node scripts/compare-sidecars.mjs                         # run both sidecars and print differences
-CLAUDIO_CORE_PATH=$PWD/artifacts/claudio-core-cs/debug/claudio-core vp test   # shell contract suite against C#
+CLAUDIO_CORE_PATH=$PWD/../../artifacts/claudio-core/debug/claudio-core vp test   # shell contract suite
 ```
 
 ### Docker
@@ -55,17 +45,17 @@ docker compose -f docker/docker-compose.yml up --build
 
 ### Windows test VM (Windows behaviour from a Linux host)
 
-`scripts/windows-vm.sh` runs a Windows 11 VM ([dockur/windows](https://github.com/dockur/windows) under rootless podman with KVM). Use it to test Windows-only code (`src/claudio-core-cs/Windows/`, the Rust `windows_integration/`, installers, the uninstaller) instead of guessing. Native AOT cannot cross-compile to Windows, so Windows binaries are built inside the VM.
+`scripts/windows-vm.sh` runs a Windows 11 VM ([dockur/windows](https://github.com/dockur/windows) under rootless podman with KVM). Use it to test Windows-only code (`src/claudio-core/Windows/`, the Rust `windows_integration/`, installers, the uninstaller) instead of guessing. Native AOT cannot cross-compile to Windows, so Windows binaries are built inside the VM.
 
 ```bash
 scripts/windows-vm.sh status                  # container state and whether SSH answers; run this first
 scripts/windows-vm.sh up                      # start it (it is stopped when not in use)
 scripts/windows-vm.sh wait                    # block until SSH answers after a start
 scripts/windows-vm.sh push                    # copy the working tree to C:\claudio (push --clean wipes it first)
-scripts/windows-vm.sh run 'dotnet test --project tests/claudio-core-cs'
-scripts/windows-vm.sh run 'cd src/claudio-electron; $env:CLAUDIO_CORE_PATH="C:\claudio\artifacts\claudio-core-cs\publish\claudio-core.exe"; vp test tests/core- tests/real-core'
-scripts/windows-vm.sh run 'dotnet publish src/claudio-core-cs -c Release -r win-x64 -o artifacts/claudio-core-cs/publish'
-scripts/windows-vm.sh desktop 'artifacts\claudio-core-cs\publish\claudio-core.exe < request.jsonl'
+scripts/windows-vm.sh run 'dotnet test --project tests/claudio-core'
+scripts/windows-vm.sh run 'cd src/claudio-electron; $env:CLAUDIO_CORE_PATH="C:\claudio\artifacts\claudio-core\publish\claudio-core.exe"; vp test tests/core- tests/real-core'
+scripts/windows-vm.sh run 'dotnet publish src/claudio-core -c Release -r win-x64 -o artifacts/claudio-core/publish'
+scripts/windows-vm.sh desktop 'artifacts\claudio-core\publish\claudio-core.exe < request.jsonl'
 scripts/windows-vm.sh snapshot clean          # save the disk (stops the VM); restore clean rolls back
 scripts/windows-vm.sh down
 ```
@@ -85,7 +75,7 @@ scripts/windows-vm.sh down
 Monorepo with a Rust API, an Electron desktop client backed by a Rust sidecar, and a React frontend:
 
 - **`src/claudio-api`** — Axum-based Rust API. Serves the SPA as static files and provides REST endpoints.
-- **`src/claudio-core`** — Headless Rust sidecar for the desktop app: installs, game launching, Proton/umu. JSON lines over stdio, no UI dependencies.
+- **`src/claudio-core`** — Headless C# (.NET Native AOT) sidecar for the desktop app: installs, game launching, Proton/umu. JSON lines over stdio, no UI dependencies.
 - **`src/claudio-electron`** — Electron shell: windows, tray, `claudio-app://` and `claudio://api` protocols, auto-updates, packaging with electron-builder.
 - **`src/claudio-web/`** — React 19 SPA built with Vite. Output goes to `src/claudio-api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
 - **`tests/claudio-api-rs/`** — Rust integration test crate for API behavior.

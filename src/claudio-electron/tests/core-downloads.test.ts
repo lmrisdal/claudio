@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { CoreHarness, contractAvailable, coreKind } from "./support/core-harness";
+import { CoreHarness, contractAvailable } from "./support/core-harness";
 import { FakeServer } from "./support/fake-server";
 
 const sevenZip = [process.env.CLAUDIO_TEST_7Z, "/usr/bin/7zzs", "/usr/bin/7zz", "/usr/bin/7z"].find(
@@ -219,12 +219,9 @@ describe.skipIf(!contractAvailable || !canBuildArchives || !sevenZip)(
       it.each(["zip", "tar", "tar.gz", "7z"] as const)(
         "extracts a %s and unwraps the root folder",
         async (kind) => {
-          if (kind === "zip" && coreKind === "rust") {
-            return;
-          }
           sendFile(server, 10, `pack.${kind}`, buildArchive(kind));
           startCore();
-          if (kind === "7z" && coreKind === "csharp") {
+          if (kind === "7z") {
             core.sevenZipDir(sevenZip!);
           }
 
@@ -235,9 +232,6 @@ describe.skipIf(!contractAvailable || !canBuildArchives || !sevenZip)(
       );
 
       it("rejects a corrupted zip", async () => {
-        if (coreKind === "rust") {
-          return;
-        }
         const archive = buildArchive("zip");
         archive[Math.floor(archive.length / 3)] ^= 0xff;
         sendFile(server, 11, "pack.zip", archive);
@@ -259,9 +253,7 @@ describe.skipIf(!contractAvailable || !canBuildArchives || !sevenZip)(
         archive[40] ^= 0xff;
         sendFile(server, 13, "pack.7z", archive);
         startCore();
-        if (coreKind === "csharp") {
-          core.sevenZipDir(sevenZip!);
-        }
+        core.sevenZipDir(sevenZip!);
 
         await expect(download(13, true)).rejects.toThrow();
       });
