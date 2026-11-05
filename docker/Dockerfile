@@ -21,6 +21,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 RUN apk add --no-cache libavif-apps icu-libs sqlite-libs
 WORKDIR /app
 COPY --from=backend /app ./
+# Owned by 1000:1000 so a fresh named volume is writable when run with --user 1000:1000
+RUN mkdir -p /config && chown 1000:1000 /config
 VOLUME /config
 VOLUME /games
 ENV CLAUDIO_CONFIG_PATH=/config/config.toml

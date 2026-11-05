@@ -66,25 +66,36 @@ test('release command rejects branch pushes', () => {
   assert.match(result.stderr, /Publishing requires a version tag/);
 });
 
+function runContainerPublish(env) {
+  const workflow = readFileSync(join(__dirname, '../.github/workflows/release.yml'), 'utf8');
+  const script = workflow.match(/      - name: Publish tested container images\n        run: \|\n([\s\S]*?)(?=      - name:)/)[1].replace(/^ {10}/gm, '');
+  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', `docker() { printf '%s\\n' "$*"; }\n${script}`], {
+    env: { ...process.env, GITHUB_REPOSITORY: 'LMrisdal/Claudio', ...env },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim().split('\n').at(-1).split(' ');
+}
+
+const sha = 'a'.repeat(40);
+const shaImages = [`ghcr.io/lmrisdal/claudio:sha-${sha}-amd64`, `ghcr.io/lmrisdal/claudio:sha-${sha}-arm64`];
+
 for (const [version, prerelease, channel] of [
   ['0.2.3-beta.1', 'true', 'dev'],
   ['0.2.3', 'false', 'latest'],
 ]) {
   test(`publishes ${version} with the ${channel} container tag`, () => {
-    const workflow = readFileSync(join(__dirname, '../.github/workflows/release.yml'), 'utf8');
-    const script = workflow.match(/      - name: Publish tested container images\n        run: \|\n([\s\S]*?)(?=      - name:)/)[1].replace(/^ {10}/gm, '');
-    const sha = 'a'.repeat(40);
-    const result = spawnSync('bash', ['-euo', 'pipefail', '-c', `docker() { printf '%s\\n' "$*"; }\n${script}`], {
-      env: { ...process.env, GITHUB_REPOSITORY: 'LMrisdal/Claudio', GITHUB_SHA: sha, VERSION: version, PRERELEASE: prerelease },
-      encoding: 'utf8',
-    });
-    assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.stdout.trim().split('\n').at(-1).split(' '), [
+    const command = runContainerPublish({ GITHUB_EVENT_NAME: 'push', GITHUB_SHA: sha, VERSION: version, PRERELEASE: prerelease });
+    assert.deepEqual(command, [
       'buildx', 'imagetools', 'create',
       '--tag', `ghcr.io/lmrisdal/claudio:${version}`,
       '--tag', `ghcr.io/lmrisdal/claudio:${channel}`,
-      `ghcr.io/lmrisdal/claudio:sha-${sha}-amd64`,
-      `ghcr.io/lmrisdal/claudio:sha-${sha}-arm64`,
+      ...shaImages,
     ]);
   });
 }
+
+test('manual runs only move the dev container tag', () => {
+  const command = runContainerPublish({ GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: sha, VERSION: '0.2.3', PRERELEASE: 'false' });
+  assert.deepEqual(command, ['buildx', 'imagetools', 'create', '--tag', 'ghcr.io/lmrisdal/claudio:dev', ...shaImages]);
+});

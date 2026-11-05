@@ -20,7 +20,7 @@ A self-hosted game library manager for organizing, browsing, and downloading you
 ```bash
 docker run -d \
   --name claudio \
-  -e PUID=1000 -e PGID=1000 \
+  --user 1000:1000 \
   -p 8080:8080 \
   -v /path/to/games:/games \
   -v claudio-data:/config \
@@ -38,12 +38,11 @@ services:
     container_name: claudio
     ports:
       - "8080:8080" # host:container
+    user: "1000:1000"
     volumes:
       - claudio-data:/config
       - /path/to/games:/games
     environment:
-      - PUID=1000
-      - PGID=1000
       - CLAUDIO_IGDB_CLIENT_ID=your_client_id
       - CLAUDIO_IGDB_CLIENT_SECRET=your_client_secret
       # - CLAUDIO_PORT=8080
@@ -56,8 +55,6 @@ volumes:
 
 | Variable                         | Description                                                      | Default                |
 | -------------------------------- | ---------------------------------------------------------------- | ---------------------- |
-| `PUID`                           | User ID to run the process as                                    | `0` (root)             |
-| `PGID`                           | Group ID to run the process as                                   | `0` (root)             |
 | `CLAUDIO_PORT`                   | HTTP port                                                        | `8080`                 |
 | `CLAUDIO_LOG_LEVEL`              | Log level: `error`, `warn`, `info`, `debug`, `trace`             | `warn`                 |
 | `CLAUDIO_LIBRARY_PATHS`          | Comma-separated game library paths                               | `/games`               |

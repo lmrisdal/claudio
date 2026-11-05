@@ -7,10 +7,7 @@ All settings can be configured via environment variables. These take precedence 
 
 ## Container
 
-| Variable | Description                    | Default    |
-| -------- | ------------------------------ | ---------- |
-| `PUID`   | User ID to run the process as  | `0` (root) |
-| `PGID`   | Group ID to run the process as | `0` (root) |
+The image runs as root unless you set a user. To run as your own user, pass `--user 1000:1000` to `docker run` or set `user: "1000:1000"` in Compose. Directories you bind-mount to `/config` must be writable by that user.
 
 ## Server
 
