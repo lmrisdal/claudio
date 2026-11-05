@@ -68,9 +68,9 @@ jobs:
           rid=linux-x64
           extra=-p:StaticOpenSslLinking=true
           if [ "$RUNNER_OS" = Windows ]; then rid=win-x64; extra=; fi
-          dotnet publish src/claudio-core -c Release -r "$rid" $extra -o artifacts/claudio-core/publish
+          dotnet publish src/claudio-desktop/core -c Release -r "$rid" $extra -o artifacts/claudio-core/publish
           if [ "$RUNNER_OS" = Windows ]; then
-            dotnet publish src/claudio-uninstaller -c Release -r "$rid" -o artifacts/claudio-uninstaller/publish
+            dotnet publish src/claudio-desktop/uninstaller -c Release -r "$rid" -o artifacts/claudio-uninstaller/publish
           fi
       - uses: voidzero-dev/setup-vp@v1
         with:
@@ -92,17 +92,17 @@ jobs:
       - name: Stage sidecar
         run: node scripts/stage-sidecar.mjs csharp
       - name: Install shell dependencies
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: vp install --frozen-lockfile
       - name: Bundle shell
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: vp pack
       - name: Package
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: vp exec electron-builder ${{ matrix.args }} --publish never
       - name: Smoke-test AppImage
         if: runner.os == 'Linux'
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y xvfb
@@ -110,7 +110,7 @@ jobs:
           xvfb-run -a node scripts/smoke.mjs release/*.AppImage --appimage-extract-and-run --no-sandbox
       - name: Smoke-test packaged Windows app
         if: runner.os == 'Windows'
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         run: node scripts/smoke.mjs release/win-unpacked/Claudio.exe
       - uses: actions/upload-artifact@v4
         with:
@@ -120,11 +120,11 @@ jobs:
           retention-days: 14
           path: |
             artifacts/7-zip/7z*-src.tar.xz
-            src/claudio-electron/release/*.AppImage
-            src/claudio-electron/release/*.exe
-            src/claudio-electron/release/*.blockmap
-            src/claudio-electron/release/*.yml
-            !src/claudio-electron/release/builder-*.yml
+            src/claudio-desktop/app/release/*.AppImage
+            src/claudio-desktop/app/release/*.exe
+            src/claudio-desktop/app/release/*.blockmap
+            src/claudio-desktop/app/release/*.yml
+            !src/claudio-desktop/app/release/builder-*.yml
 
   container:
     name: Package container (${{ matrix.arch }})

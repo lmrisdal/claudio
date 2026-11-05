@@ -15,7 +15,7 @@
     <TestingPlatformDotnetTestSupport>false</TestingPlatformDotnetTestSupport>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <OutputPath>$(MSBuildThisFileDirectory)../../artifacts/claudio-uninstaller/$([System.String]::Copy('$(Configuration)').ToLowerInvariant())/</OutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory)../../../artifacts/claudio-uninstaller/$([System.String]::Copy('$(Configuration)').ToLowerInvariant())/</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>

@@ -10,7 +10,7 @@
     "lint": "vp lint .",
     "preview": "vp preview",
     "generate-icons": "../scripts/generate-icons.sh",
-    "desktop:dev": "CLAUDIO_DESKTOP_BUILD=1 vp build && cd ../claudio-electron && vp run dev",
+    "desktop:dev": "CLAUDIO_DESKTOP_BUILD=1 vp build && cd ../claudio-desktop/app && vp run dev",
     "desktop:build": "CLAUDIO_DESKTOP_BUILD=1 vp build"
   },
   "dependencies": {

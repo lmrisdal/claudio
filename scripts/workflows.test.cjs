@@ -41,15 +41,15 @@ for (const version of ['01.2.3', '1.2', '1.2.3-', '1.2.3-01', '1.2.3-beta.01', '
 test('reads the application versions', () => {
   const root = mkdtempSync(join(tmpdir(), 'claudio-version-'));
   try {
-    for (const name of ['claudio-electron', 'claudio-web', 'claudio-core']) {
+    for (const name of ['claudio-desktop/core', 'claudio-desktop/app', 'claudio-web']) {
       mkdirSync(join(root, 'src', name), { recursive: true });
     }
-    for (const name of ['claudio-electron', 'claudio-web']) {
+    for (const name of ['claudio-desktop/app', 'claudio-web']) {
       writeFileSync(join(root, 'src', name, 'package.json'), JSON.stringify({ version: '0.3.0' }));
     }
-    writeFileSync(join(root, 'src/claudio-core/Claudio.Core.csproj'), '<Project><PropertyGroup><Version>0.3.0</Version></PropertyGroup></Project>');
+    writeFileSync(join(root, 'src/claudio-desktop/core/Claudio.Core.csproj'), '<Project><PropertyGroup><Version>0.3.0</Version></PropertyGroup></Project>');
     assert.deepEqual(readVersions(root), versions('0.3.0'));
-    writeFileSync(join(root, 'src/claudio-core/Claudio.Core.csproj'), '<Project><PropertyGroup><Version>0.2.0</Version></PropertyGroup></Project>');
+    writeFileSync(join(root, 'src/claudio-desktop/core/Claudio.Core.csproj'), '<Project><PropertyGroup><Version>0.2.0</Version></PropertyGroup></Project>');
     assert.throws(() => validateVersion(readVersions(root)), /does not match/);
   } finally {
     rmSync(root, { recursive: true, force: true });

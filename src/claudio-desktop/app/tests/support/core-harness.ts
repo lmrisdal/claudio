@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..", "..", "..", "..");
+const repoRoot = path.resolve(here, "..", "..", "..", "..", "..");
 const executable = process.platform === "win32" ? "claudio-core.exe" : "claudio-core";
 
 export const coreBinary = process.env.CLAUDIO_CORE_PATH

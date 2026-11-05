@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const stageDirectory = path.join(root, "src", "claudio-electron", "sidecar");
+export const stageDirectory = path.join(root, "src", "claudio-desktop", "app", "sidecar");
 
 export function plan(kind, platform, options = {}) {
   const exe = platform === "win32" ? ".exe" : "";

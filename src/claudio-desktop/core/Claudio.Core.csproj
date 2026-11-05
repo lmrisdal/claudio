@@ -15,7 +15,7 @@
     <TestingPlatformDotnetTestSupport>false</TestingPlatformDotnetTestSupport>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <OutputPath>$(MSBuildThisFileDirectory)../../artifacts/claudio-core/$([System.String]::Copy('$(Configuration)').ToLowerInvariant())/</OutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory)../../../artifacts/claudio-core/$([System.String]::Copy('$(Configuration)').ToLowerInvariant())/</OutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(StaticOpenSslLinking)' == 'true'">
@@ -32,8 +32,8 @@
 
   <Target Name="CopySidecarCompanions" AfterTargets="Build" Condition="'$(PublishAot)' == 'true'">
     <ItemGroup>
-      <SevenZipFiles Include="$(MSBuildThisFileDirectory)../../artifacts/7-zip/**" />
-      <UninstallerFiles Include="$(MSBuildThisFileDirectory)../../artifacts/claudio-uninstaller/$([System.String]::Copy('$(Configuration)').ToLowerInvariant())/claudio-game-uninstaller.exe" />
+      <SevenZipFiles Include="$(MSBuildThisFileDirectory)../../../artifacts/7-zip/**" />
+      <UninstallerFiles Include="$(MSBuildThisFileDirectory)../../../artifacts/claudio-uninstaller/$([System.String]::Copy('$(Configuration)').ToLowerInvariant())/claudio-game-uninstaller.exe" />
     </ItemGroup>
     <Copy SourceFiles="@(SevenZipFiles)" DestinationFiles="@(SevenZipFiles->'$(OutputPath)7-zip/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(SevenZipFiles)' != ''" />
     <Copy SourceFiles="@(UninstallerFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('%(UninstallerFiles.FullPath)')" />
@@ -41,7 +41,7 @@
 
   <Target Name="CopySidecarCompanionsToPublish" AfterTargets="Publish" Condition="'$(PublishAot)' == 'true'">
     <ItemGroup>
-      <PublishSevenZipFiles Include="$(MSBuildThisFileDirectory)../../artifacts/7-zip/**" />
+      <PublishSevenZipFiles Include="$(MSBuildThisFileDirectory)../../../artifacts/7-zip/**" />
     </ItemGroup>
     <Copy SourceFiles="@(PublishSevenZipFiles)" DestinationFiles="@(PublishSevenZipFiles->'$(PublishDir)7-zip/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(PublishSevenZipFiles)' != ''" />
   </Target>

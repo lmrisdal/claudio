@@ -4,8 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const electronPackageJsonPath = path.join(root, "src/claudio-electron/package.json");
-const csprojPath = path.join(root, "src/claudio-core/Claudio.Core.csproj");
+const electronPackageJsonPath = path.join(root, "src/claudio-desktop/app/package.json");
+const csprojPath = path.join(root, "src/claudio-desktop/core/Claudio.Core.csproj");
 const frontendPackageJsonPath = path.join(root, "src/claudio-web/package.json");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -53,7 +53,7 @@ function main() {
   const oldFrontend = updateFrontendPackageJson(version);
 
   console.log(`Updated desktop version to ${version}`);
-  console.log(`- src/claudio-electron/package.json: ${oldElectron} -> ${version}`);
+  console.log(`- src/claudio-desktop/app/package.json: ${oldElectron} -> ${version}`);
   console.log(`- Claudio.Core.csproj: ${oldCsproj} -> ${version}`);
   console.log(`- src/claudio-web/package.json: ${oldFrontend} -> ${version}`);
 }

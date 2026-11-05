@@ -63,7 +63,7 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/src/claudio-core/Claudio.Core.csproj",
+        "${workspaceFolder}/src/claudio-desktop/core/Claudio.Core.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
@@ -97,10 +97,10 @@
     {
       "label": "build electron",
       "type": "process",
-      "command": "${workspaceFolder}/src/claudio-electron/node_modules/.bin/vp",
+      "command": "${workspaceFolder}/src/claudio-desktop/app/node_modules/.bin/vp",
       "args": ["pack"],
       "options": {
-        "cwd": "${workspaceFolder}/src/claudio-electron"
+        "cwd": "${workspaceFolder}/src/claudio-desktop/app"
       }
     },
     {
@@ -118,7 +118,7 @@
       "command": "./node_modules/.bin/electron .",
       "dependsOn": ["build desktop"],
       "options": {
-        "cwd": "${workspaceFolder}/src/claudio-electron"
+        "cwd": "${workspaceFolder}/src/claudio-desktop/app"
       },
       "isBackground": true,
       "problemMatcher": [],

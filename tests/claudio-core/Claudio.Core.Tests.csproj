@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\claudio-core\Claudio.Core.csproj" />
+    <ProjectReference Include="..\..\src\claudio-desktop\core\Claudio.Core.csproj" />
   </ItemGroup>
 
 </Project>

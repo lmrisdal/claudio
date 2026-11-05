@@ -8,7 +8,7 @@ files:
   - dist/**/*
   - package.json
 extraResources:
-  - from: ../claudio-web/dist
+  - from: ../../claudio-web/dist
     to: web
   - from: resources/icon.png
     to: icon.png

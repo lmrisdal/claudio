@@ -9,8 +9,8 @@ bump:
 		exit 1; \
 	fi; \
 	node scripts/bump_version.cjs "$$version"; \
-	dotnet build src/claudio-core; \
-	git add src/claudio-electron/package.json src/claudio-core/Claudio.Core.csproj src/claudio-web/package.json; \
+	dotnet build src/claudio-desktop/core; \
+	git add src/claudio-desktop/app/package.json src/claudio-desktop/core/Claudio.Core.csproj src/claudio-web/package.json; \
 	git commit -m "chore(release): bump version to $$version"; \
 	git tag -a "v$$version" -m "Claudio $$version"; \
 	case "$$push_flag" in \

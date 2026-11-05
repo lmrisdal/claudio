@@ -13,8 +13,8 @@ TestResults/
 **/obj/
 **/node_modules/
 **/dist/
-src/claudio-core/
-src/claudio-uninstaller/
+src/claudio-desktop/core/
+src/claudio-desktop/uninstaller/
 
 # Logs and OS/editor noise
 *.log

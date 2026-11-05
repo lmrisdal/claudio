@@ -70,8 +70,8 @@ jobs:
       - name: Check C# formatting
         shell: bash
         run: |
-          dotnet format src/claudio-core/Claudio.Core.csproj --verify-no-changes
-          dotnet format src/claudio-uninstaller/Claudio.Uninstaller.csproj --verify-no-changes
+          dotnet format src/claudio-desktop/core/Claudio.Core.csproj --verify-no-changes
+          dotnet format src/claudio-desktop/uninstaller/Claudio.Uninstaller.csproj --verify-no-changes
           dotnet format tests/claudio-core/Claudio.Core.Tests.csproj --verify-no-changes
       - name: Test C# sidecar
         run: dotnet test --project tests/claudio-core
@@ -81,34 +81,34 @@ jobs:
           rid=linux-x64
           extra=-p:StaticOpenSslLinking=true
           if [ "$RUNNER_OS" = Windows ]; then rid=win-x64; extra=; fi
-          dotnet publish src/claudio-core -c Release -r "$rid" $extra -o artifacts/claudio-core/publish
+          dotnet publish src/claudio-desktop/core -c Release -r "$rid" $extra -o artifacts/claudio-core/publish
           if [ "$RUNNER_OS" = Windows ]; then
-            dotnet publish src/claudio-uninstaller -c Release -r "$rid" -o artifacts/claudio-uninstaller/publish
+            dotnet publish src/claudio-desktop/uninstaller -c Release -r "$rid" -o artifacts/claudio-uninstaller/publish
           fi
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: '22'
-          working-directory: src/claudio-electron
+          working-directory: src/claudio-desktop/app
           cache: true
           run-install: |
             args: ['--frozen-lockfile']
       - run: vp check
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
       - run: vp test
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
       - name: Fetch 7-Zip
         shell: bash
         run: node scripts/fetch-7zip.mjs "$(node -p process.platform)" artifacts/7-zip
       - name: Run the sidecar contract suite against the C# Native AOT build
         shell: bash
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
         env:
           CLAUDIO_CORE_PATH: ${{ github.workspace }}/artifacts/claudio-core/publish/claudio-core${{ runner.os == 'Windows' && '.exe' || '' }}
           CLAUDIO_STATIC_OPENSSL: ${{ runner.os == 'Linux' && '1' || '' }}
           CLAUDIO_TEST_7Z: ${{ github.workspace }}/artifacts/7-zip/${{ runner.os == 'Windows' && '7za.exe' || '7zzs' }}
         run: vp test tests/core-*.test.ts tests/real-core.test.ts
       - run: vp pack
-        working-directory: src/claudio-electron
+        working-directory: src/claudio-desktop/app
       - name: Test release helpers
         if: runner.os == 'Linux'
         run: node --test scripts/*.test.cjs

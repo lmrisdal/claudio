@@ -19,14 +19,14 @@ function fixture(t) {
     return result.stdout.trim();
   };
   const git = (...args) => success('git', args);
-  for (const directory of ['scripts', 'src/claudio-core', 'src/claudio-web', 'src/claudio-electron']) {
+  for (const directory of ['scripts', 'src/claudio-desktop/core', 'src/claudio-web', 'src/claudio-desktop/app']) {
     mkdirSync(join(cwd, directory), { recursive: true });
   }
   copyFileSync(join(__dirname, '../Makefile'), join(cwd, 'Makefile'));
   copyFileSync(join(__dirname, 'bump_version.cjs'), join(cwd, 'scripts/bump_version.cjs'));
   writeFileSync(join(cwd, '.gitignore'), '/target/\nartifacts/\nbin/\nobj/\n');
-  writeFileSync(join(cwd, 'src/claudio-core/Claudio.Core.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><Version>0.2.1</Version></PropertyGroup></Project>');
-  for (const name of ['claudio-web', 'claudio-electron']) {
+  writeFileSync(join(cwd, 'src/claudio-desktop/core/Claudio.Core.csproj'), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><Version>0.2.1</Version></PropertyGroup></Project>');
+  for (const name of ['claudio-web', 'claudio-desktop/app']) {
     writeFileSync(join(cwd, 'src', name, 'package.json'), JSON.stringify({ version: '0.2.1' }));
   }
   git('init', '--initial-branch=main');
@@ -43,12 +43,12 @@ function fixture(t) {
 test('make bump commits the version files and tags the release commit', t => {
   const { cwd, success, git } = fixture(t);
   success('make', ['bump', '0.2.2'], { input: 'n\n' });
-  assert.match(readFileSync(join(cwd, 'src/claudio-core/Claudio.Core.csproj'), 'utf8'), /<Version>0\.2\.2<\/Version>/);
-  assert.match(git('show', 'HEAD:src/claudio-core/Claudio.Core.csproj'), /<Version>0\.2\.2<\/Version>/);
+  assert.match(readFileSync(join(cwd, 'src/claudio-desktop/core/Claudio.Core.csproj'), 'utf8'), /<Version>0\.2\.2<\/Version>/);
+  assert.match(git('show', 'HEAD:src/claudio-desktop/core/Claudio.Core.csproj'), /<Version>0\.2\.2<\/Version>/);
   assert.equal(git('status', '--porcelain'), '');
   assert.equal(git('rev-parse', 'v0.2.2^{commit}'), git('rev-parse', 'HEAD'));
   assert.equal(git('cat-file', '-t', 'v0.2.2'), 'tag');
-  for (const name of ['claudio-web', 'claudio-electron']) {
+  for (const name of ['claudio-web', 'claudio-desktop/app']) {
     assert.equal(JSON.parse(readFileSync(join(cwd, 'src', name, 'package.json'), 'utf8')).version, '0.2.2');
   }
 });

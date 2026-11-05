@@ -499,4 +499,4 @@ docs/.astro/
 .claude/
 
 # Staged desktop sidecar
-src/claudio-electron/sidecar/
+src/claudio-desktop/app/sidecar/
