@@ -487,7 +487,6 @@ src/claudio-web/dist/
 # Embedded SPA (built from src/claudio-web/)
 src/claudio-api/wwwroot/*
 !src/claudio-api/wwwroot/.gitkeep
-src/claudio-api-rs/wwwroot/
 
 # Local config (contains secrets)
 config/
@@ -499,5 +498,5 @@ docs/.astro/
 # Claude Code
 .claude/
 
-# Rust
+# Staged desktop sidecar
 src/claudio-electron/sidecar/

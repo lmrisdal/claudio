@@ -3,9 +3,7 @@ using System.IO.Compression;
 
 namespace Claudio.Core.Install;
 
-// TarFile.ExtractToDirectory aborts on `..` entries and on absolute symlinks, which are common in Linux
-// game tarballs. This follows the Rust tar crate instead: skip `..` entries, keep symlink targets as
-// written, and refuse only writes through a link that resolves outside the destination.
+// TarFile.ExtractToDirectory aborts on `..` entries and on absolute symlinks, which are common in Linux game tarballs.
 internal static class TarExtract
 {
     private const string CancelledMessage = "Install cancelled.";

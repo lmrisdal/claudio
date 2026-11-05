@@ -45,7 +45,7 @@ docker compose -f docker/docker-compose.yml up --build
 
 ### Windows test VM (Windows behaviour from a Linux host)
 
-`scripts/windows-vm.sh` runs a Windows 11 VM ([dockur/windows](https://github.com/dockur/windows) under rootless podman with KVM). Use it to test Windows-only code (`src/claudio-core/Windows/`, the Rust `windows_integration/`, installers, the uninstaller) instead of guessing. Native AOT cannot cross-compile to Windows, so Windows binaries are built inside the VM.
+`scripts/windows-vm.sh` runs a Windows 11 VM ([dockur/windows](https://github.com/dockur/windows) under rootless podman with KVM). Use it to test Windows-only code (`src/claudio-core/Windows/`, installers, the uninstaller) instead of guessing. Native AOT cannot cross-compile to Windows, so Windows binaries are built inside the VM.
 
 ```bash
 scripts/windows-vm.sh status                  # container state and whether SSH answers; run this first
@@ -68,22 +68,22 @@ scripts/windows-vm.sh down
 - **Reset between installer tests:** `restore clean`, then `up` and `wait`. Snapshots are reflink copies on btrfs, so they are instant. Never leave the VM in a state the next test depends on without a snapshot.
 - **Files:** `pull <remote> <local>` copies a file out. The host folder `~/.local/share/claudio-winvm/shared` is `Z:` in Windows.
 - **State** (disk, snapshots, SSH key, generated password) lives in `~/.local/share/claudio-winvm`, outside the repo. All ports listen on 127.0.0.1 only.
-- **First-time setup** (already done on this machine): `up`, `wait` (Windows installs itself, 20-40 minutes), `provision` (.NET 10 SDK, MSVC build tools for Native AOT, Node.js, Vite+, Rust, and UAC switched back on, since the dockur install turns it off), then `snapshot clean`.
+- **First-time setup** (already done on this machine): `up`, `wait` (Windows installs itself, 20-40 minutes), `provision` (.NET 10 SDK, MSVC build tools for Native AOT, Node.js, Vite+, and UAC switched back on, since the dockur install turns it off), then `snapshot clean`.
 
 ## Architecture
 
-Monorepo with a Rust API, an Electron desktop client backed by a Rust sidecar, and a React frontend:
+Monorepo with a C# API, an Electron desktop client backed by a C# sidecar, and a React frontend:
 
-- **`src/claudio-api`** — Axum-based Rust API. Serves the SPA as static files and provides REST endpoints.
+- **`src/claudio-api`** — ASP.NET Core API (.NET 10). Serves the SPA as static files and provides REST endpoints.
 - **`src/claudio-core`** — Headless C# (.NET Native AOT) sidecar for the desktop app: installs, game launching, Proton/umu. JSON lines over stdio, no UI dependencies.
 - **`src/claudio-electron`** — Electron shell: windows, tray, `claudio-app://` and `claudio://api` protocols, auto-updates, packaging with electron-builder.
 - **`src/claudio-web/`** — React 19 SPA built with Vite. Output goes to `src/claudio-api/wwwroot/`. Uses TanStack React Query for data fetching, React Router for routing, Tailwind CSS v4 (via Vite plugin, no tailwind.config).
-- **`tests/claudio-api-rs/`** — Rust integration test crate for API behavior.
-- **`tests/claudio-core/`** — Rust integration tests for the sidecar.
+- **`tests/claudio-api/`** — TUnit tests for API behavior.
+- **`tests/claudio-core/`** — Unit tests for the sidecar.
 
 ### Backend structure
 
-Routes live under `src/claudio-api/src/routes/`, database entities are under `src/claudio-api/src/entity/`, and the app uses SeaORM with SQLite and PostgreSQL support.
+Endpoints live under `src/claudio-api/Endpoints/`, models under `Models/` and migrations under `Migrations/`. The app uses EF Core with SQLite and PostgreSQL support.
 
 ### Configuration
 
@@ -210,13 +210,13 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 
 ## Key Conventions
 
-- The SPA is served by the Rust API from `wwwroot` with an `index.html` fallback.
+- The SPA is served by the API from `wwwroot` with an `index.html` fallback.
 - Desktop-only code in the SPA talks to the shell through `src/claudio-web/src/features/desktop/hooks/desktop-bridge.ts` (`window.claudioDesktop`). Do not import Electron or Node APIs in the SPA.
 - Game downloads use streaming with `enableRangeProcessing` for resume support.
 - IGDB integration authenticates via Twitch OAuth (client credentials flow).
 
 ## Testing
 
-- **New features must include tests.** Add or update Rust tests for isolated logic and endpoint behavior.
-- **Changes to existing code must run relevant tests** (`cargo test`). If behavior changes, update the tests to match.
-- API integration tests live in `tests/claudio-api-rs/`.
+- **New features must include tests.** Add or update tests for isolated logic and endpoint behavior.
+- **Changes to existing code must run relevant tests** (`dotnet test`). If behavior changes, update the tests to match.
+- API integration tests live in `tests/claudio-api/`.

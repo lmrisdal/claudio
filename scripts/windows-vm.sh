@@ -32,7 +32,7 @@ Usage: scripts/windows-vm.sh <command> [args]
   status             container state and whether SSH answers
   logs               follow the container log (install progress)
   wait [seconds]     wait until SSH answers (default 3600)
-  provision          install the .NET 10 SDK, MSVC build tools, Node.js, Vite+ and Rust, and turn UAC on
+  provision          install the .NET 10 SDK, MSVC build tools, Node.js, and Vite+, and turn UAC on
   reboot             restart Windows and wait for SSH
   push [--clean]     copy the working tree (tracked and untracked, not ignored) to $REMOTE_ROOT
   ssh [command]      PowerShell over SSH, as an administrator with a full token

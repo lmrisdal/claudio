@@ -43,15 +43,6 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue) -and -not (Test-Path '
 }
 Add-MachinePath 'C:\Program Files\nodejs'
 
-if (-not (Test-Path "$env:USERPROFILE\.cargo\bin\cargo.exe")) {
-    Write-Output 'Installing Rust (stable, MSVC)'
-    Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile "$downloads\rustup-init.exe"
-    & "$downloads\rustup-init.exe" -y --profile minimal --default-toolchain stable --component clippy,rustfmt
-    if ($LASTEXITCODE -ne 0) {
-        throw "rustup-init failed with exit code $LASTEXITCODE"
-    }
-}
-
 # npm and vp ship .ps1 shims. This process runs with -ExecutionPolicy Bypass, so PowerShell reports the
 # machine setting as overridden even though it was applied.
 try { Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force } catch [System.Security.SecurityException] { }
