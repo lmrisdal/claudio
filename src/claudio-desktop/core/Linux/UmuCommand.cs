@@ -71,7 +71,7 @@ internal static class UmuCommand
         var umuRun = Umu.ResolveRun();
         var runtimePrefix = HostPaths.NestedRuntimePath(prefix);
         var info = new ProcessStartInfo(umuRun) { WorkingDirectory = prefix };
-        info.ArgumentList.Add("");
+        info.ArgumentList.Add("createprefix");
         SetEnvironment(info, runtimePrefix, protonPath, "umu-default", "none");
         Log.Info("claudio_core", $"[umu] preparing prefix {runtimePrefix} with Proton {protonPath}");
         LoggedChild child;
@@ -86,7 +86,8 @@ internal static class UmuCommand
 
         using (child.Process)
         {
-            WaitFor(child, cancelled, $"preparing prefix {runtimePrefix}");
+            // Proton exits 1 after creating the prefix because there is no executable to run, so judge success by the prefix itself.
+            WaitFor(child, cancelled, $"preparing prefix {runtimePrefix}", () => IsPrefixInitialised(prefix));
         }
     }
 
@@ -99,7 +100,10 @@ internal static class UmuCommand
         }
     }
 
-    private static void WaitFor(LoggedChild child, Func<bool> cancelled, string activity)
+    private static bool IsPrefixInitialised(string prefix) =>
+        File.Exists(Path.Combine(prefix, "pfx", "system.reg")) || File.Exists(Path.Combine(prefix, "system.reg"));
+
+    private static void WaitFor(LoggedChild child, Func<bool> cancelled, string activity, Func<bool>? acceptFailure = null)
     {
         while (true)
         {
@@ -118,7 +122,7 @@ internal static class UmuCommand
 
         child.Process.WaitForExit();
         child.DrainOutput();
-        if (child.Process.ExitCode != 0)
+        if (child.Process.ExitCode != 0 && acceptFailure?.Invoke() != true)
         {
             throw new CommandException(
                 $"UMU exited with status exit status: {child.Process.ExitCode} while {activity}.\n{child.Tail.Format("UMU")}");

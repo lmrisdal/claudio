@@ -50,10 +50,9 @@ export default function InstallSpaceInfo({
           style={{ width: `${gamePercent}%` }}
         />
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-text-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-text-muted/60" aria-hidden="true" />
-          {formatSize(usedBytes)} used
+      <div className="mt-2.5 flex flex-wrap justify-between items-center gap-x-5 gap-y-1.5 text-xs text-text-muted">
+        <span >
+          {formatSize(disk.freeBytes)} free of {formatSize(disk.totalBytes)}
         </span>
         {requiredBytes > 0 && (
           <span
@@ -66,9 +65,6 @@ export default function InstallSpaceInfo({
             {formatSize(requiredBytes)} needed
           </span>
         )}
-        <span className="ml-auto">
-          {formatSize(disk.freeBytes)} free of {formatSize(disk.totalBytes)}
-        </span>
       </div>
       {insufficient && (
         <p className="mt-1 text-xs text-red-400" role="alert">
