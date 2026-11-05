@@ -9,6 +9,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Claudio",
+      logo: { src: "./src/assets/icon.svg", replacesTitle: true },
       customCss: ["./src/custom.css"],
       components: {
         Header: "./src/components/Header.astro",
@@ -24,20 +25,19 @@ export default defineConfig({
           ],
         },
         {
-          label: "Configuration",
+          label: "Clients",
           items: [
-            { label: "Environment Variables", slug: "configuration/environment-variables" },
-            { label: "Config File", slug: "configuration/config-file" },
-            { label: "Database", slug: "configuration/database" },
+            { label: "Installing on Windows", slug: "clients/windows" },
+            { label: "Installing on Linux", slug: "clients/linux" },
+            { label: "Web UI vs Desktop App", slug: "clients/web-ui" },
           ],
         },
         {
-          label: "Authentication",
+          label: "Configuration",
           items: [
-            { label: "Overview", slug: "authentication/overview" },
-            { label: "OAuth Providers", slug: "authentication/oauth-providers" },
-            { label: "Custom OIDC Provider", slug: "authentication/custom-oidc" },
-            { label: "Proxy Authentication", slug: "authentication/proxy-auth" },
+            { label: "Environment Variables", slug: "configuration/environment-variables" },
+            { label: "Configuration", slug: "configuration/config-file" },
+            { label: "Database", slug: "configuration/database" },
           ],
         },
       ],

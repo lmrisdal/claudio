@@ -7,12 +7,15 @@ Games are organized by platform in your library directories:
 
 ```
 /games/
-  pc/
+  win/
     Hades II (2025)/
     Celeste (2018) (igdb-26226)/
+    Hollow Knight (2017).zip
   switch/
     The Legend of Zelda Breath of the Wild (2017)/
 ```
+
+Each top-level folder is a platform. A folder named `pc` is treated as `win`.
 
 ## Naming Convention
 
@@ -28,8 +31,10 @@ Adding `igdb-NNNNN` is useful when automatic matching picks the wrong game.
 Games can be:
 
 - **Loose files** — a directory containing the game files
-- **A single archive** — zip, tar, or tar.gz
+- **A single archive** — zip, 7z, tar, tar.gz/tgz, or iso, either on its own in the platform folder or as the only file inside a game folder
 
 ## Scanning
+
+Platform folders can be excluded from scanning with `CLAUDIO_EXCLUDE_PLATFORMS` or `exclude_platforms` in `config.toml`.
 
 Background scanning runs every 2 minutes to pick up changes in your library directories. You can adjust this with `CLAUDIO_SCAN_INTERVAL` (in seconds) or `scan_interval_secs` in `config.toml`. You can also trigger a manual scan from the admin panel.

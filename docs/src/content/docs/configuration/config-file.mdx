@@ -1,5 +1,5 @@
 ---
-title: Config File
+title: Configuration
 description: Configure Claudio using a TOML config file.
 ---
 
@@ -19,17 +19,18 @@ provider = "sqlite"             # "sqlite" or "postgres"
 sqlite_path = "/config/claudio.db"
 # postgres_connection = "postgres://claudio:secret@localhost/claudio"
 
-[auth]
-# browser_origins = ["https://claudio.example.com"]
-# proxy_auth_header = "Remote-User"
-# proxy_auth_auto_create = false
-
 [igdb]
 client_id = ""
 client_secret = ""
+# timeout_secs = 600   # Maximum runtime for a queued IGDB scan job
+
+[steamgriddb]
+api_key = ""
+# timeout_secs = 900   # Maximum runtime for a queued SteamGridDB job
 
 [library]
 library_paths = ["/games"]
+# exclude_platforms = ["ps", "ngc"]   # Platform folders to skip during scans
 # scan_interval_secs = 120   # How often to re-scan the library (in seconds)
 ```
 
@@ -46,29 +47,23 @@ Server configuration including the HTTP port and log level.
 
 Database provider selection (`sqlite` or `postgres`) and connection details.
 
-### `[auth]`
-
-Authentication settings including browser origins for cookie-auth CORS and proxy authentication. See [Authentication](/claudio/authentication/overview/) for details.
-
 ### `[igdb]`
 
 IGDB/Twitch API credentials for game metadata. See the [Twitch Developer Portal](https://dev.twitch.tv/console) to create credentials.
+
+- `timeout_secs` — maximum runtime for a queued IGDB scan job (default: `600`)
+
+### `[steamgriddb]`
+
+SteamGridDB API key, used to search for cover art when IGDB has no match.
+
+- `api_key` — your SteamGridDB API key
+- `timeout_secs` — maximum runtime for a queued SteamGridDB job (default: `900`)
 
 ### `[library]`
 
 List of paths to scan for game directories and scan timing.
 
 - `library_paths` — directories to scan for platform/game folders (default: `["/games"]`)
+- `exclude_platforms` — platform folders to skip during scans, e.g. `["ps", "ngc"]` (default: none)
 - `scan_interval_secs` — how often to re-scan the library in seconds (default: `120`)
-
-### `[auth.github]` / `[auth.google]`
-
-OAuth provider credentials. See [OAuth Providers](/claudio/authentication/oauth-providers/).
-
-### `[auth.oidc_provider]`
-
-Custom OpenID Connect provider. See [Custom OIDC](/claudio/authentication/custom-oidc/).
-
-`browser_origins` is only needed when the browser app and API are served from different origins, such as `https://claudio.example.com` for the SPA and `https://api.example.com` for the API. For same-origin reverse-proxy setups, leave it unset.
-
-This is an advanced setting and is not needed for normal Docker deployments where Claudio serves the SPA and API from the same origin.
