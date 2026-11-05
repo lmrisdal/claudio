@@ -91,7 +91,7 @@ TOML config loaded from `CLAUDIO_CONFIG_PATH` env var or `/config/config.toml`. 
 - Tailwind classes are used for styling in JSX, with semantic tokens for colors and spacing.
 - Only one React component per file.
 - Avoid useEffect where possible. See: https://react.dev/learn/you-might-not-need-an-effect
-- Limit source files to 400 lines for readability. If a file grows too large, consider splitting it into smaller components or modules.
+- Limit source files length for readability. 500-ish lines for frontend, 1000-ish lines for backend. If a file grows too large, consider splitting it into smaller components or modules.
 - Avoid comments that explain "what" the code is doing — the code should be self-explanatory. Use comments to explain "why" if the reasoning is not obvious.
 
 ### Frontend patterns

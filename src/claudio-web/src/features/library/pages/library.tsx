@@ -561,10 +561,9 @@ export default function Library() {
     [saveFocusedGameId],
   );
 
-  const handleDownloadGame = useCallback(async (game: Game) => {
-    const { ticket } = await api.post<{ ticket: string }>(`/games/${game.id}/download-ticket`);
+  const handleDownloadGame = useCallback((game: Game) => {
     const anchor = document.createElement("a");
-    anchor.href = `/api/games/${game.id}/download?ticket=${encodeURIComponent(ticket)}`;
+    anchor.href = `/api/games/${game.id}/download`;
     anchor.download = "";
     document.body.append(anchor);
     anchor.click();

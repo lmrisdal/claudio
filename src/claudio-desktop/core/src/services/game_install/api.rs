@@ -199,7 +199,7 @@ async fn download_game_package_inner(
             })?;
             let extract_app = app.clone();
             let extract_gid = input.id;
-            extract_archive_subprocess(
+            extract_archive_in_background(
                 &download_info.file_path,
                 &staging,
                 &control.cancel_token,

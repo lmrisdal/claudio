@@ -91,7 +91,7 @@ where
             }
             fs::create_dir_all(&staging).map_err(|err| err.to_string())?;
 
-            extract_archive_subprocess(
+            extract_archive_in_background(
                 &download_info.file_path,
                 &staging,
                 &controller.control.cancel_token,

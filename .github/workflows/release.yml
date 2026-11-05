@@ -148,9 +148,10 @@ jobs:
           compression-level: 0
           retention-days: 14
 
+  # Tag pushes publish a versioned release. Manual runs refresh :dev and a single
+  # rolling draft release tagged "dev", replaced on every run so drafts don't pile up.
   publish:
     name: Publish release
-    if: github.event_name == 'push'
     needs: [version, desktop, container]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -160,7 +161,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || 'dev' }}
       VERSION: ${{ needs.version.outputs.version }}
       PRERELEASE: ${{ needs.version.outputs.prerelease }}
     steps:
@@ -181,11 +182,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload tested assets to draft release
+        if: github.event_name == 'push'
         run: |
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "Claudio $RELEASE_TAG" --generate-notes
           fi
           gh release upload "$RELEASE_TAG" release/* --clobber
+      - name: Replace rolling dev draft release
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            if [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != true ]; then
+              echo "::error::Release $RELEASE_TAG is published; refusing to replace it."
+              exit 1
+            fi
+            gh release delete "$RELEASE_TAG" --yes
+          fi
+          gh release create "$RELEASE_TAG" --draft --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Claudio dev $VERSION (${GITHUB_SHA::7})" \
+            --notes "Rolling development build from ${GITHUB_REF_NAME} at ${GITHUB_SHA}. Replaced on every manual Release run."
+          gh release upload "$RELEASE_TAG" release/*
       - name: Publish tested container images
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
@@ -194,16 +211,18 @@ jobs:
             docker tag "claudio:release-${arch}" "${image}:sha-${GITHUB_SHA}-${arch}"
             docker push "${image}:sha-${GITHUB_SHA}-${arch}"
           done
-          tags=(--tag "${image}:${VERSION}")
-          if [ "$PRERELEASE" = true ]; then
-            tags+=(--tag "${image}:dev")
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            tags=(--tag "${image}:dev")
+          elif [ "$PRERELEASE" = true ]; then
+            tags=(--tag "${image}:${VERSION}" --tag "${image}:dev")
           else
-            tags+=(--tag "${image}:latest")
+            tags=(--tag "${image}:${VERSION}" --tag "${image}:latest")
           fi
           docker buildx imagetools create "${tags[@]}" \
             "${image}:sha-${GITHUB_SHA}-amd64" \
             "${image}:sha-${GITHUB_SHA}-arm64"
       - name: Publish GitHub release
+        if: github.event_name == 'push'
         run: |
           if [ "$PRERELEASE" = true ]; then
             gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false

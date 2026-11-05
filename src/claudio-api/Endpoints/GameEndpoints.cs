@@ -32,7 +32,6 @@ public static class GameEndpoints
         group.MapGet("/{id:int}", GetById);
         group.MapGet("/{id:int}/executables", ListExecutables);
         group.MapGet("/{id:int}/installer-inspection", InspectInstaller);
-        group.MapPost("/{id:int}/download-ticket", CreateDownloadTicket);
         group.MapGet("/{id:int}/download", Download);
         group.MapGet("/{id:int}/download-files-manifest", GetDownloadFilesManifest);
         group.MapGet("/{id:int}/download-files", DownloadFile);
@@ -40,7 +39,7 @@ public static class GameEndpoints
         group.MapGet("/{id:int}/browse", BrowseGameFiles);
         group.MapGet("/{id:int}/emulation", GetEmulationInfo);
         group.MapPost("/{id:int}/emulation/session", CreateEmulationSession);
-        group.MapMethods("/{id:int}/emulation/files/{ticket}/{**path}", ["GET", "HEAD"], GetEmulationFile);
+        group.MapMethods("/{id:int}/emulation/files/{**path}", ["GET", "HEAD"], GetEmulationFile);
 
         return group;
     }
@@ -109,24 +108,6 @@ public static class GameEndpoints
         }
     }
 
-    private static async Task<IResult> CreateDownloadTicket(int id, AppDbContext db, DownloadTicketService ticketService)
-    {
-        var game = await db.Games.FindAsync(id);
-        if (game is null) return Results.NotFound();
-        if (game.IsProcessing) return Results.Conflict("Game is currently being processed.");
-
-        if (!ExistsOnDisk(game))
-            return Results.Problem("Game files not found on disk.", statusCode: 500);
-
-        var ticket = ticketService.CreateTicket(id);
-
-        // Legacy browser flow keeps ticket response shape. Desktop can use
-        // /download-files-manifest and /download-files endpoints without tickets.
-        var files = BuildLooseFileManifest(game);
-
-        return Results.Ok(new { ticket, files });
-    }
-
     public record DownloadFileManifestEntry(string Path, long Size);
 
     private static async Task<IResult> GetDownloadFilesManifest(int id, AppDbContext db)
@@ -144,14 +125,9 @@ public static class GameEndpoints
 
     private static async Task<IResult> Download(
         int id,
-        [FromQuery] string? ticket,
         AppDbContext db,
-        DownloadService downloadService,
-        DownloadTicketService ticketService)
+        DownloadService downloadService)
     {
-        if (ticket is not null && !ticketService.TryRedeem(ticket, id))
-            return Results.Unauthorized();
-
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
 
@@ -312,7 +288,7 @@ public static class GameEndpoints
         List<string> Candidates);
 
     public record EmulationSessionRequest(string Path);
-    public record EmulationSessionResponse(string Ticket, string GameUrl);
+    public record EmulationSessionResponse(string GameUrl);
 
     public record BrowseEntry(string Name, bool IsDirectory, long? Size);
     public record BrowseResult(string Path, bool InsideArchive, List<BrowseEntry> Entries);
@@ -379,8 +355,7 @@ public static class GameEndpoints
     private static async Task<IResult> CreateEmulationSession(
         int id,
         EmulationSessionRequest request,
-        AppDbContext db,
-        EmulationTicketService ticketService)
+        AppDbContext db)
     {
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
@@ -392,25 +367,19 @@ public static class GameEndpoints
         if (!info.Candidates.Contains(request.Path, StringComparer.OrdinalIgnoreCase))
             return Results.BadRequest("Invalid ROM path.");
 
-        var ticket = ticketService.CreateTicket(id);
         var encodedSegments = request.Path
             .Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(Uri.EscapeDataString);
-        var gameUrl = $"/api/games/{id}/emulation/files/{Uri.EscapeDataString(ticket)}/{string.Join("/", encodedSegments)}";
+        var gameUrl = $"/api/games/{id}/emulation/files/{string.Join("/", encodedSegments)}";
 
-        return Results.Ok(new EmulationSessionResponse(ticket, gameUrl));
+        return Results.Ok(new EmulationSessionResponse(gameUrl));
     }
 
     private static async Task<IResult> GetEmulationFile(
         int id,
-        string ticket,
         string path,
-        AppDbContext db,
-        EmulationTicketService ticketService)
+        AppDbContext db)
     {
-        if (!ticketService.IsValid(ticket, id))
-            return Results.Unauthorized();
-
         var game = await db.Games.FindAsync(id);
         if (game is null) return Results.NotFound();
 

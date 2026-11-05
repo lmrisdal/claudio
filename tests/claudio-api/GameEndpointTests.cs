@@ -357,6 +357,30 @@ public class GameEndpointTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task EmulationSession_ReturnsUrlThatServesRomFile()
+    {
+        var gameDir = Path.Combine(_gamesDir, "gba", "Pokemon");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "pokemon.gba"), "rom-data");
+
+        await SeedGameAsync("Pokemon", "gba", "Pokemon", gameDir);
+        var client = CreateClient();
+
+        var sessionResponse = await client.PostAsJsonAsync("/api/games/1/emulation/session", new { path = "pokemon.gba" });
+
+        sessionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var session = await sessionResponse.Content.ReadFromJsonAsync<JsonElement>();
+        session.TryGetProperty("ticket", out _).Should().BeFalse();
+        var gameUrl = session.GetProperty("gameUrl").GetString();
+        gameUrl.Should().Be("/api/games/1/emulation/files/pokemon.gba");
+
+        var fileResponse = await client.GetAsync(gameUrl);
+
+        fileResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await fileResponse.Content.ReadAsStringAsync()).Should().Be("rom-data");
+    }
+
+    [Test]
     public async Task GetEmulationInfo_UnsupportedPlatform_ReturnsNotSupported()
     {
         var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
@@ -388,7 +412,7 @@ public class GameEndpointTests : IAsyncDisposable
         info.GetProperty("supported").GetBoolean().Should().BeFalse();
     }
 
-    // --- Download ticket ---
+    // --- Download ---
 
     [Test]
     public async Task Download_Anonymous_ReturnsOk()
@@ -425,33 +449,7 @@ public class GameEndpointTests : IAsyncDisposable
     }
 
     [Test]
-    public async Task DownloadTicket_LooseFolder_IncludesFileManifest()
-    {
-        var gameDir = Path.Combine(_gamesDir, "pc", "Doom");
-        Directory.CreateDirectory(gameDir);
-        File.WriteAllText(Path.Combine(gameDir, "game.exe"), "exe");
-        File.WriteAllText(Path.Combine(gameDir, "readme.txt"), "info");
-
-        await SeedGameAsync("Doom", "pc", "Doom", gameDir);
-        var client = CreateClient();
-
-        var response = await client.PostAsync("/api/games/1/download-ticket", null);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.TryGetProperty("ticket", out _).Should().BeTrue();
-        json.TryGetProperty("files", out var files).Should().BeTrue();
-        files.ValueKind.Should().Be(JsonValueKind.Array);
-        files.GetArrayLength().Should().Be(2);
-        var paths = Enumerable.Range(0, files.GetArrayLength())
-            .Select(i => files[i].GetProperty("path").GetString())
-            .ToList();
-        paths.Should().Contain("game.exe");
-        paths.Should().Contain("readme.txt");
-    }
-
-    [Test]
-    public async Task DownloadTicket_StandaloneArchive_OmitsFileManifest()
+    public async Task DownloadFilesManifest_StandaloneArchive_ReturnsNullFiles()
     {
         var archivePath = Path.Combine(_gamesDir, "pc", "game.zip");
         Directory.CreateDirectory(Path.GetDirectoryName(archivePath)!);
@@ -460,11 +458,10 @@ public class GameEndpointTests : IAsyncDisposable
         await SeedGameAsync("ZipGame", "pc", "game.zip", archivePath);
         var client = CreateClient();
 
-        var response = await client.PostAsync("/api/games/1/download-ticket", null);
+        var response = await client.GetAsync("/api/games/1/download-files-manifest");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.TryGetProperty("ticket", out _).Should().BeTrue();
         json.TryGetProperty("files", out var files).Should().BeTrue();
         files.ValueKind.Should().Be(JsonValueKind.Null);
     }

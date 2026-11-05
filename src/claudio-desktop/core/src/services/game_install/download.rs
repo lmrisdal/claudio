@@ -114,90 +114,18 @@ where
         .await;
     }
 
-    let mut response = if manifest_missing {
-        let ticket_response = client
-            .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-            .headers(headers.clone())
-            .send()
-            .await
-            .map_err(|err| err.to_string())?;
-
-        if !ticket_response.status().is_success() {
-            return Err(format!(
-                "Failed to create download ticket: {}",
-                ticket_response.status()
-            ));
-        }
-
-        let ticket_json: serde_json::Value = ticket_response
-            .json()
-            .await
-            .map_err(|err| err.to_string())?;
-        let ticket = ticket_json
-            .get("ticket")
-            .and_then(|value| value.as_str())
-            .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
-            .to_owned();
-
-        client
-            .get(format!(
-                "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-            ))
-            .headers(headers.clone())
-            .send()
-            .await
-            .map_err(|err| err.to_string())?
-    } else {
-        client
-            .get(format!("{server_url}/api/games/{game_id}/download"))
-            .headers(headers.clone())
-            .send()
-            .await
-            .map_err(|err| err.to_string())?
-    };
+    let response = client
+        .get(format!("{server_url}/api/games/{game_id}/download"))
+        .headers(headers.clone())
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
-            let ticket_response = client
-                .post(format!("{server_url}/api/games/{game_id}/download-ticket"))
-                .headers(headers.clone())
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-
-            if !ticket_response.status().is_success() {
-                return Err(format!(
-                    "Failed to create download ticket: {}",
-                    ticket_response.status()
-                ));
-            }
-
-            let ticket_json: serde_json::Value = ticket_response
-                .json()
-                .await
-                .map_err(|err| err.to_string())?;
-            let ticket = ticket_json
-                .get("ticket")
-                .and_then(|value| value.as_str())
-                .ok_or_else(|| "Download ticket response was missing the ticket.".to_string())?
-                .to_owned();
-
-            response = client
-                .get(format!(
-                    "{server_url}/api/games/{game_id}/download?ticket={ticket}"
-                ))
-                .headers(headers.clone())
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-        }
-
-        if !response.status().is_success() {
-            return Err(format!(
-                "Failed to download game package: {}",
-                response.status()
-            ));
-        }
+        return Err(format!(
+            "Failed to download game package: {}",
+            response.status()
+        ));
     }
 
     let filename =

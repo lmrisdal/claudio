@@ -614,6 +614,9 @@ export default function GameDetailActions({
                 }
                 onClick={() => void handleInstallClick()}
                 onContextMenu={(event) => {
+                  if (displayGame.installType !== "installer") {
+                    return;
+                  }
                   event.preventDefault();
                   setInstallButtonMenu({ x: event.clientX, y: event.clientY });
                 }}

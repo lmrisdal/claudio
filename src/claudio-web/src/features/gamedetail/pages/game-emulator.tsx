@@ -21,7 +21,6 @@ interface EmulationInfo {
 }
 
 interface EmulationSession {
-  ticket: string;
   gameUrl: string;
 }
 

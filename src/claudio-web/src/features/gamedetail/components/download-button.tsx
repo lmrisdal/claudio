@@ -1,24 +1,18 @@
 import { useState } from "react";
-import { api } from "../../core/api/client";
 import { formatSize } from "../../core/utils/format";
 
 export default function DownloadButton({ gameId, size }: { gameId: number; size: number }) {
   const [preparing, setPreparing] = useState(false);
 
-  async function handleDownload() {
+  function handleDownload() {
     setPreparing(true);
-    try {
-      const { ticket } = await api.post<{ ticket: string }>(`/games/${gameId}/download-ticket`);
-      const url = `/api/games/${gameId}/download?ticket=${encodeURIComponent(ticket)}`;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "";
-      document.body.append(a);
-      a.click();
-      a.remove();
-    } finally {
-      setTimeout(() => setPreparing(false), 1000);
-    }
+    const a = document.createElement("a");
+    a.href = `/api/games/${gameId}/download`;
+    a.download = "";
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => setPreparing(false), 1000);
   }
 
   return (

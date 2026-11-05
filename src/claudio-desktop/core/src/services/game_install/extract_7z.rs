@@ -3,19 +3,6 @@ use sevenz_rust2::{Archive, Error as SevenZipError, decompress_with_extract_fn};
 
 const CANCELLED_MESSAGE: &str = "Install cancelled.";
 
-pub(super) async fn extract_7z_blocking(
-    source: &Path,
-    destination: &Path,
-    cancel_token: &Arc<AtomicBool>,
-) -> Result<(), String> {
-    let source = source.to_path_buf();
-    let destination = destination.to_path_buf();
-    let cancel_token = cancel_token.clone();
-    tokio::task::spawn_blocking(move || extract_7z(&source, &destination, &cancel_token, |_| {}))
-        .await
-        .map_err(|err| format!("7z extraction task failed: {err}"))?
-}
-
 pub(super) fn extract_7z<F>(
     source: &Path,
     destination: &Path,

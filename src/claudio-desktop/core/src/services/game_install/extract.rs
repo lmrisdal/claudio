@@ -13,7 +13,7 @@ pub(super) fn infer_filename(headers: &HeaderMap) -> Option<String> {
     })
 }
 
-pub(super) async fn extract_archive_subprocess<F>(
+pub(super) async fn extract_archive_in_background<F>(
     source: &Path,
     destination: &Path,
     cancel_token: &Arc<AtomicBool>,
@@ -22,76 +22,21 @@ pub(super) async fn extract_archive_subprocess<F>(
 where
     F: FnMut(Option<f64>),
 {
-    fs::create_dir_all(destination).map_err(|err| {
-        log_io_failure("create extraction destination", destination, &err);
-        format_install_io_error("create the extraction destination", destination, &err)
-    })?;
-    let lower = source.to_string_lossy().to_lowercase();
-
-    if lower.ends_with(".7z") {
-        on_progress(None);
-        return extract_7z_blocking(source, destination, cancel_token).await;
-    }
-
-    let mut command = if lower.ends_with(".zip")
-        || lower.ends_with(".tar.gz")
-        || lower.ends_with(".tgz")
-        || lower.ends_with(".tar")
-    {
-        let mut c = tokio::process::Command::new("tar");
-        c.arg("-xf").arg(source).arg("-C").arg(destination);
-        c
-    } else {
-        let target = destination.join(
-            source
-                .file_name()
-                .ok_or_else(|| "Downloaded package had no file name.".to_string())?,
-        );
-        if cancel_token.load(Ordering::Relaxed) {
-            return Err("Install cancelled.".to_string());
-        }
-        fs::copy(source, target.as_path()).map_err(|err| {
-            log_io_failure_pair(
-                "copy package into extraction destination",
-                source,
-                &target,
-                &err,
-            );
-            format_install_io_error_pair(
-                "copy package into the extraction destination",
-                source,
-                &target,
-                &err,
-            )
-        })?;
-        return Ok(());
-    };
-
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-    let mut child = command
-        .spawn()
-        .map_err(|err| format!("Failed to start extractor: {err}"))?;
+    let source = source.to_path_buf();
+    let destination = destination.to_path_buf();
+    let task_cancel = cancel_token.clone();
+    let mut task = tokio::task::spawn_blocking(move || {
+        extract_archive_or_copy(&source, &destination, &task_cancel, |_| {})
+    });
 
     loop {
-        if cancel_token.load(Ordering::Relaxed) {
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            return Err("Install cancelled.".to_string());
-        }
         tokio::select! {
-            exit = child.wait() => {
-                let status = exit.map_err(|err| err.to_string())?;
-                if status.success() {
+            result = &mut task => {
+                let result = result.map_err(|err| format!("Extraction task failed: {err}"))?;
+                if result.is_ok() {
                     on_progress(Some(1.0));
-                    return Ok(());
                 }
-                if cancel_token.load(Ordering::Relaxed) {
-                    return Err("Install cancelled.".to_string());
-                }
-                return Err(format!("Extractor exited with status {status}"));
+                return result;
             }
             _ = tokio::time::sleep(std::time::Duration::from_millis(400)) => {
                 on_progress(None);
