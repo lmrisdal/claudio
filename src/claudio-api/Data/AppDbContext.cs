@@ -50,6 +50,8 @@ public class Game
     public string? Franchise { get; set; }
     public string? GameEngine { get; set; }
     public bool IsProcessing { get; set; }
+    public DateTime? IgdbAttemptedAt { get; set; }
+    public DateTime? HeroAttemptedAt { get; set; }
 }
 
 public class AppPreferences

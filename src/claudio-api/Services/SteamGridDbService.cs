@@ -112,9 +112,11 @@ public class SteamGridDbService(
         {
             using var scope = scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var retryCutoff = MetadataRetryPolicy.RetryCutoff(DateTime.UtcNow);
             var gameIds = await db.Games
                 .AsNoTracking()
                 .Where(g => g.IgdbId != null && g.HeroUrl == null && !g.IsMissing)
+                .Where(g => g.HeroAttemptedAt == null || g.HeroAttemptedAt < retryCutoff)
                 .OrderBy(g => g.Title)
                 .Select(g => g.Id)
                 .ToListAsync(timeoutCts.Token);
@@ -197,34 +199,41 @@ public class SteamGridDbService(
 
         UpdateStatus(GetStatus() with { CurrentGame = game.Title, Processed = 0, Matched = 0, LastError = null });
 
+        var heroUrl = await FindHeroUrlAsync(game.Title, client, cancellationToken);
+        game.HeroAttemptedAt = DateTime.UtcNow;
+        game.HeroUrl = heroUrl;
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (heroUrl is null)
+            return new SteamGridDbResult(game.Title, false);
+
+        logger.LogInformation("SteamGridDB hero: {Title} -> {Url}", game.Title, heroUrl);
+        return new SteamGridDbResult(game.Title, true);
+    }
+
+    private static async Task<string?> FindHeroUrlAsync(string title, HttpClient client, CancellationToken cancellationToken)
+    {
         var searchRes = await client.GetAsync(
-            $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(game.Title)}",
+            $"https://www.steamgriddb.com/api/v2/search/autocomplete/{Uri.EscapeDataString(title)}",
             cancellationToken);
         if (!searchRes.IsSuccessStatusCode)
-            return new SteamGridDbResult(game.Title, false);
+            return null;
 
         var searchJson = await searchRes.Content.ReadAsStringAsync(cancellationToken);
         var searchResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbGame>>>(searchJson);
         var sgdbGame = searchResult?.Data?.FirstOrDefault();
         if (sgdbGame is null)
-            return new SteamGridDbResult(game.Title, false);
+            return null;
 
         var heroesRes = await client.GetAsync(
             $"https://www.steamgriddb.com/api/v2/heroes/game/{sgdbGame.Id}",
             cancellationToken);
         if (!heroesRes.IsSuccessStatusCode)
-            return new SteamGridDbResult(game.Title, false);
+            return null;
 
         var heroesJson = await heroesRes.Content.ReadAsStringAsync(cancellationToken);
         var heroesResult = JsonSerializer.Deserialize<SgdbResponse<List<SgdbImage>>>(heroesJson);
-        var heroUrl = heroesResult?.Data?.FirstOrDefault()?.Url;
-        if (heroUrl is null)
-            return new SteamGridDbResult(game.Title, false);
-
-        game.HeroUrl = heroUrl;
-        await db.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("SteamGridDB hero: {Title} -> {Url}", game.Title, heroUrl);
-        return new SteamGridDbResult(game.Title, true);
+        return heroesResult?.Data?.FirstOrDefault()?.Url;
     }
 
     private HttpClient CreateClient()

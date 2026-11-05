@@ -50,7 +50,7 @@ public static class AdminEndpoints
 
     private static IResult TriggerIgdbScan(IgdbService igdbService)
     {
-        igdbService.QueueScan();
+        igdbService.QueueScan(force: true);
         return Results.Accepted();
     }
 

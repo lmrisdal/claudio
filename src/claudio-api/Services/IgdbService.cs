@@ -21,6 +21,7 @@ public class IgdbService(
     private readonly Channel<bool> _channel = Channel.CreateUnbounded<bool>();
     private readonly Lock _queueLock = new();
     private bool _scanQueued;
+    private bool _forceQueuedScan;
     private readonly Lock _statusLock = new();
     private IgdbScanStatus _scanStatus = new(false, false, null, 0, 0, 0, null);
 
@@ -32,19 +33,28 @@ public class IgdbService(
         }
     }
 
-    public bool QueueScan()
+    /// <param name="force">Retry games that recently failed to match instead of waiting out the retry interval.</param>
+    public bool QueueScan(bool force = false)
     {
         EnsureConfigured();
 
         lock (_queueLock)
         {
-            if (_scanQueued || GetScanStatus().IsRunning)
+            if (GetScanStatus().IsRunning)
                 return false;
 
+            if (_scanQueued)
+            {
+                _forceQueuedScan |= force;
+                return false;
+            }
+
             _scanQueued = true;
+            _forceQueuedScan = force;
             if (!_channel.Writer.TryWrite(true))
             {
                 _scanQueued = false;
+                _forceQueuedScan = false;
                 return false;
             }
 
@@ -57,16 +67,19 @@ public class IgdbService(
     {
         await foreach (var _ in _channel.Reader.ReadAllAsync(stoppingToken))
         {
+            bool force;
             lock (_queueLock)
             {
                 _scanQueued = false;
+                force = _forceQueuedScan;
+                _forceQueuedScan = false;
             }
 
             UpdateStatus(GetScanStatus() with { IsQueued = false });
 
             try
             {
-                await RunQueuedScanAsync(stoppingToken);
+                await RunQueuedScanAsync(force, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -76,10 +89,10 @@ public class IgdbService(
         }
     }
 
-    public async Task<IgdbScanResult> ScanAsync(CancellationToken cancellationToken = default)
+    public async Task<IgdbScanResult> ScanAsync(bool force = false, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
-        return await RunScanAsync(cancellationToken);
+        return await RunScanAsync(force, cancellationToken);
     }
 
     public async Task<List<IgdbCandidate>> SearchCandidatesAsync(string query, CancellationToken cancellationToken = default)
@@ -109,14 +122,14 @@ public class IgdbService(
         logger.LogInformation("Matched: {Title} -> IGDB #{IgdbId}", game.Title, igdbId);
     }
 
-    private async Task RunQueuedScanAsync(CancellationToken stoppingToken)
+    private async Task RunQueuedScanAsync(bool force, CancellationToken stoppingToken)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, config.Igdb.TimeoutSecs)));
 
         try
         {
-            await RunScanAsync(timeoutCts.Token);
+            await RunScanAsync(force, timeoutCts.Token);
             UpdateStatus(new IgdbScanStatus(false, GetQueuedFlag(), null, 0, 0, 0, null));
         }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
@@ -132,13 +145,20 @@ public class IgdbService(
         }
     }
 
-    private async Task<IgdbScanResult> RunScanAsync(CancellationToken cancellationToken)
+    private async Task<IgdbScanResult> RunScanAsync(bool force, CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var gameIds = await db.Games
+        var query = db.Games
             .AsNoTracking()
-            .Where(g => g.IgdbId == null && !g.IsMissing)
+            .Where(g => g.IgdbId == null && !g.IsMissing);
+        if (!force)
+        {
+            var retryCutoff = MetadataRetryPolicy.RetryCutoff(DateTime.UtcNow);
+            query = query.Where(g => g.IgdbAttemptedAt == null || g.IgdbAttemptedAt < retryCutoff);
+        }
+
+        var gameIds = await query
             .OrderBy(g => g.Title)
             .Select(g => g.Id)
             .ToListAsync(cancellationToken);
@@ -162,6 +182,7 @@ public class IgdbService(
             }
 
             UpdateStatus(GetScanStatus() with { CurrentGame = game.Title, LastError = null });
+            game.IgdbAttemptedAt = DateTime.UtcNow;
 
             try
             {
@@ -169,6 +190,7 @@ public class IgdbService(
                 if (candidate is null)
                 {
                     logger.LogInformation("No IGDB match for: {Title} ({Platform})", game.Title, game.Platform);
+                    await gameDb.SaveChangesAsync(cancellationToken);
                     skipped++;
                     UpdateStatus(GetScanStatus() with { Processed = matched + skipped });
                     continue;
@@ -190,6 +212,7 @@ public class IgdbService(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Failed to fetch IGDB data for: {Title}", game.Title);
+                await TrySaveAttemptAsync(gameDb, game, cancellationToken);
                 skipped++;
                 UpdateStatus(GetScanStatus() with { Processed = matched + skipped });
             }
@@ -202,6 +225,18 @@ public class IgdbService(
             gameIds.Count);
 
         return new IgdbScanResult(gameIds.Count, matched, skipped);
+    }
+
+    private async Task TrySaveAttemptAsync(AppDbContext gameDb, Game game, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await gameDb.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Failed to record IGDB attempt for: {Title}", game.Title);
+        }
     }
 
     private async Task<IgdbCandidate?> FindCandidateAsync(Game game, CancellationToken cancellationToken)

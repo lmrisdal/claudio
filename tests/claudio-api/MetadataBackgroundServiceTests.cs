@@ -143,6 +143,89 @@ public class MetadataBackgroundServiceTests : IDisposable
         requestBody.Should().NotContain("search \\\"Bob");
     }
 
+    [Test]
+    public async Task ScanAsync_DoesNotRetryUnmatchedGamesUntilRetryIntervalPasses()
+    {
+        var gameId = await SeedGameAsync(new Game { Title = "Obscure", FolderName = "Obscure", Platform = "n64", FolderPath = "/games/Obscure" });
+        var gameSearches = 0;
+        var service = CreateIgdbService(new StubHttpClientFactory(new AsyncStubHttpMessageHandler((request, _) =>
+        {
+            if (request.RequestUri!.Host == "id.twitch.tv")
+                return Task.FromResult(JsonResponse(new { access_token = "token", expires_in = 3600 }));
+
+            Interlocked.Increment(ref gameSearches);
+            return Task.FromResult(JsonResponse(Array.Empty<object>()));
+        })));
+
+        (await service.ScanAsync()).Total.Should().Be(1);
+        (await GetGameAsync(gameId)).IgdbAttemptedAt.Should().NotBeNull();
+
+        (await service.ScanAsync()).Total.Should().Be(0);
+        gameSearches.Should().Be(1);
+
+        await UpdateGameAsync(gameId, g => g.IgdbAttemptedAt = DateTime.UtcNow - MetadataRetryPolicy.RetryAfter - TimeSpan.FromHours(1));
+        (await service.ScanAsync()).Total.Should().Be(1);
+        gameSearches.Should().Be(2);
+    }
+
+    [Test]
+    public async Task ScanAsync_ForceRetriesRecentlyFailedGames()
+    {
+        await SeedGameAsync(new Game
+        {
+            Title = "Obscure",
+            FolderName = "Obscure",
+            Platform = "n64",
+            FolderPath = "/games/Obscure",
+            IgdbAttemptedAt = DateTime.UtcNow,
+        });
+        var service = CreateIgdbService(new StubHttpClientFactory(new AsyncStubHttpMessageHandler((request, _) =>
+            Task.FromResult(request.RequestUri!.Host == "id.twitch.tv"
+                ? JsonResponse(new { access_token = "token", expires_in = 3600 })
+                : JsonResponse(Array.Empty<object>())))));
+
+        (await service.ScanAsync()).Total.Should().Be(0);
+        (await service.ScanAsync(force: true)).Total.Should().Be(1);
+    }
+
+    [Test]
+    public async Task MissingHeroSweep_DoesNotRetryGamesWithoutHeroUntilRetryIntervalPasses()
+    {
+        var gameId = await SeedGameAsync(new Game
+        {
+            Title = "Obscure",
+            FolderName = "Obscure",
+            Platform = "n64",
+            FolderPath = "/games/Obscure",
+            IgdbId = 123,
+        });
+        var requests = 0;
+        var service = CreateSteamGridDbService(new StubHttpClientFactory(new AsyncStubHttpMessageHandler((_, _) =>
+        {
+            Interlocked.Increment(ref requests);
+            return Task.FromResult(JsonResponse(new { data = Array.Empty<object>() }));
+        })));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var processingTask = service.ProcessQueueAsync(cts.Token);
+
+        service.QueueMissingHeroSweep().Should().BeTrue();
+        await WaitForAsync(() => GetGameAsync(gameId).Result.HeroAttemptedAt is not null, TimeSpan.FromSeconds(5));
+        await WaitForAsync(() => !service.GetStatus().IsRunning && !service.GetStatus().IsQueued, TimeSpan.FromSeconds(5));
+        var requestsAfterFirstSweep = requests;
+
+        service.QueueMissingHeroSweep().Should().BeTrue();
+        await WaitForAsync(() => !service.GetStatus().IsQueued, TimeSpan.FromSeconds(5));
+        await WaitForAsync(() => !service.GetStatus().IsRunning, TimeSpan.FromSeconds(5));
+        await Task.Delay(300);
+
+        requests.Should().Be(requestsAfterFirstSweep);
+        (await GetGameAsync(gameId)).HeroUrl.Should().BeNull();
+
+        await cts.CancelAsync();
+        await AwaitCancellationAsync(processingTask);
+    }
+
     private IgdbService CreateIgdbService(IHttpClientFactory httpClientFactory)
     {
         var steamGridDbService = CreateSteamGridDbService(httpClientFactory);
@@ -163,11 +246,28 @@ public class MetadataBackgroundServiceTests : IDisposable
             NullLogger<SteamGridDbService>.Instance);
     }
 
-    private async Task SeedGameAsync(Game game)
+    private async Task<int> SeedGameAsync(Game game)
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Games.Add(game);
+        await db.SaveChangesAsync();
+        return game.Id;
+    }
+
+    private async Task<Game> GetGameAsync(int id)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Games.AsNoTracking().SingleAsync(g => g.Id == id);
+    }
+
+    private async Task UpdateGameAsync(int id, Action<Game> update)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var game = await db.Games.SingleAsync(g => g.Id == id);
+        update(game);
         await db.SaveChangesAsync();
     }
 

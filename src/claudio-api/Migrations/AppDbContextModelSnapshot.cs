@@ -59,8 +59,14 @@ namespace Claudio.Api.Migrations
                     b.Property<string>("Genre")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("HeroAttemptedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("HeroUrl")
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("IgdbAttemptedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long?>("IgdbId")
                         .HasColumnType("bigint");
