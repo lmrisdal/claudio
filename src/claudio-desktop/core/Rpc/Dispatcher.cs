@@ -56,6 +56,9 @@ internal sealed class Dispatcher(RpcHost host)
             case "resolve_install_browse_root":
                 var browse = Parse(method, parameters, context.TargetPathArgs);
                 return Value(await Task.Run(() => InstallPaths.ResolveInstallBrowseRoot(browse.TargetPath)), context.String);
+            case "get_disk_space":
+                var space = Parse(method, parameters, context.TargetPathArgs);
+                return Value(await Task.Run(() => InstallPaths.GetDiskSpace(space.TargetPath)), context.DiskSpace);
             case "resolve_default_download_root":
                 return Value(await Task.Run(InstallPaths.ResolveDefaultDownloadRoot), context.String);
             case "resolve_download_path":

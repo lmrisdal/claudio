@@ -705,6 +705,7 @@ export default function GameDetailActions({
         defaultPath={defaultInstallPath}
         defaultProtonPath={defaultProtonPath}
         isPortable={displayGame.installType === "portable"}
+        requiredBytes={displayGame.sizeBytes}
         exeLabel={installExeLabel}
         exeOptions={exeList ?? []}
         installerPath={

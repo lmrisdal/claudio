@@ -165,6 +165,15 @@ export async function resolveInstallBrowseRoot(targetPath: string): Promise<stri
   return invoke<string | null>("resolve_install_browse_root", { targetPath });
 }
 
+export interface DiskSpace {
+  freeBytes: number;
+  totalBytes: number;
+}
+
+export async function getDiskSpace(targetPath: string): Promise<DiskSpace | null> {
+  return invoke<DiskSpace | null>("get_disk_space", { targetPath });
+}
+
 export async function resolveDefaultDownloadRoot(): Promise<string> {
   return invoke<string>("resolve_default_download_root");
 }

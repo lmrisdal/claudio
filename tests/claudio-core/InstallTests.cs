@@ -162,6 +162,19 @@ public class FileOpsTests
     }
 
     [Test]
+    public async Task GetDiskSpaceMeasuresNearestExistingParent()
+    {
+        using var data = new TestDataDir();
+
+        var space = InstallPaths.GetDiskSpace(Path.Combine(data.Root, "missing", "deeper", "game"));
+        space.Should().NotBeNull();
+        space!.FreeBytes.Should().BeGreaterThan(0);
+        space.TotalBytes.Should().BeGreaterThanOrEqualTo(space.FreeBytes);
+        InstallPaths.GetDiskSpace("   ").Should().BeNull();
+        await Task.CompletedTask;
+    }
+
+    [Test]
     public async Task ValidateInstallTargetPathAllowsWritableParent()
     {
         using var data = new TestDataDir();

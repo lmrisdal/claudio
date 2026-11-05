@@ -359,6 +359,17 @@ describe.skipIf(!contractAvailable)("claudio-core protocol contract", () => {
     });
   });
 
+  it("reports disk space for a folder that does not exist yet", async () => {
+    start();
+
+    const space = (await core.call("get_disk_space", {
+      targetPath: `${core.dataHome}${process.platform === "win32" ? "\\" : "/"}missing`,
+    })) as { freeBytes: number; totalBytes: number };
+
+    expect(space.freeBytes).toBeGreaterThan(0);
+    expect(space.totalBytes).toBeGreaterThanOrEqual(space.freeBytes);
+  });
+
   describe("proton", () => {
     it("lists proton versions as label and value pairs", async () => {
       start();

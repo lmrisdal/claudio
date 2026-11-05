@@ -47,6 +47,12 @@ public sealed class RemoteGame
     public string? GameEngine { get; set; }
 }
 
+public sealed class DiskSpace
+{
+    [JsonRequired] public long FreeBytes { get; set; }
+    [JsonRequired] public long TotalBytes { get; set; }
+}
+
 public sealed class InstalledGame
 {
     public GameLaunchOptions LaunchOptions { get; set; } = new();

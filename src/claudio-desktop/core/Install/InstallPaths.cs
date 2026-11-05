@@ -33,6 +33,37 @@ internal static class InstallPaths
         return trimmed.Length == 0 ? null : BrowseRoot(trimmed);
     }
 
+    public static DiskSpace? GetDiskSpace(string targetPath)
+    {
+        var trimmed = targetPath.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        // The target usually doesn't exist yet, so measure the nearest existing ancestor.
+        string? current = Path.GetFullPath(trimmed);
+        while (current is not null && !Directory.Exists(current))
+        {
+            current = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(current));
+        }
+
+        if (current is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var drive = new DriveInfo(current);
+            return new DiskSpace { FreeBytes = drive.AvailableFreeSpace, TotalBytes = drive.TotalSize };
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string? BrowseRoot(string targetDir)
     {
         var current = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(targetDir)) ?? targetDir;

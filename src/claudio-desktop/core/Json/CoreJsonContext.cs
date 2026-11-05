@@ -11,6 +11,7 @@ namespace Claudio.Core.Json;
     Converters = [typeof(RustFloatConverter)])]
 [JsonSerializable(typeof(DesktopSettings))]
 [JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(DiskSpace))]
 [JsonSerializable(typeof(List<InstalledGame>))]
 [JsonSerializable(typeof(InstalledGame))]
 [JsonSerializable(typeof(RemoteGame))]
