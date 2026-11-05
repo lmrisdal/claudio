@@ -60,16 +60,6 @@
     {
       "label": "build core",
       "type": "process",
-      "command": "cargo",
-      "args": ["build", "-p", "claudio-core", "--bin", "claudio-core"],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": "$rustc"
-    },
-    {
-      "label": "build core (C#)",
-      "type": "process",
       "command": "dotnet",
       "args": [
         "build",
@@ -88,8 +78,8 @@
       }
     },
     {
-      "label": "build core (C#) with 7-zip",
-      "dependsOn": ["fetch 7-zip", "build core (C#)"],
+      "label": "build core with 7-zip",
+      "dependsOn": ["fetch 7-zip", "build core"],
       "dependsOrder": "sequence"
     },
     {
@@ -116,16 +106,7 @@
     {
       "label": "build desktop",
       "dependsOn": [
-        "build core",
-        "build desktop web",
-        "build electron"
-      ],
-      "dependsOrder": "parallel"
-    },
-    {
-      "label": "build desktop (C# core)",
-      "dependsOn": [
-        "build core (C#) with 7-zip",
+        "build core with 7-zip",
         "build desktop web",
         "build electron"
       ],
