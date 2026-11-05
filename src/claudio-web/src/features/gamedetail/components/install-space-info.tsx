@@ -51,7 +51,7 @@ export default function InstallSpaceInfo({
         />
       </div>
       <div className="mt-2.5 flex flex-wrap justify-between items-center gap-x-5 gap-y-1.5 text-xs text-text-muted">
-        <span >
+        <span>
           {formatSize(disk.freeBytes)} free of {formatSize(disk.totalBytes)}
         </span>
         {requiredBytes > 0 && (

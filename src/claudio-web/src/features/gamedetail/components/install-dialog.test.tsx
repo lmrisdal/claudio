@@ -135,7 +135,7 @@ describe("InstallDialog download mode", () => {
     await settleQueries(queryClient);
 
     const text = dialogSurface().textContent;
-    expect(text).toContain("2.00 GB this game");
+    expect(text).toContain("2.00 GB needed");
     expect(text).toContain("50.00 GB free of 200.00 GB");
     const bar = dialogSurface().querySelector('[role="progressbar"]');
     expect(bar?.getAttribute("aria-valuenow")).toBe("150");
