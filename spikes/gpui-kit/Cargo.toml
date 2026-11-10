@@ -1,0 +1,16 @@
+[package]
+name = "claudio-gpui-spike"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-only"
+
+# Standalone on purpose: keeps GPUI out of the main workspace's lockfile and CI.
+[workspace]
+
+[dependencies]
+gpui-kit = "0.9"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
