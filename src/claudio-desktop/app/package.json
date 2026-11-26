@@ -1,6 +1,6 @@
 {
   "name": "claudio-desktop",
-  "version": "0.2.2",
+  "version": "0.2.5",
   "private": true,
   "description": "Claudio desktop client",
   "license": "AGPL-3.0-only",
