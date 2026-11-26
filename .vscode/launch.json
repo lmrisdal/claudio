@@ -1,47 +1,19 @@
 {
-  // Use IntelliSense to find out which attributes exist for C# debugging
-  // Use hover for the description of the existing attributes
-  // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
   "version": "0.2.0",
   "configurations": [
     {
       "name": "Claudio API",
-      "type": "coreclr",
+      "type": "node",
       "request": "launch",
-      "preLaunchTask": "build api",
-      // If you have changed target frameworks, make sure to update the program path.
-      "program": "${workspaceFolder}/src/claudio-api/bin/Debug/net10.0/Claudio.Api.dll",
-      "args": [],
       "cwd": "${workspaceFolder}",
-      "stopAtEntry": false,
-      "console": "internalConsole",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/claudio-api/Claudio.Api.csproj"],
+      "port": 8080,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_URLS": "http://localhost:8080",
         "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml",
         "CLAUDIO_LOG_LEVEL": "info"
-      },
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+https?://\\S+",
-        "uriFormat": "http://localhost:8080"
-      },
-      "sourceFileMap": {
-        "/Views": "${workspaceFolder}/Views"
-      }
-    },
-    {
-      "name": "Claudio API (No Debug)",
-      "type": "node",
-      "request": "launch",
-      "preLaunchTask": "build api",
-      "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/claudio-api/Claudio.Api.csproj"],
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:8080",
-        "CLAUDIO_CONFIG_PATH": "${workspaceFolder}/config/config.toml"
       },
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
@@ -74,7 +46,7 @@
   "compounds": [
     {
       "name": "API + Electron",
-      "configurations": ["Claudio API (No Debug)", "Electron Dev"]
+      "configurations": ["Claudio API", "Electron Dev"]
     }
   ]
 }
