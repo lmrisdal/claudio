@@ -2,8 +2,6 @@ use super::installer_detect::detect_installer;
 use super::*;
 use std::process::{Command, Output};
 
-/// Where the installer runs from, plus the disc mount that has to stay
-/// attached until the installer finishes.
 pub(super) struct InstallerSource {
     pub(super) root: PathBuf,
     pub(super) installer_hint: Option<String>,
@@ -16,10 +14,6 @@ pub(super) fn is_disc_image(path: &Path) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("iso"))
 }
 
-/// Unpacks the package into `staging_dir`, then mounts a disc image if the
-/// installer lives on one. Mounting keeps the drive-letter and disc-swap
-/// behaviour some disc installers rely on; extracting the image is the
-/// fallback when the system will not mount it.
 pub(super) fn prepare_installer_source<F>(
     package_path: &Path,
     staging_dir: &Path,
@@ -83,8 +77,6 @@ where
     }
 }
 
-/// Picks the disc image to install from, or `None` when the installer is a
-/// loose file next to it.
 pub(super) fn disc_image_for_installer(
     root: &Path,
     installer_hint: Option<&str>,
@@ -102,7 +94,6 @@ pub(super) fn disc_image_for_installer(
         return None;
     }
 
-    // Multi-disc sets install from the first disc and prompt for the rest.
     images.sort_by_key(|path| path.to_string_lossy().to_ascii_lowercase());
     images.into_iter().next()
 }
@@ -155,7 +146,6 @@ impl MountedDisc {
 #[cfg(target_os = "windows")]
 impl Drop for MountedDisc {
     fn drop(&mut self) {
-        // A disc the user mounted themselves stays mounted.
         if !self.owned {
             return;
         }
@@ -176,8 +166,6 @@ fn run_powershell(script: &str, image: &Path) -> Result<String, String> {
     use std::os::windows::process::CommandExt;
     use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 
-    // The image path goes through an environment variable so no quoting of
-    // user-controlled paths is needed inside the script.
     let mut command = Command::new("powershell.exe");
     command
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
@@ -212,7 +200,6 @@ impl MountedDisc {
     }
 
     fn mount_loop_device(&self) -> Result<PathBuf, String> {
-        // Desktops often auto-mount a new loop device; use that mount if so.
         for _ in 0..5 {
             if let Some(mount_point) = mount_point_of(&self.loop_device) {
                 return Ok(mount_point);
@@ -278,7 +265,6 @@ impl MountedDisc {
 }
 
 #[cfg(any(target_os = "linux", test))]
-/// "Mapped file /path/game.iso as /dev/loop0."
 pub(super) fn parse_loop_device(output: &str) -> Option<String> {
     output
         .split_whitespace()
@@ -287,7 +273,6 @@ pub(super) fn parse_loop_device(output: &str) -> Option<String> {
 }
 
 #[cfg(any(target_os = "linux", test))]
-/// "Mounted /dev/loop0 at /run/media/user/GAME."
 pub(super) fn parse_mount_point(output: &str) -> Option<PathBuf> {
     let (_, path) = output.trim().split_once(" at ")?;
     let path = path.strip_suffix('.').unwrap_or(path);
@@ -332,8 +317,6 @@ fn unescape_mount_field(field: &str) -> String {
     result
 }
 
-/// Extracts with an archiver already on the system. 7-Zip reads both ISO 9660
-/// and UDF; bsdtar (Windows ships it as tar.exe) reads ISO 9660.
 pub(super) fn extract_disc_image(
     image: &Path,
     destination: &Path,

@@ -14,8 +14,6 @@ pub(super) fn resolve_installer_path(
         .ok_or_else(|| "Could not find an installer executable in the extracted files.".to_string())
 }
 
-/// Disc images mounted on Linux without Joliet or Rock Ridge show lower-case
-/// names, while the server lists them as stored on the disc.
 pub(super) fn find_path_ignoring_case(root: &Path, relative: &str) -> Option<PathBuf> {
     let exact = root.join(relative);
     if exact.exists() {

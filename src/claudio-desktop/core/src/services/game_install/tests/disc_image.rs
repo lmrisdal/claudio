@@ -16,6 +16,13 @@ fn fixture_root(name: &str, files: &[&str]) -> PathBuf {
     root
 }
 
+fn assert_same_file(actual: &Path, expected: &Path) {
+    assert_eq!(
+        fs::canonicalize(actual).expect("actual path should exist"),
+        fs::canonicalize(expected).expect("expected path should exist")
+    );
+}
+
 #[test]
 fn is_disc_image_matches_iso_in_any_case() {
     assert!(is_disc_image(Path::new("Game.ISO")));
@@ -81,10 +88,8 @@ fn prepare_installer_source_without_disc_uses_staging_folder() {
 fn find_path_ignoring_case_matches_lower_case_mount_names() {
     let root = fixture_root("disc-case", &["install/setup.exe"]);
 
-    assert_eq!(
-        find_path_ignoring_case(&root, "INSTALL/SETUP.EXE"),
-        Some(root.join("install").join("setup.exe"))
-    );
+    let found = find_path_ignoring_case(&root, "INSTALL/SETUP.EXE").expect("file should be found");
+    assert_same_file(&found, &root.join("install").join("setup.exe"));
     assert_eq!(find_path_ignoring_case(&root, "INSTALL/missing.exe"), None);
 
     let _ = fs::remove_dir_all(root);
@@ -94,10 +99,9 @@ fn find_path_ignoring_case_matches_lower_case_mount_names() {
 fn resolve_installer_path_hint_ignores_case() {
     let root = fixture_root("disc-resolve-case", &["setup.exe", "other/install.exe"]);
 
-    assert_eq!(
-        resolve_installer_path(&root, Some("OTHER/INSTALL.EXE")).expect("hint should resolve"),
-        root.join("other").join("install.exe")
-    );
+    let installer =
+        resolve_installer_path(&root, Some("OTHER/INSTALL.EXE")).expect("hint should resolve");
+    assert_same_file(&installer, &root.join("other").join("install.exe"));
 
     let _ = fs::remove_dir_all(root);
 }
@@ -150,7 +154,6 @@ fn build_iso_with_bsdtar(root: &Path) -> PathBuf {
     iso
 }
 
-/// Mounts a real image through udisks2, so it needs a desktop session.
 #[cfg(target_os = "linux")]
 #[test]
 #[ignore]
@@ -187,7 +190,6 @@ fn prepare_installer_source_mounts_iso_with_udisks() {
     let _ = fs::remove_dir_all(root);
 }
 
-/// Needs 7-Zip or bsdtar on the PATH.
 #[cfg(target_os = "linux")]
 #[test]
 #[ignore]
