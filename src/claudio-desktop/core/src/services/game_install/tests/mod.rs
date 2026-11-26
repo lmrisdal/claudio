@@ -6,6 +6,7 @@ use std::sync::atomic::AtomicBool;
 use zip::write::SimpleFileOptions;
 
 mod core;
+mod disc_image;
 mod extract;
 mod installer;
 mod installer_arguments;

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AwesomeAssertions;
@@ -312,6 +313,77 @@ public class GameEndpointTests : IAsyncDisposable
         var gameDir = Path.Combine(_gamesDir, "pc", "Broken");
         Directory.CreateDirectory(gameDir);
         File.WriteAllText(Path.Combine(gameDir, "broken.7z"), "not a 7z archive");
+        await SeedGameAsync("Broken", "pc", "Broken", gameDir);
+        var client = CreateClient();
+
+        var executables = await client.GetFromJsonAsync<List<string>>("/api/games/1/executables");
+
+        executables.Should().BeEmpty();
+    }
+
+    // --- Disc images ---
+
+    private string WriteIsoFixture(string relativePath)
+    {
+        var builder = new DiscUtils.Iso9660.CDBuilder { UseJoliet = true, VolumeIdentifier = "GAME" };
+        builder.AddFile("SETUP.EXE", Encoding.UTF8.GetBytes("MZ-setup requireAdministrator"));
+        builder.AddFile(@"Data\Long File Name.cab", Encoding.UTF8.GetBytes("cab"));
+        builder.AddFile(@"Tools\patch.exe", Encoding.UTF8.GetBytes("MZ-patch"));
+
+        var isoPath = Path.Combine(_gamesDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(isoPath)!);
+        builder.Build(isoPath);
+        return isoPath;
+    }
+
+    [Test]
+    public async Task BrowseGameFiles_SingleIsoInFolder_ListsDiscContents()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Disc");
+        WriteIsoFixture(Path.Combine("pc", "Disc", "Disc.iso"));
+        await SeedGameAsync("Disc", "pc", "Disc", gameDir);
+        var client = CreateClient();
+
+        var rootNames = await ReadBrowseNamesAsync(await client.GetAsync("/api/games/1/browse"));
+        var nestedNames = await ReadBrowseNamesAsync(await client.GetAsync("/api/games/1/browse?path=Data"));
+
+        rootNames.Should().Equal("Data", "Tools", "SETUP.EXE");
+        nestedNames.Should().Equal("Long File Name.cab");
+    }
+
+    [Test]
+    public async Task GetExecutables_StandaloneIso_ListsExecutablesInsideDisc()
+    {
+        var isoPath = WriteIsoFixture(Path.Combine("pc", "Disc.iso"));
+        await SeedGameAsync("Disc", "pc", "Disc.iso", isoPath);
+        var client = CreateClient();
+
+        var executables = await client.GetFromJsonAsync<List<string>>("/api/games/1/executables");
+
+        executables.Should().Equal("SETUP.EXE", "Tools/patch.exe");
+    }
+
+    [Test]
+    public async Task InspectInstaller_ExecutableInsideIso_ReadsFileFromDisc()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Disc");
+        WriteIsoFixture(Path.Combine("pc", "Disc", "Disc.iso"));
+        await SeedGameAsync("Disc", "pc", "Disc", gameDir);
+        var client = CreateClient();
+
+        var response = await client.GetAsync("/api/games/1/installer-inspection?path=SETUP.EXE");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        body.GetProperty("installerType").GetString().Should().Be("exe");
+    }
+
+    [Test]
+    public async Task GetExecutables_CorruptIso_ReturnsEmptyList()
+    {
+        var gameDir = Path.Combine(_gamesDir, "pc", "Broken");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, "broken.iso"), "not a disc image");
         await SeedGameAsync("Broken", "pc", "Broken", gameDir);
         var client = CreateClient();
 

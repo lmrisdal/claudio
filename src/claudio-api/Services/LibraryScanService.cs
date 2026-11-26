@@ -106,7 +106,7 @@ public class LibraryScanService(
                         Platform = platform,
                         FolderName = fileName,
                         FolderPath = archiveFile,
-                        InstallType = InstallType.Portable,
+                        InstallType = DiscImage.IsDiscImage(fileName) ? InstallType.Installer : InstallType.Portable,
                         SizeBytes = new FileInfo(archiveFile).Length,
                         IsMissing = false,
                     });
@@ -181,6 +181,9 @@ public class LibraryScanService(
         var fileNames = new List<string>();
 
         var singleArchive = Endpoints.GameEndpoints.FindSingleArchive(directory);
+        if (singleArchive is not null && DiscImage.IsDiscImage(singleArchive))
+            return InstallType.Installer;
+
         if (singleArchive is not null)
         {
             fileNames.AddRange(Endpoints.GameEndpoints.ReadArchiveEntries(singleArchive)

@@ -92,6 +92,25 @@ public class LibraryScanServiceTests : IDisposable
     }
 
     [Test]
+    public async Task Scan_DiscImages_AreInstallers()
+    {
+        var platformDir = Path.Combine(_tempDir, "pc");
+        Directory.CreateDirectory(Path.Combine(platformDir, "Folder Game"));
+        var builder = new DiscUtils.Iso9660.CDBuilder();
+        builder.AddFile("README.TXT", "readme"u8.ToArray());
+        builder.Build(Path.Combine(platformDir, "Folder Game", "disc.iso"));
+        builder.Build(Path.Combine(platformDir, "Standalone.iso"));
+
+        await CreateService().ScanAsync();
+
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var games = await db.Games.ToListAsync();
+        games.Should().HaveCount(2);
+        games.Should().AllSatisfy(g => g.InstallType.Should().Be(Claudio.Api.Enums.InstallType.Installer));
+    }
+
+    [Test]
     public async Task Scan_ExcludesPlatforms()
     {
         CreatePlatformWithGames("pc", "Doom");

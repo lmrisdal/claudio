@@ -61,14 +61,15 @@ pub(super) async fn install_installer_linux(
             format_install_io_error("create the installer staging folder", &staging_dir, &err)
         })?;
 
-        extract_archive_or_copy(
+        let source = prepare_installer_source(
             &package_path_owned,
             &staging_dir,
+            installer_exe_hint.as_deref(),
             &control_for_task.cancel_token,
             &mut progress_cb,
         )?;
 
-        let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+        let installer = resolve_installer_path(&source.root, source.installer_hint.as_deref())?;
         emit_progress_indeterminate(
             &app_handle,
             gid,
@@ -92,6 +93,7 @@ pub(super) async fn install_installer_linux(
         )?;
         let search_root = prefix.join("pfx").join("drive_c");
 
+        drop(source);
         let _ = cleanup_directory(&staging_dir, "installer staging directory");
         let exe = resolve_game_exe_hint(&search_root, &install_directory, game_exe_hint.as_deref());
 

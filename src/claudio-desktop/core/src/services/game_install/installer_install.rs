@@ -62,9 +62,10 @@ pub(super) async fn install_installer(
             format_install_io_error("create the installer staging folder", &staging_dir, &err)
         })?;
             let install_result = (|| -> Result<Option<String>, String> {
-            extract_archive_or_copy(
+            let source = prepare_installer_source(
                 &package_path_owned,
                 &staging_dir,
+                installer_exe_hint.as_deref(),
                 &control.cancel_token,
                 &mut progress_cb,
             )?;
@@ -76,7 +77,7 @@ pub(super) async fn install_installer(
                 Some("Extracting game…"),
             );
 
-            let installer = resolve_installer_path(&staging_dir, installer_exe_hint.as_deref())?;
+            let installer = resolve_installer_path(&source.root, source.installer_hint.as_deref())?;
             let launch_kind = installer_launch_kind(&installer);
             let requests_elevation =
                 launch_kind == InstallerLaunchKind::Exe && file_requests_elevation(&installer)?;
@@ -184,9 +185,10 @@ pub(super) async fn install_installer(
                 Some("Applying patches…"),
                 false,
             );
-            let installer_dir = installer.parent().unwrap_or(&staging_dir);
+            let installer_dir = installer.parent().unwrap_or(&source.root);
             apply_scene_overrides(installer_dir, &target_dir_owned)?;
 
+            drop(source);
             let _ = cleanup_directory(&staging_dir, "installer staging directory");
 
             let exe = game_exe_hint

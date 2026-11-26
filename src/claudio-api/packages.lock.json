@@ -12,6 +12,25 @@
           "RestEase": "1.5.5"
         }
       },
+      "LTRData.DiscUtils.Iso9660": {
+        "type": "Direct",
+        "requested": "[1.0.91, )",
+        "resolved": "1.0.91",
+        "contentHash": "9YaXeB8J+A/xrYrib76c/Lxs1NBM6rlzQ3KAnipYRszC3mLZXH0COJQ/AhZu8sNyQy2s31XZaaRRZc8ifAPHHw==",
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.91"
+        }
+      },
+      "LTRData.DiscUtils.Udf": {
+        "type": "Direct",
+        "requested": "[1.0.91, )",
+        "resolved": "1.0.91",
+        "contentHash": "cg3RNTgRsUXgFU3ypSQh3/zJNQCF4tq7AWbpwi4ZApVwSAXIe9h6xhvsRKnFbWIEUIeJKPkDaWpLO3xBxLnMLA==",
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.91",
+          "LTRData.DiscUtils.Iso9660": "1.0.91"
+        }
+      },
       "Microsoft.AspNetCore.SpaProxy": {
         "type": "Direct",
         "requested": "[10.0.5, )",
@@ -74,6 +93,27 @@
         "type": "Transitive",
         "resolved": "2.14.1",
         "contentHash": "lQKvtaTDOXnoVJ20ibTuSIOf2i0uO0MPbDhd1jm238I+U/2ZnRENj0cktKZhtchBMtCUSRQ5v4xBCUbKNmyVMw=="
+      },
+      "LTRData.DiscUtils.Core": {
+        "type": "Transitive",
+        "resolved": "1.0.91",
+        "contentHash": "CLIlc+K9kP7BJjLIrdd29tWBh53uIqKsHjT/7Oigep1HcoODeJBTti7Cdes+QmIGPHcGCkWnqNeWMkHeGz7OSw==",
+        "dependencies": {
+          "LTRData.DiscUtils.Streams": "1.0.91"
+        }
+      },
+      "LTRData.DiscUtils.Streams": {
+        "type": "Transitive",
+        "resolved": "1.0.91",
+        "contentHash": "bjT45BWrzr9pYEjH9yp9N1PcjdYmY9QggVsjyviXXKCN9fcBxHqnAd+3AoEEUsbR8ZL8Gwa/HAPd05pwLEBN3Q==",
+        "dependencies": {
+          "LTRData.Extensions": "1.0.24"
+        }
+      },
+      "LTRData.Extensions": {
+        "type": "Transitive",
+        "resolved": "1.0.24",
+        "contentHash": "Tmkv948Mxrw7NO4gxNKvB9VDUMzcH1pv4TC07BWSFEsYTpc7H01bIstpclnDXQoKahrgGqrxo8VqE6BmK/9fug=="
       },
       "Microsoft.Build.Framework": {
         "type": "Transitive",

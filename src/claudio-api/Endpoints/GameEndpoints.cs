@@ -777,7 +777,11 @@ public static class GameEndpoints
 
         try
         {
-            if (lower.EndsWith(".zip"))
+            if (DiscImage.IsDiscImage(archivePath))
+            {
+                entries.AddRange(DiscImage.ReadEntries(archivePath));
+            }
+            else if (lower.EndsWith(".zip"))
             {
                 using var archive = ZipFile.OpenRead(archivePath);
                 foreach (var entry in archive.Entries)
@@ -860,6 +864,9 @@ public static class GameEndpoints
 
         try
         {
+            if (DiscImage.IsDiscImage(archivePath))
+                return DiscImage.OpenEntry(archivePath, relativePath);
+
             if (lower.EndsWith(".zip"))
             {
                 using var archive = ZipFile.OpenRead(archivePath);

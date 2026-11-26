@@ -21,6 +21,7 @@ use tar::Archive;
 use zip::read::ZipArchive;
 
 mod api;
+mod disc_image;
 mod download;
 mod download_individual;
 mod extract;
@@ -62,6 +63,7 @@ pub use api::{
 pub use launch_settings::update_game_launch_settings;
 pub use state::InstallState;
 
+use disc_image::prepare_installer_source;
 #[cfg(feature = "integration-tests")]
 use download::download_package_with;
 use download::{DownloadInfo, DownloadOptions, download_package};
